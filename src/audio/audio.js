@@ -1,15 +1,21 @@
-// 環境音のレイヤー再生。情景の sounds を個別音量で重ねてループする。
-// ブラウザ制限により、最初のユーザー操作後にだけ鳴り始められる。
-// 素材ファイルがまだ無い場合でも、エラーで止めず静かに無音で続行する。
+// 環境音のレイヤー再生。情景の sounds を個別音量で重ねる。
+// ループ音（雨・ヒグラシ）は流しっぱなし、loop:false で interval を持つ音（遠雷）は
+// ランダムな間隔で時々鳴らす。ブラウザ制限により最初のユーザー操作後にだけ鳴り始める。
+// 素材ファイルが無くてもエラーで止めず静かに無音で続行する。
 
 export function createAudio() {
   let ctx = null
   let master = null
-  let layers = [] // { id, source, gain, buffer }
+  let loopSources = [] // ループ再生中の source
+  let timers = [] // ランダム再生のタイマー
   let currentScene = null
   let muted = false
   let volume = 0.8
   let started = false
+
+  // GitHub Pages のサブパス（/seasons/）配下でも正しく解決する。
+  const base = import.meta.env.BASE_URL || '/'
+  const urlOf = (src) => base + src
 
   function ensureContext() {
     if (ctx) return
@@ -23,7 +29,7 @@ export function createAudio() {
 
   async function loadBuffer(src) {
     try {
-      const res = await fetch(src)
+      const res = await fetch(urlOf(src))
       if (!res.ok) return null
       const arr = await res.arrayBuffer()
       return await ctx.decodeAudioData(arr)
@@ -32,32 +38,63 @@ export function createAudio() {
     }
   }
 
-  function stopLayers() {
-    layers.forEach((l) => {
+  function playOnce(buffer, gainValue) {
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    const gain = ctx.createGain()
+    gain.gain.value = gainValue != null ? gainValue : 1
+    source.connect(gain).connect(master)
+    source.start()
+  }
+
+  // loop:false + interval:[min,max] の音を、ランダム間隔で繰り返し鳴らす。
+  function scheduleInterval(def, buffer) {
+    const [min, max] = def.interval
+    const next = () => {
+      const delay = (min + Math.random() * (max - min)) * 1000
+      const id = setTimeout(() => {
+        if (started && ctx) playOnce(buffer, def.gain)
+        next()
+      }, delay)
+      timers.push(id)
+    }
+    next()
+  }
+
+  function stopAll() {
+    loopSources.forEach((s) => {
       try {
-        l.source.stop()
+        s.stop()
       } catch {
         /* 既に停止 */
       }
     })
-    layers = []
+    timers.forEach((id) => clearTimeout(id))
+    loopSources = []
+    timers = []
   }
 
   async function playScene(scene) {
     currentScene = scene
     if (!started || !ctx) return
-    stopLayers()
+    stopAll()
     for (const def of scene.sounds || []) {
       const buffer = await loadBuffer(def.src)
       if (!buffer) continue
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.loop = def.loop !== false
-      const gain = ctx.createGain()
-      gain.gain.value = def.gain != null ? def.gain : 1
-      source.connect(gain).connect(master)
-      source.start()
-      layers.push({ id: def.id, source, gain, buffer })
+      if (def.loop !== false) {
+        const source = ctx.createBufferSource()
+        source.buffer = buffer
+        source.loop = true
+        const gain = ctx.createGain()
+        gain.gain.value = def.gain != null ? def.gain : 1
+        source.connect(gain).connect(master)
+        source.start()
+        loopSources.push(source)
+      } else if (def.interval) {
+        scheduleInterval(def, buffer)
+      } else {
+        playOnce(buffer, def.gain)
+      }
     }
   }
 
@@ -72,8 +109,8 @@ export function createAudio() {
     },
     /** 情景を切り替える（音も差し替える）。 */
     async setScene(scene) {
-      await playScene(scene)
       currentScene = scene
+      await playScene(scene)
     },
     setMuted(m) {
       muted = m

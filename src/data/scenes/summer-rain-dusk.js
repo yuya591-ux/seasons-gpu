@@ -36,10 +36,11 @@ export default {
     rain: { intensity: 0.65 },
   },
 
-  // 音セット（レイヤー）。実体ファイルは次ステップで /public/audio に追加し CREDITS.md に記録する。
+  // 音セット（レイヤー）。出典・ライセンスは CREDITS.md に全数記録。
+  // 形式は iOS/Safari でも鳴るよう .mp3。遠雷はループせず、ランダム間隔で時々鳴らす。
   sounds: [
-    { id: 'rain', label: '雨音', src: 'audio/summer-rain-dusk/rain.ogg', gain: 0.8, loop: true },
-    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.ogg', gain: 0.5, loop: true },
-    { id: 'thunder', label: '遠雷', src: 'audio/summer-rain-dusk/thunder.ogg', gain: 0.4, loop: true },
+    { id: 'rain', label: '雨音', src: 'audio/summer-rain-dusk/rain.mp3', gain: 0.85, loop: true },
+    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.45, loop: true },
+    { id: 'thunder', label: '遠雷', src: 'audio/summer-rain-dusk/thunder.mp3', gain: 0.5, loop: false, interval: [22, 55] },
   ],
 }
