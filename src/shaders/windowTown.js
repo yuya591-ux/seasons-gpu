@@ -60,10 +60,10 @@ const FRAGMENT_BODY = /* glsl */ `
     return mix(col, hcol, step(p.y, h));
   }
 
-  // 街レイヤー（建物のシルエット＋灯る窓）を col に重ねる。
+  // 街レイヤー（建物のシルエット＋灯る窓＋たまにTVアンテナ）を col に重ねる。
   vec3 town(
     vec3 col, vec2 p, float wx, float ridgeY, float cw, float amp,
-    vec3 sil, vec3 light, float winLit, float winCols, float winRows, float seed
+    vec3 sil, vec3 light, float winLit, float winCols, float winRows, float seed, float antennaAmt
   ) {
     float u = wx / cw + seed;
     float cell = floor(u);
@@ -77,7 +77,9 @@ const FRAGMENT_BODY = /* glsl */ `
     float peak = (roofType > 0.62) ? (0.5 - abs(fx - bw * 0.5) / max(bw, 0.001)) * amp * 0.7 : 0.0;
     float ridge = ridgeY + (gap > 0.5 ? -0.03 : bh + peak);
     float body = step(p.y, ridge);
-    col = mix(col, sil, body);
+    // 建物ごとに色味を少し揺らす（家並みの個体差）
+    vec3 silv = sil * (0.82 + 0.34 * h11(cell * 5.3 + 2.0));
+    col = mix(col, silv, body);
 
     // 窓のグリッド（建物本体のみ・三角屋根の頂部は除く）
     if (body > 0.5 && gap < 0.5) {
@@ -88,8 +90,19 @@ const FRAGMENT_BODY = /* glsl */ `
       float below = step(p.y, ridgeY + bh - 0.012); // 屋根の少し下から窓
       float lit = step(1.0 - winLit, h21(wid + seed));
       lit *= 0.78 + 0.22 * sin(uTime * 1.3 + h21(wid) * 33.0); // ちらつき
-      vec3 wcol = mix(sil * 1.22, light, lit);
+      vec3 wcol = mix(silv * 1.25, light, lit);
       col = mix(col, wcol, rect * below * 0.9);
+    }
+
+    // TVアンテナ（昭和の郷愁）。陸屋根にたまに立つ。
+    if (antennaAmt > 0.0 && gap < 0.5 && roofType <= 0.62) {
+      float ax = abs(fx - bw * 0.5);
+      float hasA = step(h11(cell * 7.7 + 4.0), antennaAmt);
+      float mh = 0.045 + 0.02 * h11(cell + 8.0);
+      float mast = step(ridge, p.y) * step(p.y, ridge + mh) * step(ax, 0.006);
+      float bar = step(abs(p.y - (ridge + mh * 0.72)), 0.004) * step(ax, 0.03)
+                + step(abs(p.y - (ridge + mh * 0.5)), 0.004) * step(ax, 0.022);
+      col = mix(col, sil * 0.35, hasA * clamp(mast + bar, 0.0, 1.0) * 0.85);
     }
     return col;
   }
@@ -99,32 +112,48 @@ const FRAGMENT_BODY = /* glsl */ `
     float asp = uResolution.x / uResolution.y;
     float t = uTime;
     vec2 p = frag;
+    // 上下の見回し: 景色だけ縦にずらす（窓枠は固定）
+    vec2 vp = vec2(p.x, p.y - uPan.y);
 
     // 空（夕暮れ）: 下=茜、上=紫紺
-    vec3 col = mix(uSkyMid, uSkyTop, smoothstep(0.52, 1.0, p.y));
-    col = mix(uHorizon, col, smoothstep(0.42, 0.62, p.y));
-    col += uSunGlow * exp(-abs(p.y - 0.5) * 7.0) * 0.22; // 地平の残照
+    vec3 col = mix(uSkyMid, uSkyTop, smoothstep(0.52, 1.0, vp.y));
+    col = mix(uHorizon, col, smoothstep(0.42, 0.62, vp.y));
+    col += uSunGlow * exp(-abs(vp.y - 0.5) * 7.0) * 0.22; // 地平の残照
 
-    float base = (p.x - 0.5) * asp;
+    // 夕焼け雲（茜に染まる）
+    float cl = fbm(vec2((vp.x - 0.5) * asp * 1.6 + uPan.x * 0.15 + t * 0.008, vp.y * 2.2));
+    float cloudband = smoothstep(0.52, 0.82, cl) * smoothstep(0.46, 0.96, vp.y);
+    col = mix(col, mix(uHorizon, uSunGlow, 0.45), cloudband * 0.4);
+
+    float base = (vp.x - 0.5) * asp;
 
     // 奥→手前（視差は手前ほど大きい）
-    col = hills(col, p, base + uPan.x * 0.10, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
-    col = town(col, p, base + uPan.x * 0.22, 0.50, 0.10, 0.06,
-               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3);
-    col = town(col, p, base + uPan.x * 0.45, 0.42, 0.16, 0.13,
-               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1);
-    col = town(col, p, base + uPan.x * 0.85, 0.30, 0.26, 0.18,
-               uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3);
+    col = hills(col, vp, base + uPan.x * 0.10, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
+    col = town(col, vp, base + uPan.x * 0.22, 0.50, 0.10, 0.06,
+               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0);
+    col = town(col, vp, base + uPan.x * 0.45, 0.42, 0.16, 0.13,
+               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22);
+    col = town(col, vp, base + uPan.x * 0.85, 0.30, 0.26, 0.18,
+               uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5);
+
+    // 街灯（手前の通り沿いに、にじむ暖色の点）
+    float lx = base + uPan.x * 0.85;
+    float lcell = floor(lx / 0.22);
+    float lph = fract(lx / 0.22);
+    float ly = 0.085 + h11(lcell + 3.0) * 0.02;
+    float dl = length(vec2((lph - 0.5) * 0.22, vp.y - ly) * vec2(1.0, 1.3));
+    float lamp = exp(-dl * 42.0) + exp(-dl * 12.0) * 0.35;
+    col += uSunGlow * lamp * step(vp.y, 0.18) * 0.9;
 
     // 電線（手前・郷愁）。ゆるく垂れる数本。
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      float yl = 0.66 + fi * 0.035 + sin(p.x * asp * 2.2 + fi * 1.7 + uPan.x * 0.6) * 0.012;
+      float yl = 0.66 + fi * 0.035 + sin(p.x * asp * 2.2 + fi * 1.7 + uPan.x * 0.6) * 0.012 - uPan.y;
       float d = abs(p.y - yl);
       col = mix(col, vec3(0.02, 0.02, 0.04), smoothstep(0.0035, 0.0, d) * 0.8);
     }
 
-    // 窓枠（最前景のサッシ）
+    // 窓枠（最前景のサッシ・固定）
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
     float inner =

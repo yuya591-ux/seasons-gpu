@@ -182,10 +182,15 @@ export function createRenderer(canvas) {
 
   return {
     ok: true,
-    // 指スワイプなどから見回しの目標値を動かす
+    // 指スワイプなどから見回しの目標値を動かす（相対）
     addPan(dx, dy) {
       panTarget.x = clamp(panTarget.x + dx, PAN_LIMIT.x)
       panTarget.y = clamp(panTarget.y + dy, PAN_LIMIT.y)
+    },
+    // 端末の傾きなどから見回しの目標値を直接決める（絶対）
+    setPanTarget(x, y) {
+      panTarget.x = clamp(x, PAN_LIMIT.x)
+      panTarget.y = clamp(y, PAN_LIMIT.y)
     },
     setScene(s) {
       scene = s

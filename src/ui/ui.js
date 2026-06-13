@@ -256,6 +256,22 @@ export function buildUI(opts) {
     qRow.appendChild(qChips)
     el.appendChild(qRow)
 
+    // 傾きで見回す（既定オフ）
+    const tiltRow = h('div', 'setrow')
+    tiltRow.appendChild(h('span', 'setrow__label', '操作'))
+    const tiltChips = h('div', 'axis__chips')
+    const tiltBtn = h('button', 'chip', '傾きで見回す')
+    tiltBtn.classList.toggle('chip--on', settings.tilt)
+    tiltBtn.addEventListener('click', () => {
+      settings.tilt = !settings.tilt
+      tiltBtn.classList.toggle('chip--on', settings.tilt)
+      onSettings({ tilt: settings.tilt })
+      poke()
+    })
+    tiltChips.appendChild(tiltBtn)
+    tiltRow.appendChild(tiltChips)
+    el.appendChild(tiltRow)
+
     close.addEventListener('click', () => {
       el.classList.remove('panel--open')
       poke()

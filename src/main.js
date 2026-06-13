@@ -6,6 +6,7 @@ import { createRenderer } from './engine/renderer.js'
 import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
+import { createTilt } from './ui/tilt.js'
 
 const canvas = document.getElementById('scene')
 const fallback = document.getElementById('fallback')
@@ -29,6 +30,7 @@ function start() {
   const settings = state.settings
 
   const audio = createAudio()
+  const tilt = createTilt(renderer)
   audio.setMuted(settings.muted)
   audio.setVolume(settings.volume)
   // 起動時の情景を音側にも伝える（鳴り始めは最初のタップ後）
@@ -52,6 +54,10 @@ function start() {
     onSettings(patch) {
       updateSettings(patch)
       renderer.setSettings(getState().settings)
+      if (patch.tilt !== undefined) {
+        if (patch.tilt) tilt.enable()
+        else tilt.disable()
+      }
     },
     onAudioStart() {
       return audio.start()
