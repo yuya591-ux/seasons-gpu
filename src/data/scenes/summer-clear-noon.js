@@ -11,21 +11,21 @@ export default {
   intensityLabel: '陽炎', // 設定スライダー（陽炎と雲の強さ）
 
   palette: {
-    // 正午（最も青が濃い）
+    // 正午（最も青が濃い）。白とびを避けるため地平・雲は純白にしない。
     early: {
-      skyTop: '#2f6fd0', // 天頂の青
-      skyMid: '#6ea8e6', // 中空
-      horizon: '#d6e6f2', // 地平の淡い水色
-      sunGlow: '#fff4d8', // 陽射し
-      dropTint: '#ffffff', // 入道雲の白
+      skyTop: '#1f57b8', // 天頂の深い青
+      skyMid: '#4f8fd6', // 中空
+      horizon: '#a3c5e4', // 地平の水色（白くしすぎない）
+      sunGlow: '#ffe6b8', // 陽射し（控えめに使う）
+      dropTint: '#eef4fb', // 入道雲の明部（やや青みの白）
     },
-    // 午後の入り（わずかに白み、暖かく）
+    // 午後の入り（わずかに暖かく）
     late: {
-      skyTop: '#3f78cf',
-      skyMid: '#84b3e6',
-      horizon: '#e3e9ee',
-      sunGlow: '#fff0cf',
-      dropTint: '#f6f3ee',
+      skyTop: '#2c63bd',
+      skyMid: '#5e97d8',
+      horizon: '#b2cfe6',
+      sunGlow: '#ffdfa8',
+      dropTint: '#e7eef6',
     },
   },
 

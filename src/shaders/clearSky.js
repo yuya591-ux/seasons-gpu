@@ -65,30 +65,48 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 sky = mix(uHorizon, uSkyMid, smoothstep(0.0, 0.5, uv.y));
     sky = mix(sky, uSkyTop, smoothstep(0.45, 1.0, uv.y));
 
-    // 真昼の陽射し（上方）。淡いにじみ。
+    // 真昼の陽射し（上方）。白とびしないよう控えめ。
     vec2 suv = vec2((uv.x - 0.5) * asp + 0.5, uv.y);
-    float sun = exp(-distance(suv, vec2(0.5, 0.92)) * 2.2);
-    sky += uSunGlow * sun * 0.5;
+    float sun = exp(-distance(suv, vec2(0.5, 0.95)) * 2.6);
+    sky += uSunGlow * sun * 0.22;
 
-    // 入道雲: fbmで盛り上がる雲。地平〜中ほどに塊。
+    vec3 col = sky;
     vec2 cuv = vec2((uv.x - 0.5) * asp + 0.5, uv.y);
-    float base = fbm(cuv * vec2(2.2, 2.6) + vec2(t * 0.015, -t * 0.004));
-    float detail = fbm(cuv * vec2(5.0, 5.5) - vec2(t * 0.02, 0.0));
-    float field = base * 0.7 + detail * 0.3;
-    float band = smoothstep(0.05, 0.5, uv.y) * (1.0 - smoothstep(0.6, 0.95, uv.y));
-    float cloudMask = smoothstep(0.52, 0.72, field) * (0.4 + 0.6 * band) * mix(0.7, 1.0, uIntensity);
-    // 雲の陰影（盛り上がりの下を少し暗く）
-    vec3 cloudCol = mix(uDropTint * 0.78, uDropTint, smoothstep(0.5, 0.82, field));
-    vec3 col = mix(sky, cloudCol, clamp(cloudMask, 0.0, 1.0));
 
-    // 地平の白いもや（暑さ）
-    col = mix(col, mix(col, uHorizon, 0.6), heat * 0.5);
+    // 入道雲: 地平から立ち上がる、もくもくした塊。陽の当たる上が白く、底が翳る。
+    vec2 q = cuv * vec2(1.7, 1.9) + vec2(t * 0.012, 0.0);
+    float d1 = fbm(q);
+    float d2 = fbm(q * 2.3 + 11.0);
+    float dens = d1 * 0.68 + d2 * 0.32;
+    // 雲が湧く高さ帯（下〜中ほどに集中＝入道雲らしい立ち上がり）
+    float tower = smoothstep(0.04, 0.30, uv.y) * (1.0 - smoothstep(0.60, 0.92, uv.y));
+    float cloudMask = smoothstep(0.44, 0.58, dens) * tower;
+    cloudMask = clamp(cloudMask * mix(0.9, 1.3, uIntensity), 0.0, 1.0);
+    // 簡易ライティング: 密度の芯ほど陽が当たって明るい、縁は翳る
+    float lit = smoothstep(0.46, 0.74, dens);
+    vec3 cloudLit = uDropTint; // 陽の当たる白
+    vec3 cloudSha = uDropTint * 0.58 + uSkyMid * 0.16; // 青みを帯びた翳り
+    vec3 cloudCol = mix(cloudSha, cloudLit, lit);
+    col = mix(col, cloudCol, cloudMask);
+
+    // 遠くの木立のシルエット（夏の郷愁・緑）。最下部に、もやでかすませて薄く。
+    float treeTop = 0.085 + fbm(vec2(cuv.x * 6.0, 3.0)) * 0.035;
+    float tree = smoothstep(treeTop + 0.006, treeTop - 0.006, uv.y);
+    vec3 green = mix(vec3(0.16, 0.27, 0.15), uHorizon, 0.4); // 夏の濃い緑＋距離のもや
+    col = mix(col, green, tree * 0.85);
+
+    // 地平の白いもや（暑さ）。白とびしない程度に。
+    col = mix(col, mix(col, uHorizon, 0.45), heat * 0.3);
 
     // ごく軽い周辺減光
     float vig = 1.0 - 0.18 * smoothstep(0.4, 1.2, distance(frag, vec2(0.5, 0.55)));
     col *= vig;
 
     col *= uBright;
+
+    // 白とび防止のソフトな天井（ハイライトを滑らかに抑える）
+    col -= max(col - vec3(0.82), 0.0) * 0.5;
+
     // 微量グレインでバンディングを防ぐ
     col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.012;
 

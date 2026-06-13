@@ -111,8 +111,9 @@ body.idle .topbar {
 .hud__scene {
   font-size: 0.95rem;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.78);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.92);
+  /* どんな明るさの景色でも読めるよう、濃いめの影で縁取る */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 0, 0, 0.4);
 }
 .hud__audio {
   display: flex;
@@ -131,42 +132,49 @@ body.idle .topbar {
 
 .iconbtn {
   appearance: none;
-  border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* どんな景色でも読めるよう、濃い半透明のピル背景にする */
+  background: rgba(20, 16, 26, 0.34);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.95);
   font-size: 0.85rem;
   letter-spacing: 0.1em;
   padding: 0.5rem 0.8rem;
   border-radius: 999px;
   cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: background 0.25s ease;
 }
 .iconbtn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(20, 16, 26, 0.5);
 }
 
 .slider {
   appearance: none;
   width: 8rem;
-  height: 3px;
+  height: 4px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.25);
+  /* 明るい景色でも見えるよう、濃い半透明トラック */
+  background: rgba(20, 16, 26, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
   outline: none;
 }
 .slider::-webkit-slider-thumb {
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
 }
 .slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
 }
 
