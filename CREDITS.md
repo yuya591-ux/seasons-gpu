@@ -20,6 +20,15 @@
 - 雷は 2007年、オーストラリア・ダーウィンで録音。
 - 変更点（CC BY 素材）：Ogg→MP3 へ変換。アプリ内ではループ／ランダム間隔で再生。
 
+### 情景「夏の晴れ、真昼」 — `public/audio/summer-clear-noon/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| 油蝉 | `aburazemi.mp3` | "Aburazemi 07z7315" / ISAKA Yoji (Cory) | CC BY 2.1 JP — https://creativecommons.org/licenses/by/2.1/jp/ | https://commons.wikimedia.org/wiki/File:Aburazemi_07z7315.ogg |
+
+- 油蝉は実在種 *Graptopsaltria nigrofuscata*（アブラゼミ）の本物の鳴き声。2007年、神奈川県川崎市・東高根森林公園で録音。
+- 変更点：Ogg→MP3 へ変換。アプリ内ではループ再生。
+
 ## 画像・フォント
 
 - 画像は使用しない（情景はすべてシェーダー計算で生成）。

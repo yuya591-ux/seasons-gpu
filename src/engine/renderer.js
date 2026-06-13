@@ -1,7 +1,8 @@
-// WebGL レンダラ。フルスクリーン三角形に雨ガラスシェーダーを当てて描く。
-// 情景のパレットを時間でゆっくり移ろわせ（夕方→暮れ際）、設定（雨脚・明るさ・品質）を反映する。
+// WebGL レンダラ。フルスクリーン三角形に、情景ごとのシェーダーを当てて描く。
+// 情景のパレットを時間でゆっくり移ろわせ、設定（強さ・明るさ・品質）を反映する。
+// 情景の render 種別が変わったらシェーダー（プログラム）を組み直す。
 
-import { vertexSource, buildFragment } from '../shaders/rainGlass.js'
+import { getShader } from '../shaders/index.js'
 import { hexToRgb, mixRgb } from '../util/color.js'
 
 const DPR_BY_QUALITY = { soft: 2, standard: 1.5, light: 1 }
@@ -35,14 +36,16 @@ export function createRenderer(canvas) {
   let program = null
   let loc = {}
   let quality = 'standard'
+  let shaderType = 'rainGlass'
   let scene = null
   let settings = { rain: 0.65, brightness: 1.0, quality: 'standard' }
   let rafId = 0
   const startTime = performance.now()
 
-  function buildProgram(q) {
-    const vs = compile(gl, gl.VERTEX_SHADER, vertexSource)
-    const fs = compile(gl, gl.FRAGMENT_SHADER, buildFragment(q))
+  function buildProgram(q, type) {
+    const shader = getShader(type)
+    const vs = compile(gl, gl.VERTEX_SHADER, shader.vertexSource)
+    const fs = compile(gl, gl.FRAGMENT_SHADER, shader.buildFragment(q))
     if (!vs || !fs) return false
     const p = gl.createProgram()
     gl.attachShader(p, vs)
@@ -62,7 +65,7 @@ export function createRenderer(canvas) {
     loc = {
       uResolution: gl.getUniformLocation(program, 'uResolution'),
       uTime: gl.getUniformLocation(program, 'uTime'),
-      uRain: gl.getUniformLocation(program, 'uRain'),
+      uIntensity: gl.getUniformLocation(program, 'uIntensity'),
       uBright: gl.getUniformLocation(program, 'uBright'),
       uSkyTop: gl.getUniformLocation(program, 'uSkyTop'),
       uSkyMid: gl.getUniformLocation(program, 'uSkyMid'),
@@ -71,6 +74,7 @@ export function createRenderer(canvas) {
       uDropTint: gl.getUniformLocation(program, 'uDropTint'),
     }
     quality = q
+    shaderType = type
     return true
   }
 
@@ -112,7 +116,7 @@ export function createRenderer(canvas) {
     const seconds = (now - startTime) / 1000
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
-    gl.uniform1f(loc.uRain, settings.rain)
+    gl.uniform1f(loc.uIntensity, settings.rain)
     gl.uniform1f(loc.uBright, settings.brightness)
     if (scene) {
       const c = currentColors(seconds)
@@ -156,7 +160,7 @@ export function createRenderer(canvas) {
     'webglcontextrestored',
     () => {
       setupBuffer()
-      if (buildProgram(quality)) {
+      if (buildProgram(quality, shaderType)) {
         resize()
         play()
       }
@@ -168,17 +172,20 @@ export function createRenderer(canvas) {
     ok: true,
     setScene(s) {
       scene = s
+      // 現象（描画タイプ）が変わったらシェーダーを組み直す
+      const type = s.render || 'rainGlass'
+      if (type !== shaderType) buildProgram(quality, type)
     },
     setSettings(s) {
       // 品質が変わったらシェーダーを組み直す
-      if (s.quality !== quality) buildProgram(s.quality)
+      if (s.quality !== quality) buildProgram(s.quality, shaderType)
       settings = s
       resize()
     },
     start(initialScene, initialSettings) {
       scene = initialScene
       settings = initialSettings
-      if (!buildProgram(initialSettings.quality)) return false
+      if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()
       play()
       return true

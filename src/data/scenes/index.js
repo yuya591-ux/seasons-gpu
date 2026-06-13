@@ -2,9 +2,11 @@
 // 既存は一切触らない（非破壊・疎結合）。
 
 import summerRainDusk from './summer-rain-dusk.js'
+import summerClearNoon from './summer-clear-noon.js'
 
 export const SCENES = [
   summerRainDusk,
+  summerClearNoon,
   // 次の情景をここに追加していく（例: 冬・雪・夜・静寂 など）
 ]
 

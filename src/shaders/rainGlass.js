@@ -14,7 +14,7 @@ const FRAGMENT_BODY = /* glsl */ `
 
   uniform vec2 uResolution;
   uniform float uTime;
-  uniform float uRain;       // 雨脚 0..1
+  uniform float uIntensity;       // 雨脚 0..1
   uniform float uBright;     // 明るさ 0.7..1.3
   uniform vec3 uSkyTop;      // 天頂
   uniform vec3 uSkyMid;      // 中空
@@ -61,10 +61,10 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 col = mix(lower, uSkyTop, smoothstep(0.40, 1.0, y));
     // 地平に残る暖かい帯
     float band = exp(-abs(y - 0.16) * 6.0);
-    col = mix(col, uSunGlow, band * 0.16 * (1.0 - 0.4 * uRain));
+    col = mix(col, uSunGlow, band * 0.16 * (1.0 - 0.4 * uIntensity));
     // 太陽の光芒（地平やや上、画面中央寄り）。雨で弱める。
     float glow = exp(-distance(uv, vec2(0.5, 0.18)) * 3.4);
-    col += uSunGlow * glow * (0.9 - 0.35 * uRain);
+    col += uSunGlow * glow * (0.9 - 0.35 * uIntensity);
     return col;
   }
 
@@ -116,7 +116,7 @@ const FRAGMENT_BODY = /* glsl */ `
     float asp = uResolution.x / uResolution.y;
     vec2 ruv = vec2((frag.x - 0.5) * asp, frag.y); // 滴を丸くするアスペクト補正
     float t = uTime;
-    float rain = clamp(uRain, 0.0, 1.0);
+    float rain = clamp(uIntensity, 0.0, 1.0);
 
     vec4 sd = staticDroplets(ruv, t);
     vec4 rs = runningStreaks(frag, t);

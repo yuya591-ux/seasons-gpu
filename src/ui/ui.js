@@ -26,6 +26,7 @@ export function buildUI(opts) {
   document.body.appendChild(root)
 
   let currentScene = initialScene
+  let intensityLabelEl = null // 設定の「強さ」スライダーの名前（情景で変わる）
 
   // ── 起動ゲート（iOS自動再生対策） ──
   const gate = h('div', 'gate')
@@ -182,6 +183,7 @@ export function buildUI(opts) {
       if (!scene || scene.id === currentScene.id) return
       currentScene = scene
       sceneName.textContent = scene.label
+      if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
       onApplyScene(scene)
       el.classList.remove('panel--open')
       poke()
@@ -210,12 +212,19 @@ export function buildUI(opts) {
     head.appendChild(close)
     el.appendChild(head)
 
-    el.appendChild(
-      makeSlider('雨脚', 0, 1, 0.01, settings.rain, (v) => {
+    const intensityRow = makeSlider(
+      currentScene.intensityLabel || '強さ',
+      0,
+      1,
+      0.01,
+      settings.rain,
+      (v) => {
         settings.rain = v
         onSettings({ rain: v })
-      }),
+      },
     )
+    intensityLabelEl = intensityRow.querySelector('.setrow__label')
+    el.appendChild(intensityRow)
     el.appendChild(
       makeSlider('明るさ', 0.7, 1.3, 0.01, settings.brightness, (v) => {
         settings.brightness = v

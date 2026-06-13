@@ -7,6 +7,8 @@ export default {
   axes: { season: 'summer', weather: 'rain', time: 'dusk' },
   label: '夏の雨、夕暮れ',
   status: 'ready', // 'ready' | 'planned'
+  render: 'rainGlass', // 描画タイプ（src/shaders/index.js）
+  intensityLabel: '雨脚', // 設定スライダーの名前
 
   // 色パレット（#rrggbb）。キーフレーム配列で持ち、将来は時刻でさらに細かく移ろわせられる。
   palette: {
