@@ -42,3 +42,226 @@ body {
 .fallback[hidden] {
   display: none;
 }
+
+/* ── UI 全般（静かで控えめ・眺める邪魔をしない） ── */
+body {
+  font-family: system-ui, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.06em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* 子要素だけ受け取る */
+}
+.ui button,
+.ui input {
+  pointer-events: auto;
+}
+
+/* 無操作時はHUD・ボタンを静かに消す（パネルは別管理） */
+.hud,
+.topbar {
+  transition: opacity 1.2s ease;
+}
+body.idle .hud,
+body.idle .topbar {
+  opacity: 0;
+}
+
+/* 起動ゲート */
+.gate {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  background: rgba(20, 16, 26, 0.55);
+  backdrop-filter: blur(2px);
+  transition: opacity 0.8s ease;
+}
+.gate--hide {
+  opacity: 0;
+}
+.gate__title {
+  font-size: clamp(1.4rem, 5vw, 2.2rem);
+  letter-spacing: 0.3em;
+  font-weight: 300;
+}
+.gate__lead {
+  font-size: clamp(0.85rem, 3vw, 1rem);
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.2em;
+}
+
+/* HUD（左下: 情景名・音） */
+.hud {
+  position: fixed;
+  left: max(1.2rem, env(safe-area-inset-left));
+  bottom: max(1.2rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.hud__scene {
+  font-size: 0.95rem;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+.hud__audio {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* 右上ボタン */
+.topbar {
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  display: flex;
+  gap: 0.5rem;
+}
+
+.iconbtn {
+  appearance: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  padding: 0.5rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.25s ease;
+}
+.iconbtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.slider {
+  appearance: none;
+  width: 8rem;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+.slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+/* パネル（情景・設定） */
+.panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(92vw, 30rem);
+  transform: translate(-50%, -46%);
+  background: rgba(22, 18, 28, 0.82);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  padding: 1.4rem 1.5rem 1.6rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease, visibility 0.4s;
+}
+.panel--open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+}
+.panel__title {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.85);
+}
+.panel__status {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
+
+.axis,
+.setrow {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0.7rem 0;
+}
+.axis__label,
+.setrow__label {
+  flex: 0 0 3.2rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+.axis__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.chip {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.82rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.chip--on {
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(20, 16, 26, 0.95);
+  border-color: transparent;
+}
+
+.primary {
+  display: block;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.7rem;
+  border: none;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(20, 16, 26, 0.95);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.primary:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
