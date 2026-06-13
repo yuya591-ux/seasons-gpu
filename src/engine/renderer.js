@@ -42,6 +42,11 @@ export function createRenderer(canvas) {
   let rafId = 0
   const startTime = performance.now()
 
+  // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
+  const panCur = { x: 0, y: 0 }
+  const panTarget = { x: 0, y: 0 }
+  const PAN_LIMIT = { x: 1.25, y: 0.28 }
+
   function buildProgram(q, type) {
     const shader = getShader(type)
     const vs = compile(gl, gl.VERTEX_SHADER, shader.vertexSource)
@@ -65,6 +70,7 @@ export function createRenderer(canvas) {
     loc = {
       uResolution: gl.getUniformLocation(program, 'uResolution'),
       uTime: gl.getUniformLocation(program, 'uTime'),
+      uPan: gl.getUniformLocation(program, 'uPan'),
       uIntensity: gl.getUniformLocation(program, 'uIntensity'),
       uBright: gl.getUniformLocation(program, 'uBright'),
       uSkyTop: gl.getUniformLocation(program, 'uSkyTop'),
@@ -114,8 +120,12 @@ export function createRenderer(canvas) {
   function render(now) {
     resize()
     const seconds = (now - startTime) / 1000
+    // 見回しをなめらかに追従
+    panCur.x += (panTarget.x - panCur.x) * 0.12
+    panCur.y += (panTarget.y - panCur.y) * 0.12
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
+    gl.uniform2f(loc.uPan, panCur.x, panCur.y)
     gl.uniform1f(loc.uIntensity, settings.rain)
     gl.uniform1f(loc.uBright, settings.brightness)
     if (scene) {
@@ -168,10 +178,20 @@ export function createRenderer(canvas) {
     false,
   )
 
+  const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v))
+
   return {
     ok: true,
+    // 指スワイプなどから見回しの目標値を動かす
+    addPan(dx, dy) {
+      panTarget.x = clamp(panTarget.x + dx, PAN_LIMIT.x)
+      panTarget.y = clamp(panTarget.y + dy, PAN_LIMIT.y)
+    },
     setScene(s) {
       scene = s
+      // 情景を変えたら見回しを正面へ戻す
+      panTarget.x = 0
+      panTarget.y = 0
       // 現象（描画タイプ）が変わったらシェーダーを組み直す
       const type = s.render || 'rainGlass'
       if (type !== shaderType) buildProgram(quality, type)

@@ -5,6 +5,7 @@ import { getState, setScene, updateSettings } from './state.js'
 import { createRenderer } from './engine/renderer.js'
 import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
+import { attachLookAround } from './ui/lookAround.js'
 
 const canvas = document.getElementById('scene')
 const fallback = document.getElementById('fallback')
@@ -64,4 +65,7 @@ function start() {
       audio.setVolume(v)
     },
   })
+
+  // 指スワイプで景色を見回す（窓辺シリーズで有効）
+  attachLookAround(canvas, renderer)
 }

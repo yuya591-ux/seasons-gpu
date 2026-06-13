@@ -3,10 +3,12 @@
 
 import summerRainDusk from './summer-rain-dusk.js'
 import summerClearNoon from './summer-clear-noon.js'
+import summerDuskDowntown from './summer-dusk-downtown.js'
 
 export const SCENES = [
   summerRainDusk,
   summerClearNoon,
+  summerDuskDowntown,
   // 次の情景をここに追加していく（例: 冬・雪・夜・静寂 など）
 ]
 
