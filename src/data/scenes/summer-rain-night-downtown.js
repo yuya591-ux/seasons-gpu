@@ -3,6 +3,7 @@ export default {
   id: 'summer-rain-night-downtown',
   axes: { season: 'summer', weather: 'rain', time: 'night' },
   label: '夏の雨の夜、高台の下町',
+  desc: '窓を流れる雨と、夜の街明かり。雨音とヒグラシ',
   status: 'ready',
   render: 'windowTown',
   view: 'downtown',

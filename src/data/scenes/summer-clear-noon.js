@@ -6,6 +6,7 @@ export default {
   id: 'summer-clear-noon',
   axes: { season: 'summer', weather: 'clear', time: 'noon' },
   label: '夏の晴れ、真昼',
+  desc: '抜けるような青空と入道雲、地平の陽炎。油蝉のジリジリ',
   status: 'ready',
   render: 'clearSky',
   intensityLabel: '陽炎', // 設定スライダー（陽炎と雲の強さ）

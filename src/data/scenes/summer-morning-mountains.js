@@ -3,6 +3,7 @@ export default {
   id: 'summer-morning-mountains',
   axes: { season: 'summer', weather: 'clear', time: 'morning' },
   label: '夏の朝、山あいの窓',
+  desc: '朝霧にかすむ、重なる山並み。渡る風',
   status: 'ready',
   render: 'windowMountains',
   view: 'mountains',

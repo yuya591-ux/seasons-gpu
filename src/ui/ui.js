@@ -2,7 +2,7 @@
 // 文言は静かで上質に。システム用語は出さない。
 
 import { SEASONS, WEATHERS, TIMES, labelOf } from '../data/axes.js'
-import { findScene, isReady } from '../data/scenes/index.js'
+import { SCENES } from '../data/scenes/index.js'
 
 const h = (tag, cls, text) => {
   const el = document.createElement(tag)
@@ -117,7 +117,7 @@ export function buildUI(opts) {
   )
   poke()
 
-  // ── 情景パネルの中身 ──
+  // ── 情景パネル：実装済みの情景をカード一覧で直接選ぶ ──
   function buildScenePanel() {
     const el = h('div', 'panel panel--scene')
     const head = h('div', 'panel__head')
@@ -126,68 +126,47 @@ export function buildUI(opts) {
     head.appendChild(close)
     el.appendChild(head)
 
-    let tentative = { ...currentScene.axes }
+    const gallery = h('div', 'gallery')
+    el.appendChild(gallery)
 
-    const axisRows = [
-      { key: 'season', list: SEASONS, label: '季節' },
-      { key: 'weather', list: WEATHERS, label: '天気' },
-      { key: 'time', list: TIMES, label: '時間' },
-    ]
-    const chipEls = {}
-    axisRows.forEach((row) => {
-      const r = h('div', 'axis')
-      r.appendChild(h('span', 'axis__label', row.label))
-      const chips = h('div', 'axis__chips')
-      chipEls[row.key] = []
-      row.list.forEach((opt) => {
-        const chip = h('button', 'chip', opt.label)
-        chip.addEventListener('click', () => {
-          tentative[row.key] = opt.id
-          refresh()
-          poke()
-        })
-        chips.appendChild(chip)
-        chipEls[row.key].push({ id: opt.id, chip })
+    const cards = []
+    SCENES.filter((s) => s.status === 'ready').forEach((scene) => {
+      const card = h('button', 'scene-card')
+      // 色のサムネ（情景のパレットから）
+      const sw = h('span', 'scene-card__swatch')
+      const pal = scene.palette.early
+      sw.style.background = `linear-gradient(165deg, ${pal.skyTop}, ${pal.skyMid} 55%, ${pal.horizon})`
+      const body = h('span', 'scene-card__body')
+      body.appendChild(h('span', 'scene-card__label', scene.label))
+      body.appendChild(h('span', 'scene-card__desc', scene.desc || ''))
+      const axesText =
+        labelOf(SEASONS, scene.axes.season) +
+        '・' +
+        labelOf(WEATHERS, scene.axes.weather) +
+        '・' +
+        labelOf(TIMES, scene.axes.time)
+      body.appendChild(h('span', 'scene-card__axes', axesText))
+      card.appendChild(sw)
+      card.appendChild(body)
+      card.addEventListener('click', () => {
+        if (scene.id !== currentScene.id) {
+          currentScene = scene
+          sceneName.textContent = scene.label
+          if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
+          onApplyScene(scene)
+          markCurrent()
+        }
+        el.classList.remove('panel--open')
+        poke()
       })
-      r.appendChild(chips)
-      el.appendChild(r)
+      gallery.appendChild(card)
+      cards.push({ id: scene.id, card })
     })
 
-    const status = h('p', 'panel__status', '')
-    el.appendChild(status)
-    const apply = h('button', 'primary', 'この情景にする')
-    el.appendChild(apply)
-
-    function refresh() {
-      axisRows.forEach((row) => {
-        chipEls[row.key].forEach(({ id, chip }) => {
-          chip.classList.toggle('chip--on', tentative[row.key] === id)
-        })
-      })
-      const ready = isReady(tentative)
-      const scene = findScene(tentative)
-      if (ready) {
-        status.textContent = scene.label
-        const same = scene.id === currentScene.id
-        apply.disabled = same
-        apply.textContent = same ? 'いまの情景です' : 'この情景にする'
-      } else {
-        status.textContent = 'この組み合わせは準備中です'
-        apply.disabled = true
-        apply.textContent = 'この情景にする'
-      }
+    function markCurrent() {
+      cards.forEach(({ id, card }) => card.classList.toggle('scene-card--on', id === currentScene.id))
     }
 
-    apply.addEventListener('click', () => {
-      const scene = findScene(tentative)
-      if (!scene || scene.id === currentScene.id) return
-      currentScene = scene
-      sceneName.textContent = scene.label
-      if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
-      onApplyScene(scene)
-      el.classList.remove('panel--open')
-      poke()
-    })
     close.addEventListener('click', () => {
       el.classList.remove('panel--open')
       poke()
@@ -196,8 +175,7 @@ export function buildUI(opts) {
     return {
       el,
       open() {
-        tentative = { ...currentScene.axes }
-        refresh()
+        markCurrent()
         el.classList.add('panel--open')
       },
     }

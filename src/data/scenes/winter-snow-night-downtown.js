@@ -3,6 +3,7 @@ export default {
   id: 'winter-snow-night-downtown',
   axes: { season: 'winter', weather: 'snow', time: 'night' },
   label: '冬の雪の夜、高台の下町',
+  desc: '窓に舞う雪と、夜の街の灯り。しんとした風',
   status: 'ready',
   render: 'windowTown',
   view: 'downtown',

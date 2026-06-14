@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20213e"/>
+      <stop offset="0.52" stop-color="#6e3b54"/>
+      <stop offset="1" stop-color="#d98a63"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.72" r="0.55">
+      <stop offset="0" stop-color="#ffe1ad" stop-opacity="0.95"/>
+      <stop offset="0.42" stop-color="#ffb877" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffb877" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="256" cy="368" r="210" fill="url(#sun)"/>
+  <circle cx="256" cy="372" r="44" fill="#ffe9c6" opacity="0.92"/>
+  <!-- 遠い丘 -->
+  <path d="M0 402 Q140 362 256 392 T512 398 L512 512 L0 512 Z" fill="#241c30" opacity="0.5"/>
+  <!-- 窓枠（十字のサッシ） -->
+  <g stroke="#f4eee2" stroke-opacity="0.94" fill="none" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="80" y="80" width="352" height="352" rx="20"/>
+    <line x1="256" y1="92" x2="256" y2="420"/>
+    <line x1="92" y1="256" x2="420" y2="256"/>
+  </g>
+</svg>

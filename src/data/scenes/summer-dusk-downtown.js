@@ -6,6 +6,7 @@ export default {
   id: 'summer-dusk-downtown',
   axes: { season: 'summer', weather: 'cloudy', time: 'dusk' },
   label: '夏の夕暮れ、高台の下町',
+  desc: '高台から望む夕暮れの街並み。灯る窓とヒグラシ',
   status: 'ready',
   render: 'windowTown',
   view: 'downtown',

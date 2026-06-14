@@ -3,6 +3,7 @@ export default {
   id: 'summer-dusk-seaside',
   axes: { season: 'summer', weather: 'clear', time: 'dusk' },
   label: '夏の夕暮れ、海辺の窓',
+  desc: '水平線に落ちる夕陽と、きらめく波。波の音',
   status: 'ready',
   render: 'windowSea',
   view: 'sea',

@@ -6,6 +6,7 @@ export default {
   id: 'summer-rain-dusk',
   axes: { season: 'summer', weather: 'rain', time: 'dusk' },
   label: '夏の雨、夕暮れ',
+  desc: '窓ガラスを流れる雨と、にじむ夕焼け。雨音・ヒグラシ・遠雷',
   status: 'ready', // 'ready' | 'planned'
   render: 'rainGlass', // 描画タイプ（src/shaders/index.js）
   intensityLabel: '雨脚', // 設定スライダーの名前
