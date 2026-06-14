@@ -144,6 +144,9 @@ export const GROUND_GLSL = /* glsl */ `
       float dRoad = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
       vec3 roadC = mix(vec3(0.20, 0.19, 0.19), uHorizon * 0.3, 0.4) * (1.0 - 0.5 * nightAmt);
       ground = roadC;
+      // 雨に濡れた路面: 暗く沈み、空と街の灯りを鈍く映す（雨の情景の実在感）
+      float wet = step(0.5, glassMode) * step(glassMode, 1.5);
+      ground = mix(ground, ground * 0.55 + mix(uSkyMid, uHorizon, 0.5) * 0.10, wet * 0.6);
       // 川（街を蛇行。水面が空と灯りを映す）
       float riverX = sin(gz * 0.22 + 1.5) * 1.6 + cos(gz * 0.11) * 0.7;
       float river = smoothstep(0.34, 0.22, abs(g0.x - riverX));
@@ -178,6 +181,7 @@ export const GROUND_GLSL = /* glsl */ `
       // 街灯（交差点）
       float lampG = smoothstep(0.10, 0.0, length(gf - 0.5)) * step(0.45, h11(gi.x + gi.y * 3.0 + 7.0));
       ground += uSunGlow * lampG * (0.8 + 0.5 * nightAmt) * (1.0 - river);
+      ground += uSunGlow * lampG * wet * 0.6 * (1.0 - river); // 濡れた路面に滲む街灯の照り返し
       // 人影（道沿いを動く小さな点）
       float ped = step(0.5, h21(gi + 19.0))
                 * smoothstep(0.05, 0.0, length((gf - vec2(0.5, fract(uTime * 0.05 + blkR))) * vec2(1.3, 1.0)));
