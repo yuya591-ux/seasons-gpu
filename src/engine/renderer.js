@@ -97,7 +97,7 @@ export function createRenderer(canvas) {
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
   const panCur = { x: 0, y: 0 }
   const panTarget = { x: 0, y: 0 }
-  const PAN_LIMIT = { x: 2.6, y: 0.3 }
+  const PAN_LIMIT = { x: 2.6, y: 0.46 } // 見上げ/見下ろしの可動域（上空・道路を見渡せるよう拡大）
   // 端末を傾けた時の視差バイアス（窓の効果。パノラマでのみ使用）
   const parallaxBias = { x: 0, y: 0 }
   // 遠雷フラッシュ。雷鳴に合わせて立ち上げ、毎フレーム減衰させる

@@ -53,36 +53,77 @@ const FRAGMENT_BODY = /* glsl */ `
     return mix(col, hcol, step(p.y, h));
   }
 
-  // 街レイヤー（建物のシルエット＋灯る窓）。windowTown を踏襲しつつ角部屋向けに調整。
+  // 住宅街の一区画。cell ごとに建物タイプ（一軒家/商店/アパート/中層/空き地）を抽選し、
+  // 屋根・高さ・灯りを描き分ける。profile: 1=手前の家並み, 0.5=中景の商店街, 0=遠景。
   vec3 town(
     vec3 col, vec2 p, float wx, float ridgeY, float cw, float amp,
-    vec3 sil, vec3 light, float winLit, float winCols, float winRows, float seed
+    vec3 sil, vec3 light, float winLit, float seed, float profile
   ) {
     float u = wx / cw + seed;
     float cell = floor(u);
     float fx = fract(u);
-    float r = h11(cell * 1.37 + 3.1);
-    float bw = 0.60 + 0.32 * h11(cell * 2.11 + 7.7);
-    float bh = 0.05 + r * amp;
-    float gap = step(bw, fx);
-    float roofType = h11(cell * 3.7 + 1.0);
-    float peak = (roofType > 0.66) ? (0.5 - abs(fx - bw * 0.5) / max(bw, 0.001)) * amp * 0.6 : 0.0;
-    float ridge = ridgeY + (gap > 0.5 ? -0.03 : bh + peak);
-    float body = step(p.y, ridge);
-    vec3 silv = sil * (0.82 + 0.34 * h11(cell * 5.3 + 2.0));
+    float bt = h11(cell * 9.1 + seed * 2.0);          // タイプ抽選
+    float bw = 0.58 + 0.34 * h11(cell * 2.11 + 7.7);  // 間口
+
+    // 空き地（抜け）: 手前ほど多い。住宅街は隙間がある＝密度の緩急
+    float emptyTh = mix(0.06, 0.18, profile);
+    float isEmpty = step(bt, emptyTh);
+    float t2 = clamp((bt - emptyTh) / (1.0 - emptyTh), 0.0, 1.0);
+    // 手前ほど一軒家が多い住宅街。中層は遠景にだけ、ごくたまに突き出るアクセント。
+    float houseTh = mix(0.42, 0.70, profile);
+    float aptHi = houseTh + 0.18;
+    float isShop  = step(houseTh, t2) * step(t2, aptHi) * step(0.35, profile); // 商店（看板の灯り）
+    float isHouse = step(t2, houseTh);                              // 一軒家（低・三角屋根）
+    float isApt   = step(aptHi, t2) * step(t2, 0.93);              // アパート/長屋（2階建て）
+    float isMid   = step(0.93, t2) * (1.0 - step(0.3, profile));   // 中層は遠景のみ・まれ
+    isApt += (1.0 - step(0.35, profile)) * step(houseTh, t2) * step(t2, aptHi); // 遠景は商店枠→アパート
+    isApt += step(0.93, t2) * step(0.3, profile);                  // 手前/中景の最上枠→アパート（中層化させない）
+
+    float gap = max(step(bw, fx), isEmpty);
+    float fxc = clamp(fx / max(bw, 0.001), 0.0, 1.0);
+    float d = abs(fxc - 0.5);
+
+    // 高さ: 住宅は低く、アパートは2階建て、中層だけ高い（遠景のみ）
+    float bh = amp * (isHouse * 0.5 + isShop * 0.42 + isApt * 0.6 + isMid * 1.7) + 0.025;
+    float peak = isHouse * (0.5 - d) * amp * 0.55;                   // 切妻屋根
+    float ridge = ridgeY + (gap > 0.5 ? -0.04 : bh + max(peak, 0.0));
+    float body = step(p.y, ridge) * (1.0 - gap);
+    vec3 silv = sil * (0.80 + 0.34 * h11(cell * 5.3 + 2.0));
     col = mix(col, silv, body);
 
-    if (body > 0.5 && gap < 0.5) {
-      vec2 wc = vec2(wx * winCols, p.y * winRows);
-      vec2 wid = floor(wc);
-      vec2 wf = fract(wc);
-      float rect = step(0.18, wf.x) * step(wf.x, 0.82) * step(0.24, wf.y) * step(wf.y, 0.86);
-      float below = step(p.y, ridgeY + bh - 0.012);
-      float lit = step(1.0 - winLit, h21(wid + seed));
-      lit *= 0.78 + 0.22 * sin(uTime * 1.3 + h21(wid) * 33.0);
-      vec3 wcol = mix(silv * 1.25, light, lit);
-      col = mix(col, wcol, rect * below * 0.9);
+    // 一軒家の屋根を「いぶし瓦の青灰」に塗り分ける（壁より暗い＝住宅らしさの決め手）
+    float wallTop = ridgeY + bh;
+    float roofMask = isHouse * step(p.y, ridge) * step(wallTop - 0.006, p.y) * (1.0 - gap);
+    vec3 roofCol = mix(vec3(0.17, 0.19, 0.25), uHorizon * 0.35, 0.3);
+    col = mix(col, roofCol, roofMask);
+    // 瓦のテカリ（屋根の稜線に夕日が片側だけ乗る）
+    float roofBand = smoothstep(0.012, 0.0, abs(p.y - ridge)) * roofMask;
+    col += uSunGlow * roofBand * 0.20 * smoothstep(0.2, 0.85, fx);
+
+    if (body > 0.5) {
+      float vfrac = (p.y - ridgeY) / max(ridge - ridgeY, 0.02);      // 0=base 1=屋根
+      float cols = isHouse * 2.0 + isShop * 3.0 + isApt * 4.0 + isMid * 5.0 + 1.0;
+      float rows = isHouse * 2.0 + isShop * 2.0 + isApt * 3.0 + isMid * 8.0 + 1.0;
+      vec2 wc = vec2(fxc * cols, vfrac * rows);
+      vec2 wid = floor(wc); vec2 wf = fract(wc);
+      float rect = step(0.22, wf.x) * step(wf.x, 0.78) * step(0.28, wf.y) * step(wf.y, 0.84);
+      float litR = h21(wid + cell + seed);
+      float lit = step(1.0 - winLit, litR);
+      lit *= 0.9 + 0.1 * sin(uTime * 0.7 + litR * 33.0);            // ちらつきは控えめに
+      vec3 wcol = mix(silv * 1.18, light, lit);
+      float onWall = max(1.0 - isHouse, step(p.y, wallTop + 0.004)); // 一軒家は窓を壁だけに
+      col = mix(col, wcol, rect * 0.9 * onWall);
+
+      // 商店の看板帯（1階の高さに横長の発光。暖色 or 白を抽選。文字は描かない）
+      float band = isShop * smoothstep(0.06, 0.0, abs(vfrac - 0.20)) * step(0.08, fxc) * step(fxc, 0.92);
+      vec3 signCol = mix(uSunGlow, vec3(0.85, 0.92, 1.0), step(0.5, h11(cell + 5.0)));
+      col = mix(col, signCol, band * 0.85);
     }
+
+    // 屋上の貯水タンク/物干し（アパート・中層の陸屋根に小さく）
+    float tank = (isApt + isMid) * step(p.y, ridge + 0.025) * step(ridge, p.y)
+               * step(abs(fxc - 0.5), 0.10) * (1.0 - gap);
+    col = mix(col, uDropTint * 0.5, tank * 0.7);
     return col;
   }
 
@@ -100,15 +141,15 @@ const FRAGMENT_BODY = /* glsl */ `
       vec2 id = floor(gp);
       vec2 f = fract(gp) - 0.5;
       float n = h21(id + fi * 23.0);
-      if (n < 0.62) continue;                                // まばらに
+      if (n < 0.74) continue;                                // ぐっとまばらに（静けさ優先）
       float ang = t * 1.6 * (n - 0.5) * 2.0 + n * 6.2831;    // 回転
       float ca = cos(ang), sa = sin(ang);
       vec2 rf = vec2(ca * f.x - sa * f.y, sa * f.x + ca * f.y);
-      float leaf = smoothstep(0.20, 0.10, length(rf * vec2(1.0, 2.2))); // 細長い葉
+      float leaf = smoothstep(0.16, 0.08, length(rf * vec2(1.0, 2.2))); // 小さめの葉
       vec3 lc = (mode > 1.5)
-        ? mix(vec3(1.0, 0.82, 0.86), vec3(0.98, 0.7, 0.78), n)    // 花びら（淡紅）
-        : mix(vec3(0.85, 0.4, 0.13), vec3(0.7, 0.16, 0.10), n);   // 紅葉（橙〜紅）
-      col = mix(col, lc, leaf * (0.35 + 0.4 * depth));
+        ? mix(vec3(0.98, 0.84, 0.88), vec3(0.95, 0.74, 0.80), n)  // 花びら（淡紅）
+        : mix(vec3(0.78, 0.46, 0.22), vec3(0.64, 0.32, 0.18), n); // 紅葉（落ち着いた橙茶）
+      col = mix(col, lc, leaf * (0.24 + 0.30 * depth));
     }
     return col;
   }
@@ -125,80 +166,114 @@ const FRAGMENT_BODY = /* glsl */ `
     float cloudband = smoothstep(0.52, 0.82, cl) * smoothstep(0.44, 0.95, vp.y);
     col = mix(col, mix(uHorizon, uSunGlow, 0.45), cloudband * 0.4);
 
+    // 上空（見上げの報酬）: 高い所に薄い巻雲のすじ＋天頂をわずかに締める
+    float high = smoothstep(0.72, 1.05, vp.y);
+    float cirrus = fbm(vec2(ax * 0.8 + yaw * 0.7 + uTime * 0.004, vp.y * 5.0 - 1.0));
+    col = mix(col, mix(col, uSunGlow, 0.22), high * smoothstep(0.5, 0.78, cirrus) * 0.35);
+    col *= 1.0 - high * 0.05;
+
     // 遠雷フラッシュ（空がほのかに白む。雲のあたりを少し強く）
     col += uFlash * (0.10 + 0.16 * cloudband) * vec3(0.85, 0.9, 1.0);
 
-    // ねぐらへ帰る鳥影（ゆっくり横切る小さなV字）。夕・朝の郷愁
-    for (int i = 0; i < 4; i++) {
+    // 夜の度合い（空が暗いほど1）。月・観覧車・星を夜ほど強く出すための係数
+    float nightAmt = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0);
+
+    // 月（far なのでゆっくり動く。淡いハロつき）
+    vec2 mn = vec2(-0.72, 0.80);
+    float md = length(vec2((ax + yaw * 0.85) - mn.x, vp.y - mn.y));
+    float moonDisc = smoothstep(0.05, 0.043, md);
+    float moonTex = 0.92 + 0.08 * fbm(vec2((ax + yaw * 0.85) * 30.0, vp.y * 30.0));
+    col = mix(col, vec3(0.96, 0.95, 0.90) * moonTex, moonDisc * (0.35 + 0.5 * nightAmt));
+    col += vec3(0.9, 0.92, 1.0) * exp(-md * 13.0) * (0.05 + 0.10 * nightAmt);
+
+    // 星（夜空に静かに在る。またたかせない＝止まった時間）
+    vec2 sg = vec2((ax + yaw * 0.8) * 14.0, vp.y * 14.0);
+    vec2 sid = floor(sg);
+    float sn = h21(sid + 3.0);
+    float star = step(0.95, sn) * smoothstep(0.05, 0.0, length(fract(sg) - 0.5))
+               * smoothstep(0.62, 0.85, vp.y);
+    col += vec3(0.9, 0.93, 1.0) * star * nightAmt * 0.7;
+
+    // 帰る鳥影（ごくたまに、ゆっくり）。2羽だけ＝静けさを保つ
+    for (int i = 0; i < 2; i++) {
       float fi = float(i);
-      float bx = fract(uTime * 0.012 + fi * 0.27) * 2.6 - 1.3;       // 横移動
-      float byb = 0.64 + fi * 0.035 + sin(uTime * 0.3 + fi) * 0.012; // 高さ（はばたき）
+      float bx = fract(uTime * 0.008 + fi * 0.5) * 2.6 - 1.3;
+      float byb = 0.66 + fi * 0.05 + sin(uTime * 0.25 + fi) * 0.010;
       vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - byb);
       bp.x = abs(bp.x);
-      float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
-      col = mix(col, col * 0.5, wing * 0.6);
+      float wing = smoothstep(0.009, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.020);
+      col = mix(col, col * 0.55, wing * 0.5);
     }
 
-    // 奥→手前の街（高台から見下ろすので低めの地平）
-    col = hills(col, vp, ax + yaw * 0.92, 0.48, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
-    col = town(col, vp, ax + yaw * 0.96, 0.44, 0.10, 0.05,
-               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.30, 0.55, uIntensity), 60.0, 78.0, 1.3);
+    // 時間とともに窓に灯がともる（夕暮れが深まる郷愁）
+    float litRamp = 0.7 + 0.3 * smoothstep(0.0, 90.0, uTime);
 
-    // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（奥行き）
-    float haze = smoothstep(0.52, 0.40, vp.y) * smoothstep(0.30, 0.46, vp.y);
-    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.28);
+    // 奥→手前の住宅街（遠景=低い家＋たまに中層 / 中景=商店街 / 手前=家並み）
+    col = hills(col, vp, ax + yaw * 0.92, 0.50, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
+    col = town(col, vp, ax + yaw * 0.96, 0.46, 0.085, 0.05,
+               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.22, 0.45, uIntensity) * litRamp, 1.3, 0.0);
 
-    col = town(col, vp, ax + yaw * 1.02, 0.36, 0.16, 0.12,
-               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.45, 0.75, uIntensity), 34.0, 40.0, 7.1);
-    col = town(col, vp, ax + yaw * 1.10, 0.24, 0.26, 0.17,
-               uDropTint * 0.82, uSunGlow, mix(0.55, 0.9, uIntensity), 18.0, 22.0, 19.3);
+    // 空気遠近の霞: 地平で遠い街並みが空に溶ける（奥行き＝退色＝郷愁）
+    float haze = smoothstep(0.54, 0.40, vp.y) * smoothstep(0.30, 0.46, vp.y);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.40);
 
-    // 高層ビルの赤色航空障害灯（ゆっくり点滅）。日本の夜景の郷愁の決め手
+    col = town(col, vp, ax + yaw * 1.02, 0.40, 0.14, 0.11,
+               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.32, 0.55, uIntensity) * litRamp, 7.1, 0.5);
+    col = town(col, vp, ax + yaw * 1.12, 0.32, 0.20, 0.15,
+               uDropTint * 0.82, uSunGlow, mix(0.30, 0.55, uIntensity) * litRamp, 19.3, 1.0);
+
+    // 電柱・電線（昭和の住宅街の象徴）。数本だけ、静かに
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      float bx = (h11(fi * 13.0 + 2.0) - 0.5) * 2.2;       // 世界上の横位置
-      float by = 0.40 + h11(fi * 5.0 + 3.0) * 0.12;        // スカイライン上の高さ
-      float wxr = ax + yaw * (1.0 + fi * 0.02);
-      float d = length(vec2(wxr - bx, vp.y - by) * vec2(1.0, 1.35));
-      float blink = smoothstep(0.45, 0.55, fract(uTime * 0.5 + fi * 0.37)); // ゆっくり点滅
-      float beacon = exp(-d * 150.0) + exp(-d * 45.0) * 0.22;
-      col += vec3(1.0, 0.12, 0.08) * beacon * blink * 0.9;
+      float yl = 0.31 + fi * 0.018 + sin((ax + yaw * 1.12) * 2.0 + fi * 1.7) * 0.010;
+      col = mix(col, vec3(0.03, 0.03, 0.04), smoothstep(0.0028, 0.0, abs(vp.y - yl)) * 0.7);
+    }
+    float poleW = ax + yaw * 1.12;
+    float pole = step(abs(fract(poleW / 0.5) - 0.5), 0.010) * step(vp.y, 0.40) * step(0.27, vp.y)
+               * step(0.5, h11(floor(poleW / 0.5) + 11.0));
+    col = mix(col, vec3(0.03, 0.03, 0.04), pole * 0.7);
+
+    // 遠くの高い建物の赤い灯（点滅させず、静かに灯す。1〜2基）
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      float bx = (h11(fi * 13.0 + 2.0) - 0.5) * 1.8;
+      float by = 0.46 + h11(fi * 5.0 + 3.0) * 0.08;
+      float bd = length(vec2((ax + yaw) - bx, vp.y - by) * vec2(1.0, 1.35));
+      col += vec3(0.9, 0.18, 0.12) * (exp(-bd * 160.0) + exp(-bd * 55.0) * 0.16) * (0.35 + 0.35 * nightAmt);
     }
 
-    // ── 手前の商店街（見下ろす通り）。最下部に道・店の灯り・反射 ──
-    float streetTop = 0.205;
-    float st = smoothstep(streetTop, streetTop - 0.025, vp.y); // 1 = 通りの領域
+    // ── 見下ろす通り（手前の道路。下を向くと画面に広がる。車は置かず静かに） ──
+    float streetTop = 0.27;
+    float st = smoothstep(streetTop, streetTop - 0.07, vp.y); // 1 = 通りの領域（帯を広く）
     {
-      float sx = ax + yaw * 1.18;                 // 通りは最も手前＝速く流れる
+      float depth = clamp((streetTop - vp.y) / 0.5, 0.0, 1.0);     // 0=手前 1=奥(消失点)
+      float vanish = yaw * 0.12;
+      float persX = (ax - vanish) / max(1.0 - depth * 0.8, 0.14);  // 消失点へ収束
+      // 濡れたアスファルト（奥は霞む）
+      vec3 road = mix(vec3(0.05, 0.05, 0.062), uHorizon * 0.12, depth * 0.8);
+      // センターライン（破線・奥ほど詰まる＝パース）
+      float center = step(abs(persX), 0.02) * step(0.45, fract(depth * 20.0)) * (1.0 - depth * 0.5);
+      road = mix(road, vec3(0.6, 0.58, 0.5), center * 0.5);
+      // 店先・自販機の灯り（道の両脇から、奥へ点列）
+      float sx = ax + yaw * 1.18;
       float cellW = 0.052;
       float shopCell = floor(sx / cellW);
       float fxs = fract(sx / cellW) - 0.5;
-      float sr = h11(shopCell + 7.0);
-      float shopLit = step(0.30, sr);             // 多くの店が灯る商店街
-      float isVend = step(0.82, h11(shopCell + 9.0)); // たまに自販機（白〜青白）
-      float sy = 0.105 + h11(shopCell + 2.0) * 0.04;
-      // 店先の暖色グロー（提灯/看板を様式的に。固有名は出さない）／自販機は冷たい白
+      float shopLit = step(0.30, h11(shopCell + 7.0));
+      float isVend = step(0.85, h11(shopCell + 9.0));
+      float sy = 0.10 + h11(shopCell + 2.0) * 0.03;
       vec3 shopHue = mix(uSunGlow, vec3(1.0, 0.55, 0.38), step(0.5, h11(shopCell + 5.0)));
       shopHue = mix(shopHue, vec3(0.82, 0.92, 1.0), isVend);
-      float sign = smoothstep(0.03, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
-      // 自販機は縦長で少し明るい灯り
-      float vend = isVend * smoothstep(0.055, 0.0, abs(vp.y - 0.085)) * smoothstep(0.26, 0.0, abs(fxs));
-      // 道路（暗く濡れて、灯りを縦に映す）
-      vec3 road = mix(vec3(0.035, 0.035, 0.045), uHorizon * 0.10, 0.5);
-      road += shopHue * sign * shopLit * 0.85;
-      road += shopHue * vend * 0.55;
-      float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.08, vp.y);
-      road += shopHue * refl * (shopLit + isVend) * 0.22;
+      float sign = smoothstep(0.028, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
+      road += shopHue * sign * (shopLit + isVend) * 0.8;
+      // 濡れた路面に縦に伸びる灯りの反射
+      float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.12, vp.y);
+      road += shopHue * refl * (shopLit + isVend) * 0.32;
       // 通り沿いの街灯
       float lampPh = fract(sx / 0.16) - 0.5;
-      float lampY = 0.165 + h11(floor(sx / 0.16) + 3.0) * 0.02;
+      float lampY = 0.155 + h11(floor(sx / 0.16) + 3.0) * 0.02;
       float dl = length(vec2(lampPh * 0.16, vp.y - lampY) * vec2(1.0, 1.4));
-      road += uSunGlow * (exp(-dl * 40.0) + exp(-dl * 11.0) * 0.3) * 0.9;
-      // 通りを流れる車のヘッドライト（ゆっくり横切る）＋濡れた道の反射
-      float carW = mix(-1.4, 1.4, fract(uTime * 0.045));
-      float cd = length(vec2(sx - carW, (vp.y - 0.10) * 2.6));
-      road += vec3(1.0, 0.93, 0.78) * exp(-cd * 26.0) * 0.85;
-      road += vec3(1.0, 0.93, 0.78) * smoothstep(0.16, 0.0, abs(sx - carW)) * smoothstep(0.10, -0.06, vp.y) * 0.10;
+      road += uSunGlow * (exp(-dl * 40.0) + exp(-dl * 11.0) * 0.3) * 0.85;
       col = mix(col, road, st);
     }
 

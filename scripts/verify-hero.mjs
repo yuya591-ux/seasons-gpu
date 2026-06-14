@@ -1,0 +1,22 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+await page.goto('http://localhost:4790/seasons/', { waitUntil: 'networkidle' })
+await page.evaluate(() => document.fonts.ready)
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(500)
+await page.locator('button:has-text("情景")').click()
+await page.waitForTimeout(300)
+await page.locator('.scene-card:has-text("秋の夕暮れ、高台の角部屋")').click()
+await page.waitForTimeout(2500)
+await page.screenshot({ path: 'scripts/_shots/hero_front.png' })
+// 少し下を向く（道路と手前の家並み）
+const box = await page.locator('#scene').boundingBox()
+await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5)
+await page.mouse.down()
+for (let i = 1; i <= 12; i++) { await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5 + (box.height * 0.35 * i) / 12); await page.waitForTimeout(20) }
+await page.mouse.up()
+await page.waitForTimeout(900)
+await page.screenshot({ path: 'scripts/_shots/hero_down.png' })
+await browser.close()
+console.log('done')

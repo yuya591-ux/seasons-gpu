@@ -36,10 +36,16 @@ async function dragBy(dx, dy, steps = 12) {
   await page.mouse.up()
 }
 // 下を向く＝見下ろす商店街
-await dragBy(0, box.height * 0.5)
+await dragBy(0, box.height * 0.6)
 await page.waitForTimeout(800)
 await page.screenshot({ path: 'scripts/_shots/corner_down.png' })
-await dragBy(0, -box.height * 0.5) // 正面へ戻す
+await dragBy(0, -box.height * 0.6) // 正面へ戻す
+await page.waitForTimeout(400)
+// 上を向く＝上空
+await dragBy(0, -box.height * 0.6)
+await page.waitForTimeout(800)
+await page.screenshot({ path: 'scripts/_shots/corner_up.png' })
+await dragBy(0, box.height * 0.6) // 正面へ戻す
 await page.waitForTimeout(500)
 // 少しだけ右を向く＝建物の角が見える「角部屋」の見せ場
 await dragBy(-box.width * 0.5, 0)
