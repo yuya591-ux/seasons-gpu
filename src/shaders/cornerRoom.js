@@ -258,63 +258,50 @@ const FRAGMENT_BODY = /* glsl */ `
       col += vec3(0.9, 0.18, 0.12) * (exp(-bd * 160.0) + exp(-bd * 55.0) * 0.16) * (0.35 + 0.35 * nightAmt);
     }
 
-    // ── 見下ろす通り（明るく見やすく。車道＋歩道＋歩く人影） ──
-    float streetTop = 0.27;
-    float st = smoothstep(streetTop, streetTop - 0.08, vp.y); // 通りの領域
+    // ── 見下ろす街並み（地面のパース投影＝本当に高所から下を眺めている） ──
+    // 地平 hY より下は地面。vp.y が下がるほど手前（視点に近い）＝パースで街路が地平へ収束する。
+    float hY = 0.43;
+    float gmask = smoothstep(hY + 0.02, hY - 0.02, vp.y);
     {
-      float depth = clamp((streetTop - vp.y) / 0.55, 0.0, 1.0);    // 0=奥(消失) 1=手前
-      float vanish = yaw * 0.12;
-      float persX = (ax - vanish) / max(1.0 - depth * 0.78, 0.14); // 消失点へ収束
-      float side = abs(persX);
-      float sx = ax + yaw * 1.8 + uParallax.x * 1.8;
-      float roadW = 0.26;
-      // 車道（濡れたアスファルト・夜でも見える明るさ）と両脇の歩道（明るいコンクリ）
-      vec3 asphalt = mix(vec3(0.14, 0.13, 0.14), uHorizon * 0.22, depth * 0.6);
-      vec3 pave = mix(vec3(0.26, 0.25, 0.24), uHorizon * 0.22, depth * 0.5);
-      float onWalk = smoothstep(roadW, roadW + 0.03, side);
-      vec3 road = mix(asphalt, pave, onWalk);
-      // センターライン（破線）と縁石（車道と歩道の境）
-      float center = step(side, 0.012) * step(0.45, fract(depth * 22.0));
-      road = mix(road, vec3(0.72, 0.70, 0.60), center * 0.55);
-      float curb = smoothstep(0.012, 0.0, abs(side - roadW));
-      road = mix(road, vec3(0.5, 0.49, 0.45), curb * 0.4);
-      // 店先・自販機の灯り＋濡れ反射
-      float cellW = 0.052;
-      float shopCell = floor(sx / cellW);
-      float fxs = fract(sx / cellW) - 0.5;
-      float shopLit = step(0.30, h11(shopCell + 7.0));
-      float isVend = step(0.85, h11(shopCell + 9.0));
-      float sy = 0.10 + h11(shopCell + 2.0) * 0.03;
-      vec3 shopHue = mix(uSunGlow, vec3(1.0, 0.55, 0.38), step(0.5, h11(shopCell + 5.0)));
-      shopHue = mix(shopHue, vec3(0.82, 0.92, 1.0), isVend);
-      float sign = smoothstep(0.028, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
-      road += shopHue * sign * (shopLit + isVend) * 0.7;
-      float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.12, vp.y);
-      road += shopHue * refl * (shopLit + isVend) * 0.28;
-      // 街灯
-      float lampPh = fract(sx / 0.16) - 0.5;
-      float lampY = 0.155 + h11(floor(sx / 0.16) + 3.0) * 0.02;
-      float dl = length(vec2(lampPh * 0.16, vp.y - lampY) * vec2(1.0, 1.4));
-      road += uSunGlow * (exp(-dl * 40.0) + exp(-dl * 11.0) * 0.3) * 0.8;
-      // 歩道を歩く人影（ゆっくり横切る。見下ろすほど見える）
-      for (int i = 0; i < 6; i++) {
-        float fi = float(i);
-        float dir = step(0.5, h11(fi * 3.0 + 1.0)) * 2.0 - 1.0;
-        float lane = 0.035 + h11(fi * 5.0) * 0.14;            // 歩道上の足元の高さ
-        float pw = fract(uTime * 0.018 * dir + h11(fi * 7.0)) * 2.6 - 1.3; // 世界横位置
-        float scl = mix(2.0, 0.9, lane / 0.18);              // 手前ほど大きい
-        float hgt = 0.045 * scl;                             // 身長
-        vec2 dp = vec2(sx - pw, vp.y - lane);
-        float swing = 1.0 + 0.05 * sin(uTime * 5.0 * dir + fi); // 歩く上下動
-        float bodyP = smoothstep(0.020 * scl, 0.006 * scl, abs(dp.x)) * step(0.0, dp.y) * step(dp.y, hgt * swing);
-        float headP = smoothstep(0.015 * scl, 0.0, length(vec2(dp.x * 1.3, (dp.y - hgt) * 0.9)));
-        float ped = max(bodyP, headP);
-        // 足元のうっすらした影＋人影本体（暗いシルエット）
-        road = mix(road, vec3(0.04, 0.035, 0.045), ped * 0.9);
-        road += uSunGlow * smoothstep(0.012 * scl, 0.0, length(vec2(dp.x, (dp.y - hgt) * 0.9))) * 0.04; // 頭にほのか光
-      }
-      if (uGlass > 1.5) road = mix(road, vec3(0.82, 0.85, 0.92), 0.12); // 雪は路面に白
-      col = mix(col, road, st);
+      float t = max(hY - vp.y, 0.006);             // 0=地平, 大=手前(下)
+      float d = 0.06 / t;                           // 視点からの距離（地平=遠, 手前=近）
+      float scl = 7.0;                              // 区画の細かさ
+      // 地面の世界座標。横はパースで広がり、見回し/覗き込みでスライドする。
+      float gx = (ax * 1.6 + (yaw + uParallax.x * 1.6) * 0.6) * d * scl;
+      float gz = d * scl;
+      vec2 g = vec2(gx, gz);
+      vec2 gi = floor(g);
+      vec2 gf = fract(g);
+      float blkR = h21(gi + 2.0);
+      // 街路（区画の境界＝縦横の道）
+      float dRoad = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
+      float road = smoothstep(0.16, 0.11, dRoad);   // 1=道
+      // 区画（建物の屋上を上から）＝はっきり明るく。道は中明度。たまに緑地。
+      float isPark = step(0.88, blkR);
+      vec3 roofC = mix(vec3(0.34, 0.30, 0.29), uHorizon * 0.7, 0.4) * (0.78 + 0.5 * blkR);
+      roofC = mix(roofC, mix(vec3(0.16, 0.24, 0.14), uHorizon * 0.4, 0.3), isPark); // 緑地
+      vec3 roadC = mix(vec3(0.18, 0.17, 0.17), uHorizon * 0.28, 0.4);
+      vec3 ground = mix(roofC, roadC, road);
+      // 屋上の縁の立体感（夕日が片側に）＋区画の灯り（窓・屋上）
+      ground += uSunGlow * smoothstep(0.18, 0.14, dRoad) * (1.0 - road) * smoothstep(0.0, 0.6, gf.x) * 0.10;
+      float roofLight = step(0.66, h21(gi + 11.0)) * smoothstep(0.36, 0.05, length(gf - 0.5)) * (1.0 - road);
+      ground += uSunGlow * roofLight * 0.22;
+      // 街灯（交差点に点々）
+      float lampG = smoothstep(0.10, 0.0, length(gf - 0.5)) * step(0.5, h11(gi.x + gi.y * 3.0 + 7.0)) * road;
+      ground += uSunGlow * lampG * 0.8;
+      // 人影（道沿いを動く小さな点）
+      float ped = step(0.55, h21(gi + 19.0)) * smoothstep(0.06, 0.0, length(gf - vec2(0.5, fract(uTime * 0.05 + blkR)))) * road;
+      ground = mix(ground, vec3(0.06, 0.05, 0.05), ped * 0.6);
+      // 車のヘッドライト（縦の道を流れる）
+      float carY = fract(uTime * 0.18 * (blkR > 0.5 ? 1.0 : -1.0) + blkR);
+      float car = step(0.5, h11(gi.x * 1.7 + 21.0)) * smoothstep(0.09, 0.0, abs(gf.x - 0.5))
+                * smoothstep(0.05, 0.0, abs(gf.y - carY));
+      ground += vec3(1.0, 0.9, 0.7) * car * 0.6;
+      // 空気遠近: 地平に近いほど霞む（遠い街は空へ溶ける）
+      float haze2 = smoothstep(0.07, 0.0, t);
+      ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), haze2 * 0.85);
+      if (uGlass > 1.5) ground = mix(ground, vec3(0.82, 0.85, 0.92), 0.12); // 雪
+      col = mix(col, ground, gmask);
     }
 
     return col;

@@ -178,39 +178,39 @@ const FRAGMENT_BODY = /* glsl */ `
       col += vec3(1.0, 0.12, 0.08) * (exp(-bd * 150.0) + exp(-bd * 45.0) * 0.22) * bl * 0.85;
     }
 
-    // ── 見下ろす通り（最前景の地面。下を向くと建物の足元〜道が広がる） ──
-    float streetTop = 0.20; // 手前 town の floorY と一致
-    float st = smoothstep(streetTop, streetTop - 0.07, vp.y);
+    // ── 見下ろす街並み（地面のパース投影＝本当に高所から下を眺めている） ──
+    float hY = 0.43;
+    float gmask = smoothstep(hY + 0.02, hY - 0.02, vp.y);
     {
-      float depth = clamp((streetTop - vp.y) / 0.5, 0.0, 1.0); // 0=手前 1=奥
-      float vanish = yaw * 0.12;
-      float persX = (ax - vanish) / max(1.0 - depth * 0.8, 0.14); // 消失点へ収束
-      vec3 road = mix(vec3(0.05, 0.05, 0.062), uHorizon * 0.12, depth * 0.8);
-      // センターライン（破線・パース）
-      float center = step(abs(persX), 0.02) * step(0.45, fract(depth * 20.0)) * (1.0 - depth * 0.5);
-      road = mix(road, vec3(0.6, 0.58, 0.5), center * 0.5);
-      // 店先・自販機の灯り（道の両脇）
-      float sx = ax + yaw * 1.8 + uParallax.x * 1.8;
-      float cellW = 0.052;
-      float shopCell = floor(sx / cellW);
-      float fxs = fract(sx / cellW) - 0.5;
-      float shopLit = step(0.30, h11(shopCell + 7.0));
-      float isVend = step(0.85, h11(shopCell + 9.0));
-      float sy = 0.095 + h11(shopCell + 2.0) * 0.03;
-      vec3 shopHue = mix(uSunGlow, vec3(1.0, 0.55, 0.38), step(0.5, h11(shopCell + 5.0)));
-      shopHue = mix(shopHue, vec3(0.82, 0.92, 1.0), isVend);
-      float sign = smoothstep(0.026, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
-      road += shopHue * sign * (shopLit + isVend) * 0.8;
-      // 濡れた路面の縦反射（雨のとき強める）
-      float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.12, vp.y);
-      road += shopHue * refl * (shopLit + isVend) * (uGlass > 0.5 ? 0.45 : 0.28);
-      // 通り沿いの街灯
-      float lampPh = fract(sx / 0.16) - 0.5;
-      float lampY = 0.15 + h11(floor(sx / 0.16) + 3.0) * 0.02;
-      float dlamp = length(vec2(lampPh * 0.16, vp.y - lampY) * vec2(1.0, 1.4));
-      road += uSunGlow * (exp(-dlamp * 40.0) + exp(-dlamp * 11.0) * 0.3) * 0.85;
-      if (uGlass > 1.5) road = mix(road, vec3(0.78, 0.82, 0.9), 0.10); // 雪は路面にうっすら白
-      col = mix(col, road, st);
+      float gt = max(hY - vp.y, 0.006);             // 0=地平, 大=手前(下)
+      float gd = 0.06 / gt;                         // 視点からの距離
+      float gscl = 7.0;
+      float ggx = (ax * 1.6 + (yaw + uParallax.x * 1.6) * 0.6) * gd * gscl;
+      float ggz = gd * gscl;
+      vec2 g = vec2(ggx, ggz);
+      vec2 gi = floor(g); vec2 gf = fract(g);
+      float blkR = h21(gi + 2.0);
+      float dRoad = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
+      float road = smoothstep(0.16, 0.11, dRoad);
+      float isPark = step(0.88, blkR);
+      vec3 roofC = mix(vec3(0.34, 0.30, 0.29), uHorizon * 0.7, 0.4) * (0.78 + 0.5 * blkR);
+      roofC = mix(roofC, mix(vec3(0.16, 0.24, 0.14), uHorizon * 0.4, 0.3), isPark);
+      vec3 roadC = mix(vec3(0.18, 0.17, 0.17), uHorizon * 0.28, 0.4);
+      vec3 ground = mix(roofC, roadC, road);
+      ground += uSunGlow * smoothstep(0.18, 0.14, dRoad) * (1.0 - road) * smoothstep(0.0, 0.6, gf.x) * 0.10;
+      float roofLight = step(0.66, h21(gi + 11.0)) * smoothstep(0.36, 0.05, length(gf - 0.5)) * (1.0 - road);
+      ground += uSunGlow * roofLight * 0.22;
+      float lampG = smoothstep(0.10, 0.0, length(gf - 0.5)) * step(0.5, h11(gi.x + gi.y * 3.0 + 7.0)) * road;
+      ground += uSunGlow * lampG * 0.8;
+      float ped = step(0.55, h21(gi + 19.0)) * smoothstep(0.06, 0.0, length(gf - vec2(0.5, fract(uTime * 0.05 + blkR)))) * road;
+      ground = mix(ground, vec3(0.06, 0.05, 0.05), ped * 0.6);
+      float carY = fract(uTime * 0.18 * (blkR > 0.5 ? 1.0 : -1.0) + blkR);
+      float car = step(0.5, h11(gi.x * 1.7 + 21.0)) * smoothstep(0.09, 0.0, abs(gf.x - 0.5)) * smoothstep(0.05, 0.0, abs(gf.y - carY));
+      ground += vec3(1.0, 0.9, 0.7) * car * 0.6;
+      float haze2 = smoothstep(0.07, 0.0, gt);
+      ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), haze2 * 0.85);
+      if (uGlass > 1.5) ground = mix(ground, vec3(0.82, 0.85, 0.92), 0.12);
+      col = mix(col, ground, gmask);
     }
 
     // 電線（手前・郷愁）。ゆるく垂れる数本。視点回転で一緒に動く。
