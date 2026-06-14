@@ -75,21 +75,33 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 col = sky;
     vec2 cuv = vec2((uv.x - 0.5) * asp + 0.5, uv.y);
 
-    // 入道雲: 地平から立ち上がる、もくもくした塊。陽の当たる上が白く、底が翳る。
-    vec2 q = cuv * vec2(1.7, 1.9) + vec2(t * 0.012, 0.0);
-    float d1 = fbm(q);
-    float d2 = fbm(q * 2.3 + 11.0);
-    float dens = d1 * 0.68 + d2 * 0.32;
-    // 雲が湧く高さ帯（下〜中ほどに集中＝入道雲らしい立ち上がり）
-    float tower = smoothstep(0.04, 0.30, uv.y) * (1.0 - smoothstep(0.60, 0.92, uv.y));
-    float cloudMask = smoothstep(0.44, 0.58, dens) * tower;
-    cloudMask = clamp(cloudMask * mix(0.9, 1.3, uIntensity), 0.0, 1.0);
-    // 簡易ライティング: 密度の芯ほど陽が当たって明るい、縁は翳る
-    float lit = smoothstep(0.46, 0.74, dens);
-    vec3 cloudLit = uDropTint; // 陽の当たる白
-    vec3 cloudSha = uDropTint * 0.58 + uSkyMid * 0.16; // 青みを帯びた翳り
-    vec3 cloudCol = mix(cloudSha, cloudLit, lit);
+    // ── 入道雲（積乱雲）: もくもく立ち上がる大きな塊。上面は陽に白く輝き、底は青く翳る ──
+    vec2 q = cuv * vec2(1.15, 1.5) + vec2(t * 0.009, 0.0);
+    vec2 warp = vec2(fbm(q + 3.1), fbm(q + 7.7)) - 0.5;       // ドメインワープでもくもく感
+    float d1 = fbm(q + warp * 0.9);
+    float d2 = fbm(q * 2.4 + 11.0 + warp);
+    float dens = d1 * 0.66 + d2 * 0.34;
+    float d1u = fbm(q + vec2(0.0, 0.07) + warp * 0.9);        // 少し上の密度
+    // 入道雲らしく低い所から高くそびえる帯
+    float tower = smoothstep(0.10, 0.26, uv.y) * (1.0 - smoothstep(0.74, 0.99, uv.y));
+    float cloudMask = smoothstep(0.42, 0.52, dens) * tower;   // 厚く・はっきり
+    cloudMask = clamp(cloudMask * mix(1.0, 1.3, uIntensity), 0.0, 1.0);
+    // 密度の縦勾配を「光の当たる面」に: 上面が陽を受け、底は影る（はっきりした立体感）
+    float topLight = smoothstep(-0.07, 0.09, d1 - d1u);
+    float core = smoothstep(0.5, 0.9, dens);
+    vec3 cloudLit = mix(uDropTint, vec3(1.0, 0.99, 0.96), 0.4); // 陽の当たる白（やや暖色）
+    vec3 cloudSha = uDropTint * 0.32 + uSkyMid * 0.42;          // 青みの濃い翳り（底）
+    vec3 cloudCol = mix(cloudSha, cloudLit, topLight);
+    cloudCol = mix(cloudCol, cloudCol * 0.82, core * 0.35);     // 芯を締めて厚みを出す
+    float rim = smoothstep(0.42, 0.5, dens) * (1.0 - smoothstep(0.5, 0.64, dens));
+    cloudCol += uSunGlow * rim * 0.18;                          // 縁の陽の透け
     col = mix(col, cloudCol, cloudMask);
+
+    // 高層のちぎれ雲（小さな積雲が上空に点々）
+    vec2 q2 = cuv * vec2(3.0, 4.2) + vec2(-t * 0.018, 0.0);
+    float small = fbm(q2 + warp * 0.4);
+    float smallMask = smoothstep(0.60, 0.72, small) * smoothstep(0.56, 0.74, uv.y) * (1.0 - smoothstep(0.86, 1.0, uv.y));
+    col = mix(col, mix(uDropTint, vec3(1.0, 0.99, 0.97), 0.4), smallMask * 0.5);
 
     // 遠くの木立のシルエット（夏の郷愁・緑）。最下部に、もやでかすませて薄く。
     float treeTop = 0.085 + fbm(vec2(cuv.x * 6.0, 3.0)) * 0.035;
