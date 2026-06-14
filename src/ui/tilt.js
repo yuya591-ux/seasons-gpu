@@ -1,7 +1,7 @@
 // 端末の傾き（ジャイロ）で見回す。既定はオフ。iOS 13+ は許可が要る（ユーザー操作内で要求）。
 // 有効化した瞬間の姿勢を基準にし、そこからの傾きを見回し量にする。
 
-export function createTilt(renderer) {
+export function createTilt({ onTilt, onDisable }) {
   let enabled = false
   let base = null
 
@@ -13,7 +13,7 @@ export function createTilt(renderer) {
     // 基準姿勢からの傾きを -1..1 に。約25°で端。
     const nx = (gx - base.gx) / 25
     const ny = -(gy - base.gy) / 25
-    renderer.applyTilt(nx, ny)
+    onTilt(nx, ny)
   }
   window.addEventListener('deviceorientation', handle)
 
@@ -34,7 +34,8 @@ export function createTilt(renderer) {
     },
     disable() {
       enabled = false
-      renderer.clearTilt()
+      base = null
+      if (onDisable) onDisable()
     },
   }
 }

@@ -7,7 +7,7 @@ import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
 import { createTilt } from './ui/tilt.js'
-import { mountSplat, unmountSplat } from './engine/splatViewer.js'
+import { mountSplat, unmountSplat, applySplatTilt, resetSplatTilt } from './engine/splatViewer.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
 
@@ -33,7 +33,18 @@ function start() {
   const settings = state.settings
 
   const audio = createAudio()
-  const tilt = createTilt(renderer)
+  let splatMode = false
+  // 端末の傾き: スプラット情景は3Dの見回し、それ以外はシェーダーの視差に振り分ける
+  const tilt = createTilt({
+    onTilt: (nx, ny) => {
+      if (splatMode) applySplatTilt(nx, ny)
+      else renderer.applyTilt(nx, ny)
+    },
+    onDisable: () => {
+      if (splatMode) resetSplatTilt()
+      else renderer.clearTilt()
+    },
+  })
   audio.setMuted(settings.muted)
   audio.setVolume(settings.volume)
 
@@ -48,7 +59,6 @@ function start() {
 
   // 情景の適用。スプラット情景は3Dビューア、それ以外はシェーダー描画に振り分ける。
   // 連打切替に備え世代トークンで古い処理の状態書き換えを無効化、失敗時は通常情景へフォールバック。
-  let splatMode = false
   let sceneGen = 0
   async function applyScene(next) {
     const gen = ++sceneGen

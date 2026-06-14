@@ -5,6 +5,30 @@
 let mountToken = 0
 let viewer = null // 確定済みビューア
 let container = null // 確定済みコンテナ
+let THREEref = null // 傾き操作で使う three の参照
+let tiltCtx = null // 傾き操作の基準（カメラ/コントロール/中心/基準角）
+
+/** 端末の傾き(nx,ny: -1..1)で3Dを見回す（傾きトグルON時）。 */
+export function applySplatTilt(nx, ny) {
+  if (!viewer || !tiltCtx || !THREEref) return
+  const { camera, controls, target, baseTheta, basePhi } = tiltCtx
+  controls.autoRotate = false
+  const q = new THREEref.Quaternion().setFromUnitVectors(camera.up, new THREEref.Vector3(0, 1, 0))
+  const qi = q.clone().invert()
+  const offset = camera.position.clone().sub(target).applyQuaternion(q)
+  const sph = new THREEref.Spherical().setFromVector3(offset)
+  sph.theta = baseTheta + nx * 0.8
+  sph.phi = Math.max(0.25, Math.min(Math.PI - 0.25, basePhi - ny * 0.45))
+  sph.makeSafe()
+  offset.setFromSpherical(sph).applyQuaternion(qi)
+  camera.position.copy(target).add(offset)
+  controls.update()
+}
+
+/** 傾き操作をやめる（自動回転を戻す）。 */
+export function resetSplatTilt() {
+  if (tiltCtx && viewer) tiltCtx.controls.autoRotate = true
+}
 
 // WebGL2 の対応状況を端末側で調べる（iOS で何が無いかを可視化）。
 function webglCaps() {
@@ -53,6 +77,7 @@ export async function unmountSplat() {
   const c = container
   viewer = null
   container = null
+  tiltCtx = null
   await disposeViewer(v)
   if (c && c.parentNode) c.parentNode.removeChild(c)
 }
@@ -60,6 +85,7 @@ export async function unmountSplat() {
 /** スプラットを表示する。失敗時は例外を投げる（呼び出し側でフォールバックする）。 */
 export async function mountSplat(parent, url) {
   const token = ++mountToken
+  tiltCtx = null
   // 直前の確定済みを片付け（進行中の他 mount は token 差で自動的に無効化される）
   {
     const pv = viewer
@@ -119,6 +145,7 @@ export async function mountSplat(parent, url) {
       import('three'),
     ])
     if (!current()) return bail()
+    THREEref = THREE
 
     state.steps.push('viewer')
     render()
@@ -227,6 +254,14 @@ export async function mountSplat(parent, url) {
         // 真下に潜って裏返らないよう、上下の見回しを制限
         ctl.minPolarAngle = 0.15 * Math.PI
         ctl.maxPolarAngle = 0.85 * Math.PI
+        // 傾き操作の基準を記録
+        tiltCtx = {
+          camera: lv.camera,
+          controls: ctl,
+          target: center.clone(),
+          baseTheta: ctl.getAzimuthalAngle(),
+          basePhi: ctl.getPolarAngle(),
+        }
         // 操作中は自動回転を止め、放したら数秒で再開
         let resumeTimer = 0
         ctl.addEventListener('start', () => {
