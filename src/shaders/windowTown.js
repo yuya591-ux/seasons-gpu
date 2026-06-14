@@ -66,9 +66,10 @@ const FRAGMENT_BODY = /* glsl */ `
   }
 
   // 街レイヤー（建物のシルエット＋灯る窓＋たまにTVアンテナ）を col に重ねる。
+  // floorY = 建物の足元の高さ。これより下は塗らず通り（地面）に譲る＝見下ろしで無限に伸びない。
   vec3 town(
     vec3 col, vec2 p, float wx, float ridgeY, float cw, float amp,
-    vec3 sil, vec3 light, float winLit, float winCols, float winRows, float seed, float antennaAmt
+    vec3 sil, vec3 light, float winLit, float winCols, float winRows, float seed, float antennaAmt, float floorY
   ) {
     float u = wx / cw + seed;
     float cell = floor(u);
@@ -81,7 +82,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // 屋根: 平らな陸屋根（団地・ビル）が主、たまに瓦の三角屋根
     float peak = (roofType > 0.62) ? (0.5 - abs(fx - bw * 0.5) / max(bw, 0.001)) * amp * 0.7 : 0.0;
     float ridge = ridgeY + (gap > 0.5 ? -0.03 : bh + peak);
-    float body = step(p.y, ridge);
+    float body = step(p.y, ridge) * step(floorY, p.y); // 足元(floorY)より下は地面に譲る
     // 建物ごとに色味を少し揺らす（家並みの個体差）
     vec3 silv = sil * (0.82 + 0.34 * h11(cell * 5.3 + 2.0));
     col = mix(col, silv, body);
@@ -147,7 +148,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
     col = hills(col, vp, ax + yaw * 0.90, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
     col = town(col, vp, ax + yaw * 0.94, 0.50, 0.10, 0.06,
-               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0);
+               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0, 0.40);
 
     // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（奥行き）
     float haze = smoothstep(0.58, 0.46, vp.y) * smoothstep(0.36, 0.50, vp.y);
@@ -159,9 +160,9 @@ const FRAGMENT_BODY = /* glsl */ `
     col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
 
     col = town(col, vp, ax + yaw * 0.98, 0.42, 0.16, 0.13,
-               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22);
+               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22, 0.33);
     col = town(col, vp, ax + yaw * 1.04, 0.30, 0.26, 0.18,
-               uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5);
+               uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5, 0.20);
 
     // 高層ビルの赤色航空障害灯（ゆっくり点滅）
     for (int bi = 0; bi < 3; bi++) {
@@ -173,14 +174,40 @@ const FRAGMENT_BODY = /* glsl */ `
       col += vec3(1.0, 0.12, 0.08) * (exp(-bd * 150.0) + exp(-bd * 45.0) * 0.22) * bl * 0.85;
     }
 
-    // 街灯（手前の通り沿いに、にじむ暖色の点）
-    float lx = ax + yaw * 1.04;
-    float lcell = floor(lx / 0.22);
-    float lph = fract(lx / 0.22);
-    float ly = 0.085 + h11(lcell + 3.0) * 0.02;
-    float dl = length(vec2((lph - 0.5) * 0.22, vp.y - ly) * vec2(1.0, 1.3));
-    float lamp = exp(-dl * 42.0) + exp(-dl * 12.0) * 0.35;
-    col += uSunGlow * lamp * step(vp.y, 0.18) * 0.9;
+    // ── 見下ろす通り（最前景の地面。下を向くと建物の足元〜道が広がる） ──
+    float streetTop = 0.20; // 手前 town の floorY と一致
+    float st = smoothstep(streetTop, streetTop - 0.07, vp.y);
+    {
+      float depth = clamp((streetTop - vp.y) / 0.5, 0.0, 1.0); // 0=手前 1=奥
+      float vanish = yaw * 0.12;
+      float persX = (ax - vanish) / max(1.0 - depth * 0.8, 0.14); // 消失点へ収束
+      vec3 road = mix(vec3(0.05, 0.05, 0.062), uHorizon * 0.12, depth * 0.8);
+      // センターライン（破線・パース）
+      float center = step(abs(persX), 0.02) * step(0.45, fract(depth * 20.0)) * (1.0 - depth * 0.5);
+      road = mix(road, vec3(0.6, 0.58, 0.5), center * 0.5);
+      // 店先・自販機の灯り（道の両脇）
+      float sx = ax + yaw * 1.10;
+      float cellW = 0.052;
+      float shopCell = floor(sx / cellW);
+      float fxs = fract(sx / cellW) - 0.5;
+      float shopLit = step(0.30, h11(shopCell + 7.0));
+      float isVend = step(0.85, h11(shopCell + 9.0));
+      float sy = 0.095 + h11(shopCell + 2.0) * 0.03;
+      vec3 shopHue = mix(uSunGlow, vec3(1.0, 0.55, 0.38), step(0.5, h11(shopCell + 5.0)));
+      shopHue = mix(shopHue, vec3(0.82, 0.92, 1.0), isVend);
+      float sign = smoothstep(0.026, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
+      road += shopHue * sign * (shopLit + isVend) * 0.8;
+      // 濡れた路面の縦反射（雨のとき強める）
+      float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.12, vp.y);
+      road += shopHue * refl * (shopLit + isVend) * (uGlass > 0.5 ? 0.45 : 0.28);
+      // 通り沿いの街灯
+      float lampPh = fract(sx / 0.16) - 0.5;
+      float lampY = 0.15 + h11(floor(sx / 0.16) + 3.0) * 0.02;
+      float dlamp = length(vec2(lampPh * 0.16, vp.y - lampY) * vec2(1.0, 1.4));
+      road += uSunGlow * (exp(-dlamp * 40.0) + exp(-dlamp * 11.0) * 0.3) * 0.85;
+      if (uGlass > 1.5) road = mix(road, vec3(0.78, 0.82, 0.9), 0.10); // 雪は路面にうっすら白
+      col = mix(col, road, st);
+    }
 
     // 電線（手前・郷愁）。ゆるく垂れる数本。視点回転で一緒に動く。
     for (int i = 0; i < 3; i++) {
@@ -202,7 +229,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col *= mix(0.84, 1.0, inner);            // 枠の内側を少し翳らせる
     col = mix(col, vec3(0.05, 0.045, 0.06), fr); // サッシ本体
 
-    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
+    col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
     col -= max(col - vec3(0.9), 0.0) * 0.5;  // 白とび防止
     col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;

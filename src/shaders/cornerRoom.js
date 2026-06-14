@@ -409,7 +409,7 @@ const FRAGMENT_BODY = /* glsl */ `
     float vig = 1.0 - 0.34 * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));
     col *= vig;
 
-    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
+    col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
     col -= max(col - vec3(0.92), 0.0) * 0.5; // 白とび防止
     col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;

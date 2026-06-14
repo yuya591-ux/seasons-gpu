@@ -116,7 +116,7 @@ const FRAGMENT_BODY = /* glsl */ `
     float vig = 1.0 - 0.18 * smoothstep(0.4, 1.2, distance(frag, vec2(0.5, 0.55)));
     col *= vig;
 
-    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
+    col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
 
     // 白とび防止のソフトな天井（ハイライトを滑らかに抑える）

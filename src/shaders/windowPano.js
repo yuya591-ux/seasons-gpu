@@ -86,7 +86,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col *= 1.0 + skyMask * drift * 0.20;
 
     // 「記憶の風景」グレード（全情景共通）。生写真感を抑え、影=藍/ハイライト=橙へ寄せる
-    col = applyGrade(col);
+    col = applyGrade(col, frag);
 
     // 窓ガラスの現象（任意）
     col = applyGlass(col, p, t, uGlass);
