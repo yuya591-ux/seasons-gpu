@@ -60,10 +60,15 @@ function start() {
       renderer.pause()
       try {
         await mountSplat(document.body, BASE + next.splatUrl)
+        // 読み込み中に新しい情景へ切替わっていたら、出来上がったスプラットを片付けて譲る
+        if (gen !== sceneGen) {
+          await unmountSplat()
+          return
+        }
       } catch (e) {
         console.error('スプラット読み込み失敗→通常情景へ:', e)
-        if (gen !== sceneGen) return
         await unmountSplat()
+        if (gen !== sceneGen) return
         splatMode = false
         canvas.style.display = ''
         renderer.resume()
@@ -77,6 +82,7 @@ function start() {
         canvas.style.display = ''
         renderer.resume()
       }
+      if (gen !== sceneGen) return
       renderer.setScene(next)
     }
   }
