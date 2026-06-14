@@ -155,15 +155,18 @@ export async function mountSplat(parent, url) {
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1
-      viewer.camera.position.set(center.x, center.y, center.z + radius * 2.2)
+      // 3/4 アングルで近めに収める
+      const dir = new THREE.Vector3(0.5, -0.35, 1).normalize()
+      const dist = Math.max(radius * 1.7, 1.5)
+      viewer.camera.position.copy(center).addScaledVector(dir, dist)
       viewer.camera.lookAt(center)
       if (viewer.controls) {
         viewer.controls.target.copy(center)
-        viewer.controls.minDistance = Math.max(radius * 0.3, 0.4)
+        viewer.controls.minDistance = Math.max(radius * 0.25, 0.3)
         viewer.controls.maxDistance = radius * 8 + 5
         viewer.controls.enablePan = false
         viewer.controls.autoRotate = true
-        viewer.controls.autoRotateSpeed = 0.5
+        viewer.controls.autoRotateSpeed = 0.4
         viewer.controls.update()
       }
       state.steps.push('frame')
@@ -173,6 +176,16 @@ export async function mountSplat(parent, url) {
 
     state.steps.push('done')
     render()
+
+    // 窓枠（最前景のサッシ）
+    const frame = document.createElement('div')
+    frame.className = 'splat-frame'
+    container.appendChild(frame)
+
+    // 正常に出たら診断は数秒で自動的に隠す（エラー時は残す）
+    setTimeout(() => {
+      if (!state.error) diag.style.display = 'none'
+    }, 3500)
   } catch (e) {
     state.error = (e && e.message ? e.message : String(e))
     diag.style.display = 'block'

@@ -63,6 +63,18 @@ body {
   width: 100%;
   height: 100%;
 }
+/* スプラットの窓枠（最前景・操作は透過） */
+.splat-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* 内側に向かう枠＋周辺減光で「窓から覗く」感じに */
+  box-shadow:
+    inset 0 0 0 8px rgba(8, 7, 10, 0.92),
+    inset 0 0 0 10px rgba(255, 255, 255, 0.06),
+    inset 0 0 120px 24px rgba(0, 0, 0, 0.55);
+}
 .splat-diag {
   position: absolute;
   top: 3.2rem;
