@@ -175,7 +175,7 @@ export async function mountSplat(parent, url, mode = 'orbit') {
       gpuAcceleratedSort: false,
       integerBasedSort: false,
       halfPrecisionCovariancesOnGPU: false,
-      antialiased: false,
+      antialiased: true, // 小さなsplatのジャギ/シマリングを低減
     })
 
     // iOS ではライブラリ内蔵の取得(fetchWithProgress)が失敗するため、こちらで取得して渡す

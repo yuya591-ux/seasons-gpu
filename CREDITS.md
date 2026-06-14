@@ -58,7 +58,7 @@
 | 用途 | ファイル | 由来 | 扱い |
 | --- | --- | --- | --- |
 | 本物の3D（実証用） | `public/splat/demo-small.splat` | 3D Gaussian Splatting / Mip-NeRF360 の "garden" シーン。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。研究素材のため正式公開はしない前提。表示用に約122万splatへ間引き（均等＋不透明度下限で浮遊ノイズを除去）。本番は本人が撮影・学習した `.ply` に差し替える。 |
-| 室内から見回す（実証用） | `public/splat/room.splat` | 3D Gaussian Splatting / Mip-NeRF360 の "room" シーン。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。研究素材のため正式公開はしない前提。表示用に約73万splatへ間引き。本番は本人撮影の「角部屋＋窓＋街」に差し替える。 |
+| 室内から見回す（実証用） | `public/splat/room.splat` | 3D Gaussian Splatting / Mip-NeRF360 の "room" シーン。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。研究素材のため正式公開はしない前提。表示用に約114万splatへ最適化（巨大splat=滲みと低不透明度の浮遊を除去）。本番は本人撮影の「角部屋＋窓＋街」に差し替える。 |
 
 - 学習ツール: Brush（wgpu, Apache-2.0/MIT）をローカルで使用（リポジトリ外）。
 - 表示ライブラリ: three.js（MIT）/ @mkkellogg/gaussian-splats-3d（MIT）。
