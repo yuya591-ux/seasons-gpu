@@ -6,6 +6,7 @@
 
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
+import { GROUND_GLSL } from './ground.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -47,6 +48,7 @@ const FRAGMENT_BODY = /* glsl */ `
     for (int i = 0; i < OCTAVES; i++) { s += a * vnoise(p); p *= 2.0; a *= 0.5; }
     return s;
   }
+//__GROUND__
 
   // 遠い緑の稜線
   vec3 hills(vec3 col, vec2 p, float wx, float ridgeY, vec3 hcol) {
@@ -259,50 +261,9 @@ const FRAGMENT_BODY = /* glsl */ `
     }
 
     // ── 見下ろす街並み（地面のパース投影＝本当に高所から下を眺めている） ──
-    // 地平 hY より下は地面。vp.y が下がるほど手前（視点に近い）＝パースで街路が地平へ収束する。
-    float hY = 0.43;
-    float gmask = smoothstep(hY + 0.02, hY - 0.02, vp.y);
-    {
-      float t = max(hY - vp.y, 0.006);             // 0=地平, 大=手前(下)
-      float d = 0.06 / t;                           // 視点からの距離（地平=遠, 手前=近）
-      float scl = 7.0;                              // 区画の細かさ
-      // 地面の世界座標。横はパースで広がり、見回し/覗き込みでスライドする。
-      float gx = (ax * 1.6 + (yaw + uParallax.x * 1.6) * 0.6) * d * scl;
-      float gz = d * scl;
-      vec2 g = vec2(gx, gz);
-      vec2 gi = floor(g);
-      vec2 gf = fract(g);
-      float blkR = h21(gi + 2.0);
-      // 街路（区画の境界＝縦横の道）
-      float dRoad = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
-      float road = smoothstep(0.16, 0.11, dRoad);   // 1=道
-      // 区画（建物の屋上を上から）＝はっきり明るく。道は中明度。たまに緑地。
-      float isPark = step(0.88, blkR);
-      vec3 roofC = mix(vec3(0.34, 0.30, 0.29), uHorizon * 0.7, 0.4) * (0.78 + 0.5 * blkR);
-      roofC = mix(roofC, mix(vec3(0.16, 0.24, 0.14), uHorizon * 0.4, 0.3), isPark); // 緑地
-      vec3 roadC = mix(vec3(0.18, 0.17, 0.17), uHorizon * 0.28, 0.4);
-      vec3 ground = mix(roofC, roadC, road);
-      // 屋上の縁の立体感（夕日が片側に）＋区画の灯り（窓・屋上）
-      ground += uSunGlow * smoothstep(0.18, 0.14, dRoad) * (1.0 - road) * smoothstep(0.0, 0.6, gf.x) * 0.10;
-      float roofLight = step(0.66, h21(gi + 11.0)) * smoothstep(0.36, 0.05, length(gf - 0.5)) * (1.0 - road);
-      ground += uSunGlow * roofLight * 0.22;
-      // 街灯（交差点に点々）
-      float lampG = smoothstep(0.10, 0.0, length(gf - 0.5)) * step(0.5, h11(gi.x + gi.y * 3.0 + 7.0)) * road;
-      ground += uSunGlow * lampG * 0.8;
-      // 人影（道沿いを動く小さな点）
-      float ped = step(0.55, h21(gi + 19.0)) * smoothstep(0.06, 0.0, length(gf - vec2(0.5, fract(uTime * 0.05 + blkR)))) * road;
-      ground = mix(ground, vec3(0.06, 0.05, 0.05), ped * 0.6);
-      // 車のヘッドライト（縦の道を流れる）
-      float carY = fract(uTime * 0.18 * (blkR > 0.5 ? 1.0 : -1.0) + blkR);
-      float car = step(0.5, h11(gi.x * 1.7 + 21.0)) * smoothstep(0.09, 0.0, abs(gf.x - 0.5))
-                * smoothstep(0.05, 0.0, abs(gf.y - carY));
-      ground += vec3(1.0, 0.9, 0.7) * car * 0.6;
-      // 空気遠近: 地平に近いほど霞む（遠い街は空へ溶ける）
-      float haze2 = smoothstep(0.07, 0.0, t);
-      ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), haze2 * 0.85);
-      if (uGlass > 1.5) ground = mix(ground, vec3(0.82, 0.85, 0.92), 0.12); // 雪
-      col = mix(col, ground, gmask);
-    }
+    float gmask;
+    vec3 ground = lookDownGround(vp, ax, yaw, uParallax.x, nightAmt, uGlass, gmask);
+    col = mix(col, ground, gmask);
 
     return col;
   }
@@ -443,6 +404,8 @@ const QUALITY_DEFINES = {
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。ガラス現象とグレードを main 直前に挿入。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY
+    .replace('//__GROUND__', GROUND_GLSL) // 地面関数は outsideView より前に定義する必要がある
+    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
   return defines + body
 }
