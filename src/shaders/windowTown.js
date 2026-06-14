@@ -27,6 +27,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec3 uSunGlow;     // 残照・窓の灯り色
   uniform vec3 uDropTint;    // 建物のシルエット基色
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
+  uniform float uFlash;      // 遠雷フラッシュ 0..1
 
   float h11(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -133,6 +134,9 @@ const FRAGMENT_BODY = /* glsl */ `
     float cl = fbm(vec2(ax * 1.6 + yaw + t * 0.008, vp.y * 2.2));
     float cloudband = smoothstep(0.52, 0.82, cl) * smoothstep(0.46, 0.96, vp.y);
     col = mix(col, mix(uHorizon, uSunGlow, 0.45), cloudband * 0.4);
+
+    // 遠雷フラッシュ: 夜空と雲がほのかに白む（雷鳴に同期）
+    col += uFlash * (0.10 + 0.18 * cloudband) * vec3(0.82, 0.88, 1.0);
 
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
     col = hills(col, vp, ax + yaw * 0.90, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));

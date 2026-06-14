@@ -44,6 +44,6 @@ export default {
   sounds: [
     { id: 'rain', label: '雨音', src: 'audio/summer-rain-dusk/rain.mp3', gain: 0.85, loop: true },
     { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.45, loop: true },
-    { id: 'thunder', label: '遠雷', src: 'audio/summer-rain-dusk/thunder.mp3', gain: 0.5, loop: false, interval: [22, 55] },
+    { id: 'thunder', label: '遠雷', src: 'audio/summer-rain-dusk/thunder.mp3', gain: 0.5, loop: false, interval: [22, 55], cue: 'thunder' },
   ],
 }

@@ -32,7 +32,12 @@ function start() {
   const scene = resolveScene(state.sceneId)
   const settings = state.settings
 
-  const audio = createAudio()
+  // 遠雷の音に合わせて空をほのかに光らせる（シェーダー情景のみ反応）
+  const audio = createAudio({
+    onCue: (def) => {
+      if (def.cue === 'thunder') renderer.triggerFlash(0.6) // 遠雷はひかえめに
+    },
+  })
   let splatMode = false
   // 端末の傾き: スプラット情景は3Dの見回し、それ以外はシェーダーの視差に振り分ける
   const tilt = createTilt({
@@ -130,6 +135,9 @@ function start() {
       audio.setVolume(v)
     },
   })
+
+  // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュの確認など）
+  if (/[?&]dev=1/.test(location.search)) window.__renderer = renderer
 
   // 起動時の情景を適用（スプラットなら3Dビューアへ）
   applyScene(scene)

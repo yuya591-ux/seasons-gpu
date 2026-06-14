@@ -3,7 +3,8 @@
 // ランダムな間隔で時々鳴らす。ブラウザ制限により最初のユーザー操作後にだけ鳴り始める。
 // 素材ファイルが無くてもエラーで止めず静かに無音で続行する。
 
-export function createAudio() {
+export function createAudio(opts) {
+  const onCue = (opts && opts.onCue) || null // 音の発火を画面に伝える（遠雷フラッシュ等）
   let ctx = null
   let master = null
   let loopSources = [] // ループ再生中の source
@@ -57,7 +58,14 @@ export function createAudio() {
       const delay = (min + Math.random() * (max - min)) * 1000
       const id = setTimeout(() => {
         if (myGen !== gen) return
-        if (started && ctx) playOnce(buffer, def.gain)
+        if (started && ctx) {
+          // 稲光は音より先に届く: フラッシュを少し先行させてから雷鳴を鳴らす
+          if (onCue && def.cue) onCue(def)
+          const lead = onCue && def.cue ? 220 : 0
+          setTimeout(() => {
+            if (myGen === gen && started && ctx) playOnce(buffer, def.gain)
+          }, lead)
+        }
         next()
       }, delay)
       timers.push(id)

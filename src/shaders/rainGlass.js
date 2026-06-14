@@ -23,6 +23,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec3 uHorizon;     // 地平
   uniform vec3 uSunGlow;     // 光芒
   uniform vec3 uDropTint;    // 水滴のハイライト
+  uniform float uFlash;      // 遠雷フラッシュ 0..1
 
   float hash21(vec2 p) {
     p = fract(p * vec2(123.34, 345.45));
@@ -160,6 +161,10 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 全体の色味ハイライト
     col += uDropTint * mask * 0.05;
+
+    // 遠雷フラッシュ: 空がほのかに白み、濡れたガラスの滴がきらりと反応する
+    col += uFlash * vec3(0.85, 0.9, 1.0) * (0.10 + 0.18 * (1.0 - mask));
+    col += uFlash * (sSpec + rSpec) * 0.5;
 
     // やわらかな周辺減光
     float vig = 1.0 - 0.28 * smoothstep(0.35, 1.15, distance(frag, vec2(0.5, 0.55)));

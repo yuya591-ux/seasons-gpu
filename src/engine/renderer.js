@@ -99,6 +99,8 @@ export function createRenderer(canvas) {
   const PAN_LIMIT = { x: 2.6, y: 0.3 }
   // 端末を傾けた時の視差バイアス（窓の効果。パノラマでのみ使用）
   const parallaxBias = { x: 0, y: 0 }
+  // 遠雷フラッシュ。雷鳴に合わせて立ち上げ、毎フレーム減衰させる
+  let flashLevel = 0
 
   function buildProgram(q, type) {
     const shader = getShader(type)
@@ -126,6 +128,7 @@ export function createRenderer(canvas) {
       uPan: gl.getUniformLocation(program, 'uPan'),
       uParallax: gl.getUniformLocation(program, 'uParallax'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
+      uFlash: gl.getUniformLocation(program, 'uFlash'),
       uPano: gl.getUniformLocation(program, 'uPano'),
       uHasPano: gl.getUniformLocation(program, 'uHasPano'),
       uDepth: gl.getUniformLocation(program, 'uDepth'),
@@ -196,6 +199,10 @@ export function createRenderer(canvas) {
       )
     }
     gl.uniform1f(loc.uGlass, glassMode)
+    if (loc.uFlash) gl.uniform1f(loc.uFlash, flashLevel)
+    // フラッシュは素早く立ち、ゆっくり減衰（遠雷のほのかな閃光）
+    if (flashLevel > 0.001) flashLevel *= 0.92
+    else flashLevel = 0
     gl.uniform1f(loc.uIntensity, settings.rain)
     // パノラマ写真（あれば）をテクスチャユニット0、深度マップを1に
     if (loc.uPano) {
@@ -305,6 +312,10 @@ export function createRenderer(canvas) {
       parallaxBias.y = 0
       panTarget.x = 0
       panTarget.y = 0
+    },
+    // 遠雷など。空をほのかに光らせる（雷鳴の少し前に呼ぶと自然）
+    triggerFlash(strength) {
+      flashLevel = Math.max(flashLevel, strength != null ? strength : 0.8)
     },
     setScene(s) {
       scene = s
