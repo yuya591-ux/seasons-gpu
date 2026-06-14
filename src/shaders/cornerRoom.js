@@ -149,7 +149,7 @@ const FRAGMENT_BODY = /* glsl */ `
       vec2 id = floor(gp);
       vec2 f = fract(gp) - 0.5;
       float n = h21(id + fi * 23.0);
-      if (n < 0.74) continue;                                // ぐっとまばらに（静けさ優先）
+      if (n < 0.81) continue;                                // ぐっとまばらに（静けさ優先）
       float ang = t * 1.6 * (n - 0.5) * 2.0 + n * 6.2831;    // 回転
       float ca = cos(ang), sa = sin(ang);
       vec2 rf = vec2(ca * f.x - sa * f.y, sa * f.x + ca * f.y);
@@ -157,7 +157,7 @@ const FRAGMENT_BODY = /* glsl */ `
       vec3 lc = (mode > 1.5)
         ? mix(vec3(0.98, 0.84, 0.88), vec3(0.95, 0.74, 0.80), n)  // 花びら（淡紅）
         : mix(vec3(0.78, 0.46, 0.22), vec3(0.64, 0.32, 0.18), n); // 紅葉（落ち着いた橙茶）
-      col = mix(col, lc, leaf * (0.24 + 0.30 * depth));
+      col = mix(col, lc, leaf * (0.20 + 0.24 * depth));
     }
     return col;
   }

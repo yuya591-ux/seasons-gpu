@@ -45,9 +45,10 @@ export const GROUND_GLSL = /* glsl */ `
             * (0.4 + 0.4 * sin(uTime * 1.2 + blkR * 20.0));
     // 川（街を蛇行して流れる。水面が空と灯りを映す＝街の見どころ）
     float riverX = sin(gz * 0.22 + 1.5) * 1.6 + cos(gz * 0.11) * 0.7;
-    float river = smoothstep(0.32, 0.22, abs(g0.x - riverX));
-    vec3 waterC = mix(uSkyMid, uHorizon, 0.5) * 0.6;
-    ground = mix(ground, waterC, river * 0.92);
+    float river = smoothstep(0.34, 0.22, abs(g0.x - riverX));
+    vec3 waterC = mix(uSkyMid, uHorizon, 0.55) * 0.72;
+    waterC += uSunGlow * smoothstep(0.12, 0.0, abs(g0.x - riverX + sin(gz * 2.0) * 0.05)) * 0.18; // 水面のきらめき
+    ground = mix(ground, waterC, river * 0.95);
     road *= (1.0 - river);                          // 川の上は道/灯り/車を出さない
     // 街路樹（道の脇・公園に緑の点々）
     vec2 tg = g0 * 3.2; vec2 tgi = floor(tg); vec2 tgf = fract(tg);
