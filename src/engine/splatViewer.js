@@ -4,6 +4,7 @@
 
 let viewer = null
 let container = null
+let errHandlers = null
 
 // WebGL2 の対応状況を端末側で調べる（iOS で何が無いかを可視化）。
 function webglCaps() {
@@ -40,7 +41,7 @@ export async function mountSplat(parent, url) {
   const diag = document.createElement('pre')
   diag.className = 'splat-diag'
   container.appendChild(diag)
-  const state = { caps: webglCaps(), steps: [], error: null, splats: null, lost: false }
+  const state = { caps: webglCaps(), steps: [], error: null, splats: null, lost: false, fetched: null }
   const render = () => {
     const c = state.caps
     diag.textContent =
@@ -48,6 +49,7 @@ export async function mountSplat(parent, url) {
       `WebGL2: ${c.webgl2}` + (c.webgl1 != null ? ` (webgl1:${c.webgl1})` : '') + '\n' +
       `GPU: ${c.renderer || '-'}\n` +
       `maxTex: ${c.maxTex || '-'}  colBufFloat: ${c.colorBufFloat}  floatLinear: ${c.floatLinear}\n` +
+      `fetch: ${state.fetched || '-'}\n` +
       `手順: ${state.steps.join(' > ') || '-'}\n` +
       `splats: ${state.splats == null ? '-' : state.splats}\n` +
       (state.lost ? 'WebGLコンテキスト喪失\n' : '') +
@@ -58,6 +60,25 @@ export async function mountSplat(parent, url) {
     diag.style.display = 'none'
   })
 
+  // 実エラー（ワーカー/WASM等）を画面に出す
+  const onErr = (m) => {
+    state.error = (state.error ? state.error + ' | ' : '') + m
+    diag.style.display = 'block'
+    render()
+  }
+  errHandlers = {
+    err: (e) => onErr('err:' + (e.message || e.filename || '?')),
+    rej: (e) => onErr('rej:' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))),
+  }
+  window.addEventListener('error', errHandlers.err)
+  window.addEventListener('unhandledrejection', errHandlers.rej)
+
+  const withTimeout = (p, ms, label) =>
+    Promise.race([
+      p,
+      new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timeout ' + ms + 'ms')), ms)),
+    ])
+
   try {
     state.steps.push('import')
     render()
@@ -65,6 +86,14 @@ export async function mountSplat(parent, url) {
       import('@mkkellogg/gaussian-splats-3d'),
       import('three'),
     ])
+
+    // ファイル到達確認（ネットワーク要因の切り分け）
+    try {
+      const r = await fetch(url, { method: 'HEAD' })
+      state.fetched = r.status + ' ' + (r.headers.get('content-length') || '?')
+    } catch (e) {
+      state.fetched = 'FAIL ' + (e && e.message ? e.message : e)
+    }
 
     state.steps.push('viewer')
     render()
@@ -85,7 +114,11 @@ export async function mountSplat(parent, url) {
 
     state.steps.push('load')
     render()
-    await viewer.addSplatScene(url, { showLoadingUI: true, progressiveLoad: false })
+    await withTimeout(
+      viewer.addSplatScene(url, { showLoadingUI: false, progressiveLoad: false }),
+      25000,
+      'load',
+    )
 
     state.steps.push('start')
     render()
@@ -136,6 +169,11 @@ export async function mountSplat(parent, url) {
 }
 
 export async function unmountSplat() {
+  if (errHandlers) {
+    window.removeEventListener('error', errHandlers.err)
+    window.removeEventListener('unhandledrejection', errHandlers.rej)
+    errHandlers = null
+  }
   if (viewer) {
     try {
       if (viewer.stop) viewer.stop()
