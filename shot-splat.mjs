@@ -1,0 +1,15 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 390, height: 720 } })
+page.on('pageerror', (e) => console.log('pageerror:', e.message))
+await page.goto('http://localhost:4790/seasons/', { waitUntil: 'networkidle' })
+await page.click('.gate'); await page.waitForTimeout(300)
+await page.click('button:has-text("情景")'); await page.waitForTimeout(400)
+await page.locator('.scene-card', { hasText: '本物の3D' }).click()
+await page.waitForTimeout(12000) // 読み込み＋描画を待つ
+await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {})
+await page.screenshot({ path: 'splat-shot.png', timeout: 90000, animations: 'disabled' })
+const steps = await page.evaluate(() => { const d = document.querySelector('.splat-diag'); return d ? d.textContent.replace(/\n/g, ' / ') : 'no-diag' })
+await browser.close()
+console.log('steps:', steps)
+console.log('done')

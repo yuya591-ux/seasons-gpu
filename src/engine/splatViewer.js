@@ -152,26 +152,44 @@ export async function mountSplat(parent, url) {
     // オートフレーミング
     try {
       const mesh = viewer.getSplatMesh()
-      state.splats = mesh.getSplatCount ? mesh.getSplatCount() : '?'
-      const box = mesh.computeBoundingBox(true)
-      const center = box.getCenter(new THREE.Vector3())
-      const size = box.getSize(new THREE.Vector3())
-      const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1
-      // 3/4 アングルで近めに収める
-      const dir = new THREE.Vector3(0.5, -0.35, 1).normalize()
-      const dist = Math.max(radius * 1.7, 1.5)
+      const count = mesh.getSplatCount ? mesh.getSplatCount() : 0
+      state.splats = count
+      // 浮遊splatに惑わされないよう、中心をサンプリングして百分位で範囲を決める
+      const N = Math.min(5000, count)
+      const step = Math.max(1, Math.floor(count / N))
+      const xs = [], ys = [], zs = []
+      const tmp = new THREE.Vector3()
+      for (let i = 0; i < count; i += step) {
+        mesh.getSplatCenter(i, tmp, true)
+        xs.push(tmp.x); ys.push(tmp.y); zs.push(tmp.z)
+      }
+      xs.sort((a, b) => a - b); ys.sort((a, b) => a - b); zs.sort((a, b) => a - b)
+      const P = (arr, p) => arr[Math.floor((arr.length - 1) * p)] || 0
+      // 中心＝中央値、被写体の大きさ＝四分位範囲（密な中心部で捉え、広大な背景に引っ張られない）
+      const center = new THREE.Vector3(P(xs, 0.5), P(ys, 0.5), P(zs, 0.5))
+      const ex = P(xs, 0.75) - P(xs, 0.25)
+      const ey = P(ys, 0.75) - P(ys, 0.25)
+      const ez = P(zs, 0.75) - P(zs, 0.25)
+      const radius = 0.5 * Math.max(ex, ey, ez) || 1
+
+      const dist = radius * 4.0
+      // cameraUp が [0,-1,0]（世界の上は -Y）なので、-Y を強めると上から見下ろす
+      const dir = new THREE.Vector3(0.3, -0.55, 0.9).normalize()
       viewer.camera.position.copy(center).addScaledVector(dir, dist)
+      viewer.camera.near = Math.max(dist * 0.02, 0.01)
+      viewer.camera.far = dist * 12 + radius * 12
+      viewer.camera.updateProjectionMatrix()
       viewer.camera.lookAt(center)
       if (viewer.controls) {
         viewer.controls.target.copy(center)
-        viewer.controls.minDistance = Math.max(radius * 0.25, 0.3)
-        viewer.controls.maxDistance = radius * 8 + 5
+        viewer.controls.minDistance = Math.max(radius * 0.2, 0.2)
+        viewer.controls.maxDistance = dist * 4
         viewer.controls.enablePan = false
         viewer.controls.autoRotate = true
-        viewer.controls.autoRotateSpeed = 0.4
+        viewer.controls.autoRotateSpeed = 0.35
         viewer.controls.update()
       }
-      state.steps.push('frame')
+      state.steps.push('frame r=' + radius.toFixed(2))
     } catch (e) {
       state.error = 'frame: ' + (e && e.message ? e.message : e)
     }
