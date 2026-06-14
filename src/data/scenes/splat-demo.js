@@ -9,7 +9,7 @@ export default {
   desc: '写真から再構成した本物の3D。ドラッグで自由に見回せる（実証用）',
   status: 'ready',
   render: 'splat',
-  splatUrl: 'splat/demo.splat', // public/ 配下
+  splatUrl: 'splat/demo-small.splat', // public/ 配下（iOS負荷対策で約34万splatに間引き）
 
   // ギャラリーのサムネ用パレット（描画には使わない）
   palette: {

@@ -57,7 +57,7 @@
 
 | 用途 | ファイル | 由来 | 扱い |
 | --- | --- | --- | --- |
-| 本物の3D（実証用） | `public/splat/demo.splat` | 3D Gaussian Splatting 研究で広く使われる "train" シーン（Tanks and Temples 由来）。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。非商用の研究素材のため、正式公開はしない前提。本番は本人が撮影・学習した `.ply` に差し替える。 |
+| 本物の3D（実証用） | `public/splat/demo-small.splat` | 3D Gaussian Splatting 研究で広く使われる "train" シーン（Tanks and Temples 由来）。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。非商用の研究素材のため、正式公開はしない前提。iOS負荷対策で約34万splatに間引き。本番は本人が撮影・学習した `.ply` に差し替える。 |
 
 - 学習ツール: Brush（wgpu, Apache-2.0/MIT）をローカルで使用（リポジトリ外）。
 - 表示ライブラリ: three.js（MIT）/ @mkkellogg/gaussian-splats-3d（MIT）。

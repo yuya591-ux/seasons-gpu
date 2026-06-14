@@ -1,74 +1,140 @@
 // 本物の3D（ガウシアン・スプラット）ビューアのラッパー。
 // Three.js ベースの @mkkellogg/gaussian-splats-3d を遅延読み込みし、スプラット情景でのみ使う。
-// 既存のシェーダー描画とは排他（スプラット表示中はシェーダーを止める）。
+// iPhone 等で原因を特定できるよう、画面上に診断情報を表示する。
 
 let viewer = null
 let container = null
 
-/** スプラットを表示する。parent にビューア用の要素を載せ、url の .splat/.ply を読み込む。 */
+// WebGL2 の対応状況を端末側で調べる（iOS で何が無いかを可視化）。
+function webglCaps() {
+  try {
+    const c = document.createElement('canvas')
+    const gl = c.getContext('webgl2')
+    if (!gl) {
+      const gl1 = c.getContext('webgl')
+      return { webgl2: false, webgl1: !!gl1 }
+    }
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info')
+    const has = (n) => !!gl.getExtension(n)
+    return {
+      webgl2: true,
+      renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'n/a',
+      maxTex: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+      colorBufFloat: has('EXT_color_buffer_float'),
+      floatLinear: has('OES_texture_float_linear'),
+      floatBlend: has('EXT_float_blend'),
+    }
+  } catch (e) {
+    return { error: String(e) }
+  }
+}
+
 export async function mountSplat(parent, url) {
   await unmountSplat()
-  const [GS, THREE] = await Promise.all([
-    import('@mkkellogg/gaussian-splats-3d'),
-    import('three'),
-  ])
 
   container = document.createElement('div')
   container.className = 'splat-stage'
   parent.appendChild(container)
 
-  viewer = new GS.Viewer({
-    rootElement: container,
-    // 3DGS のスプラットは Y が下向きのことが多い
-    cameraUp: [0, -1, 0],
-    initialCameraPosition: [0, 0, -6],
-    initialCameraLookAt: [0, 0, 0],
-    selfDrivenMode: true, // 自前の描画ループ
-    useBuiltInControls: true, // ドラッグで見回し
-    // GitHub Pages は COOP/COEP が無く SharedArrayBuffer が使えないため共有メモリを切る
-    sharedMemoryForWorkers: false,
-    gpuAcceleratedSort: true,
-    antialiased: false,
+  // 画面上の診断パネル
+  const diag = document.createElement('pre')
+  diag.className = 'splat-diag'
+  container.appendChild(diag)
+  const state = { caps: webglCaps(), steps: [], error: null, splats: null, lost: false }
+  const render = () => {
+    const c = state.caps
+    diag.textContent =
+      '【3D診断】 タップで閉じる\n' +
+      `WebGL2: ${c.webgl2}` + (c.webgl1 != null ? ` (webgl1:${c.webgl1})` : '') + '\n' +
+      `GPU: ${c.renderer || '-'}\n` +
+      `maxTex: ${c.maxTex || '-'}  colBufFloat: ${c.colorBufFloat}  floatLinear: ${c.floatLinear}\n` +
+      `手順: ${state.steps.join(' > ') || '-'}\n` +
+      `splats: ${state.splats == null ? '-' : state.splats}\n` +
+      (state.lost ? 'WebGLコンテキスト喪失\n' : '') +
+      (state.error ? 'ERROR: ' + state.error : '')
+  }
+  render()
+  diag.addEventListener('click', () => {
+    diag.style.display = 'none'
   })
 
-  // .splat は逐次読み込み非対応のため一括読み込み（読込中はローディング表示）
-  await viewer.addSplatScene(url, { showLoadingUI: true, progressiveLoad: false })
-  viewer.start()
-
-  // オートフレーミング: 3Dの境界を計算し、カメラを必ず3Dへ向ける（真っ黒回避）
   try {
-    const mesh = viewer.getSplatMesh()
-    const box = mesh.computeBoundingBox(true)
-    const center = box.getCenter(new THREE.Vector3())
-    const size = box.getSize(new THREE.Vector3())
-    const radius = 0.5 * Math.max(size.x, size.y, size.z)
-    const dist = Math.max(radius * 2.2, 2)
-    viewer.camera.position.set(center.x, center.y, center.z + dist)
-    viewer.camera.lookAt(center)
-    if (viewer.controls) {
-      viewer.controls.target.copy(center)
-      viewer.controls.minDistance = Math.max(radius * 0.3, 0.5)
-      viewer.controls.maxDistance = radius * 6 + 5
-      viewer.controls.update()
-    }
-  } catch (e) {
-    console.warn('オートフレーミングに失敗（既定カメラで表示）:', e)
-  }
+    state.steps.push('import')
+    render()
+    const [GS, THREE] = await Promise.all([
+      import('@mkkellogg/gaussian-splats-3d'),
+      import('three'),
+    ])
 
-  // 窓辺らしい、ゆるやかな見回し
-  const c = viewer.controls
-  if (c) {
-    c.enablePan = false
-    c.enableZoom = true
-    c.autoRotate = true
-    c.autoRotateSpeed = 0.5
-    c.rotateSpeed = 0.5
-    c.zoomSpeed = 0.6
+    state.steps.push('viewer')
+    render()
+    viewer = new GS.Viewer({
+      rootElement: container,
+      cameraUp: [0, -1, 0],
+      initialCameraPosition: [0, 0, -6],
+      initialCameraLookAt: [0, 0, 0],
+      selfDrivenMode: true,
+      useBuiltInControls: true,
+      sharedMemoryForWorkers: false,
+      // iOS では GPU ソート（float描画バッファ依存）が落ちやすいので CPU ソートにする
+      gpuAcceleratedSort: false,
+      integerBasedSort: false,
+      halfPrecisionCovariancesOnGPU: false,
+      antialiased: false,
+    })
+
+    state.steps.push('load')
+    render()
+    await viewer.addSplatScene(url, { showLoadingUI: true, progressiveLoad: false })
+
+    state.steps.push('start')
+    render()
+    viewer.start()
+
+    // コンテキスト喪失を検知して画面に出す
+    const cv = container.querySelector('canvas')
+    if (cv) {
+      cv.addEventListener('webglcontextlost', () => {
+        state.lost = true
+        diag.style.display = 'block'
+        render()
+      })
+    }
+
+    // オートフレーミング
+    try {
+      const mesh = viewer.getSplatMesh()
+      state.splats = mesh.getSplatCount ? mesh.getSplatCount() : '?'
+      const box = mesh.computeBoundingBox(true)
+      const center = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1
+      viewer.camera.position.set(center.x, center.y, center.z + radius * 2.2)
+      viewer.camera.lookAt(center)
+      if (viewer.controls) {
+        viewer.controls.target.copy(center)
+        viewer.controls.minDistance = Math.max(radius * 0.3, 0.4)
+        viewer.controls.maxDistance = radius * 8 + 5
+        viewer.controls.enablePan = false
+        viewer.controls.autoRotate = true
+        viewer.controls.autoRotateSpeed = 0.5
+        viewer.controls.update()
+      }
+      state.steps.push('frame')
+    } catch (e) {
+      state.error = 'frame: ' + (e && e.message ? e.message : e)
+    }
+
+    state.steps.push('done')
+    render()
+  } catch (e) {
+    state.error = (e && e.message ? e.message : String(e))
+    diag.style.display = 'block'
+    render()
   }
   return viewer
 }
 
-/** スプラット表示を片付ける（GPU/ワーカーを解放）。 */
 export async function unmountSplat() {
   if (viewer) {
     try {
