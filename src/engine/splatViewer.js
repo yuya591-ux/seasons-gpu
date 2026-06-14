@@ -167,14 +167,9 @@ export async function mountSplat(parent, url, mode = 'orbit', bg = null) {
 
     state.steps.push('viewer')
     render()
-    // 対応端末（WebGL2＋浮動小数テクスチャ）ではGPUソートを使い、奥行きの滲み/チラつきを抑える。
-    // 非対応端末は自動でCPUソートにフォールバック（黒画面より品質低下のほうがまし）。
-    const forceCpu = /[?&]cpusort=1/.test(location.search) // 検証用にCPUソートへ固定できる
-    // ソフトウェアGL(SwiftShader/llvmpipe等)ではGPUソートが描画されないことがあるため除外する
-    const soft = /swiftshader|llvmpipe|software|microsoft basic/i.test(state.caps.renderer || '')
-    const canGpuSort =
-      !forceCpu && !soft && !!(state.caps.webgl2 && state.caps.colorBufFloat && state.caps.floatLinear)
-    state.gpuSort = canGpuSort
+    // ソートは必ずCPU。iOS Safari ではこのライブラリのGPUソートが描画されず真っ白になるため使わない。
+    // （実機・headless とも確認。黒/白画面を出さない実証済みの構成を厳守する）
+    state.gpuSort = false
     lv = new GS.Viewer({
       rootElement: lc,
       cameraUp: [0, -1, 0],
@@ -183,8 +178,8 @@ export async function mountSplat(parent, url, mode = 'orbit', bg = null) {
       selfDrivenMode: true,
       useBuiltInControls: mode !== 'room', // 部屋モードは自前の一人称操作
       sharedMemoryForWorkers: false,
-      gpuAcceleratedSort: canGpuSort, // 対応端末はGPUソート＝深度の滲み/チラつき低減
-      integerBasedSort: true, // 整数距離ソートで再ソートを高速化（CPU/GPU共通の精度・速度向上）
+      gpuAcceleratedSort: false, // iOSで描画されない不具合のため無効（CPUソート固定）
+      integerBasedSort: false,
       halfPrecisionCovariancesOnGPU: false, // iOSの精度確保のため単精度を維持
       antialiased: true, // 小さなsplatのジャギ/シマリングを低減
     })

@@ -183,31 +183,35 @@ const FRAGMENT_BODY = /* glsl */ `
     float barH = smoothstep(0.010, 0.0, abs(wp.y - 0.52)) * aperture;         // 中央の横框
     float bars = clamp(max(barV, barH), 0.0, 1.0);
 
-    // ── 室内（翳った壁・窓台・天井ぎわ） ──
-    // 室内の基調は暗い暖色グレー。窓からの光が床と窓台にこぼれる。
-    vec3 wallCol = mix(vec3(0.05, 0.045, 0.05), uHorizon * 0.16, 0.5);
-    // 窓まわりの内壁の陰影（開口に近いほど窓あかりを受けて明るい）
-    float nearWin = smoothstep(0.32, 0.0, min(min(wp.x - winL + 0.0, winR - wp.x), min(wp.y - winB, winT - wp.y)));
-    vec3 interior = wallCol * (0.7 + 0.6 * nearWin);
-    interior += uSunGlow * nearWin * 0.06;
+    // ── 窓ガラスのうっすらした映り込み（“ガラス越し”の実在感。上ほど室内の暖色が乗る） ──
+    float reflAmt = (0.025 + 0.05 * smoothstep(0.35, 1.0, wp.y)) * aperture;
+    outside = mix(outside, outside * 0.86 + uSunGlow * 0.10 + vec3(0.015, 0.015, 0.02), reflAmt);
 
-    // 窓台（下のサッシの厚み）。開口のすぐ下に明るい桟
-    float sill = smoothstep(winB, winB - 0.022, wp.y) * smoothstep(winB - 0.055, winB - 0.03, wp.y);
-    interior = mix(interior, uSunGlow * 0.4 + vec3(0.06), sill * 0.8);
+    // ── 室内（翳った壁・窓の見込み(reveal)・窓台） ──
+    // 室内の基調は暗い暖色グレー。窓に近い壁ほど外光を受けて明るい。
+    vec3 wallCol = mix(vec3(0.045, 0.04, 0.045), uHorizon * 0.14, 0.5);
+    // アパーチャ縁から室内側への距離（負＝窓の外側＝室内）
+    float edgeDist = min(min(wp.x - winL, winR - wp.x), min(wp.y - winB, winT - wp.y));
+    float intoRoom = clamp(-edgeDist, 0.0, 0.5);
+    float nearWin = smoothstep(0.30, 0.0, intoRoom);
+    // 見込み（窓の縁のすぐ内側が壁の厚みで陰る＝開口の立体感）
+    float reveal = smoothstep(0.0, 0.03, intoRoom) * smoothstep(0.14, 0.035, intoRoom);
+    vec3 interior = wallCol * (0.5 + 0.7 * nearWin);
+    interior += uSunGlow * nearWin * 0.05;
+    interior *= 1.0 - reveal * 0.5;
+    // 窓台（下の見込み＝水平面で外光を受けて明るい）
+    float sillBand = smoothstep(winB, winB - 0.05, wp.y) * step(winL - 0.03, wp.x) * step(wp.x, winR + 0.03);
+    interior = mix(interior, uSunGlow * 0.32 + vec3(0.05, 0.045, 0.05), sillBand * 0.65);
 
-    // 窓枠（サッシ本体）。開口の縁
-    float frameInner = max(ax0 * ay0, 0.0);
-    float sash = (1.0 - frameInner);
-    // サッシは暗いアルミ。内側の縁にハイライト
-    vec3 sashCol = mix(vec3(0.06, 0.06, 0.07), vec3(0.16, 0.16, 0.18), nearWin);
+    // 窓枠（サッシ本体）。開口の縁の内側にハイライト
+    vec3 sashCol = mix(vec3(0.05, 0.05, 0.06), vec3(0.15, 0.15, 0.17), nearWin);
 
-    // 合成: まず外（アパーチャ内）と室内（外側）
+    // 合成: 外（アパーチャ内）／室内（外側）／桟・サッシ（最前面）
     vec3 col = mix(interior, outside, aperture);
-    // 桟・サッシを最前面に（暗いアルミ＋内側ハイライト）
     col = mix(col, sashCol, bars * 0.96);
 
     // 室内全体のごく弱い周辺減光（奥行き）
-    float vig = 1.0 - 0.30 * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));
+    float vig = 1.0 - 0.34 * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));
     col *= vig;
 
     col = applyGrade(col); // 全情景共通の「記憶の風景」グレード

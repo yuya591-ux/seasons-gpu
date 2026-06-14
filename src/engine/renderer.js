@@ -190,7 +190,10 @@ export function createRenderer(canvas) {
     const clampP = (v) => Math.max(-0.07, Math.min(0.07, v))
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
-    gl.uniform2f(loc.uPan, panCur.x, panCur.y)
+    // ごく弱い“息づかい”の揺れ。静止画ではなく、その場に居る気配を出す（窓辺シリーズで効く）
+    const swayX = Math.sin(seconds * 0.09) * 0.012 + Math.sin(seconds * 0.043 + 1.3) * 0.006
+    const swayY = Math.sin(seconds * 0.06 + 0.7) * 0.006
+    gl.uniform2f(loc.uPan, panCur.x + swayX, panCur.y + swayY)
     if (loc.uParallax) {
       gl.uniform2f(
         loc.uParallax,

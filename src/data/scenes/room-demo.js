@@ -7,6 +7,7 @@ export default {
   label: 'ある部屋の窓辺',
   desc: '部屋に立って、ゆっくりと見回す。指でも、画面を傾けても。',
   status: 'ready',
+  public: false, // 実証用プレースホルダ（研究素材の室内）。本命はシェーダーの cornerRoom。?dev=1 のみ
   render: 'splat',
   splatUrl: 'splat/room.splat',
   splatMode: 'room', // 一人称・部屋モード
