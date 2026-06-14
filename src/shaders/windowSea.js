@@ -86,6 +86,17 @@ const FRAGMENT_BODY = /* glsl */ `
                 smoothstep(0.5, 0.18, abs(ax - islX));
     col = mix(col, mix(uDropTint, vec3(0.05, 0.06, 0.09), 0.5), clamp(isl, 0.0, 1.0));
 
+    // 海鳥の影（V字が空をゆっくり横切る）
+    for (int bi = 0; bi < 3; bi++) {
+      float bfi = float(bi);
+      float bx = fract(t * 0.012 + bfi * 0.31) * 2.6 - 1.3;
+      float by = 0.72 + bfi * 0.035 + sin(t * 0.3 + bfi) * 0.012;
+      vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - by);
+      bp.x = abs(bp.x);
+      float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
+      col = mix(col, col * 0.55, wing * 0.6);
+    }
+
     // ガラス現象
     col = applyGlass(col, p, t, uGlass);
 

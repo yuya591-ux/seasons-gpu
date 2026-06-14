@@ -175,15 +175,20 @@ const FRAGMENT_BODY = /* glsl */ `
       float fxs = fract(sx / cellW) - 0.5;
       float sr = h11(shopCell + 7.0);
       float shopLit = step(0.30, sr);             // 多くの店が灯る商店街
+      float isVend = step(0.82, h11(shopCell + 9.0)); // たまに自販機（白〜青白）
       float sy = 0.105 + h11(shopCell + 2.0) * 0.04;
-      // 店先の暖色グロー（提灯/看板を様式的に。固有名は出さない）
+      // 店先の暖色グロー（提灯/看板を様式的に。固有名は出さない）／自販機は冷たい白
       vec3 shopHue = mix(uSunGlow, vec3(1.0, 0.55, 0.38), step(0.5, h11(shopCell + 5.0)));
+      shopHue = mix(shopHue, vec3(0.82, 0.92, 1.0), isVend);
       float sign = smoothstep(0.03, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
+      // 自販機は縦長で少し明るい灯り
+      float vend = isVend * smoothstep(0.055, 0.0, abs(vp.y - 0.085)) * smoothstep(0.26, 0.0, abs(fxs));
       // 道路（暗く濡れて、灯りを縦に映す）
       vec3 road = mix(vec3(0.035, 0.035, 0.045), uHorizon * 0.10, 0.5);
       road += shopHue * sign * shopLit * 0.85;
+      road += shopHue * vend * 0.55;
       float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.08, vp.y);
-      road += shopHue * refl * shopLit * 0.22;
+      road += shopHue * refl * (shopLit + isVend) * 0.22;
       // 通り沿いの街灯
       float lampPh = fract(sx / 0.16) - 0.5;
       float lampY = 0.165 + h11(floor(sx / 0.16) + 3.0) * 0.02;
@@ -304,6 +309,16 @@ const FRAGMENT_BODY = /* glsl */ `
     // 合成: 外（アパーチャ内）／室内（外側）／桟・サッシ（最前面）
     vec3 col = mix(interior, outside, aperture);
     col = mix(col, sashCol, bars * 0.96);
+
+    // 雪が桟と窓台の上に積もる（uGlass==2=雪のときだけ）
+    if (uGlass > 1.5) {
+      float bumpy = (fbm(vec2(wp.x * 38.0, 3.0)) - 0.5) * 0.008; // 雪面のでこぼこ
+      float capMull = smoothstep(0.024, 0.004, abs(wp.y - (0.527 + bumpy))) * step(wp.y, 0.529); // 横框の上
+      float capSill = smoothstep(0.030, 0.006, abs(wp.y - (winB + 0.020 + bumpy))) * step(wp.y, winB + 0.022)
+                    * step(winL - 0.02, wp.x) * step(wp.x, winR + 0.02); // 窓台の上
+      float snowCap = clamp(max(capMull, capSill), 0.0, 1.0) * aperture;
+      col = mix(col, vec3(0.92, 0.94, 0.99), snowCap * 0.9);
+    }
 
     // 室内全体のごく弱い周辺減光（奥行き）
     float vig = 1.0 - 0.34 * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));

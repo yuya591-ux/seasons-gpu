@@ -82,6 +82,17 @@ const FRAGMENT_BODY = /* glsl */ `
     col = ridge(col, vp, ax + yaw * 1.02, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35);
     col = ridge(col, vp, ax + yaw * 1.06, 53.0, 0.20, 4.6, 0.30, vec3(0.08, 0.12, 0.08), 0.0);
 
+    // 渡り鳥の影（V字が空をゆっくり横切る）
+    for (int bi = 0; bi < 3; bi++) {
+      float bfi = float(bi);
+      float bx = fract(t * 0.011 + bfi * 0.33) * 2.6 - 1.3;
+      float by = 0.74 + bfi * 0.03 + sin(t * 0.3 + bfi) * 0.012;
+      vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - by);
+      bp.x = abs(bp.x);
+      float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
+      col = mix(col, col * 0.55, wing * 0.6);
+    }
+
     // ガラス現象（雪・雨）
     col = applyGlass(col, p, t, uGlass);
 
