@@ -100,6 +100,17 @@ const FRAGMENT_BODY = /* glsl */ `
     // 遠雷フラッシュ（空がほのかに白む。雲のあたりを少し強く）
     col += uFlash * (0.10 + 0.16 * cloudband) * vec3(0.85, 0.9, 1.0);
 
+    // ねぐらへ帰る鳥影（ゆっくり横切る小さなV字）。夕・朝の郷愁
+    for (int i = 0; i < 4; i++) {
+      float fi = float(i);
+      float bx = fract(uTime * 0.012 + fi * 0.27) * 2.6 - 1.3;       // 横移動
+      float byb = 0.64 + fi * 0.035 + sin(uTime * 0.3 + fi) * 0.012; // 高さ（はばたき）
+      vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - byb);
+      bp.x = abs(bp.x);
+      float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
+      col = mix(col, col * 0.5, wing * 0.6);
+    }
+
     // 奥→手前の街（高台から見下ろすので低めの地平）
     col = hills(col, vp, ax + yaw * 0.92, 0.48, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
     col = town(col, vp, ax + yaw * 0.96, 0.44, 0.10, 0.05,
@@ -176,16 +187,25 @@ const FRAGMENT_BODY = /* glsl */ `
     // 夕暮れの残照が上端だけにかすかに回り込む
     concrete += uSunGlow * 0.05 * smoothstep(0.6, 1.0, vp.y);
 
-    // 規則的な小窓（多くは暗く、ごく一部だけ灯る）
-    vec2 wc = vec2(wx * 11.0, vp.y * 18.0 + 2.0);
-    vec2 wid = floor(wc); vec2 wf = fract(wc);
-    float rect = step(0.26, wf.x) * step(wf.x, 0.74) * step(0.30, wf.y) * step(wf.y, 0.80);
-    float lit = step(0.90, h21(wid + 41.0));
+    // マンションの面: 各戸にベランダ（手すり＋奥の陰）・窓・室外機
+    vec2 cell = vec2(wx * 5.5, vp.y * 9.0 + 1.0); // 1セル=1戸
+    vec2 cid = floor(cell); vec2 cf = fract(cell);
+    float unitR = h21(cid + 41.0);
+    float win = step(0.16, cf.x) * step(cf.x, 0.84) * step(0.46, cf.y) * step(cf.y, 0.86);
+    float lit = step(0.86, unitR);
     vec3 wcol = mix(vec3(0.05, 0.05, 0.065), uSunGlow * 0.8, lit);
-    concrete = mix(concrete, wcol, rect * 0.8);
+    float railing = smoothstep(0.035, 0.0, abs(cf.y - 0.32));        // 横手すりの線
+    float balconyShade = step(0.05, cf.y) * step(cf.y, 0.44);        // 手すり下の陰
+    float ac = step(0.30, cf.x) * step(cf.x, 0.55) * step(0.10, cf.y) * step(cf.y, 0.26)
+             * step(0.5, h21(cid + 7.0));                            // 室外機（たまに）
+    concrete = mix(concrete, concrete * 0.6, balconyShade * 0.5);    // ベランダ奥の陰
+    concrete = mix(concrete, wcol, win * 0.85);                      // 窓
+    concrete = mix(concrete, vec3(0.10, 0.10, 0.12), railing * 0.45); // 手すり
+    concrete = mix(concrete, vec3(0.04, 0.04, 0.05), ac * 0.8);      // 室外機
 
-    // 建物の角（左端＝こちらに近い稜線）を陰らせて立体に
-    concrete *= mix(0.55, 1.0, smoothstep(0.0, 0.07, wx));
+    // 建物の角（左端＝こちらに近い稜線）。すぐ右は陰、稜線自体はかすかに光を受ける
+    concrete *= mix(0.5, 1.0, smoothstep(0.0, 0.06, wx));
+    concrete += vec3(0.08, 0.09, 0.11) * smoothstep(0.012, 0.0, wx);
     return vec4(concrete, cover);
   }
 

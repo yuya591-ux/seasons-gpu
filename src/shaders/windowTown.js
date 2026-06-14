@@ -142,10 +142,25 @@ const FRAGMENT_BODY = /* glsl */ `
     col = hills(col, vp, ax + yaw * 0.90, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
     col = town(col, vp, ax + yaw * 0.94, 0.50, 0.10, 0.06,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0);
+
+    // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（奥行き）
+    float haze = smoothstep(0.58, 0.46, vp.y) * smoothstep(0.36, 0.50, vp.y);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.26);
+
     col = town(col, vp, ax + yaw * 0.98, 0.42, 0.16, 0.13,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22);
     col = town(col, vp, ax + yaw * 1.04, 0.30, 0.26, 0.18,
                uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5);
+
+    // 高層ビルの赤色航空障害灯（ゆっくり点滅）
+    for (int bi = 0; bi < 3; bi++) {
+      float bfi = float(bi);
+      float bx = (h11(bfi * 13.0 + 2.0) - 0.5) * 2.0;
+      float by = 0.50 + h11(bfi * 5.0 + 3.0) * 0.12;
+      float bd = length(vec2((ax + yaw * 0.98) - bx, vp.y - by) * vec2(1.0, 1.35));
+      float bl = smoothstep(0.45, 0.55, fract(t * 0.5 + bfi * 0.37));
+      col += vec3(1.0, 0.12, 0.08) * (exp(-bd * 150.0) + exp(-bd * 45.0) * 0.22) * bl * 0.85;
+    }
 
     // 街灯（手前の通り沿いに、にじむ暖色の点）
     float lx = ax + yaw * 1.04;
