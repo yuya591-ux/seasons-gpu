@@ -55,36 +55,52 @@ const FRAGMENT_BODY = /* glsl */ `
     float sunAz = -0.05;             // 世界に固定した夕陽の方位
     float sunScreenX = sunAz - yaw;  // 首を振ると視界の中を動く
 
-    // 空（夕暮れ）
-    vec3 sky = mix(uHorizon, uSkyMid, smoothstep(horizon, 0.8, vp.y));
-    sky = mix(sky, uSkyTop, smoothstep(0.78, 1.0, vp.y));
-    float sun = exp(-distance(vec2(ax, vp.y), vec2(sunScreenX, horizon + 0.04)) * 3.2);
+    // ── 空（夕暮れ・水平線に沈む夕陽・層雲・地平の霞） ──
+    vec3 sky = mix(uHorizon, uSkyMid, smoothstep(horizon, 0.82, vp.y));
+    sky = mix(sky, uSkyTop, smoothstep(0.80, 1.0, vp.y));
+    vec2 sunP = vec2(ax - sunScreenX, vp.y - (horizon + 0.02));
+    float sunDist = length(sunP * vec2(1.0, 1.3));
+    float sun = exp(-sunDist * 3.0);                        // 大きなグロー
+    float sunDisc = smoothstep(0.058, 0.046, sunDist);     // 太陽円盤（水平線に半分沈む）
     sky += uSunGlow * sun * 0.7;
+    sky = mix(sky, mix(uSunGlow, vec3(1.0, 0.96, 0.86), 0.45), sunDisc * 0.92);
+    // 横に伸びる層雲（夕陽で底が染まる）
+    float cl = fbm(vec2((ax + yaw) * 1.2 + t * 0.006, vp.y * 3.0));
+    float cloud = smoothstep(0.5, 0.75, cl) * smoothstep(horizon + 0.02, 0.96, vp.y);
+    sky = mix(sky, mix(uHorizon, uSunGlow, 0.5), cloud * 0.35);
+    // 地平の霞（海と空の境を柔らかく＝郷愁）
+    float hazeB = exp(-abs(vp.y - horizon) * 24.0);
+    sky = mix(sky, mix(uHorizon, uSunGlow, 0.3), hazeB * 0.4);
 
-    // 海: 遠近のあるさざ波（ノイズ）。水平線では空を映し、手前ほど深い色。
+    // ── 海面（寄せるうねり・フレネル・夕陽の道・波頭の泡） ──
     float depth = clamp((horizon - vp.y) / horizon, 0.0, 1.0); // 0=水平線, 1=手前
-    float persp = 1.0 / (depth + 0.06);                        // 水平線ほど細かい
-    vec2 wuv = vec2((ax + yaw) * persp * 0.7, depth * persp * 0.5 - t * 0.25);
-    float ripple = fbm(wuv) + 0.5 * fbm(wuv * 2.3 + 4.0);
-
-    vec3 horizonRefl = mix(uHorizon, uSunGlow, sun * 0.5);
-    vec3 water = mix(horizonRefl, uDropTint, smoothstep(0.0, 0.5, depth));
-    water *= 0.88 + 0.22 * ripple;                             // うねりの陰影
-
-    // 夕陽のきらめき: 反射の帯に、ランダムな点でちらつく
-    float reflBand = exp(-abs(ax - sunScreenX) * 4.5);
-    float glit = smoothstep(0.62, 0.92, ripple) * reflBand * smoothstep(0.0, 0.22, depth);
-    glit *= 0.55 + 0.45 * fbm(wuv * 4.0 + t * 1.3);
-    water += uSunGlow * glit * mix(0.6, 1.1, uIntensity);
+    float persp = 1.0 / (depth + 0.05);                        // 水平線ほど細かい
+    vec2 swuv = vec2((ax + yaw) * persp, depth * persp);
+    float swell = sin(swuv.y * 3.0 - t * 0.6) * 0.5
+                + sin(swuv.y * 7.0 + swuv.x * 0.5 - t * 0.9) * 0.3;   // 岸へ寄せる波
+    float ripple = fbm(swuv * vec2(1.4, 2.2) + vec2(t * 0.05, -t * 0.3))
+                 + 0.5 * fbm(swuv * vec2(3.0, 5.0) + vec2(0.0, -t * 0.5));
+    float fres = smoothstep(0.0, 0.5, depth);                  // 手前=深い藍, 水平線=反射
+    vec3 reflC = mix(uHorizon, uSunGlow, sun * 0.6);
+    vec3 water = mix(reflC, uDropTint, fres);
+    water *= 0.82 + 0.26 * (swell * 0.5 + ripple * 0.5);       // うねりの陰影
+    // 夕陽の道（太陽の真下に伸びる帯。波頭がきらめき明滅）
+    float pathW = exp(-abs(ax - sunScreenX) * (3.0 + depth * 6.0));
+    float spark = smoothstep(0.55, 0.95, ripple + swell * 0.3);
+    float scint = 0.5 + 0.5 * sin(swuv.x * 30.0 + swuv.y * 18.0 - t * 6.0);
+    water += uSunGlow * pathW * spark * scint * mix(0.7, 1.3, uIntensity);
+    // 波頭の白い泡（手前ほど）
+    float foam = smoothstep(0.86, 1.02, ripple + swell * 0.3) * smoothstep(0.25, 0.85, depth);
+    water = mix(water, vec3(0.85, 0.88, 0.9), foam * 0.22);
 
     vec3 col = (vp.y > horizon) ? sky : water;
 
-    // 遠い島影（世界に固定）
+    // 遠い島影（世界に固定。空気遠近で霞む）
     float islX = 0.35 - yaw;
     float islY = horizon + 0.02 + (fbm(vec2((ax + yaw) * 1.2 + 5.0, 0.0)) - 0.5) * 0.04;
     float isl = step(vp.y, islY) * step(horizon - 0.01, vp.y) *
                 smoothstep(0.5, 0.18, abs(ax - islX));
-    col = mix(col, mix(uDropTint, vec3(0.05, 0.06, 0.09), 0.5), clamp(isl, 0.0, 1.0));
+    col = mix(col, mix(mix(uDropTint, uHorizon, 0.4), vec3(0.05, 0.06, 0.09), 0.4), clamp(isl, 0.0, 1.0) * 0.85);
 
     // 海鳥の影（V字が空をゆっくり横切る）
     for (int bi = 0; bi < 3; bi++) {
