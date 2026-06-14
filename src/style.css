@@ -75,6 +75,18 @@ body {
     inset 0 0 0 10px rgba(255, 255, 255, 0.06),
     inset 0 0 120px 24px rgba(0, 0, 0, 0.55);
 }
+.splat-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+}
 .splat-diag {
   position: absolute;
   top: 3.2rem;

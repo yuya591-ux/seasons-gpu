@@ -97,6 +97,12 @@ export async function mountSplat(parent, url) {
     diag.style.display = 'none'
   })
 
+  // 読み込み中の控えめな表示
+  const loading = document.createElement('div')
+  loading.className = 'splat-loading'
+  loading.textContent = '本物の3Dを読み込み中…'
+  lc.appendChild(loading)
+
   let lv = null
   // 自分の世代でなくなったら、作りかけを片付けて終了
   const bail = async () => {
@@ -206,13 +212,28 @@ export async function mountSplat(parent, url) {
       lv.camera.updateProjectionMatrix()
       lv.camera.lookAt(center)
       if (lv.controls) {
-        lv.controls.target.copy(center)
-        lv.controls.minDistance = Math.max(radius * 0.2, 0.2)
-        lv.controls.maxDistance = dist * 4
-        lv.controls.enablePan = false
-        lv.controls.autoRotate = true
-        lv.controls.autoRotateSpeed = 0.35
-        lv.controls.update()
+        const ctl = lv.controls
+        ctl.target.copy(center)
+        ctl.minDistance = Math.max(radius * 0.2, 0.2)
+        ctl.maxDistance = dist * 4
+        ctl.enablePan = false
+        ctl.autoRotate = true
+        ctl.autoRotateSpeed = 0.35
+        // 真下に潜って裏返らないよう、上下の見回しを制限
+        ctl.minPolarAngle = 0.15 * Math.PI
+        ctl.maxPolarAngle = 0.85 * Math.PI
+        // 操作中は自動回転を止め、放したら数秒で再開
+        let resumeTimer = 0
+        ctl.addEventListener('start', () => {
+          ctl.autoRotate = false
+          clearTimeout(resumeTimer)
+        })
+        ctl.addEventListener('end', () => {
+          resumeTimer = setTimeout(() => {
+            if (token === mountToken) ctl.autoRotate = true
+          }, 4000)
+        })
+        ctl.update()
       }
       state.steps.push('frame')
     } catch (e) {
@@ -231,6 +252,7 @@ export async function mountSplat(parent, url) {
     container = lc
     lv = null
 
+    loading.remove()
     state.steps.push('done')
     render()
 
@@ -240,6 +262,7 @@ export async function mountSplat(parent, url) {
     }, 3500)
   } catch (e) {
     state.error = e && e.message ? e.message : String(e)
+    if (loading.parentNode) loading.remove()
     diag.style.display = 'block'
     render()
     await disposeViewer(lv)
