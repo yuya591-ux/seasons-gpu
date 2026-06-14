@@ -87,14 +87,6 @@ export async function mountSplat(parent, url) {
       import('three'),
     ])
 
-    // ファイル到達確認（ネットワーク要因の切り分け）
-    try {
-      const r = await fetch(url, { method: 'HEAD' })
-      state.fetched = r.status + ' ' + (r.headers.get('content-length') || '?')
-    } catch (e) {
-      state.fetched = 'FAIL ' + (e && e.message ? e.message : e)
-    }
-
     state.steps.push('viewer')
     render()
     viewer = new GS.Viewer({
@@ -112,12 +104,33 @@ export async function mountSplat(parent, url) {
       antialiased: false,
     })
 
-    state.steps.push('load')
+    // iOS ではライブラリ内蔵の取得(fetchWithProgress)が失敗するため、こちらで取得して渡す
+    state.steps.push('fetch')
+    render()
+    const data = await withTimeout(
+      fetch(url).then((r) => {
+        if (!r.ok) throw new Error('HTTP ' + r.status)
+        return r.arrayBuffer()
+      }),
+      30000,
+      'fetch',
+    )
+    state.fetched = (data.byteLength / 1e6).toFixed(1) + 'MB'
+
+    state.steps.push('parse')
+    render()
+    const splatBuffer = await withTimeout(
+      GS.SplatLoader.loadFromFileData(data, 1, 0, true),
+      30000,
+      'parse',
+    )
+
+    state.steps.push('add')
     render()
     await withTimeout(
-      viewer.addSplatScene(url, { showLoadingUI: false, progressiveLoad: false }),
-      25000,
-      'load',
+      viewer.addSplatBuffers([splatBuffer], [{ splatAlphaRemovalThreshold: 1 }], true, false, false, false, false),
+      30000,
+      'add',
     )
 
     state.steps.push('start')
