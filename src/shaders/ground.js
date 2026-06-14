@@ -37,6 +37,17 @@ export const GROUND_GLSL = /* glsl */ `
     // 区画の縁の陰影＝建物の高さの暗示。奥(上)の縁が陰り、手前(下)の縁が明るい＝立体に見える
     ground *= 1.0 - smoothstep(0.80, 1.0, gf.y) * 0.42 * (1.0 - road);
     ground *= 1.0 + smoothstep(0.20, 0.0, gf.y) * 0.16 * (1.0 - road);
+    // 川（街を蛇行して流れる。水面が空と灯りを映す＝街の見どころ）
+    float riverX = sin(gz * 0.22 + 1.5) * 1.6 + cos(gz * 0.11) * 0.7;
+    float river = smoothstep(0.32, 0.22, abs(g0.x - riverX));
+    vec3 waterC = mix(uSkyMid, uHorizon, 0.5) * 0.6;
+    ground = mix(ground, waterC, river * 0.92);
+    road *= (1.0 - river);                          // 川の上は道/灯り/車を出さない
+    // 街路樹（道の脇・公園に緑の点々）
+    vec2 tg = g0 * 3.2; vec2 tgi = floor(tg); vec2 tgf = fract(tg);
+    float treeArea = max(smoothstep(0.20, 0.12, dRoad), step(0.82, mat));
+    float tree = step(0.66, h21(tgi + 41.0)) * smoothstep(0.30, 0.05, length(tgf - 0.5)) * treeArea * (1.0 - road) * (1.0 - river);
+    ground = mix(ground, mix(vec3(0.11, 0.19, 0.09), uHorizon * 0.25, 0.2), tree * 0.55);
     // 夜でも見えるよう街全体をうっすら底上げ（街灯の照り返し）
     ground += mix(uHorizon, uSunGlow, 0.4) * 0.05 * nightAmt;
     // 屋上の縁の立体（夕日が片側）
