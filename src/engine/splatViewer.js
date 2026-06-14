@@ -204,8 +204,9 @@ export async function mountSplat(parent, url) {
       const ey = P(ys, 0.75) - P(ys, 0.25)
       const ez = P(zs, 0.75) - P(zs, 0.25)
       const radius = 0.5 * Math.max(ex, ey, ez) || 1
-      const dist = radius * 4.0
-      const dir = new THREE.Vector3(0.3, -0.55, 0.9).normalize()
+      // 被写体が映える斜め上からの定番アングル（中央値=地面寄りのため見下ろし気味が安定）
+      const dist = radius * 3.6
+      const dir = new THREE.Vector3(0.25, -0.45, 0.95).normalize()
       lv.camera.position.copy(center).addScaledVector(dir, dist)
       lv.camera.near = Math.max(dist * 0.02, 0.01)
       lv.camera.far = dist * 12 + radius * 12
@@ -214,11 +215,15 @@ export async function mountSplat(parent, url) {
       if (lv.controls) {
         const ctl = lv.controls
         ctl.target.copy(center)
-        ctl.minDistance = Math.max(radius * 0.2, 0.2)
+        ctl.minDistance = Math.max(radius * 0.15, 0.15)
         ctl.maxDistance = dist * 4
-        ctl.enablePan = false
+        // 二本指で移動・つまんでズーム＝景色の中を動ける
+        ctl.enablePan = true
+        ctl.screenSpacePanning = true
+        ctl.panSpeed = 0.8
+        ctl.zoomSpeed = 0.8
         ctl.autoRotate = true
-        ctl.autoRotateSpeed = 0.35
+        ctl.autoRotateSpeed = 0.3
         // 真下に潜って裏返らないよう、上下の見回しを制限
         ctl.minPolarAngle = 0.15 * Math.PI
         ctl.maxPolarAngle = 0.85 * Math.PI

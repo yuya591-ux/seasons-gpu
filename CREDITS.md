@@ -57,7 +57,7 @@
 
 | 用途 | ファイル | 由来 | 扱い |
 | --- | --- | --- | --- |
-| 本物の3D（実証用） | `public/splat/demo-small.splat` | 3D Gaussian Splatting / Mip-NeRF360 の "garden" シーン。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。研究素材のため正式公開はしない前提。表示用に約73万splatへ間引き。本番は本人が撮影・学習した `.ply` に差し替える。 |
+| 本物の3D（実証用） | `public/splat/demo-small.splat` | 3D Gaussian Splatting / Mip-NeRF360 の "garden" シーン。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。研究素材のため正式公開はしない前提。表示用に約97万splatへ間引き。本番は本人が撮影・学習した `.ply` に差し替える。 |
 
 - 学習ツール: Brush（wgpu, Apache-2.0/MIT）をローカルで使用（リポジトリ外）。
 - 表示ライブラリ: three.js（MIT）/ @mkkellogg/gaussian-splats-3d（MIT）。
