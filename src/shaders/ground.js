@@ -48,8 +48,8 @@ export const GROUND_GLSL = /* glsl */ `
     float treeArea = max(smoothstep(0.20, 0.12, dRoad), step(0.82, mat));
     float tree = step(0.66, h21(tgi + 41.0)) * smoothstep(0.30, 0.05, length(tgf - 0.5)) * treeArea * (1.0 - road) * (1.0 - river);
     ground = mix(ground, mix(vec3(0.11, 0.19, 0.09), uHorizon * 0.25, 0.2), tree * 0.55);
-    // 夜でも見えるよう街全体をうっすら底上げ（街灯の照り返し）
-    ground += mix(uHorizon, uSunGlow, 0.4) * 0.05 * nightAmt;
+    // 街全体をうっすら底上げ（街灯の照り返し）。常時＋夜はさらに＝下が暗すぎて見えないのを防ぐ
+    ground += mix(uHorizon, uSunGlow, 0.4) * (0.04 + 0.07 * nightAmt);
     // 屋上の縁の立体（夕日が片側）
     ground += uSunGlow * smoothstep(roadWdt + 0.05, roadWdt + 0.01, dRoad) * (1.0 - road) * smoothstep(0.0, 0.6, gf.x) * 0.10;
     // 屋上/窓の灯り
@@ -61,12 +61,15 @@ export const GROUND_GLSL = /* glsl */ `
     // 人影（道沿いを動く小さな点）
     float ped = step(0.5, h21(gi + 19.0)) * smoothstep(0.05, 0.0, length((gf - vec2(0.5, fract(uTime * 0.05 + blkR))) * vec2(1.3, 1.0))) * road;
     ground = mix(ground, vec3(0.05, 0.04, 0.05), ped * 0.7);
-    // 車（縦の道を流れる。進行方向で白ヘッドライト/赤テール）
+    // 車（縦の道を流れる。白ヘッドライト/赤テール＋前方へ伸びる淡いビーム）
     float carDir = (blkR > 0.5) ? 1.0 : -1.0;
-    float carY = fract(uTime * 0.20 * carDir + blkR);
-    float car = step(0.40, h11(gi.x * 1.7 + gi.y * 2.3 + 21.0))
-              * smoothstep(0.08, 0.0, abs(gf.x - 0.5)) * smoothstep(0.045, 0.0, abs(gf.y - carY)) * road;
-    ground += mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.32, 0.2), step(0.0, -carDir)) * car * 0.7;
+    float carY = fract(uTime * 0.22 * carDir + blkR);
+    float onVroad = smoothstep(0.13, 0.0, abs(gf.x - 0.5)) * road;
+    float carOn = step(0.45, h11(gi.x * 1.7 + gi.y * 2.3 + 21.0));
+    float carBody = smoothstep(0.05, 0.0, abs(gf.y - carY));
+    float carBeam = smoothstep(0.16, 0.0, abs(gf.y - carY - carDir * 0.07)); // 前方ビーム
+    vec3 carCol = mix(vec3(1.0, 0.92, 0.72), vec3(1.0, 0.30, 0.18), step(0.0, -carDir));
+    ground += carCol * onVroad * carOn * (carBody * 0.9 + carBeam * 0.22);
     // 近景(手前)の明るさを少し持ち上げ＝下を覗いた時に見やすく
     ground *= 1.0 + smoothstep(0.12, 0.42, gt) * 0.22;
     // 空気遠近: 地平に近いほど霞む（遠い街は空へ溶ける）
