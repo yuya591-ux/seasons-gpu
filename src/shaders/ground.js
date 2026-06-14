@@ -34,6 +34,9 @@ export const GROUND_GLSL = /* glsl */ `
     roofC *= 0.8 + 0.4 * blkR;
     vec3 roadC = mix(vec3(0.20, 0.19, 0.19), uHorizon * 0.3, 0.4);
     vec3 ground = mix(roofC, roadC, road);
+    // 区画の縁の陰影＝建物の高さの暗示。奥(上)の縁が陰り、手前(下)の縁が明るい＝立体に見える
+    ground *= 1.0 - smoothstep(0.80, 1.0, gf.y) * 0.42 * (1.0 - road);
+    ground *= 1.0 + smoothstep(0.20, 0.0, gf.y) * 0.16 * (1.0 - road);
     // 夜でも見えるよう街全体をうっすら底上げ（街灯の照り返し）
     ground += mix(uHorizon, uSunGlow, 0.4) * 0.05 * nightAmt;
     // 屋上の縁の立体（夕日が片側）
@@ -53,6 +56,8 @@ export const GROUND_GLSL = /* glsl */ `
     float car = step(0.40, h11(gi.x * 1.7 + gi.y * 2.3 + 21.0))
               * smoothstep(0.08, 0.0, abs(gf.x - 0.5)) * smoothstep(0.045, 0.0, abs(gf.y - carY)) * road;
     ground += mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.32, 0.2), step(0.0, -carDir)) * car * 0.7;
+    // 近景(手前)の明るさを少し持ち上げ＝下を覗いた時に見やすく
+    ground *= 1.0 + smoothstep(0.12, 0.42, gt) * 0.22;
     // 空気遠近: 地平に近いほど霞む（遠い街は空へ溶ける）
     ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), smoothstep(0.07, 0.0, gt) * 0.85);
     if (glassMode > 1.5) ground = mix(ground, vec3(0.82, 0.85, 0.92), 0.12); // 雪
