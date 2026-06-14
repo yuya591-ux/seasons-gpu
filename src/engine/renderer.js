@@ -46,7 +46,7 @@ export function createRenderer(canvas) {
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
   const panCur = { x: 0, y: 0 }
   const panTarget = { x: 0, y: 0 }
-  const PAN_LIMIT = { x: 1.25, y: 0.28 }
+  const PAN_LIMIT = { x: 2.6, y: 0.3 }
 
   function buildProgram(q, type) {
     const shader = getShader(type)

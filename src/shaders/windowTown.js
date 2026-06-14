@@ -115,8 +115,13 @@ const FRAGMENT_BODY = /* glsl */ `
     float asp = uResolution.x / uResolution.y;
     float t = uTime;
     vec2 p = frag;
-    // 上下の見回し: 景色だけ縦にずらす（窓枠は固定）
-    vec2 vp = vec2(p.x, p.y - uPan.y);
+    // 一人称の視界。横スワイプ=首を振る(ヨー)、縦=見上げ/見下ろし(ピッチ)。
+    // 各レイヤーをほぼ一律に回し、向いた方向の景色が現れるようにする（広角の周辺は湾曲）。
+    float yaw = uPan.x;
+    float pitch = uPan.y;
+    float ax = (p.x - 0.5) * asp;        // 画面内の水平角（中心0）
+    float curve = -0.10 * ax * ax;       // 広角の周辺で地平がゆるく湾曲
+    vec2 vp = vec2(p.x, p.y - pitch + curve);
 
     // 空（夕暮れ）: 下=茜、上=紫紺
     vec3 col = mix(uSkyMid, uSkyTop, smoothstep(0.52, 1.0, vp.y));
@@ -124,23 +129,21 @@ const FRAGMENT_BODY = /* glsl */ `
     col += uSunGlow * exp(-abs(vp.y - 0.5) * 7.0) * 0.22; // 地平の残照
 
     // 夕焼け雲（茜に染まる）
-    float cl = fbm(vec2((vp.x - 0.5) * asp * 1.6 + uPan.x * 0.15 + t * 0.008, vp.y * 2.2));
+    float cl = fbm(vec2(ax * 1.6 + yaw + t * 0.008, vp.y * 2.2));
     float cloudband = smoothstep(0.52, 0.82, cl) * smoothstep(0.46, 0.96, vp.y);
     col = mix(col, mix(uHorizon, uSunGlow, 0.45), cloudband * 0.4);
 
-    float base = (vp.x - 0.5) * asp;
-
-    // 奥→手前（視差は手前ほど大きい）
-    col = hills(col, vp, base + uPan.x * 0.10, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
-    col = town(col, vp, base + uPan.x * 0.22, 0.50, 0.10, 0.06,
+    // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
+    col = hills(col, vp, ax + yaw * 0.90, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
+    col = town(col, vp, ax + yaw * 0.94, 0.50, 0.10, 0.06,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0);
-    col = town(col, vp, base + uPan.x * 0.45, 0.42, 0.16, 0.13,
+    col = town(col, vp, ax + yaw * 0.98, 0.42, 0.16, 0.13,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22);
-    col = town(col, vp, base + uPan.x * 0.85, 0.30, 0.26, 0.18,
+    col = town(col, vp, ax + yaw * 1.04, 0.30, 0.26, 0.18,
                uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5);
 
     // 街灯（手前の通り沿いに、にじむ暖色の点）
-    float lx = base + uPan.x * 0.85;
+    float lx = ax + yaw * 1.04;
     float lcell = floor(lx / 0.22);
     float lph = fract(lx / 0.22);
     float ly = 0.085 + h11(lcell + 3.0) * 0.02;
@@ -148,10 +151,10 @@ const FRAGMENT_BODY = /* glsl */ `
     float lamp = exp(-dl * 42.0) + exp(-dl * 12.0) * 0.35;
     col += uSunGlow * lamp * step(vp.y, 0.18) * 0.9;
 
-    // 電線（手前・郷愁）。ゆるく垂れる数本。
+    // 電線（手前・郷愁）。ゆるく垂れる数本。視点回転で一緒に動く。
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      float yl = 0.66 + fi * 0.035 + sin(p.x * asp * 2.2 + fi * 1.7 + uPan.x * 0.6) * 0.012 - uPan.y;
+      float yl = 0.66 + fi * 0.035 + sin((ax + yaw * 1.05) * 2.2 + fi * 1.7) * 0.012 - pitch + curve;
       float d = abs(p.y - yl);
       col = mix(col, vec3(0.02, 0.02, 0.04), smoothstep(0.0035, 0.0, d) * 0.8);
     }

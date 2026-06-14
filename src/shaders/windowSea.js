@@ -43,36 +43,46 @@ const FRAGMENT_BODY = /* glsl */ `
     float asp = uResolution.x / uResolution.y;
     float t = uTime;
     vec2 p = frag;
-    vec2 vp = vec2(p.x, p.y - uPan.y);
+    // 一人称の視界（ヨー/ピッチ＋ゆるい湾曲）
+    float yaw = uPan.x;
+    float pitch = uPan.y;
+    float ax = (p.x - 0.5) * asp;
+    float curve = -0.08 * ax * ax;
+    vec2 vp = vec2(p.x, p.y - pitch + curve);
 
     float horizon = 0.52;
-    float x = (vp.x - 0.5) * asp;
-    float sunX = -0.05 + uPan.x * 0.25; // 夕陽は見回しで動く
+    float sunAz = -0.05;             // 世界に固定した夕陽の方位
+    float sunScreenX = sunAz - yaw;  // 首を振ると視界の中を動く
 
     // 空（夕暮れ）
     vec3 sky = mix(uHorizon, uSkyMid, smoothstep(horizon, 0.8, vp.y));
     sky = mix(sky, uSkyTop, smoothstep(0.78, 1.0, vp.y));
-    float sun = exp(-distance(vec2(x, vp.y), vec2(sunX, horizon + 0.05)) * 3.2);
+    float sun = exp(-distance(vec2(ax, vp.y), vec2(sunScreenX, horizon + 0.04)) * 3.2);
     sky += uSunGlow * sun * 0.7;
 
-    // 海
-    vec3 deep = mix(uDropTint, uHorizon * 0.7, smoothstep(horizon, horizon - 0.5, vp.y));
-    vec3 water = deep;
-    // 横に走る波のうねり
-    float band = sin((horizon - vp.y) * 70.0 + sin(vp.x * 14.0 + t * 0.6) * 1.5 + t * 1.8);
-    float shimmer = smoothstep(0.6, 1.0, band) * smoothstep(horizon, horizon - 0.45, vp.y);
-    water += uSunGlow * shimmer * mix(0.08, 0.20, uIntensity);
-    // 夕陽の反射（縦の道）
-    float refl = exp(-abs(x - sunX) * 5.0) * smoothstep(horizon, horizon - 0.4, vp.y);
-    refl *= 0.5 + 0.5 * sin((horizon - vp.y) * 55.0 + t * 3.0 + sin(vp.x * 30.0) * 2.0);
-    water += uSunGlow * max(refl, 0.0) * 0.5;
+    // 海: 遠近のあるさざ波（ノイズ）。水平線では空を映し、手前ほど深い色。
+    float depth = clamp((horizon - vp.y) / horizon, 0.0, 1.0); // 0=水平線, 1=手前
+    float persp = 1.0 / (depth + 0.06);                        // 水平線ほど細かい
+    vec2 wuv = vec2((ax + yaw) * persp * 0.7, depth * persp * 0.5 - t * 0.25);
+    float ripple = fbm(wuv) + 0.5 * fbm(wuv * 2.3 + 4.0);
+
+    vec3 horizonRefl = mix(uHorizon, uSunGlow, sun * 0.5);
+    vec3 water = mix(horizonRefl, uDropTint, smoothstep(0.0, 0.5, depth));
+    water *= 0.88 + 0.22 * ripple;                             // うねりの陰影
+
+    // 夕陽のきらめき: 反射の帯に、ランダムな点でちらつく
+    float reflBand = exp(-abs(ax - sunScreenX) * 4.5);
+    float glit = smoothstep(0.62, 0.92, ripple) * reflBand * smoothstep(0.0, 0.22, depth);
+    glit *= 0.55 + 0.45 * fbm(wuv * 4.0 + t * 1.3);
+    water += uSunGlow * glit * mix(0.6, 1.1, uIntensity);
 
     vec3 col = (vp.y > horizon) ? sky : water;
 
-    // 遠い島（水平線のすぐ上に低く）
-    float islY = horizon + 0.02 + (fbm(vec2((x - uPan.x * 0.3) * 1.2 + 5.0, 0.0)) - 0.5) * 0.04;
-    float isl = step(vp.y, islY) * step(horizon - 0.005, vp.y) *
-                smoothstep(0.55, 0.2, abs(x - (0.35 + uPan.x * 0.3)));
+    // 遠い島影（世界に固定）
+    float islX = 0.35 - yaw;
+    float islY = horizon + 0.02 + (fbm(vec2((ax + yaw) * 1.2 + 5.0, 0.0)) - 0.5) * 0.04;
+    float isl = step(vp.y, islY) * step(horizon - 0.01, vp.y) *
+                smoothstep(0.5, 0.18, abs(ax - islX));
     col = mix(col, mix(uDropTint, vec3(0.05, 0.06, 0.09), 0.5), clamp(isl, 0.0, 1.0));
 
     // ガラス現象

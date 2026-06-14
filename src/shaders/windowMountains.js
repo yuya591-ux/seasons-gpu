@@ -58,25 +58,28 @@ const FRAGMENT_BODY = /* glsl */ `
     float asp = uResolution.x / uResolution.y;
     float t = uTime;
     vec2 p = frag;
-    vec2 vp = vec2(p.x, p.y - uPan.y);
+    // 一人称の視界（ヨー/ピッチ＋広角の湾曲）
+    float yaw = uPan.x;
+    float pitch = uPan.y;
+    float ax = (p.x - 0.5) * asp;
+    float curve = -0.10 * ax * ax;
+    vec2 vp = vec2(p.x, p.y - pitch + curve);
 
     // 朝の空
     vec3 col = mix(uHorizon, uSkyMid, smoothstep(0.3, 0.66, vp.y));
     col = mix(col, uSkyTop, smoothstep(0.62, 1.0, vp.y));
-    // 朝陽（左寄りの低い位置）
-    vec2 suv = vec2((vp.x - 0.5) * asp, vp.y);
-    float sun = exp(-distance(suv, vec2(-0.25 + uPan.x * 0.1, 0.72)) * 3.0);
+    // 朝陽（世界に固定。首を振ると視界の中を移動する）
+    float sun = exp(-distance(vec2(ax, vp.y), vec2(-0.25 - yaw, 0.72)) * 3.0);
     col += uSunGlow * sun * 0.5;
 
-    float x = (vp.x - 0.5) * asp;
     float mistAmt = mix(0.25, 0.7, uIntensity);
 
-    // 奥→手前（遠いほど空色に霞む）
-    col = ridge(col, vp, x + uPan.x * 0.08, 1.0, 0.60, 1.2, 0.16, mix(uSkyMid, uHorizon, 0.5), mistAmt);
-    col = ridge(col, vp, x + uPan.x * 0.16, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.55), mistAmt * 0.8);
-    col = ridge(col, vp, x + uPan.x * 0.30, 21.0, 0.44, 2.6, 0.24, mix(uDropTint, uSkyMid, 0.28), mistAmt * 0.6);
-    col = ridge(col, vp, x + uPan.x * 0.55, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35);
-    col = ridge(col, vp, x + uPan.x * 0.90, 53.0, 0.20, 4.6, 0.30, vec3(0.08, 0.12, 0.08), 0.0);
+    // 奥→手前（遠いほど空色に霞む）。回転はほぼ一律。
+    col = ridge(col, vp, ax + yaw * 0.90, 1.0, 0.60, 1.2, 0.16, mix(uSkyMid, uHorizon, 0.5), mistAmt);
+    col = ridge(col, vp, ax + yaw * 0.94, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.55), mistAmt * 0.8);
+    col = ridge(col, vp, ax + yaw * 0.98, 21.0, 0.44, 2.6, 0.24, mix(uDropTint, uSkyMid, 0.28), mistAmt * 0.6);
+    col = ridge(col, vp, ax + yaw * 1.02, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35);
+    col = ridge(col, vp, ax + yaw * 1.06, 53.0, 0.20, 4.6, 0.30, vec3(0.08, 0.12, 0.08), 0.0);
 
     // ガラス現象（雪・雨）
     col = applyGlass(col, p, t, uGlass);
