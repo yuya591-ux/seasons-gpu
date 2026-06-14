@@ -341,8 +341,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float aperture = ax0 * ay0;
 
     // 桟（窓を上下2枚＋中央の縦框で田の字に近い割り付け）
-    float barV = smoothstep(0.010, 0.0, abs(wp.x - 0.5)) * aperture;          // 中央の縦框
-    float barH = smoothstep(0.010, 0.0, abs(wp.y - 0.52)) * aperture;         // 中央の横框
+    float barV = smoothstep(0.006, 0.0, abs(wp.x - 0.5)) * aperture;          // 中央の縦框（細く）
+    float barH = smoothstep(0.006, 0.0, abs(wp.y - 0.52)) * aperture;         // 中央の横框（細く）
     float bars = clamp(max(barV, barH), 0.0, 1.0);
 
     // ── 窓ガラスのうっすらした映り込み（“ガラス越し”の実在感。上ほど室内の暖色が乗る） ──
@@ -370,12 +370,12 @@ const FRAGMENT_BODY = /* glsl */ `
                     * smoothstep(winR + 0.04, winR - 0.14, wp.x);
     interior += uSunGlow * floorGlow * 0.05;
 
-    // 窓枠（サッシ本体）。開口の縁の内側にハイライト
-    vec3 sashCol = mix(vec3(0.05, 0.05, 0.06), vec3(0.15, 0.15, 0.17), nearWin);
+    // 窓枠（サッシ本体）。開口の縁の内側にハイライト。桟は黒でなく暖かいアルミ灰
+    vec3 sashCol = mix(vec3(0.14, 0.13, 0.13), vec3(0.32, 0.30, 0.29), nearWin);
 
     // 合成: 外（アパーチャ内）／室内（外側）／桟・サッシ（最前面）
     vec3 col = mix(interior, outside, aperture);
-    col = mix(col, sashCol, bars * 0.96);
+    col = mix(col, sashCol, bars * 0.85);
 
     // 雪が桟と窓台の上に積もる（uGlass==2=雪のときだけ）
     if (uGlass > 1.5) {

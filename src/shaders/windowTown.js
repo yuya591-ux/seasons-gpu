@@ -186,6 +186,19 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 ground = lookDownGround(vp, ax, yaw, uParallax.x, nightAmt, uGlass, gmask);
     col = mix(col, ground, gmask);
 
+    // 自分の建物の外壁（真下を覗くと、窓の下に自分の壁が続く＝乗り出して覗く実感）
+    float lookDown = smoothstep(0.06, 0.32, pitch);
+    if (lookDown > 0.001) {
+      float ledgeY = -0.04 + 0.40 * lookDown + uParallax.y * 0.6;     // 壁の上端(庇)。見下ろすほどせり上がる
+      float onWall = smoothstep(ledgeY, ledgeY - 0.015, p.y);
+      float streak = fbm(vec2(p.x * 9.0, p.y * 2.2)) * 0.4 + fbm(vec2(p.x * 30.0, p.y * 0.6)) * 0.14;
+      vec3 myWall = mix(vec3(0.085, 0.082, 0.092), vec3(0.155, 0.135, 0.125), streak);
+      myWall += uSunGlow * 0.05 * smoothstep(ledgeY - 0.10, ledgeY, p.y);
+      float eave = smoothstep(0.013, 0.0, abs(p.y - ledgeY));
+      col = mix(col, myWall, onWall);
+      col = mix(col, uSunGlow * 0.35 + vec3(0.06, 0.055, 0.05), eave * 0.6 * lookDown);
+    }
+
     // 電線（手前・郷愁）。地平より上にだけ垂れる（見下ろし時は視界の外へ）。
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
