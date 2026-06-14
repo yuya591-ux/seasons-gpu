@@ -104,19 +104,42 @@ const FRAGMENT_BODY = /* glsl */ `
     col = hills(col, vp, ax + yaw * 0.92, 0.48, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
     col = town(col, vp, ax + yaw * 0.96, 0.44, 0.10, 0.05,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.30, 0.55, uIntensity), 60.0, 78.0, 1.3);
+
+    // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（奥行き）
+    float haze = smoothstep(0.52, 0.40, vp.y) * smoothstep(0.30, 0.46, vp.y);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.28);
+
     col = town(col, vp, ax + yaw * 1.02, 0.36, 0.16, 0.12,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.45, 0.75, uIntensity), 34.0, 40.0, 7.1);
     col = town(col, vp, ax + yaw * 1.10, 0.24, 0.26, 0.17,
                uDropTint * 0.82, uSunGlow, mix(0.55, 0.9, uIntensity), 18.0, 22.0, 19.3);
 
-    // 街あかりの点（手前の通り沿い）
-    float lx = ax + yaw * 1.10;
-    float lcell = floor(lx / 0.22);
-    float lph = fract(lx / 0.22);
-    float ly = 0.075 + h11(lcell + 3.0) * 0.02;
-    float dl = length(vec2((lph - 0.5) * 0.22, vp.y - ly) * vec2(1.0, 1.3));
-    float lamp = exp(-dl * 42.0) + exp(-dl * 12.0) * 0.35;
-    col += uSunGlow * lamp * step(vp.y, 0.16) * 0.9;
+    // ── 手前の商店街（見下ろす通り）。最下部に道・店の灯り・反射 ──
+    float streetTop = 0.205;
+    float st = smoothstep(streetTop, streetTop - 0.025, vp.y); // 1 = 通りの領域
+    {
+      float sx = ax + yaw * 1.18;                 // 通りは最も手前＝速く流れる
+      float cellW = 0.052;
+      float shopCell = floor(sx / cellW);
+      float fxs = fract(sx / cellW) - 0.5;
+      float sr = h11(shopCell + 7.0);
+      float shopLit = step(0.30, sr);             // 多くの店が灯る商店街
+      float sy = 0.105 + h11(shopCell + 2.0) * 0.04;
+      // 店先の暖色グロー（提灯/看板を様式的に。固有名は出さない）
+      vec3 shopHue = mix(uSunGlow, vec3(1.0, 0.55, 0.38), step(0.5, h11(shopCell + 5.0)));
+      float sign = smoothstep(0.03, 0.0, abs(vp.y - sy)) * smoothstep(0.42, 0.0, abs(fxs));
+      // 道路（暗く濡れて、灯りを縦に映す）
+      vec3 road = mix(vec3(0.035, 0.035, 0.045), uHorizon * 0.10, 0.5);
+      road += shopHue * sign * shopLit * 0.85;
+      float refl = smoothstep(0.30, 0.0, abs(fxs)) * smoothstep(sy - 0.01, -0.08, vp.y);
+      road += shopHue * refl * shopLit * 0.22;
+      // 通り沿いの街灯
+      float lampPh = fract(sx / 0.16) - 0.5;
+      float lampY = 0.165 + h11(floor(sx / 0.16) + 3.0) * 0.02;
+      float dl = length(vec2(lampPh * 0.16, vp.y - lampY) * vec2(1.0, 1.4));
+      road += uSunGlow * (exp(-dl * 40.0) + exp(-dl * 11.0) * 0.3) * 0.9;
+      col = mix(col, road, st);
+    }
 
     return col;
   }
@@ -187,21 +210,26 @@ const FRAGMENT_BODY = /* glsl */ `
     float reflAmt = (0.025 + 0.05 * smoothstep(0.35, 1.0, wp.y)) * aperture;
     outside = mix(outside, outside * 0.86 + uSunGlow * 0.10 + vec3(0.015, 0.015, 0.02), reflAmt);
 
-    // ── 室内（翳った壁・窓の見込み(reveal)・窓台） ──
-    // 室内の基調は暗い暖色グレー。窓に近い壁ほど外光を受けて明るい。
-    vec3 wallCol = mix(vec3(0.045, 0.04, 0.045), uHorizon * 0.14, 0.5);
+    // ── 室内（翳った壁・窓の見込み(reveal)・窓台・床に落ちる窓あかり） ──
+    // 室内は暗い暖色グレー（窓を主役にするため翳らせる）。窓に近い壁ほど外光を受けて明るい。
+    vec3 wallCol = mix(vec3(0.032, 0.028, 0.032), uHorizon * 0.12, 0.45);
     // アパーチャ縁から室内側への距離（負＝窓の外側＝室内）
     float edgeDist = min(min(wp.x - winL, winR - wp.x), min(wp.y - winB, winT - wp.y));
     float intoRoom = clamp(-edgeDist, 0.0, 0.5);
     float nearWin = smoothstep(0.30, 0.0, intoRoom);
     // 見込み（窓の縁のすぐ内側が壁の厚みで陰る＝開口の立体感）
     float reveal = smoothstep(0.0, 0.03, intoRoom) * smoothstep(0.14, 0.035, intoRoom);
-    vec3 interior = wallCol * (0.5 + 0.7 * nearWin);
+    vec3 interior = wallCol * (0.42 + 0.75 * nearWin);
     interior += uSunGlow * nearWin * 0.05;
     interior *= 1.0 - reveal * 0.5;
     // 窓台（下の見込み＝水平面で外光を受けて明るい）
     float sillBand = smoothstep(winB, winB - 0.05, wp.y) * step(winL - 0.03, wp.x) * step(wp.x, winR + 0.03);
-    interior = mix(interior, uSunGlow * 0.32 + vec3(0.05, 0.045, 0.05), sillBand * 0.65);
+    interior = mix(interior, uSunGlow * 0.30 + vec3(0.045, 0.04, 0.045), sillBand * 0.6);
+    // 窓の下の床に落ちる窓あかり（窓幅の内側で、手前へ向かって淡く減衰）
+    float floorGlow = smoothstep(winB, winB - 0.34, wp.y)
+                    * smoothstep(winL - 0.04, winL + 0.14, wp.x)
+                    * smoothstep(winR + 0.04, winR - 0.14, wp.x);
+    interior += uSunGlow * floorGlow * 0.05;
 
     // 窓枠（サッシ本体）。開口の縁の内側にハイライト
     vec3 sashCol = mix(vec3(0.05, 0.05, 0.06), vec3(0.15, 0.15, 0.17), nearWin);

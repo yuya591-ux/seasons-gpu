@@ -16,9 +16,11 @@ await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(500)
 await page.locator('button:has-text("情景")').click()
 await page.waitForTimeout(300)
-await page.locator('.scene-card:has-text("高台の角部屋")').click()
+await page.locator('.scene-card:has-text("秋の夕暮れ、高台の角部屋")').click()
 await page.waitForTimeout(1500)
 await page.screenshot({ path: 'scripts/_shots/corner_front.png' })
+const cvEl = page.locator('#scene')
+const box0 = await cvEl.boundingBox()
 
 // 画面中央をつかんで左へドラッグ＝右を向く（隣の壁が迫る）
 const cv = page.locator('#scene')
@@ -33,6 +35,12 @@ async function dragBy(dx, dy, steps = 12) {
   }
   await page.mouse.up()
 }
+// 下を向く＝見下ろす商店街
+await dragBy(0, box.height * 0.5)
+await page.waitForTimeout(800)
+await page.screenshot({ path: 'scripts/_shots/corner_down.png' })
+await dragBy(0, -box.height * 0.5) // 正面へ戻す
+await page.waitForTimeout(500)
 // 少しだけ右を向く＝建物の角が見える「角部屋」の見せ場
 await dragBy(-box.width * 0.5, 0)
 await page.waitForTimeout(900)
