@@ -75,14 +75,18 @@ export const GROUND_GLSL = /* glsl */ `
                    * (1.0 - smoothstep(0.20, 0.42, gt) * 0.85)
                    * smoothstep(0.25, 0.55, hBH);
 
-      // 屋上/壁の素地（夕暮れの光を受けた暖色）
-      vec3 concrete = mix(vec3(0.44, 0.40, 0.36), uHorizon * 0.7, 0.40);
-      vec3 tileCol  = mix(vec3(0.38, 0.29, 0.23), uHorizon * 0.6, 0.34);
-      vec3 roofTop = mix(concrete, tileCol, step(0.5, hMat)) * (0.86 + 0.30 * hBlk);
-      // 前面の壁（こちらを向く陰の面）。西日が片側に差す＋上ほど空の光を受けて明るい＋足元はAOで翳る
+      // 建物ごとの素材を抽選（コンクリ灰白/モルタル暖/タイル茶/防水シート灰緑）＝色の多様性で実在感
+      float msel = h21(hGi + 61.0);
+      vec3 base = vec3(0.50, 0.48, 0.45);                          // コンクリ灰白
+      base = mix(base, vec3(0.52, 0.45, 0.37), step(0.30, msel)); // モルタル暖
+      base = mix(base, vec3(0.42, 0.31, 0.25), step(0.58, msel)); // タイル茶
+      base = mix(base, vec3(0.35, 0.37, 0.33), step(0.82, msel)); // 防水シート灰緑
+      base = mix(base, uHorizon, 0.16) * (0.86 + 0.26 * hBlk);    // 夕暮れの大気を少し含ませる
+      vec3 roofTop = base;
+      // 前面の壁（こちらを向く陰の面）。西日が片側に差す＋上ほど空の光を受けて明るい＋足元はAO
       float westLit = smoothstep(0.0, 0.7, fract(horizAngle * 0.7 + hBlk));
-      vec3 wallCol = roofTop * (0.40 + 0.14 * westLit) * (0.62 + 0.50 * vfrac);
-      // 壁の窓（低周波・なめらか・遠景では消える＝チラつき防止）。各階の横帯＋控えめな縦割り
+      vec3 wallCol = base * (0.46 + 0.16 * westLit) * (0.62 + 0.50 * vfrac);
+      // 壁の窓（低周波・遠景/真下/低層では省く＝チラつき防止）。各階の横帯＋控えめな縦割り
       float isTall = step(0.5, hTower);
       float rows = mix(4.0, 11.0, isTall);
       float cols = mix(3.0, 5.0, isTall);
@@ -98,10 +102,25 @@ export const GROUND_GLSL = /* glsl */ `
       wallCol = mix(wallCol, winFace, pane * detail * (0.5 + 0.5 * nightAmt));
       wallCol *= 0.78 + 0.22 * smoothstep(0.0, 0.18, vfrac);  // 足元の接地影(AO)
 
+      // 屋上の設備（真上から見た形＝パラペット/塔屋/水タンク/室外機）。屋上のときだけ・近景ほど精細
+      float rdet = roofness * detail;
+      float di = min(min(hGf.x, 1.0 - hGf.x), min(hGf.y, 1.0 - hGf.y));
+      roofTop += uSunGlow * smoothstep(0.0, 0.035, di) * smoothstep(0.11, 0.05, di) * 0.06 * rdet; // 縁の立ち上がり
+      vec2 phc = hGf - vec2(0.40, 0.58);
+      float phHas = step(0.45, h21(hGi + 71.0));
+      float ph = step(max(abs(phc.x), abs(phc.y) * 1.3), 0.15) * phHas;
+      roofTop = mix(roofTop, base * 1.16, ph * 0.7 * rdet);                                        // 塔屋（階段室）の上面
+      roofTop = mix(roofTop, base * 0.52,
+                    step(max(abs(phc.x + 0.17), abs(phc.y) * 1.3), 0.026) * phHas * rdet);          // 塔屋の影
+      float tank = smoothstep(0.085, 0.06, length((hGf - vec2(0.70, 0.34)) * vec2(1.0, 1.1))) * step(0.55, h21(hGi + 53.0));
+      roofTop = mix(roofTop, vec3(0.30, 0.27, 0.25), tank * 0.7 * rdet);                            // 屋上の水タンク
+      vec2 acg = floor(hGf * vec2(5.0, 4.0));
+      vec2 acf = fract(hGf * vec2(5.0, 4.0));
+      float acu = step(0.72, h21(acg + hGi + 17.0)) * step(0.3, acf.x) * step(acf.x, 0.55) * step(0.3, acf.y) * step(acf.y, 0.6);
+      roofTop = mix(roofTop, base * 0.6, acu * 0.4 * rdet);                                         // 室外機など小物
+
       vec3 bld = mix(wallCol, roofTop, roofness);
-      // 屋上の縁取り（夕日が片側に乗る＝屋上面の立体感）
-      bld += uSunGlow * roofness * smoothstep(0.62, 0.95, fract(hGf.x * 2.0)) * 0.06 * detail;
-      // 屋上の塔屋/設備のあかり（夜）
+      // 屋上の窓灯り/塔屋のあかり（夜）
       bld += winLit * roofness * step(0.62 - 0.2 * nightAmt, h21(hGi + 11.0))
            * smoothstep(0.34, 0.12, length(hGf - 0.5)) * (0.08 + 0.26 * nightAmt) * detail;
       // 高層の屋上に赤い航空障害灯（ゆっくり明滅）
