@@ -62,11 +62,25 @@ function start() {
     return
   }
 
+  // 情景切替のなめらかな暗転オーバーレイ
+  const sceneFade = document.createElement('div')
+  sceneFade.className = 'scene-fade'
+  document.body.appendChild(sceneFade)
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
   // 情景の適用。スプラット情景は3Dビューア、それ以外はシェーダー描画に振り分ける。
   // 連打切替に備え世代トークンで古い処理の状態書き換えを無効化、失敗時は通常情景へフォールバック。
   let sceneGen = 0
-  async function applyScene(next) {
+  async function applyScene(next, animate = true) {
     const gen = ++sceneGen
+    if (animate) {
+      // 情景の空色へ一瞬沈める（暗転）。切替が見えてから景色を入れ替える
+      sceneFade.style.background = (next.palette && next.palette.early && next.palette.early.skyMid) || '#1a1320'
+      sceneFade.style.transition = 'opacity 0.25s ease'
+      sceneFade.style.opacity = '1'
+      await wait(260)
+      if (gen !== sceneGen) return // 連打されたら新しい切替に任せる
+    }
     setScene(next.id)
     audio.setScene(next)
     if (next.render === 'splat') {
@@ -101,6 +115,13 @@ function start() {
       }
       if (gen !== sceneGen) return
       renderer.setScene(next)
+    }
+    // 暗転から静かに戻す（最新の切替のときだけ）
+    if (animate && gen === sceneGen) {
+      sceneFade.style.transition = 'opacity 0.6s ease'
+      requestAnimationFrame(() => {
+        sceneFade.style.opacity = '0'
+      })
     }
   }
 
@@ -139,8 +160,8 @@ function start() {
   // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュの確認など）
   if (/[?&]dev=1/.test(location.search)) window.__renderer = renderer
 
-  // 起動時の情景を適用（スプラットなら3Dビューアへ）
-  applyScene(scene)
+  // 起動時の情景を適用（暗転なし。導入は起動ゲートが担う）
+  applyScene(scene, false)
 
   // 指スワイプで景色を見回す（窓辺シリーズで有効）
   attachLookAround(canvas, renderer)

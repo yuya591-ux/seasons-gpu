@@ -113,6 +113,17 @@ body {
   pointer-events: auto;
 }
 
+/* 情景切替のなめらかな暗転（情景の空色へ一瞬沈み、静かに戻る） */
+.scene-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 4; /* 情景の上・UIの下 */
+  opacity: 0;
+  pointer-events: none;
+  background: #1a1320;
+  transition: opacity 0.6s ease;
+}
+
 .ui {
   position: fixed;
   inset: 0;
