@@ -37,6 +37,7 @@ export function createRenderer(canvas) {
   let loc = {}
   let quality = 'standard'
   let shaderType = 'rainGlass'
+  let glassMode = 0 // 窓辺シリーズのガラス現象 0=なし 1=雨 2=雪
   let scene = null
   let settings = { rain: 0.65, brightness: 1.0, quality: 'standard' }
   let rafId = 0
@@ -71,6 +72,7 @@ export function createRenderer(canvas) {
       uResolution: gl.getUniformLocation(program, 'uResolution'),
       uTime: gl.getUniformLocation(program, 'uTime'),
       uPan: gl.getUniformLocation(program, 'uPan'),
+      uGlass: gl.getUniformLocation(program, 'uGlass'),
       uIntensity: gl.getUniformLocation(program, 'uIntensity'),
       uBright: gl.getUniformLocation(program, 'uBright'),
       uSkyTop: gl.getUniformLocation(program, 'uSkyTop'),
@@ -126,6 +128,7 @@ export function createRenderer(canvas) {
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
     gl.uniform2f(loc.uPan, panCur.x, panCur.y)
+    gl.uniform1f(loc.uGlass, glassMode)
     gl.uniform1f(loc.uIntensity, settings.rain)
     gl.uniform1f(loc.uBright, settings.brightness)
     if (scene) {
@@ -179,6 +182,7 @@ export function createRenderer(canvas) {
   )
 
   const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v))
+  const glassOf = (s) => (s && s.glass === 'snow' ? 2 : s && s.glass === 'rain' ? 1 : 0)
 
   return {
     ok: true,
@@ -194,6 +198,7 @@ export function createRenderer(canvas) {
     },
     setScene(s) {
       scene = s
+      glassMode = glassOf(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
       panTarget.y = 0
@@ -210,6 +215,7 @@ export function createRenderer(canvas) {
     start(initialScene, initialSettings) {
       scene = initialScene
       settings = initialSettings
+      glassMode = glassOf(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()
       play()

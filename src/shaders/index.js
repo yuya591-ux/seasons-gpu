@@ -4,11 +4,15 @@
 import * as rainGlass from './rainGlass.js'
 import * as clearSky from './clearSky.js'
 import * as windowTown from './windowTown.js'
+import * as windowMountains from './windowMountains.js'
+import * as windowSea from './windowSea.js'
 
 export const SHADERS = {
   rainGlass, // 窓ガラスの雨
   clearSky, // 晴天・入道雲・陽炎
   windowTown, // 窓辺の下町（多層パララックス・見回し）
+  windowMountains, // 窓辺の山あい
+  windowSea, // 窓辺の海辺
 }
 
 /** render 種別からシェーダーを引く（未知なら雨ガラスにフォールバック）。 */

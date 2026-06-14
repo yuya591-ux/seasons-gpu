@@ -3,6 +3,8 @@
 // 指スワイプで見回す（uPan）。瓦屋根・団地・電柱電線・灯る窓で郷愁を出す。画像は使わない。
 // パレットの5色は他の情景と共通の名前で受け取り、ここでは空・残照・建物・窓灯りとして解釈する。
 
+import { GLASS_GLSL } from './glass.js'
+
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
   void main() {
@@ -23,6 +25,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec3 uHorizon;     // 地平（茜）
   uniform vec3 uSunGlow;     // 残照・窓の灯り色
   uniform vec3 uDropTint;    // 建物のシルエット基色
+  uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
 
   float h11(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -153,6 +156,9 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, vec3(0.02, 0.02, 0.04), smoothstep(0.0035, 0.0, d) * 0.8);
     }
 
+    // 窓ガラスの現象（雨・雪）を窓のガラス面に重ねる
+    col = applyGlass(col, p, t, uGlass);
+
     // 窓枠（最前景のサッシ・固定）
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
@@ -175,8 +181,9 @@ const QUALITY_DEFINES = {
   light: '#define OCTAVES 3\n',
 }
 
-/** 品質に応じたフラグメントシェーダー文字列を組み立てる。 */
+/** 品質に応じたフラグメントシェーダー文字列を組み立てる。ガラス現象の関数を main 直前に挿入する。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  return defines + FRAGMENT_BODY
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n  void main()')
+  return defines + body
 }

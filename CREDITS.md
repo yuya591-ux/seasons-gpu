@@ -29,6 +29,22 @@
 - 油蝉は実在種 *Graptopsaltria nigrofuscata*（アブラゼミ）の本物の鳴き声。2007年、神奈川県川崎市・東高根森林公園で録音。
 - 変更点：Ogg→MP3 へ変換。アプリ内ではループ再生。
 
+### 情景「夏の夕暮れ、海辺の窓」 — `public/audio/summer-dusk-seaside/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| 波 | `waves.mp3` | "Waves" / Dsw4 | パブリックドメイン | https://commons.wikimedia.org/wiki/File:Waves.ogg |
+
+### 情景「冬の雪の夜／夏の朝（山）」 — `public/audio/winter-snow-night/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| 風 | `wind.mp3` | "Wind in Swedish pine forest at 25 mps" / W.carter | CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/ | https://commons.wikimedia.org/wiki/File:Wind_in_Swedish_pine_forest_at_25_mps.ogg |
+
+- 波は 2008年秋、米ニューヨーク州オンタリオ湖畔で録音。
+- 風は森を渡る風の録音。冬の雪の夜と、山あいの朝で使用（同じファイルを再利用）。
+- 変更点：Ogg→MP3 へ変換。アプリ内ではループ再生。CC BY-SA 素材は同ライセンス継承。
+
 ## 画像・フォント
 
 - 画像は使用しない（情景はすべてシェーダー計算で生成）。

@@ -4,12 +4,19 @@
 import summerRainDusk from './summer-rain-dusk.js'
 import summerClearNoon from './summer-clear-noon.js'
 import summerDuskDowntown from './summer-dusk-downtown.js'
+import winterSnowNightDowntown from './winter-snow-night-downtown.js'
+import summerRainNightDowntown from './summer-rain-night-downtown.js'
+import summerMorningMountains from './summer-morning-mountains.js'
+import summerDuskSeaside from './summer-dusk-seaside.js'
 
 export const SCENES = [
   summerRainDusk,
   summerClearNoon,
   summerDuskDowntown,
-  // 次の情景をここに追加していく（例: 冬・雪・夜・静寂 など）
+  winterSnowNightDowntown,
+  summerRainNightDowntown,
+  summerMorningMountains,
+  summerDuskSeaside,
 ]
 
 /** 軸の組み合わせから情景を引く。未登録なら undefined。 */
