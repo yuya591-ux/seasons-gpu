@@ -8,7 +8,10 @@ let container = null
 /** スプラットを表示する。parent にビューア用の要素を載せ、url の .splat/.ply を読み込む。 */
 export async function mountSplat(parent, url) {
   await unmountSplat()
-  const GS = await import('@mkkellogg/gaussian-splats-3d')
+  const [GS, THREE] = await Promise.all([
+    import('@mkkellogg/gaussian-splats-3d'),
+    import('three'),
+  ])
 
   container = document.createElement('div')
   container.className = 'splat-stage'
@@ -32,6 +35,26 @@ export async function mountSplat(parent, url) {
   await viewer.addSplatScene(url, { showLoadingUI: true, progressiveLoad: false })
   viewer.start()
 
+  // オートフレーミング: 3Dの境界を計算し、カメラを必ず3Dへ向ける（真っ黒回避）
+  try {
+    const mesh = viewer.getSplatMesh()
+    const box = mesh.computeBoundingBox(true)
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3())
+    const radius = 0.5 * Math.max(size.x, size.y, size.z)
+    const dist = Math.max(radius * 2.2, 2)
+    viewer.camera.position.set(center.x, center.y, center.z + dist)
+    viewer.camera.lookAt(center)
+    if (viewer.controls) {
+      viewer.controls.target.copy(center)
+      viewer.controls.minDistance = Math.max(radius * 0.3, 0.5)
+      viewer.controls.maxDistance = radius * 6 + 5
+      viewer.controls.update()
+    }
+  } catch (e) {
+    console.warn('オートフレーミングに失敗（既定カメラで表示）:', e)
+  }
+
   // 窓辺らしい、ゆるやかな見回し
   const c = viewer.controls
   if (c) {
@@ -40,8 +63,6 @@ export async function mountSplat(parent, url) {
     c.autoRotate = true
     c.autoRotateSpeed = 0.5
     c.rotateSpeed = 0.5
-    c.minDistance = 1.5
-    c.maxDistance = 18
     c.zoomSpeed = 0.6
   }
   return viewer
