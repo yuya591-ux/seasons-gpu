@@ -63,6 +63,11 @@ export function createRenderer(canvas) {
     const key = s && s.pano ? s.pano : null
     if (key === panoKey) return
     panoKey = key
+    // 旧テクスチャを解放（GPUメモリの累積を防ぐ）
+    if (panoTex) gl.deleteTexture(panoTex)
+    if (panoDepthTex) gl.deleteTexture(panoDepthTex)
+    panoTex = null
+    panoDepthTex = null
     panoReady = 0
     panoDepthReady = 0
     if (!key) return
@@ -246,7 +251,14 @@ export function createRenderer(canvas) {
     'webglcontextrestored',
     () => {
       setupBuffer()
+      // 喪失でテクスチャは無効化される。状態をリセットして現在の情景のパノラマを再ロード。
+      panoTex = null
+      panoDepthTex = null
+      panoReady = 0
+      panoDepthReady = 0
+      panoKey = null
       if (buildProgram(quality, shaderType)) {
+        if (scene) loadPano(scene)
         resize()
         play()
       }

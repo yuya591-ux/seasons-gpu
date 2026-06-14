@@ -97,8 +97,13 @@ function start() {
       updateSettings(patch)
       renderer.setSettings(getState().settings)
       if (patch.tilt !== undefined) {
-        if (patch.tilt) tilt.enable()
-        else tilt.disable()
+        if (patch.tilt) {
+          tilt.enable().then((ok) => {
+            if (!ok) updateSettings({ tilt: false }) // 許可拒否なら設定を戻す
+          })
+        } else {
+          tilt.disable()
+        }
       }
     },
     onAudioStart() {

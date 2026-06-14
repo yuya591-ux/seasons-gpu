@@ -12,6 +12,7 @@ export function createAudio() {
   let muted = false
   let volume = 0.8
   let started = false
+  let gen = 0 // 情景の世代。切替で増やし、進行中の読み込み・タイマー連鎖を無効化する
 
   // GitHub Pages のサブパス（/seasons/）配下でも正しく解決する。
   const base = import.meta.env.BASE_URL || '/'
@@ -48,11 +49,14 @@ export function createAudio() {
   }
 
   // loop:false + interval:[min,max] の音を、ランダム間隔で繰り返し鳴らす。
-  function scheduleInterval(def, buffer) {
+  // myGen が現在の世代でなくなったら連鎖を止める（古い情景のタイマーが残らない）。
+  function scheduleInterval(def, buffer, myGen) {
     const [min, max] = def.interval
     const next = () => {
+      if (myGen !== gen) return
       const delay = (min + Math.random() * (max - min)) * 1000
       const id = setTimeout(() => {
+        if (myGen !== gen) return
         if (started && ctx) playOnce(buffer, def.gain)
         next()
       }, delay)
@@ -62,6 +66,7 @@ export function createAudio() {
   }
 
   function stopAll() {
+    gen++ // 進行中の playScene の読み込み・タイマー連鎖を無効化
     loopSources.forEach((s) => {
       try {
         s.stop()
@@ -78,8 +83,10 @@ export function createAudio() {
     currentScene = scene
     if (!started || !ctx) return
     stopAll()
+    const myGen = gen
     for (const def of scene.sounds || []) {
       const buffer = await loadBuffer(def.src)
+      if (myGen !== gen) return // 読み込み中に別情景へ切替わった→破棄
       if (!buffer) continue
       if (def.loop !== false) {
         const source = ctx.createBufferSource()
@@ -91,7 +98,7 @@ export function createAudio() {
         source.start()
         loopSources.push(source)
       } else if (def.interval) {
-        scheduleInterval(def, buffer)
+        scheduleInterval(def, buffer, myGen)
       } else {
         playOnce(buffer, def.gain)
       }
