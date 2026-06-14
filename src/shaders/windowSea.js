@@ -18,6 +18,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uIntensity;  // 波のきらめきの強さ 0..1
   uniform float uBright;
   uniform vec2 uPan;
+  uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
   uniform float uGlass;
   uniform vec3 uSkyTop;
   uniform vec3 uSkyMid;
@@ -52,8 +53,8 @@ const FRAGMENT_BODY = /* glsl */ `
     vec2 vp = vec2(p.x, p.y - pitch + curve);
 
     float horizon = 0.52;
-    float sunAz = -0.05;             // 世界に固定した夕陽の方位
-    float sunScreenX = sunAz - yaw;  // 首を振ると視界の中を動く
+    float sunAz = -0.05;                  // 世界に固定した夕陽の方位
+    float sunScreenX = sunAz - yaw * 0.25; // 夕陽は遠いのでほとんど動かない
 
     // ── 空（夕暮れ・水平線に沈む夕陽・層雲・地平の霞） ──
     vec3 sky = mix(uHorizon, uSkyMid, smoothstep(horizon, 0.82, vp.y));
@@ -65,7 +66,7 @@ const FRAGMENT_BODY = /* glsl */ `
     sky += uSunGlow * sun * 0.7;
     sky = mix(sky, mix(uSunGlow, vec3(1.0, 0.96, 0.86), 0.45), sunDisc * 0.92);
     // 横に伸びる層雲（夕陽で底が染まる）
-    float cl = fbm(vec2((ax + yaw) * 1.2 + t * 0.006, vp.y * 3.0));
+    float cl = fbm(vec2((ax + yaw * 0.18) * 1.2 + t * 0.006, vp.y * 3.0));
     float cloud = smoothstep(0.5, 0.75, cl) * smoothstep(horizon + 0.02, 0.96, vp.y);
     sky = mix(sky, mix(uHorizon, uSunGlow, 0.5), cloud * 0.35);
     // 地平の霞（海と空の境を柔らかく＝郷愁）
@@ -100,14 +101,14 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 col = (vp.y > horizon) ? sky : water;
 
     // 遠い島影（世界に固定。空気遠近で霞む）
-    float islX = 0.35 - yaw;
+    float islX = 0.35 - yaw * 0.45;
     float islY = horizon + 0.02 + (fbm(vec2((ax + yaw) * 1.2 + 5.0, 0.0)) - 0.5) * 0.04;
     float isl = step(vp.y, islY) * step(horizon - 0.01, vp.y) *
                 smoothstep(0.5, 0.18, abs(ax - islX));
     col = mix(col, mix(mix(uDropTint, uHorizon, 0.4), vec3(0.05, 0.06, 0.09), 0.4), clamp(isl, 0.0, 1.0) * 0.85);
 
     // 灯台（遠くの岬に立つ。光がゆっくり明滅する）
-    float lhX = 0.62 - yaw;
+    float lhX = 0.62 - yaw * 0.7;
     float lhTop = horizon + 0.055;
     float lhTower = step(abs(ax - lhX), 0.006) * step(vp.y, lhTop) * step(horizon + 0.002, vp.y);
     col = mix(col, vec3(0.04, 0.05, 0.07), lhTower);
@@ -118,7 +119,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // 漁火（遠くの漁船の灯り。水平線近くにぽつぽつ揺れる）
     for (int fi2 = 0; fi2 < 3; fi2++) {
       float ff = float(fi2);
-      float fx2 = (h11(ff * 7.0 + 1.0) - 0.5) * 1.5 - yaw;
+      float fx2 = (h11(ff * 7.0 + 1.0) - 0.5) * 1.5 - yaw * 0.8;
       float fy2 = horizon - 0.012 - h11(ff * 3.0 + 2.0) * 0.014;
       float fd = length(vec2(ax - fx2, vp.y - fy2) * vec2(1.0, 2.6));
       float bob = 0.55 + 0.45 * sin(t * 0.5 + ff * 2.0);
@@ -135,7 +136,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float bfi = float(bi);
       float bx = fract(t * 0.012 + bfi * 0.31) * 2.6 - 1.3;
       float by = 0.72 + bfi * 0.035 + sin(t * 0.3 + bfi) * 0.012;
-      vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - by);
+      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - by);
       bp.x = abs(bp.x);
       float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
       col = mix(col, col * 0.55, wing * 0.6);

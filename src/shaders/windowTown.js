@@ -21,6 +21,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uIntensity;  // 街の灯りの多さ 0..1
   uniform float uBright;
   uniform vec2 uPan;         // 見回し（指スワイプ）
+  uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
   uniform vec3 uSkyTop;      // 天頂（暮れの紫紺）
   uniform vec3 uSkyMid;      // 中空
   uniform vec3 uHorizon;     // 地平（茜）
@@ -132,7 +133,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col += uSunGlow * exp(-abs(vp.y - 0.5) * 7.0) * 0.22; // 地平の残照
 
     // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る）
-    vec2 cq = vec2(ax * 1.4 + yaw + t * 0.008, vp.y * 2.4);
+    vec2 cq = vec2(ax * 1.4 + yaw * 0.18 + t * 0.008, vp.y * 2.4);
     vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
     float cl = fbm(cq + cwarp * 0.7);
     float clu = fbm(cq + vec2(0.0, 0.18) + cwarp * 0.7);
@@ -146,8 +147,8 @@ const FRAGMENT_BODY = /* glsl */ `
     col += uFlash * (0.10 + 0.18 * cloudband) * vec3(0.82, 0.88, 1.0);
 
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
-    col = hills(col, vp, ax + yaw * 0.90, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
-    col = town(col, vp, ax + yaw * 0.94, 0.50, 0.10, 0.06,
+    col = hills(col, vp, ax + yaw * 0.30, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
+    col = town(col, vp, ax + yaw * 0.45 + uParallax.x * 0.3, 0.50, 0.10, 0.06,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0, 0.40);
 
     // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（奥行き）
@@ -159,9 +160,9 @@ const FRAGMENT_BODY = /* glsl */ `
     float cityHalo = smoothstep(0.78, 0.46, vp.y) * smoothstep(0.34, 0.50, vp.y);
     col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
 
-    col = town(col, vp, ax + yaw * 0.98, 0.42, 0.16, 0.13,
+    col = town(col, vp, ax + yaw * 0.85 + uParallax.x * 0.8, 0.42, 0.16, 0.13,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22, 0.33);
-    col = town(col, vp, ax + yaw * 1.04, 0.30, 0.26, 0.18,
+    col = town(col, vp, ax + yaw * 1.28 + uParallax.x * 1.4, 0.30, 0.26, 0.18,
                uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5, 0.20);
 
     // 高層ビルの赤色航空障害灯（ゆっくり点滅）
@@ -169,7 +170,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float bfi = float(bi);
       float bx = (h11(bfi * 13.0 + 2.0) - 0.5) * 2.0;
       float by = 0.50 + h11(bfi * 5.0 + 3.0) * 0.12;
-      float bd = length(vec2((ax + yaw * 0.98) - bx, vp.y - by) * vec2(1.0, 1.35));
+      float bd = length(vec2((ax + yaw * 0.4) - bx, vp.y - by) * vec2(1.0, 1.35));
       float bl = smoothstep(0.45, 0.55, fract(t * 0.5 + bfi * 0.37));
       col += vec3(1.0, 0.12, 0.08) * (exp(-bd * 150.0) + exp(-bd * 45.0) * 0.22) * bl * 0.85;
     }
@@ -186,7 +187,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float center = step(abs(persX), 0.02) * step(0.45, fract(depth * 20.0)) * (1.0 - depth * 0.5);
       road = mix(road, vec3(0.6, 0.58, 0.5), center * 0.5);
       // 店先・自販機の灯り（道の両脇）
-      float sx = ax + yaw * 1.10;
+      float sx = ax + yaw * 1.8 + uParallax.x * 1.8;
       float cellW = 0.052;
       float shopCell = floor(sx / cellW);
       float fxs = fract(sx / cellW) - 0.5;
@@ -212,7 +213,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // 電線（手前・郷愁）。ゆるく垂れる数本。視点回転で一緒に動く。
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      float yl = 0.66 + fi * 0.035 + sin((ax + yaw * 1.05) * 2.2 + fi * 1.7) * 0.012 - pitch + curve;
+      float yl = 0.66 + fi * 0.035 + sin((ax + yaw * 1.5 + uParallax.x * 1.6) * 2.2 + fi * 1.7) * 0.012 - pitch + curve;
       float d = abs(p.y - yl);
       col = mix(col, vec3(0.02, 0.02, 0.04), smoothstep(0.0035, 0.0, d) * 0.8);
     }

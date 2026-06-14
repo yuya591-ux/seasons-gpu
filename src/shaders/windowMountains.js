@@ -18,6 +18,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uIntensity;  // 朝霧の濃さ 0..1
   uniform float uBright;
   uniform vec2 uPan;
+  uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
   uniform float uGlass;
   uniform vec3 uSkyTop;
   uniform vec3 uSkyMid;
@@ -96,7 +97,7 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 col = mix(uHorizon, uSkyMid, smoothstep(0.3, 0.66, vp.y));
     col = mix(col, uSkyTop, smoothstep(0.62, 1.0, vp.y));
     // 朝陽（世界に固定。首を振ると視界の中を移動する）。円盤＋薄明光線
-    vec2 sunC = vec2(-0.25 - yaw, 0.72);
+    vec2 sunC = vec2(-0.25 - yaw * 0.2, 0.72);
     float sunDist = distance(vec2(ax, vp.y), sunC);
     float sun = exp(-sunDist * 3.0);
     col += uSunGlow * sun * 0.5;
@@ -108,25 +109,25 @@ const FRAGMENT_BODY = /* glsl */ `
     float mistAmt = mix(0.25, 0.7, uIntensity);
 
     // 奥→手前（遠いほど空色に霞む）。回転はほぼ一律。lit=リム強, tex=森テクスチャ
-    col = ridge(col, vp, ax + yaw * 0.90, 1.0, 0.60, 1.2, 0.16, mix(uSkyMid, uHorizon, 0.5), mistAmt, 0.10, 0.0);
-    col = ridge(col, vp, ax + yaw * 0.94, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.55), mistAmt * 0.8, 0.18, 0.25);
+    col = ridge(col, vp, ax + yaw * 0.22, 1.0, 0.60, 1.2, 0.16, mix(uSkyMid, uHorizon, 0.5), mistAmt, 0.10, 0.0);
+    col = ridge(col, vp, ax + yaw * 0.40, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.55), mistAmt * 0.8, 0.18, 0.25);
 
     // 雲海（中腹に漂う朝霧の海。ゆっくり流れ、近い山が突き出る）
     float seaY = 0.46;
     float seaBand = smoothstep(seaY + 0.07, seaY, vp.y) * smoothstep(seaY - 0.11, seaY, vp.y);
-    float seaTex = fbm(vec2((ax + yaw) * 2.0 + uTime * 0.015, vp.y * 5.0));
+    float seaTex = fbm(vec2((ax + yaw * 0.6) * 2.0 + uTime * 0.015, vp.y * 5.0));
     col = mix(col, vec3(0.92, 0.94, 0.96), seaBand * smoothstep(0.35, 0.7, seaTex) * mistAmt * 0.7);
 
-    col = ridge(col, vp, ax + yaw * 0.98, 21.0, 0.44, 2.6, 0.24, mix(uDropTint, uSkyMid, 0.28), mistAmt * 0.6, 0.26, 0.5);
-    col = ridge(col, vp, ax + yaw * 1.02, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35, 0.32, 0.8);
-    col = ridge(col, vp, ax + yaw * 1.06, 53.0, 0.20, 4.6, 0.30, vec3(0.08, 0.12, 0.08), 0.0, 0.38, 1.0);
+    col = ridge(col, vp, ax + yaw * 0.75, 21.0, 0.44, 2.6, 0.24, mix(uDropTint, uSkyMid, 0.28), mistAmt * 0.6, 0.26, 0.5);
+    col = ridge(col, vp, ax + yaw * 1.10 + uParallax.x * 0.8, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35, 0.32, 0.8);
+    col = ridge(col, vp, ax + yaw * 1.55 + uParallax.x * 1.4, 53.0, 0.20, 4.6, 0.30, vec3(0.08, 0.12, 0.08), 0.0, 0.38, 1.0);
 
     // 渡り鳥の影（V字が空をゆっくり横切る）
     for (int bi = 0; bi < 3; bi++) {
       float bfi = float(bi);
       float bx = fract(t * 0.011 + bfi * 0.33) * 2.6 - 1.3;
       float by = 0.74 + bfi * 0.03 + sin(t * 0.3 + bfi) * 0.012;
-      vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - by);
+      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - by);
       bp.x = abs(bp.x);
       float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
       col = mix(col, col * 0.55, wing * 0.6);
