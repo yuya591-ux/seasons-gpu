@@ -18,9 +18,11 @@ export const GROUND_GLSL = /* glsl */ `
     float roadWdt = 0.11 + 0.09 * ave;
     float isBld = step(roadWdt, dRoad);                 // 1=区画(箱)・0=道（硬い境界）
     mat = h21(gi + 5.0);
-    tower = step(0.93, h21(gi + 27.0));                 // たまに高層
-    float isPark = step(0.90, mat) * (1.0 - tower);     // 緑地は控えめ
-    bH = mix(0.22 + 0.55 * blkR, 1.7, tower) * isBld * (1.0 - isPark); // 建物高さ
+    float urban = vnoise(gi * 0.07 + 3.0);              // 都心度（大=高層密集 / 小=低層の住宅地）
+    tower = step(0.93 - 0.20 * urban, h21(gi + 27.0));  // 都心ほど高層が増える
+    float isPark = step(0.92, mat) * (1.0 - tower);     // 緑地（公園）
+    float baseH = (0.16 + 0.28 * urban) + (0.28 + 0.46 * urban) * blkR; // 都心ほど背が高い
+    bH = mix(baseH, 1.1 + 1.4 * urban, tower) * isBld * (1.0 - isPark);  // 建物高さ
   }
 
   // 戻り: 街色。gmask に被覆マスク(0..1)。lean=覗き込み(uParallax.x), nightAmt=夜度, glassMode=雨雪。
@@ -123,6 +125,12 @@ export const GROUND_GLSL = /* glsl */ `
       roofTop = mix(roofTop, base * 0.6, acu * 0.4 * rdet);                                         // 室外機など小物
 
       vec3 bld = mix(wallCol, roofTop, roofness);
+      // 雨に濡れた屋上: 空を鈍く映して暗く沈む（屋上面ほど）
+      float wetB = step(0.5, glassMode) * step(glassMode, 1.5);
+      bld = mix(bld, bld * 0.72 + mix(uSkyMid, uHorizon, 0.5) * 0.10, wetB * 0.5 * roofness);
+      // 雪が屋上に積もる（屋上面は厚く・壁の縁はうっすら）＝立体の雪化粧
+      float snowB = step(1.5, glassMode);
+      bld = mix(bld, vec3(0.88, 0.90, 0.96), snowB * (0.22 + 0.58 * roofness));
       // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る
       bld += winLit * roofness * step(0.62 - (0.2 + 0.2 * district) * nightAmt, h21(hGi + 11.0))
            * smoothstep(0.34, 0.12, length(hGf - 0.5)) * (0.08 + 0.26 * nightAmt) * detail;
@@ -143,8 +151,16 @@ export const GROUND_GLSL = /* glsl */ `
       vec2 gi = floor(g); vec2 gf = fract(g);
       float blkR = h21(gi + 2.0);
       float dRoad = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
+      // 区画の性格（都心度・公園か）。建物に当たらず抜けた=道 or 公園 or 低い空き
+      float mat = h21(gi + 5.0);
+      float urban = vnoise(gi * 0.07 + 3.0);
+      float towerC = step(0.93 - 0.20 * urban, h21(gi + 27.0));
+      float isPark = step(0.92, mat) * (1.0 - towerC);
       vec3 roadC = mix(vec3(0.20, 0.19, 0.19), uHorizon * 0.3, 0.4) * (1.0 - 0.5 * nightAmt);
       ground = roadC;
+      // 公園（緑地）: 芝。街なかの抜け＝郷愁の緑。内部だけ（外周の道は残す）
+      vec3 grass = mix(vec3(0.16, 0.27, 0.13), uHorizon * 0.3, 0.22) * (1.0 - 0.45 * nightAmt);
+      ground = mix(ground, grass, isPark * smoothstep(0.08, 0.15, dRoad));
       // 雨に濡れた路面: 暗く沈み、空と街の灯りを鈍く映す（雨の情景の実在感）
       float wet = step(0.5, glassMode) * step(glassMode, 1.5);
       ground = mix(ground, ground * 0.55 + mix(uSkyMid, uHorizon, 0.5) * 0.10, wet * 0.6);
@@ -161,12 +177,15 @@ export const GROUND_GLSL = /* glsl */ `
       float dash = step(0.5, fract(gz * 6.0 + gx * 6.0));
       float centerLine = smoothstep(0.012, 0.004, dRoad) * dash;
       ground = mix(ground, vec3(0.55, 0.50, 0.36), centerLine * 0.30 * (1.0 - river));
-      // 街路樹（道の脇に並ぶ緑。点々ではなく丸い樹冠に＝ザラつかせない）
+      // 樹木（道の脇に並木＋公園は木立に。点々ではなく丸い樹冠＝ザラつかせない）
       vec2 tg = g0 * 2.0; vec2 tgf = fract(tg);
-      float treeFall = (1.0 - smoothstep(0.20, 0.34, length(tgf - 0.5)));
-      float tree = step(0.74, h21(floor(tg) + 41.0)) * treeFall
-                 * smoothstep(0.19, 0.13, dRoad) * (1.0 - river);
-      ground = mix(ground, mix(vec3(0.12, 0.20, 0.10), uHorizon * 0.25, 0.2), tree * 0.6);
+      float treeFall = 1.0 - smoothstep(0.20, 0.34, length(tgf - 0.5));
+      float treeSeed = h21(floor(tg) + 41.0);
+      float streetTree = step(0.74, treeSeed) * smoothstep(0.19, 0.13, dRoad);  // 並木
+      float parkTree = isPark * step(0.42, treeSeed);                            // 公園の木立（密）
+      float tree = max(streetTree, parkTree) * treeFall * (1.0 - river);
+      vec3 treeCol = mix(vec3(0.12, 0.22, 0.10), uHorizon * 0.25, 0.2) * (1.0 - 0.4 * nightAmt);
+      ground = mix(ground, treeCol, tree * 0.62);
       // 西日の長い影（建物が通りへ落とす影＝夕方の立体感）。太陽側に高い区画があれば翳る
       float shadow = 0.0;
       vec2 sdir = vec2(-0.96, 0.28);                 // 太陽（西やや奥）へ向かう方向
@@ -198,11 +217,14 @@ export const GROUND_GLSL = /* glsl */ `
       ground += carCol * onVroad * carOn * (carBody * 0.9 + carBeam * 0.22) * (1.0 - river);
       // 近景を持ち上げ
       ground *= 1.0 + smoothstep(0.12, 0.42, gt) * 0.22;
+      // 雪が積もった街路・公園（屋根ほどではないが白む）
+      ground = mix(ground, vec3(0.80, 0.83, 0.90), step(1.5, glassMode) * 0.55 * (1.0 - river));
       // 空気遠近（地平で空へ溶ける）
       ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), smoothstep(0.07, 0.0, gt) * 0.85);
     }
 
-    if (glassMode > 1.5) ground = mix(ground, vec3(0.82, 0.85, 0.92), 0.12); // 雪
+    // 遠雷の閃光が街をほのかに照らす（空のフラッシュと同期）
+    ground += uFlash * vec3(0.82, 0.88, 1.0) * 0.16;
     return ground;
   }
 `
