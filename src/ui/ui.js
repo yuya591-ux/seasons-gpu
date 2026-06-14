@@ -1,7 +1,6 @@
 // 画面のUI。眺める邪魔をしないよう最小限・控えめ。無操作でHUDは静かに消える。
 // 文言は静かで上質に。システム用語は出さない。
 
-import { SEASONS, WEATHERS, TIMES, labelOf } from '../data/axes.js'
 import { SCENES } from '../data/scenes/index.js'
 
 const h = (tag, cls, text) => {
@@ -42,7 +41,29 @@ export function buildUI(opts) {
       /* 音が出せなくても体験は続行 */
     }
     poke()
+    maybeShowLookHint()
   })
+
+  // 初回のみ: 「見回せる」ことをそっと伝える（localStorageで2回目以降は出さない）
+  function maybeShowLookHint() {
+    try {
+      if (localStorage.getItem('seasons_look_hint')) return
+    } catch {
+      /* localStorage不可でも続行 */
+    }
+    const hint = h('div', 'lookhint', '指でなぞって、見回す')
+    root.appendChild(hint)
+    requestAnimationFrame(() => hint.classList.add('lookhint--show'))
+    setTimeout(() => {
+      hint.classList.remove('lookhint--show')
+      setTimeout(() => hint.remove(), 1400)
+    }, 4200)
+    try {
+      localStorage.setItem('seasons_look_hint', '1')
+    } catch {
+      /* 無視 */
+    }
+  }
 
   // ── HUD（情景名・音） ──
   const hud = h('div', 'hud')
@@ -132,22 +153,17 @@ export function buildUI(opts) {
     const cards = []
     // 公開する情景だけ（実証/開発用は public:false で隠す）
     const devMode = /[?&]dev=1/.test(location.search)
+    const BASE = import.meta.env.BASE_URL || '/'
     SCENES.filter((s) => s.status === 'ready' && (s.public !== false || devMode)).forEach((scene) => {
       const card = h('button', 'scene-card')
-      // 色のサムネ（情景のパレットから）
+      // 実描画のサムネ（読み込めない時はパレットのグラデへフォールバック）
       const sw = h('span', 'scene-card__swatch')
       const pal = scene.palette.early
-      sw.style.background = `linear-gradient(165deg, ${pal.skyTop}, ${pal.skyMid} 55%, ${pal.horizon})`
+      const grad = `linear-gradient(165deg, ${pal.skyTop}, ${pal.skyMid} 55%, ${pal.horizon})`
+      sw.style.backgroundImage = `url("${BASE}thumbs/${scene.id}.jpg"), ${grad}`
       const body = h('span', 'scene-card__body')
       body.appendChild(h('span', 'scene-card__label', scene.label))
       body.appendChild(h('span', 'scene-card__desc', scene.desc || ''))
-      const axesText =
-        labelOf(SEASONS, scene.axes.season) +
-        '・' +
-        labelOf(WEATHERS, scene.axes.weather) +
-        '・' +
-        labelOf(TIMES, scene.axes.time)
-      body.appendChild(h('span', 'scene-card__axes', axesText))
       card.appendChild(sw)
       card.appendChild(body)
       card.addEventListener('click', () => {

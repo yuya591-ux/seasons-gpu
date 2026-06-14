@@ -48,5 +48,8 @@ export function isReady(axes) {
   return !!s && s.status === 'ready'
 }
 
-/** 最初に表示する既定の情景（最初の見本）。 */
-export const DEFAULT_SCENE = SCENES.find((s) => s.status === 'ready') || SCENES[0]
+/** 最初に表示する既定の情景。本アプリの核「角部屋から見回す」を最初の顔にする。 */
+export const DEFAULT_SCENE =
+  SCENES.find((s) => s.id === 'autumn-dusk-corner-room') ||
+  SCENES.find((s) => s.status === 'ready') ||
+  SCENES[0]

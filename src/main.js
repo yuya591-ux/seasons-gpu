@@ -157,8 +157,12 @@ function start() {
     },
   })
 
-  // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュの確認など）
-  if (/[?&]dev=1/.test(location.search)) window.__renderer = renderer
+  // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュ・サムネ生成など）
+  if (/[?&]dev=1/.test(location.search)) {
+    window.__renderer = renderer
+    window.__applyScene = (id) => applyScene(resolveScene(id), false)
+    window.__sceneIds = SCENES.filter((s) => s.public !== false && s.status === 'ready').map((s) => s.id)
+  }
 
   // 起動時の情景を適用（暗転なし。導入は起動ゲートが担う）
   applyScene(scene, false)
