@@ -148,11 +148,28 @@ export const GROUND_GLSL = /* glsl */ `
       vec3 waterC = mix(uSkyMid, uHorizon, 0.55) * 0.72;
       waterC += uSunGlow * smoothstep(0.12, 0.0, abs(g0.x - riverX + sin(gz * 2.0) * 0.05)) * 0.18;
       ground = mix(ground, waterC, river * 0.95);
+      // 歩道（道の外縁＝建物際の少し明るい帯）
+      float sidewalk = smoothstep(0.16, 0.13, dRoad) * smoothstep(0.085, 0.115, dRoad);
+      ground = mix(ground, mix(vec3(0.30, 0.29, 0.28), uHorizon * 0.3, 0.35), sidewalk * 0.5 * (1.0 - river));
+      // センターライン（車道の中央に淡い破線）
+      float dash = step(0.5, fract(gz * 6.0 + gx * 6.0));
+      float centerLine = smoothstep(0.012, 0.004, dRoad) * dash;
+      ground = mix(ground, vec3(0.55, 0.50, 0.36), centerLine * 0.30 * (1.0 - river));
       // 街路樹（道の脇に緑の点々）
       vec2 tg = g0 * 3.2; vec2 tgf = fract(tg);
       float tree = step(0.66, h21(floor(tg) + 41.0)) * smoothstep(0.30, 0.05, length(tgf - 0.5))
                  * smoothstep(0.20, 0.12, dRoad) * (1.0 - river);
       ground = mix(ground, mix(vec3(0.11, 0.19, 0.09), uHorizon * 0.25, 0.2), tree * 0.5);
+      // 西日の長い影（建物が通りへ落とす影＝夕方の立体感）。太陽側に高い区画があれば翳る
+      float shadow = 0.0;
+      vec2 sdir = vec2(-0.96, 0.28);                 // 太陽（西やや奥）へ向かう方向
+      for (int s = 1; s <= 4; s++) {
+        float dd = float(s) * 0.45;
+        vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
+        cityCell(g0 + sdir * dd, _gi, _gf, _bH, _t, _m, _b, _d);
+        shadow = max(shadow, step(dd * 0.55, _bH));  // 影の高さ＝距離×太陽高度(0.55)
+      }
+      ground *= 1.0 - shadow * 0.28 * (1.0 - river);
       // 街全体をうっすら底上げ（街灯の照り返し）。夜はさらに
       ground += mix(uHorizon, uSunGlow, 0.4) * (0.04 + 0.07 * nightAmt);
       // 街灯（交差点）
