@@ -2,6 +2,8 @@
 // 抜けるような青空、ゆっくり湧く入道雲、地平の陽炎（揺らぎ）を計算で生成する。
 // パレットの5色は雨ガラスと共通の名前を使い、ここでは空・雲・陽射しとして解釈する。
 
+import { GRADE_GLSL } from './grade.js'
+
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
   void main() {
@@ -102,6 +104,7 @@ const FRAGMENT_BODY = /* glsl */ `
     float vig = 1.0 - 0.18 * smoothstep(0.4, 1.2, distance(frag, vec2(0.5, 0.55)));
     col *= vig;
 
+    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
     col *= uBright;
 
     // 白とび防止のソフトな天井（ハイライトを滑らかに抑える）
@@ -123,5 +126,6 @@ const QUALITY_DEFINES = {
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  return defines + FRAGMENT_BODY
+  const body = FRAGMENT_BODY.replace('void main()', GRADE_GLSL + '\n  void main()')
+  return defines + body
 }

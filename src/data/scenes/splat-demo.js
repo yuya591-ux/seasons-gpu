@@ -8,8 +8,9 @@ export default {
   label: '実証：本物の3D（ガウシアン）',
   desc: '写真から再構成した本物の3D。ドラッグで自由に見回せる（実証用）',
   status: 'ready',
+  public: false, // 開発・実証用。?dev=1 のときだけ一覧に出す
   render: 'splat',
-  splatUrl: 'splat/demo-small.splat', // public/ 配下（iOS負荷対策で約34万splatに間引き）
+  splatUrl: 'splat/demo-small.splat', // public/ 配下（約122万splatに間引き）
 
   // ギャラリーのサムネ用パレット（描画には使わない）
   palette: {

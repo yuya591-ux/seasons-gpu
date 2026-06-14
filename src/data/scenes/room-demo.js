@@ -4,8 +4,8 @@
 export default {
   id: 'room-demo',
   axes: { season: 'autumn', weather: 'clear', time: 'dusk' },
-  label: '実証：室内から見回す（窓辺の土台）',
-  desc: '一人称で室内に立ち、指や傾きで首を振って見回す（本番＝あなたの部屋に）',
+  label: 'ある部屋の窓辺',
+  desc: '部屋に立って、ゆっくりと見回す。指でも、画面を傾けても。',
   status: 'ready',
   render: 'splat',
   splatUrl: 'splat/room.splat',

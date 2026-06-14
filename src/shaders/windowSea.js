@@ -3,6 +3,7 @@
 // パレットの5色: 空(top/mid/horizon)・夕陽(sunGlow)・海の深み(dropTint)。
 
 import { GLASS_GLSL } from './glass.js'
+import { GRADE_GLSL } from './grade.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -97,6 +98,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col *= mix(0.85, 1.0, inner);
     col = mix(col, vec3(0.06, 0.055, 0.07), fr);
 
+    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
     col *= uBright;
     col -= max(col - vec3(0.92), 0.0) * 0.5;
     col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;
@@ -112,6 +114,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
   return defines + body
 }

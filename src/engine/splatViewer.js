@@ -94,8 +94,9 @@ export async function unmountSplat() {
 }
 
 /** スプラットを表示する。失敗時は例外を投げる（呼び出し側でフォールバックする）。 */
-export async function mountSplat(parent, url, mode = 'orbit') {
+export async function mountSplat(parent, url, mode = 'orbit', bg = null) {
   const token = ++mountToken
+  const dev = /[?&]dev=1/.test(location.search) // 開発時のみ診断を出す
   tiltCtx = null
   if (roomCtl) {
     roomCtl.dispose()
@@ -114,6 +115,7 @@ export async function mountSplat(parent, url, mode = 'orbit') {
 
   const lc = document.createElement('div')
   lc.className = 'splat-stage'
+  if (bg) lc.style.background = bg // 情景の空色を下地に（黒からの唐突な切替を避ける）
   parent.appendChild(lc)
 
   const diag = document.createElement('pre')
@@ -137,11 +139,12 @@ export async function mountSplat(parent, url, mode = 'orbit') {
   diag.addEventListener('click', () => {
     diag.style.display = 'none'
   })
+  if (!dev) diag.style.display = 'none' // 本番では診断を出さない（没入を妨げない）
 
-  // 読み込み中の控えめな表示
+  // 読み込み中の控えめな表示（システム用語は出さない）
   const loading = document.createElement('div')
   loading.className = 'splat-loading'
-  loading.textContent = '本物の3Dを読み込み中…'
+  loading.textContent = '景色をひらいています…'
   lc.appendChild(loading)
 
   let lv = null
@@ -164,6 +167,14 @@ export async function mountSplat(parent, url, mode = 'orbit') {
 
     state.steps.push('viewer')
     render()
+    // 対応端末（WebGL2＋浮動小数テクスチャ）ではGPUソートを使い、奥行きの滲み/チラつきを抑える。
+    // 非対応端末は自動でCPUソートにフォールバック（黒画面より品質低下のほうがまし）。
+    const forceCpu = /[?&]cpusort=1/.test(location.search) // 検証用にCPUソートへ固定できる
+    // ソフトウェアGL(SwiftShader/llvmpipe等)ではGPUソートが描画されないことがあるため除外する
+    const soft = /swiftshader|llvmpipe|software|microsoft basic/i.test(state.caps.renderer || '')
+    const canGpuSort =
+      !forceCpu && !soft && !!(state.caps.webgl2 && state.caps.colorBufFloat && state.caps.floatLinear)
+    state.gpuSort = canGpuSort
     lv = new GS.Viewer({
       rootElement: lc,
       cameraUp: [0, -1, 0],
@@ -172,9 +183,9 @@ export async function mountSplat(parent, url, mode = 'orbit') {
       selfDrivenMode: true,
       useBuiltInControls: mode !== 'room', // 部屋モードは自前の一人称操作
       sharedMemoryForWorkers: false,
-      gpuAcceleratedSort: false,
-      integerBasedSort: false,
-      halfPrecisionCovariancesOnGPU: false,
+      gpuAcceleratedSort: canGpuSort, // 対応端末はGPUソート＝深度の滲み/チラつき低減
+      integerBasedSort: true, // 整数距離ソートで再ソートを高速化（CPU/GPU共通の精度・速度向上）
+      halfPrecisionCovariancesOnGPU: false, // iOSの精度確保のため単精度を維持
       antialiased: true, // 小さなsplatのジャギ/シマリングを低減
     })
 
@@ -221,7 +232,7 @@ export async function mountSplat(parent, url, mode = 'orbit') {
       cv.addEventListener('webglcontextlost', (e) => {
         e.preventDefault()
         state.lost = true
-        diag.style.display = 'block'
+        if (dev) diag.style.display = 'block'
         render()
       })
     }
@@ -323,6 +334,8 @@ export async function mountSplat(parent, url, mode = 'orbit') {
     lv = null
 
     loading.remove()
+    // 描画が始まってから静かに浮かび上がらせる（黒→景色のポップを避ける）
+    requestAnimationFrame(() => lc.classList.add('splat-stage--in'))
     state.steps.push('done')
     render()
 
@@ -333,7 +346,7 @@ export async function mountSplat(parent, url, mode = 'orbit') {
   } catch (e) {
     state.error = e && e.message ? e.message : String(e)
     if (loading.parentNode) loading.remove()
-    diag.style.display = 'block'
+    if (dev) diag.style.display = 'block'
     render()
     await disposeViewer(lv)
     // 失敗時は診断だけ残してコンテナは保持→呼び出し側がフォールバックし unmount する

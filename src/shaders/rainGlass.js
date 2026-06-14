@@ -2,6 +2,8 @@
 // 画像を使わず計算だけで、にじむ夕焼け → 曇りガラス → 屈折する水滴 を重ねる。
 // 品質(quality)に応じて、ぼかしのタップ数とノイズのオクターブ数をコンパイル時に切り替える。
 
+import { GRADE_GLSL } from './grade.js'
+
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
   void main() {
@@ -163,6 +165,7 @@ const FRAGMENT_BODY = /* glsl */ `
     float vig = 1.0 - 0.28 * smoothstep(0.35, 1.15, distance(frag, vec2(0.5, 0.55)));
     col *= vig;
 
+    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
     col *= uBright;
     // 微量グレインでバンディングを防ぐ
     col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.012;
@@ -181,5 +184,6 @@ const QUALITY_DEFINES = {
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  return defines + FRAGMENT_BODY
+  const body = FRAGMENT_BODY.replace('void main()', GRADE_GLSL + '\n  void main()')
+  return defines + body
 }

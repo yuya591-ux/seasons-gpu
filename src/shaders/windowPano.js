@@ -3,6 +3,7 @@
 // 平面の引き伸ばしにせず、3D写真のように立体に見える。
 
 import { GLASS_GLSL } from './glass.js'
+import { GRADE_GLSL } from './grade.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -84,11 +85,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float drift = fbm(vec2(baseU * 5.0 - t * 0.012, baseV * 5.0 + t * 0.004)) - 0.5;
     col *= 1.0 + skyMask * drift * 0.20;
 
-    // 「記憶の風景」グレード: 生写真感を抑え、少し彩度を落として柔らかく
-    float gl = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(gl), col, 0.85);            // 彩度を少し落とす
-    col += smoothstep(0.65, 1.0, gl) * 0.05;   // 柔らかいブルーム
-    col *= vec3(1.03, 1.0, 0.96);              // ほのかな暖かみ
+    // 「記憶の風景」グレード（全情景共通）。生写真感を抑え、影=藍/ハイライト=橙へ寄せる
+    col = applyGrade(col);
 
     // 窓ガラスの現象（任意）
     col = applyGlass(col, p, t, uGlass);
@@ -114,5 +112,5 @@ const FRAGMENT_BODY = /* glsl */ `
 `
 
 export function buildFragment() {
-  return FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n  void main()')
+  return FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
 }

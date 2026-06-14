@@ -4,6 +4,7 @@
 // パレットの5色は他の情景と共通の名前で受け取り、ここでは空・残照・建物・窓灯りとして解釈する。
 
 import { GLASS_GLSL } from './glass.js'
+import { GRADE_GLSL } from './grade.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -171,6 +172,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col *= mix(0.84, 1.0, inner);            // 枠の内側を少し翳らせる
     col = mix(col, vec3(0.05, 0.045, 0.06), fr); // サッシ本体
 
+    col = applyGrade(col); // 全情景共通の「記憶の風景」グレード
     col *= uBright;
     col -= max(col - vec3(0.9), 0.0) * 0.5;  // 白とび防止
     col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;
@@ -187,6 +189,6 @@ const QUALITY_DEFINES = {
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。ガラス現象の関数を main 直前に挿入する。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
   return defines + body
 }

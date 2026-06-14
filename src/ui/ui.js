@@ -130,7 +130,9 @@ export function buildUI(opts) {
     el.appendChild(gallery)
 
     const cards = []
-    SCENES.filter((s) => s.status === 'ready').forEach((scene) => {
+    // 公開する情景だけ（実証/開発用は public:false で隠す）
+    const devMode = /[?&]dev=1/.test(location.search)
+    SCENES.filter((s) => s.status === 'ready' && (s.public !== false || devMode)).forEach((scene) => {
       const card = h('button', 'scene-card')
       // 色のサムネ（情景のパレットから）
       const sw = h('span', 'scene-card__swatch')

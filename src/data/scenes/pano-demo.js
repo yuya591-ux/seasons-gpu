@@ -8,6 +8,7 @@ export default {
   label: '実証：立体パノラマの窓',
   desc: '古い街路の360°写真を、AI深度の視差で立体的に見回す（実証用）',
   status: 'ready',
+  public: false, // 開発・実証用。?dev=1 のときだけ一覧に出す
   render: 'windowPano',
   pano: 'pano/town-demo.jpg', // public/ 配下（地上目線の街路・4096px）
   panoDepth: 'pano/town-demo-depth.png', // AI推定の深度マップ
