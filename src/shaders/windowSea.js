@@ -92,6 +92,10 @@ const FRAGMENT_BODY = /* glsl */ `
     // 波頭の白い泡（手前ほど）
     float foam = smoothstep(0.86, 1.02, ripple + swell * 0.3) * smoothstep(0.25, 0.85, depth);
     water = mix(water, vec3(0.85, 0.88, 0.9), foam * 0.22);
+    // 岸へ寄せる波の白い筋（手前に横に走る＝立体感）
+    float crestLine = sin(swuv.y * 6.0 - t * 0.7) * 0.5 + 0.5;
+    float crest = smoothstep(0.72, 0.96, crestLine + (ripple - 0.5) * 0.4) * smoothstep(0.35, 0.9, depth);
+    water = mix(water, vec3(0.82, 0.85, 0.87), crest * 0.18);
 
     vec3 col = (vp.y > horizon) ? sky : water;
 
@@ -101,6 +105,30 @@ const FRAGMENT_BODY = /* glsl */ `
     float isl = step(vp.y, islY) * step(horizon - 0.01, vp.y) *
                 smoothstep(0.5, 0.18, abs(ax - islX));
     col = mix(col, mix(mix(uDropTint, uHorizon, 0.4), vec3(0.05, 0.06, 0.09), 0.4), clamp(isl, 0.0, 1.0) * 0.85);
+
+    // 灯台（遠くの岬に立つ。光がゆっくり明滅する）
+    float lhX = 0.62 - yaw;
+    float lhTop = horizon + 0.055;
+    float lhTower = step(abs(ax - lhX), 0.006) * step(vp.y, lhTop) * step(horizon + 0.002, vp.y);
+    col = mix(col, vec3(0.04, 0.05, 0.07), lhTower);
+    float lhLight = exp(-length(vec2(ax - lhX, vp.y - lhTop) * vec2(1.0, 1.2)) * 55.0);
+    float beam = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(t * 0.7), 4.0); // ゆっくり強く灯る
+    col += vec3(1.0, 0.95, 0.8) * lhLight * beam * 0.85;
+
+    // 漁火（遠くの漁船の灯り。水平線近くにぽつぽつ揺れる）
+    for (int fi2 = 0; fi2 < 3; fi2++) {
+      float ff = float(fi2);
+      float fx2 = (h11(ff * 7.0 + 1.0) - 0.5) * 1.5 - yaw;
+      float fy2 = horizon - 0.012 - h11(ff * 3.0 + 2.0) * 0.014;
+      float fd = length(vec2(ax - fx2, vp.y - fy2) * vec2(1.0, 2.6));
+      float bob = 0.55 + 0.45 * sin(t * 0.5 + ff * 2.0);
+      col += mix(vec3(1.0, 0.78, 0.5), vec3(0.8, 0.9, 1.0), h11(ff * 5.0)) * exp(-fd * 130.0) * bob * 0.6;
+    }
+
+    // 手前の防波堤（左手のテトラ/岩のシルエット）。海辺にいる手応え
+    float bwTop = 0.115 + (fbm(vec2((ax + yaw * 1.1) * 5.0, 1.0)) - 0.5) * 0.035;
+    float breakwater = step(vp.y, bwTop) * smoothstep(-0.15, -0.5, ax - 0.0);
+    col = mix(col, vec3(0.03, 0.035, 0.045), clamp(breakwater, 0.0, 1.0));
 
     // 海鳥の影（V字が空をゆっくり横切る）
     for (int bi = 0; bi < 3; bi++) {

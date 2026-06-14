@@ -1,0 +1,18 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+const errors = []
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
+await page.goto('http://localhost:4790/seasons/', { waitUntil: 'networkidle' })
+await page.evaluate(() => document.fonts.ready)
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(500)
+await page.locator('button:has-text("情景")').click()
+await page.waitForTimeout(300)
+await page.locator('.scene-card:has-text("山あいの窓")').click()
+await page.waitForTimeout(2200)
+await page.screenshot({ path: 'scripts/_shots/mtn_front.png' })
+await browser.close()
+console.log(errors.length ? 'ERR:\n' + errors.join('\n') : 'コンソールエラー無し ✓')
+if (errors.length) process.exit(1)
