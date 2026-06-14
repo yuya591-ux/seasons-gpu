@@ -51,9 +51,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 本物の3D（ガウシアン・スプラット）の表示面。UI より下に敷く。 */
+.splat-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #11131a;
+}
+.splat-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .ui {
   position: fixed;
   inset: 0;
+  z-index: 5; /* シェーダー描画・スプラット表示の上に */
   pointer-events: none; /* 子要素だけ受け取る */
 }
 .ui button,

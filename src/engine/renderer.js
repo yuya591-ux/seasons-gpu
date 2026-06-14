@@ -259,6 +259,13 @@ export function createRenderer(canvas) {
 
   return {
     ok: true,
+    // スプラット情景に切り替わる間など、シェーダー描画を一時停止／再開する
+    pause() {
+      pause()
+    },
+    resume() {
+      play()
+    },
     // 指スワイプなどから見回しの目標値を動かす（相対）
     addPan(dx, dy) {
       panTarget.x = clamp(panTarget.x + dx, PAN_LIMIT.x)

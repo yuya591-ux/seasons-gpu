@@ -7,6 +7,9 @@ import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
 import { createTilt } from './ui/tilt.js'
+import { mountSplat, unmountSplat } from './engine/splatViewer.js'
+
+const BASE = import.meta.env.BASE_URL || '/'
 
 const canvas = document.getElementById('scene')
 const fallback = document.getElementById('fallback')
@@ -33,23 +36,46 @@ function start() {
   const tilt = createTilt(renderer)
   audio.setMuted(settings.muted)
   audio.setVolume(settings.volume)
-  // 起動時の情景を音側にも伝える（鳴り始めは最初のタップ後）
-  audio.setScene(scene)
 
-  const ok = renderer.start(scene, settings)
+  // シェーダー描画は非スプラット情景で起動する（スプラットは別ビューアで表示）
+  const firstShaderScene = scene.render === 'splat' ? DEFAULT_SCENE : scene
+  const ok = renderer.start(firstShaderScene, settings)
   if (!ok) {
     canvas.hidden = true
     if (fallback) fallback.hidden = false
     return
   }
 
+  // 情景の適用。スプラット情景は3Dビューア、それ以外はシェーダー描画に振り分ける。
+  let splatMode = false
+  async function applyScene(next) {
+    setScene(next.id)
+    audio.setScene(next)
+    if (next.render === 'splat') {
+      splatMode = true
+      canvas.style.display = 'none'
+      renderer.pause()
+      try {
+        await mountSplat(document.body, BASE + next.splatUrl)
+      } catch (e) {
+        console.error('スプラットの読み込みに失敗:', e)
+      }
+    } else {
+      if (splatMode) {
+        splatMode = false
+        await unmountSplat()
+        canvas.style.display = ''
+        renderer.resume()
+      }
+      renderer.setScene(next)
+    }
+  }
+
   buildUI({
     initialScene: scene,
     settings,
     onApplyScene(next) {
-      setScene(next.id)
-      renderer.setScene(next)
-      audio.setScene(next)
+      applyScene(next)
     },
     onSettings(patch) {
       updateSettings(patch)
@@ -71,6 +97,9 @@ function start() {
       audio.setVolume(v)
     },
   })
+
+  // 起動時の情景を適用（スプラットなら3Dビューアへ）
+  applyScene(scene)
 
   // 指スワイプで景色を見回す（窓辺シリーズで有効）
   attachLookAround(canvas, renderer)

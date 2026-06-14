@@ -53,7 +53,16 @@
 
 - 変更点：表示用に 4096px 幅へ縮小。深度マップ `town-demo-depth.png` は元画像から AI（Depth-Anything V2）で生成した派生物。本番は本人撮影の写真に差し替える想定。CC BY-SA 素材は同ライセンス継承。
 
+## 3D（ガウシアン・スプラット）
+
+| 用途 | ファイル | 由来 | 扱い |
+| --- | --- | --- | --- |
+| 本物の3D（実証用） | `public/splat/demo.splat` | 3D Gaussian Splatting 研究で広く使われる "train" シーン（Tanks and Temples 由来）。配布: https://huggingface.co/cakewalk/splat-data | **実証用プレースホルダ**。非商用の研究素材のため、正式公開はしない前提。本番は本人が撮影・学習した `.ply` に差し替える。 |
+
+- 学習ツール: Brush（wgpu, Apache-2.0/MIT）をローカルで使用（リポジトリ外）。
+- 表示ライブラリ: three.js（MIT）/ @mkkellogg/gaussian-splats-3d（MIT）。
+
 ## フォント
 
-- 情景の描画は基本シェーダー計算。写真は上記の「立体パノラマの窓」でのみ使用。
+- 情景の描画は基本シェーダー計算。写真は「立体パノラマの窓」、3Dは上記でのみ使用。
 - フォントは OS 標準（system-ui 等）のみ。同梱しない。
