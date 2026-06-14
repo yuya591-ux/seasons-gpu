@@ -92,6 +92,8 @@ export function createRenderer(canvas) {
   const panCur = { x: 0, y: 0 }
   const panTarget = { x: 0, y: 0 }
   const PAN_LIMIT = { x: 2.6, y: 0.3 }
+  // 端末を傾けた時の視差バイアス（窓の効果。パノラマでのみ使用）
+  const parallaxBias = { x: 0, y: 0 }
 
   function buildProgram(q, type) {
     const shader = getShader(type)
@@ -177,11 +179,17 @@ export function createRenderer(canvas) {
     const gapY = panTarget.y - panCur.y
     panCur.x += gapX * 0.12
     panCur.y += gapY * 0.12
-    const clampP = (v) => Math.max(-0.05, Math.min(0.05, v))
+    const clampP = (v) => Math.max(-0.07, Math.min(0.07, v))
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
     gl.uniform2f(loc.uPan, panCur.x, panCur.y)
-    if (loc.uParallax) gl.uniform2f(loc.uParallax, clampP(gapX * 0.06), clampP(gapY * 0.04))
+    if (loc.uParallax) {
+      gl.uniform2f(
+        loc.uParallax,
+        clampP(gapX * 0.06 + parallaxBias.x),
+        clampP(gapY * 0.04 + parallaxBias.y),
+      )
+    }
     gl.uniform1f(loc.uGlass, glassMode)
     gl.uniform1f(loc.uIntensity, settings.rain)
     // パノラマ写真（あれば）をテクスチャユニット0、深度マップを1に
@@ -260,6 +268,24 @@ export function createRenderer(canvas) {
     setPanTarget(x, y) {
       panTarget.x = clamp(x, PAN_LIMIT.x)
       panTarget.y = clamp(y, PAN_LIMIT.y)
+    },
+    // 端末の傾き（nx,ny は -1..1）。パノラマでは視差（覗き込み）、それ以外は見回しに使う。
+    applyTilt(nx, ny) {
+      nx = Math.max(-1, Math.min(1, nx))
+      ny = Math.max(-1, Math.min(1, ny))
+      if (shaderType === 'windowPano') {
+        parallaxBias.x = nx * 0.05
+        parallaxBias.y = ny * 0.035
+      } else {
+        panTarget.x = clamp(nx * PAN_LIMIT.x, PAN_LIMIT.x)
+        panTarget.y = clamp(ny * PAN_LIMIT.y, PAN_LIMIT.y)
+      }
+    },
+    clearTilt() {
+      parallaxBias.x = 0
+      parallaxBias.y = 0
+      panTarget.x = 0
+      panTarget.y = 0
     },
     setScene(s) {
       scene = s

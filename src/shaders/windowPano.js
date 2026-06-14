@@ -26,6 +26,18 @@ const FRAGMENT_BODY = /* glsl */ `
 
   float h21(vec2 p) { p = fract(p * vec2(123.34, 345.45)); p += dot(p, p + 34.345); return fract(p.x * p.y); }
 
+  float vnoise(vec2 p) {
+    vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    float a = h21(i); float b = h21(i + vec2(1.0, 0.0));
+    float c = h21(i + vec2(0.0, 1.0)); float d = h21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    float s = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.0; a *= 0.5; }
+    return s;
+  }
+
   vec3 samplePano(vec2 uv) {
     return texture2D(uPano, vec2(fract(uv.x), clamp(uv.y, 0.002, 0.998))).rgb;
   }
@@ -65,6 +77,12 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 col = samplePano(uv);
 
     if (uHasPano < 0.5) col = vec3(0.06, 0.06, 0.08); // 未ロード時
+
+    // 生命感: 遠くの空に、ゆっくり流れる光のゆらぎ（雲影）を乗せて「止まった写真」感を消す
+    float d0 = sampleDepth(vec2(baseU, baseV));
+    float skyMask = smoothstep(0.0, 0.30, 1.0 - d0) * smoothstep(0.55, 0.28, baseV);
+    float drift = fbm(vec2(baseU * 5.0 - t * 0.012, baseV * 5.0 + t * 0.004)) - 0.5;
+    col *= 1.0 + skyMask * drift * 0.20;
 
     // 「記憶の風景」グレード: 生写真感を抑え、少し彩度を落として柔らかく
     float gl = dot(col, vec3(0.299, 0.587, 0.114));

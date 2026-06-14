@@ -10,10 +10,10 @@ export function createTilt(renderer) {
     const gx = e.gamma || 0 // 左右の傾き
     const gy = e.beta || 0 // 前後の傾き
     if (base === null) base = { gx, gy }
-    // 35°傾けたら端まで見回す
-    const dx = (gx - base.gx) / 35
-    const dy = (gy - base.gy) / 35
-    renderer.setPanTarget(dx * 1.25, -dy * 0.28)
+    // 基準姿勢からの傾きを -1..1 に。約25°で端。
+    const nx = (gx - base.gx) / 25
+    const ny = -(gy - base.gy) / 25
+    renderer.applyTilt(nx, ny)
   }
   window.addEventListener('deviceorientation', handle)
 
@@ -34,7 +34,7 @@ export function createTilt(renderer) {
     },
     disable() {
       enabled = false
-      renderer.setPanTarget(0, 0)
+      renderer.clearTilt()
     },
   }
 }
