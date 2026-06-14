@@ -252,7 +252,7 @@ export async function mountSplat(parent, url, mode = 'orbit') {
         lv.camera.near = Math.max(radius * 0.01, 0.02)
         lv.camera.far = radius * 30
         lv.camera.updateProjectionMatrix()
-        roomCtl = createRoomControls(THREE, lv, lc.querySelector('canvas'), center, new THREE.Vector3(0, -1, 0))
+        roomCtl = createRoomControls(THREE, lv, lc.querySelector('canvas'), center, new THREE.Vector3(0, -1, 0), radius * 0.5)
         state.steps.push('frame(room)')
         if (!current()) return bail()
         // 以降の周回モード処理はスキップ
