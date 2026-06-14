@@ -22,6 +22,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uBright;
   uniform vec2 uPan;         // 見回し（x=ヨー, y=ピッチ）
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく効かせる）
+  uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
   uniform float uFoliage;    // 季節の舞い 0=なし 1=紅葉 2=花びら
   uniform float uFlash;      // 遠雷フラッシュ 0..1

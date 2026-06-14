@@ -28,6 +28,7 @@ export const GROUND_GLSL = /* glsl */ `
     float hY = 0.43;                                   // 地平の画面高さ
     gmask = smoothstep(hY + 0.02, hY - 0.02, vp.y);
     if (gmask <= 0.001) return mix(uHorizon, uSkyMid, 0.35); // 地平より上は計算しない（軽量化）
+    float mo = 1.0 - uReduceMotion;                    // 0=動きを止める（車・人・点滅を静止）
 
     float gt = max(hY - vp.y, 0.004);                  // 0=地平, 大=手前(真下)
     float horizAngle = ax * 1.6 + (yaw + lean * 1.6) * 0.6; // 光線の水平/前方比
@@ -127,7 +128,7 @@ export const GROUND_GLSL = /* glsl */ `
            * smoothstep(0.34, 0.12, length(hGf - 0.5)) * (0.08 + 0.26 * nightAmt) * detail;
       // 高層の屋上に赤い航空障害灯（ゆっくり明滅）
       bld += vec3(0.9, 0.16, 0.12) * hTower * roofness
-           * smoothstep(0.16, 0.0, length(hGf - 0.5)) * (0.5 + 0.5 * sin(uTime * 1.2 + hBlk * 20.0));
+           * smoothstep(0.16, 0.0, length(hGf - 0.5)) * (0.5 + 0.5 * sin(uTime * 1.2 * mo + hBlk * 20.0));
       // 空気遠近（遠い箱ほど霞んで空へ）
       bld = mix(bld, mix(uHorizon, uSkyMid, 0.4), fog * 0.7);
       // 近景（手前の棟）を持ち上げ
@@ -184,11 +185,11 @@ export const GROUND_GLSL = /* glsl */ `
       ground += uSunGlow * lampG * wet * 0.6 * (1.0 - river); // 濡れた路面に滲む街灯の照り返し
       // 人影（道沿いを動く小さな点）
       float ped = step(0.5, h21(gi + 19.0))
-                * smoothstep(0.05, 0.0, length((gf - vec2(0.5, fract(uTime * 0.05 + blkR))) * vec2(1.3, 1.0)));
+                * smoothstep(0.05, 0.0, length((gf - vec2(0.5, fract(uTime * 0.05 * mo + blkR))) * vec2(1.3, 1.0)));
       ground = mix(ground, vec3(0.05, 0.04, 0.05), ped * 0.6 * (1.0 - river));
       // 車（縦の道を流れる。ヘッドライト/テール＋前方ビーム）
       float carDir = (blkR > 0.5) ? 1.0 : -1.0;
-      float carY = fract(uTime * 0.22 * carDir + blkR);
+      float carY = fract(uTime * 0.22 * carDir * mo + blkR);
       float onVroad = smoothstep(0.13, 0.0, abs(gf.x - 0.5));
       float carOn = step(0.45, h11(gi.x * 1.7 + gi.y * 2.3 + 21.0));
       float carBody = smoothstep(0.05, 0.0, abs(gf.y - carY));

@@ -130,6 +130,7 @@ export function createRenderer(canvas) {
       uTime: gl.getUniformLocation(program, 'uTime'),
       uPan: gl.getUniformLocation(program, 'uPan'),
       uParallax: gl.getUniformLocation(program, 'uParallax'),
+      uReduceMotion: gl.getUniformLocation(program, 'uReduceMotion'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
       uFoliage: gl.getUniformLocation(program, 'uFoliage'),
       uFlash: gl.getUniformLocation(program, 'uFlash'),
@@ -208,6 +209,7 @@ export function createRenderer(canvas) {
         clampP(gapY * 0.04 + parallaxBias.y),
       )
     }
+    if (loc.uReduceMotion) gl.uniform1f(loc.uReduceMotion, reduceMotion ? 1 : 0)
     gl.uniform1f(loc.uGlass, glassMode)
     if (loc.uFoliage) gl.uniform1f(loc.uFoliage, foliageMode)
     if (loc.uFlash) gl.uniform1f(loc.uFlash, flashLevel)
