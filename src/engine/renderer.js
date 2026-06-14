@@ -35,34 +35,47 @@ export function createRenderer(canvas) {
   }
   setupBuffer()
 
-  // パノラマ写真（任意）。情景が pano を持つときだけ読み込む。
+  // パノラマ写真＋深度マップ（任意）。情景が pano を持つときだけ読み込む。
   let panoTex = null
   let panoReady = 0
-  let panoUrl = null
-  function loadPano(path) {
-    const url = path ? BASE + path : null
-    if (url === panoUrl) return
-    panoUrl = url
-    panoReady = 0
-    if (!url) return
+  let panoDepthTex = null
+  let panoDepthReady = 0
+  let panoKey = null
+  function loadTexture(url, onReady) {
     const img = new Image()
+    let tex = null
     img.onload = () => {
-      if (!panoTex) panoTex = gl.createTexture()
-      gl.bindTexture(gl.TEXTURE_2D, panoTex)
-      // baseV=0 を画像の上端（空）に合わせるため反転しない
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      tex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false) // baseV=0 を画像上端に合わせる
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img)
       // NPOT のため CLAMP・mipmapなし（横ループはシェーダー側で fract 処理）
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-      panoReady = 1
+      onReady(tex)
     }
-    img.onerror = () => {
-      panoReady = 0
-    }
+    img.onerror = () => onReady(null)
     img.src = url
+  }
+  function loadPano(s) {
+    const key = s && s.pano ? s.pano : null
+    if (key === panoKey) return
+    panoKey = key
+    panoReady = 0
+    panoDepthReady = 0
+    if (!key) return
+    loadTexture(BASE + s.pano, (tex) => {
+      panoTex = tex
+      panoReady = tex ? 1 : 0
+    })
+    if (s.panoDepth) {
+      loadTexture(BASE + s.panoDepth, (tex) => {
+        panoDepthTex = tex
+        panoDepthReady = tex ? 1 : 0
+      })
+    }
   }
 
   let program = null
@@ -107,6 +120,8 @@ export function createRenderer(canvas) {
       uGlass: gl.getUniformLocation(program, 'uGlass'),
       uPano: gl.getUniformLocation(program, 'uPano'),
       uHasPano: gl.getUniformLocation(program, 'uHasPano'),
+      uDepth: gl.getUniformLocation(program, 'uDepth'),
+      uHasDepth: gl.getUniformLocation(program, 'uHasDepth'),
       uIntensity: gl.getUniformLocation(program, 'uIntensity'),
       uBright: gl.getUniformLocation(program, 'uBright'),
       uSkyTop: gl.getUniformLocation(program, 'uSkyTop'),
@@ -164,12 +179,16 @@ export function createRenderer(canvas) {
     gl.uniform2f(loc.uPan, panCur.x, panCur.y)
     gl.uniform1f(loc.uGlass, glassMode)
     gl.uniform1f(loc.uIntensity, settings.rain)
-    // パノラマ写真（あれば）をテクスチャユニット0に
+    // パノラマ写真（あれば）をテクスチャユニット0、深度マップを1に
     if (loc.uPano) {
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, panoTex)
       gl.uniform1i(loc.uPano, 0)
       gl.uniform1f(loc.uHasPano, panoReady)
+      gl.activeTexture(gl.TEXTURE1)
+      gl.bindTexture(gl.TEXTURE_2D, panoDepthTex)
+      gl.uniform1i(loc.uDepth, 1)
+      gl.uniform1f(loc.uHasDepth, panoDepthReady)
     }
     gl.uniform1f(loc.uBright, settings.brightness)
     if (scene) {
@@ -240,7 +259,7 @@ export function createRenderer(canvas) {
     setScene(s) {
       scene = s
       glassMode = glassOf(s)
-      loadPano(s.pano)
+      loadPano(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
       panTarget.y = 0
@@ -258,7 +277,7 @@ export function createRenderer(canvas) {
       scene = initialScene
       settings = initialSettings
       glassMode = glassOf(initialScene)
-      loadPano(initialScene.pano)
+      loadPano(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()
       play()

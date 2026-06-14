@@ -6,34 +6,35 @@ export default {
   id: 'pano-demo',
   axes: { season: 'autumn', weather: 'clear', time: 'noon' },
   label: '実証：立体パノラマの窓',
-  desc: '360°写真を見回す立体パノラマ（フリー素材・実証用）',
+  desc: '古い街路の360°写真を、AI深度の視差で立体的に見回す（実証用）',
   status: 'ready',
   render: 'windowPano',
-  pano: 'pano/town-demo.jpg', // public/ 配下
+  pano: 'pano/town-demo.jpg', // public/ 配下（地上目線の街路・4096px）
+  panoDepth: 'pano/town-demo-depth.png', // AI推定の深度マップ
   intensityLabel: '立体感', // 視差の強さ
 
   // windowPano は色uniformを使わないが、ギャラリーのサムネ用にパレットを持つ。
   palette: {
     early: {
-      skyTop: '#3f7fc8',
-      skyMid: '#8fb8e0',
-      horizon: '#cfe0ec',
-      sunGlow: '#fff2d6',
-      dropTint: '#2a4a64',
+      skyTop: '#7e8aa0',
+      skyMid: '#c2b39a',
+      horizon: '#a89478',
+      sunGlow: '#f0e6d2',
+      dropTint: '#5a5046',
     },
     late: {
-      skyTop: '#3f7fc8',
-      skyMid: '#8fb8e0',
-      horizon: '#cfe0ec',
-      sunGlow: '#fff2d6',
-      dropTint: '#2a4a64',
+      skyTop: '#7e8aa0',
+      skyMid: '#c2b39a',
+      horizon: '#a89478',
+      sunGlow: '#f0e6d2',
+      dropTint: '#5a5046',
     },
   },
   driftPeriod: 300,
   phenomena: {},
 
-  // 港町なので波音（既存素材を再利用）
+  // 静かな街路の気配として、風をごく控えめに（既存素材を再利用）
   sounds: [
-    { id: 'waves', label: '波', src: 'audio/summer-dusk-seaside/waves.mp3', gain: 0.6, loop: true },
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.18, loop: true },
   ],
 }

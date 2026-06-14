@@ -49,9 +49,9 @@
 
 | 用途 | ファイル | 作品 / 作者 | ライセンス | 出典 |
 | --- | --- | --- | --- | --- |
-| 立体パノラマの窓（実証用） | `public/pano/town-demo.jpg` | "Nynäshamn NE Equirectangular 360 panoramic" / Simon Inns | CC BY 2.0 — https://creativecommons.org/licenses/by/2.0/ | https://commons.wikimedia.org/wiki/File:Nyn%C3%A4shamn_NE_Equirectangular_360_panoramic_(21205394981).jpg |
+| 立体パノラマの窓（実証用） | `public/pano/town-demo.jpg` | "Basel Martinsgasse Panorama" / DerMische | CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/ | https://commons.wikimedia.org/wiki/File:Basel_Martinsgasse_Panorama.jpg |
 
-- 変更点：表示用に 2048px 幅へ縮小。本番は本人撮影の写真に差し替える想定。
+- 変更点：表示用に 4096px 幅へ縮小。深度マップ `town-demo-depth.png` は元画像から AI（Depth-Anything V2）で生成した派生物。本番は本人撮影の写真に差し替える想定。CC BY-SA 素材は同ライセンス継承。
 
 ## フォント
 
