@@ -10,6 +10,7 @@ import summerMorningMountains from './summer-morning-mountains.js'
 import summerDuskSeaside from './summer-dusk-seaside.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
+import roomDemo from './room-demo.js'
 
 export const SCENES = [
   summerRainDusk,
@@ -21,6 +22,7 @@ export const SCENES = [
   summerDuskSeaside,
   panoDemo,
   splatDemo,
+  roomDemo,
 ]
 
 /** 軸の組み合わせから情景を引く。未登録なら undefined。 */

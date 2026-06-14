@@ -2,14 +2,21 @@
 // Three.js ベースの @mkkellogg/gaussian-splats-3d を遅延読み込みし、スプラット情景でのみ使う。
 // 情景の連打切替に耐えるよう、世代トークンで進行中の mount をキャンセル可能にしている。
 
+import { createRoomControls } from './roomControls.js'
+
 let mountToken = 0
 let viewer = null // 確定済みビューア
 let container = null // 確定済みコンテナ
 let THREEref = null // 傾き操作で使う three の参照
-let tiltCtx = null // 傾き操作の基準（カメラ/コントロール/中心/基準角）
+let tiltCtx = null // 周回モードの傾き基準
+let roomCtl = null // 部屋モード（一人称）の操作
 
 /** 端末の傾き(nx,ny: -1..1)で3Dを見回す（傾きトグルON時）。 */
 export function applySplatTilt(nx, ny) {
+  if (roomCtl) {
+    roomCtl.setLook(nx, ny)
+    return
+  }
   if (!viewer || !tiltCtx || !THREEref) return
   const { camera, controls, target, baseTheta, basePhi } = tiltCtx
   controls.autoRotate = false
@@ -78,14 +85,22 @@ export async function unmountSplat() {
   viewer = null
   container = null
   tiltCtx = null
+  if (roomCtl) {
+    roomCtl.dispose()
+    roomCtl = null
+  }
   await disposeViewer(v)
   if (c && c.parentNode) c.parentNode.removeChild(c)
 }
 
 /** スプラットを表示する。失敗時は例外を投げる（呼び出し側でフォールバックする）。 */
-export async function mountSplat(parent, url) {
+export async function mountSplat(parent, url, mode = 'orbit') {
   const token = ++mountToken
   tiltCtx = null
+  if (roomCtl) {
+    roomCtl.dispose()
+    roomCtl = null
+  }
   // 直前の確定済みを片付け（進行中の他 mount は token 差で自動的に無効化される）
   {
     const pv = viewer
@@ -155,7 +170,7 @@ export async function mountSplat(parent, url) {
       initialCameraPosition: [0, 0, -6],
       initialCameraLookAt: [0, 0, 0],
       selfDrivenMode: true,
-      useBuiltInControls: true,
+      useBuiltInControls: mode !== 'room', // 部屋モードは自前の一人称操作
       sharedMemoryForWorkers: false,
       gpuAcceleratedSort: false,
       integerBasedSort: false,
@@ -231,6 +246,19 @@ export async function mountSplat(parent, url) {
       const ey = P(ys, 0.75) - P(ys, 0.25)
       const ez = P(zs, 0.75) - P(zs, 0.25)
       const radius = 0.5 * Math.max(ex, ey, ez) || 1
+
+      if (mode === 'room') {
+        // 一人称・部屋モード: 室内の中心に立ち、首を振って見回す
+        lv.camera.near = Math.max(radius * 0.01, 0.02)
+        lv.camera.far = radius * 30
+        lv.camera.updateProjectionMatrix()
+        roomCtl = createRoomControls(THREE, lv, lc.querySelector('canvas'), center, new THREE.Vector3(0, -1, 0))
+        state.steps.push('frame(room)')
+        if (!current()) return bail()
+        // 以降の周回モード処理はスキップ
+        // 窓枠・診断は下で共通処理
+        // （早期に共通の確定処理へ進む）
+      } else {
       // 被写体が映える斜め上からの定番アングル（中央値=地面寄りのため見下ろし気味が安定）
       const dist = radius * 3.6
       const dir = new THREE.Vector3(0.25, -0.45, 0.95).normalize()
@@ -276,6 +304,7 @@ export async function mountSplat(parent, url) {
         ctl.update()
       }
       state.steps.push('frame')
+      } // end else (orbit)
     } catch (e) {
       state.error = 'frame: ' + (e && e.message ? e.message : e)
     }

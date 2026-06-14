@@ -69,7 +69,7 @@ function start() {
       canvas.style.display = 'none'
       renderer.pause()
       try {
-        await mountSplat(document.body, BASE + next.splatUrl)
+        await mountSplat(document.body, BASE + next.splatUrl, next.splatMode || 'orbit')
         // 読み込み中に新しい情景へ切替わっていたら、出来上がったスプラットを片付けて譲る
         if (gen !== sceneGen) {
           await unmountSplat()
