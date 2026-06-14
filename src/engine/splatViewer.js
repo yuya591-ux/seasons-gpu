@@ -119,11 +119,13 @@ export async function mountSplat(parent, url) {
 
     state.steps.push('parse')
     render()
-    const splatBuffer = await withTimeout(
-      GS.SplatLoader.loadFromFileData(data, 1, 0, true),
-      30000,
-      'parse',
-    )
+    // 形式（.ply / .ksplat / .splat）に応じてパース。Brush の出力は .ply。
+    const ext = (url.split('?')[0].split('.').pop() || '').toLowerCase()
+    let parsePromise
+    if (ext === 'ply') parsePromise = GS.PlyLoader.loadFromFileData(data, 1, 0, true, 0)
+    else if (ext === 'ksplat') parsePromise = GS.KSplatLoader.loadFromFileData(data)
+    else parsePromise = GS.SplatLoader.loadFromFileData(data, 1, 0, true)
+    const splatBuffer = await withTimeout(parsePromise, 40000, 'parse')
 
     state.steps.push('add')
     render()
