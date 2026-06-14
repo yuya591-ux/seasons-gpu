@@ -1,10 +1,10 @@
 // 本物の3D（ガウシアン・スプラット）ビューアのラッパー。
 // Three.js ベースの @mkkellogg/gaussian-splats-3d を遅延読み込みし、スプラット情景でのみ使う。
-// iPhone 等で原因を特定できるよう、画面上に診断情報を表示する。
+// 情景の連打切替に耐えるよう、世代トークンで進行中の mount をキャンセル可能にしている。
 
-let viewer = null
-let container = null
-let errHandlers = null
+let mountToken = 0
+let viewer = null // 確定済みビューア
+let container = null // 確定済みコンテナ
 
 // WebGL2 の対応状況を端末側で調べる（iOS で何が無いかを可視化）。
 function webglCaps() {
@@ -23,24 +23,61 @@ function webglCaps() {
       maxTex: gl.getParameter(gl.MAX_TEXTURE_SIZE),
       colorBufFloat: has('EXT_color_buffer_float'),
       floatLinear: has('OES_texture_float_linear'),
-      floatBlend: has('EXT_float_blend'),
     }
   } catch (e) {
     return { error: String(e) }
   }
 }
 
+async function disposeViewer(v) {
+  try {
+    if (v) {
+      if (v.stop) v.stop()
+      if (v.dispose) await v.dispose()
+    }
+  } catch (e) {
+    console.warn('スプラットビューアの破棄に失敗:', e)
+  }
+}
+
+const withTimeout = (p, ms, label) =>
+  Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timeout ' + ms + 'ms')), ms)),
+  ])
+
+/** 確定済みのスプラット表示を片付ける（GPU/ワーカーを解放）。進行中の mount も無効化する。 */
+export async function unmountSplat() {
+  mountToken++
+  const v = viewer
+  const c = container
+  viewer = null
+  container = null
+  await disposeViewer(v)
+  if (c && c.parentNode) c.parentNode.removeChild(c)
+}
+
+/** スプラットを表示する。失敗時は例外を投げる（呼び出し側でフォールバックする）。 */
 export async function mountSplat(parent, url) {
-  await unmountSplat()
+  const token = ++mountToken
+  // 直前の確定済みを片付け（進行中の他 mount は token 差で自動的に無効化される）
+  {
+    const pv = viewer
+    const pc = container
+    viewer = null
+    container = null
+    await disposeViewer(pv)
+    if (pc && pc.parentNode) pc.parentNode.removeChild(pc)
+  }
+  if (token !== mountToken) return
 
-  container = document.createElement('div')
-  container.className = 'splat-stage'
-  parent.appendChild(container)
+  const lc = document.createElement('div')
+  lc.className = 'splat-stage'
+  parent.appendChild(lc)
 
-  // 画面上の診断パネル
   const diag = document.createElement('pre')
   diag.className = 'splat-diag'
-  container.appendChild(diag)
+  lc.appendChild(diag)
   const state = { caps: webglCaps(), steps: [], error: null, splats: null, lost: false, fetched: null }
   const render = () => {
     const c = state.caps
@@ -60,24 +97,13 @@ export async function mountSplat(parent, url) {
     diag.style.display = 'none'
   })
 
-  // 実エラー（ワーカー/WASM等）を画面に出す
-  const onErr = (m) => {
-    state.error = (state.error ? state.error + ' | ' : '') + m
-    diag.style.display = 'block'
-    render()
+  let lv = null
+  // 自分の世代でなくなったら、作りかけを片付けて終了
+  const bail = async () => {
+    await disposeViewer(lv)
+    if (lc.parentNode) lc.parentNode.removeChild(lc)
   }
-  errHandlers = {
-    err: (e) => onErr('err:' + (e.message || e.filename || '?')),
-    rej: (e) => onErr('rej:' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))),
-  }
-  window.addEventListener('error', errHandlers.err)
-  window.addEventListener('unhandledrejection', errHandlers.rej)
-
-  const withTimeout = (p, ms, label) =>
-    Promise.race([
-      p,
-      new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timeout ' + ms + 'ms')), ms)),
-    ])
+  const current = () => token === mountToken
 
   try {
     state.steps.push('import')
@@ -86,18 +112,18 @@ export async function mountSplat(parent, url) {
       import('@mkkellogg/gaussian-splats-3d'),
       import('three'),
     ])
+    if (!current()) return bail()
 
     state.steps.push('viewer')
     render()
-    viewer = new GS.Viewer({
-      rootElement: container,
+    lv = new GS.Viewer({
+      rootElement: lc,
       cameraUp: [0, -1, 0],
       initialCameraPosition: [0, 0, -6],
       initialCameraLookAt: [0, 0, 0],
       selfDrivenMode: true,
       useBuiltInControls: true,
       sharedMemoryForWorkers: false,
-      // iOS では GPU ソート（float描画バッファ依存）が落ちやすいので CPU ソートにする
       gpuAcceleratedSort: false,
       integerBasedSort: false,
       halfPrecisionCovariancesOnGPU: false,
@@ -115,46 +141,48 @@ export async function mountSplat(parent, url) {
       30000,
       'fetch',
     )
+    if (!current()) return bail()
     state.fetched = (data.byteLength / 1e6).toFixed(1) + 'MB'
 
     state.steps.push('parse')
     render()
-    // 形式（.ply / .ksplat / .splat）に応じてパース。Brush の出力は .ply。
     const ext = (url.split('?')[0].split('.').pop() || '').toLowerCase()
     let parsePromise
     if (ext === 'ply') parsePromise = GS.PlyLoader.loadFromFileData(data, 1, 0, true, 0)
     else if (ext === 'ksplat') parsePromise = GS.KSplatLoader.loadFromFileData(data)
     else parsePromise = GS.SplatLoader.loadFromFileData(data, 1, 0, true)
     const splatBuffer = await withTimeout(parsePromise, 40000, 'parse')
+    if (!current()) return bail()
 
     state.steps.push('add')
     render()
     await withTimeout(
-      viewer.addSplatBuffers([splatBuffer], [{ splatAlphaRemovalThreshold: 1 }], true, false, false, false, false),
-      30000,
+      lv.addSplatBuffers([splatBuffer], [{ splatAlphaRemovalThreshold: 1 }], true, false, false, false, false),
+      40000,
       'add',
     )
+    if (!current()) return bail()
 
     state.steps.push('start')
     render()
-    viewer.start()
+    lv.start()
 
-    // コンテキスト喪失を検知して画面に出す
-    const cv = container.querySelector('canvas')
+    // コンテキスト喪失の検知（preventDefault で復帰の余地を残す）
+    const cv = lc.querySelector('canvas')
     if (cv) {
-      cv.addEventListener('webglcontextlost', () => {
+      cv.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault()
         state.lost = true
         diag.style.display = 'block'
         render()
       })
     }
 
-    // オートフレーミング
+    // オートフレーミング（浮遊splatを避け、四分位で被写体を捉える）
     try {
-      const mesh = viewer.getSplatMesh()
+      const mesh = lv.getSplatMesh()
       const count = mesh.getSplatCount ? mesh.getSplatCount() : 0
       state.splats = count
-      // 浮遊splatに惑わされないよう、中心をサンプリングして百分位で範囲を決める
       const N = Math.min(5000, count)
       const step = Math.max(1, Math.floor(count / N))
       const xs = [], ys = [], zs = []
@@ -165,72 +193,65 @@ export async function mountSplat(parent, url) {
       }
       xs.sort((a, b) => a - b); ys.sort((a, b) => a - b); zs.sort((a, b) => a - b)
       const P = (arr, p) => arr[Math.floor((arr.length - 1) * p)] || 0
-      // 中心＝中央値、被写体の大きさ＝四分位範囲（密な中心部で捉え、広大な背景に引っ張られない）
       const center = new THREE.Vector3(P(xs, 0.5), P(ys, 0.5), P(zs, 0.5))
       const ex = P(xs, 0.75) - P(xs, 0.25)
       const ey = P(ys, 0.75) - P(ys, 0.25)
       const ez = P(zs, 0.75) - P(zs, 0.25)
       const radius = 0.5 * Math.max(ex, ey, ez) || 1
-
       const dist = radius * 4.0
-      // cameraUp が [0,-1,0]（世界の上は -Y）なので、-Y を強めると上から見下ろす
       const dir = new THREE.Vector3(0.3, -0.55, 0.9).normalize()
-      viewer.camera.position.copy(center).addScaledVector(dir, dist)
-      viewer.camera.near = Math.max(dist * 0.02, 0.01)
-      viewer.camera.far = dist * 12 + radius * 12
-      viewer.camera.updateProjectionMatrix()
-      viewer.camera.lookAt(center)
-      if (viewer.controls) {
-        viewer.controls.target.copy(center)
-        viewer.controls.minDistance = Math.max(radius * 0.2, 0.2)
-        viewer.controls.maxDistance = dist * 4
-        viewer.controls.enablePan = false
-        viewer.controls.autoRotate = true
-        viewer.controls.autoRotateSpeed = 0.35
-        viewer.controls.update()
+      lv.camera.position.copy(center).addScaledVector(dir, dist)
+      lv.camera.near = Math.max(dist * 0.02, 0.01)
+      lv.camera.far = dist * 12 + radius * 12
+      lv.camera.updateProjectionMatrix()
+      lv.camera.lookAt(center)
+      if (lv.controls) {
+        lv.controls.target.copy(center)
+        lv.controls.minDistance = Math.max(radius * 0.2, 0.2)
+        lv.controls.maxDistance = dist * 4
+        lv.controls.enablePan = false
+        lv.controls.autoRotate = true
+        lv.controls.autoRotateSpeed = 0.35
+        lv.controls.update()
       }
-      state.steps.push('frame r=' + radius.toFixed(2))
+      state.steps.push('frame')
     } catch (e) {
       state.error = 'frame: ' + (e && e.message ? e.message : e)
     }
 
-    state.steps.push('done')
-    render()
+    if (!current()) return bail()
 
     // 窓枠（最前景のサッシ）
     const frame = document.createElement('div')
     frame.className = 'splat-frame'
-    container.appendChild(frame)
+    lc.appendChild(frame)
+
+    // 確定（ここで初めてモジュール変数へ）
+    viewer = lv
+    container = lc
+    lv = null
+
+    state.steps.push('done')
+    render()
 
     // 正常に出たら診断は数秒で自動的に隠す（エラー時は残す）
     setTimeout(() => {
-      if (!state.error) diag.style.display = 'none'
+      if (!state.error && token === mountToken) diag.style.display = 'none'
     }, 3500)
   } catch (e) {
-    state.error = (e && e.message ? e.message : String(e))
+    state.error = e && e.message ? e.message : String(e)
     diag.style.display = 'block'
     render()
-  }
-  return viewer
-}
-
-export async function unmountSplat() {
-  if (errHandlers) {
-    window.removeEventListener('error', errHandlers.err)
-    window.removeEventListener('unhandledrejection', errHandlers.rej)
-    errHandlers = null
-  }
-  if (viewer) {
-    try {
-      if (viewer.stop) viewer.stop()
-      if (viewer.dispose) await viewer.dispose()
-    } catch {
-      /* 破棄時のエラーは無視 */
+    await disposeViewer(lv)
+    // 失敗時は診断だけ残してコンテナは保持→呼び出し側がフォールバックし unmount する
+    if (token === mountToken) {
+      viewer = null
+      container = lc
+    } else if (lc.parentNode) {
+      lc.parentNode.removeChild(lc)
     }
-    viewer = null
+    throw e
   }
-  if (container && container.parentNode) container.parentNode.removeChild(container)
-  container = null
 }
 
 export function isSplatActive() {

@@ -47,8 +47,11 @@ function start() {
   }
 
   // 情景の適用。スプラット情景は3Dビューア、それ以外はシェーダー描画に振り分ける。
+  // 連打切替に備え世代トークンで古い処理の状態書き換えを無効化、失敗時は通常情景へフォールバック。
   let splatMode = false
+  let sceneGen = 0
   async function applyScene(next) {
+    const gen = ++sceneGen
     setScene(next.id)
     audio.setScene(next)
     if (next.render === 'splat') {
@@ -58,12 +61,19 @@ function start() {
       try {
         await mountSplat(document.body, BASE + next.splatUrl)
       } catch (e) {
-        console.error('スプラットの読み込みに失敗:', e)
+        console.error('スプラット読み込み失敗→通常情景へ:', e)
+        if (gen !== sceneGen) return
+        await unmountSplat()
+        splatMode = false
+        canvas.style.display = ''
+        renderer.resume()
+        renderer.setScene(DEFAULT_SCENE)
       }
     } else {
       if (splatMode) {
         splatMode = false
         await unmountSplat()
+        if (gen !== sceneGen) return
         canvas.style.display = ''
         renderer.resume()
       }
