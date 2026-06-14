@@ -114,6 +114,18 @@ const FRAGMENT_BODY = /* glsl */ `
     col = town(col, vp, ax + yaw * 1.10, 0.24, 0.26, 0.17,
                uDropTint * 0.82, uSunGlow, mix(0.55, 0.9, uIntensity), 18.0, 22.0, 19.3);
 
+    // 高層ビルの赤色航空障害灯（ゆっくり点滅）。日本の夜景の郷愁の決め手
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float bx = (h11(fi * 13.0 + 2.0) - 0.5) * 2.2;       // 世界上の横位置
+      float by = 0.40 + h11(fi * 5.0 + 3.0) * 0.12;        // スカイライン上の高さ
+      float wxr = ax + yaw * (1.0 + fi * 0.02);
+      float d = length(vec2(wxr - bx, vp.y - by) * vec2(1.0, 1.35));
+      float blink = smoothstep(0.45, 0.55, fract(uTime * 0.5 + fi * 0.37)); // ゆっくり点滅
+      float beacon = exp(-d * 150.0) + exp(-d * 45.0) * 0.22;
+      col += vec3(1.0, 0.12, 0.08) * beacon * blink * 0.9;
+    }
+
     // ── 手前の商店街（見下ろす通り）。最下部に道・店の灯り・反射 ──
     float streetTop = 0.205;
     float st = smoothstep(streetTop, streetTop - 0.025, vp.y); // 1 = 通りの領域
@@ -138,6 +150,11 @@ const FRAGMENT_BODY = /* glsl */ `
       float lampY = 0.165 + h11(floor(sx / 0.16) + 3.0) * 0.02;
       float dl = length(vec2(lampPh * 0.16, vp.y - lampY) * vec2(1.0, 1.4));
       road += uSunGlow * (exp(-dl * 40.0) + exp(-dl * 11.0) * 0.3) * 0.9;
+      // 通りを流れる車のヘッドライト（ゆっくり横切る）＋濡れた道の反射
+      float carW = mix(-1.4, 1.4, fract(uTime * 0.045));
+      float cd = length(vec2(sx - carW, (vp.y - 0.10) * 2.6));
+      road += vec3(1.0, 0.93, 0.78) * exp(-cd * 26.0) * 0.85;
+      road += vec3(1.0, 0.93, 0.78) * smoothstep(0.16, 0.0, abs(sx - carW)) * smoothstep(0.10, -0.06, vp.y) * 0.10;
       col = mix(col, road, st);
     }
 
