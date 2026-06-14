@@ -251,6 +251,7 @@ export async function mountSplat(parent, url, mode = 'orbit') {
         // 一人称・部屋モード: 室内の中心に立ち、首を振って見回す
         lv.camera.near = Math.max(radius * 0.01, 0.02)
         lv.camera.far = radius * 30
+        lv.camera.fov = 68 // 自然で没入感のある視界
         lv.camera.updateProjectionMatrix()
         roomCtl = createRoomControls(THREE, lv, lc.querySelector('canvas'), center, new THREE.Vector3(0, -1, 0), radius * 0.5)
         state.steps.push('frame(room)')

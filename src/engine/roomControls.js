@@ -9,7 +9,7 @@ export function createRoomControls(THREE, viewer, canvas, viewpoint, up, maxLean
   const pos = viewpoint.clone()
 
   let yaw = 0
-  let pitch = 0
+  let pitch = 0.12 // やや前を見る（床を見下ろしすぎない自然な視線）
   let lean = 0 // 前後の身の乗り出し
   let lastInteract = 0
   let raf = 0
