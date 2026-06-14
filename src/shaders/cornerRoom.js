@@ -223,6 +223,10 @@ const FRAGMENT_BODY = /* glsl */ `
     float haze = smoothstep(0.54, 0.40, vp.y) * smoothstep(0.30, 0.46, vp.y);
     col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.40);
 
+    // 街あかりの照り返し（夜の湿った空気に滲む光害のドーム）。夜ほど暖かく明るむ
+    float cityHalo = smoothstep(0.74, 0.42, vp.y) * smoothstep(0.30, 0.45, vp.y);
+    col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
+
     col = town(col, vp, ax + yaw * 1.02, 0.40, 0.14, 0.11,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.32, 0.55, uIntensity) * litRamp, 7.1, 0.5);
     col = town(col, vp, ax + yaw * 1.12, 0.32, 0.20, 0.15,
