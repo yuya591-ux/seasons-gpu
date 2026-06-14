@@ -74,43 +74,45 @@ const FRAGMENT_BODY = /* glsl */ `
   // 一面の細かい水滴（生成と乾きをゆっくり繰り返す）。
   // 戻り: xy=中心からの相対方向, z=マスク, w=正規化距離(0:中心 .. 1:ふち)
   vec4 staticDroplets(vec2 uv, float t) {
-    vec2 cells = vec2(34.0, 34.0);
+    vec2 cells = vec2(24.0, 24.0);                 // 数を絞り、一粒ずつ確かなレンズに
     vec2 g = uv * cells;
     vec2 id = floor(g);
     vec2 f = fract(g) - 0.5;
     float n = hash21(id);
     float n2 = hash21(id + 13.7);
-    vec2 c = (vec2(n, n2) - 0.5) * 0.6;
+    float exists = step(0.34, hash21(id + 4.1));   // 全マスには付かない（まばら＝本物の付き方）
+    vec2 c = (vec2(n, n2) - 0.5) * 0.55;
     vec2 dir = f - c;
     float dist = length(dir);
-    float r = 0.12 + 0.16 * n;
-    float drop = smoothstep(r, r * 0.35, dist);
+    float r = (0.14 + 0.20 * n) * exists;
+    float drop = smoothstep(r, r * 0.32, dist) * exists;
     float life = sin(t * 0.25 + n * 30.0) * 0.5 + 0.5;
     drop *= smoothstep(0.12, 0.6, life);
-    return vec4(dir, drop, clamp(dist / r, 0.0, 1.0));
+    return vec4(dir, drop, clamp(dist / max(r, 0.001), 0.0, 1.0));
   }
 
-  // 縦に走る大滴とトレイル。
+  // 縦に走る大滴とトレイル（ガラスを伝い落ちる雨の筋）。複数列・蛇行・頭＋尾＋残り滴。
   // 戻り: xy=頭の中心からの相対, z=マスク, w=頭の強さ
   vec4 runningStreaks(vec2 uv, float t) {
-    vec2 cells = vec2(9.0, 1.0);
+    vec2 cells = vec2(11.0, 1.0);
     float colId = floor(uv.x * cells.x);
     float cr = hash21(vec2(colId, 5.0));
-    float active = step(0.40, cr);
+    float active = step(0.30, cr);                 // 多めの列が流れる
     float lx = fract(uv.x * cells.x) - 0.5;
-    lx += sin(uv.y * 6.0 + cr * 6.2831) * 0.10; // 蛇行
-    float speed = mix(0.06, 0.16, hash21(vec2(colId, 9.0)));
-    float headY = fract(cr * 10.0 + t * speed); // 0(上)→1(下)
-    float yy = 1.0 - uv.y;                       // 上を0に
+    lx += sin(uv.y * 6.5 + cr * 6.2831) * 0.11;    // 蛇行
+    lx += sin(uv.y * 17.0 + cr * 12.0) * 0.025;    // 細かな揺らぎ
+    float speed = mix(0.07, 0.18, hash21(vec2(colId, 9.0)));
+    float headY = fract(cr * 10.0 + t * speed);    // 0(上)→1(下)
+    float yy = 1.0 - uv.y;                          // 上を0に
     float dy = yy - headY;
     vec2 hd = vec2(lx * 1.3, dy);
-    float head = smoothstep(0.14, 0.0, length(hd));
-    // 頭より上に伸びる細い筋
-    float line = smoothstep(0.045, 0.0, abs(lx)) * step(dy, 0.0) * smoothstep(-0.55, 0.0, dy);
-    // 筋上に残る小さな滴
-    float beads = smoothstep(0.04, 0.0, abs(lx)) * step(dy, 0.0)
-                * (sin(yy * 42.0 + cr * 20.0) * 0.5 + 0.5);
-    float mask = max(head, max(line * 0.6, beads * 0.3)) * active;
+    float head = smoothstep(0.11, 0.0, length(hd)); // ふくらんだ頭（しずく）
+    // 頭より上に伸びる濡れた筋（はっきり）
+    float line = smoothstep(0.030, 0.0, abs(lx)) * step(dy, 0.0) * smoothstep(-0.62, 0.0, dy);
+    // 筋上に残る小さな滴（伝ったあとの名残）
+    float beads = smoothstep(0.028, 0.0, abs(lx)) * step(dy, 0.0)
+                * smoothstep(0.4, 1.0, sin(yy * 48.0 + cr * 20.0) * 0.5 + 0.5);
+    float mask = max(head, max(line * 0.7, beads * 0.45)) * active;
     return vec4(hd, clamp(mask, 0.0, 1.0), head * active);
   }
 
@@ -131,8 +133,10 @@ const FRAGMENT_BODY = /* glsl */ `
     // 屈折オフセット（中心方向へ）。雨脚で強さが変わる。
     vec2 refr = (sd.xy * sMask + rs.xy * rMask * 1.3) * 0.052 * mix(0.6, 1.25, rain);
 
-    // すりガラスの下地（ぼけ）
-    vec3 frosted = skyBase(frag) * 0.92;
+    // 曇りガラスの下地（結露でくもる。水のある所だけ晴れて景色が見える＝雨らしさの核）
+    vec3 sky = skyBase(frag);
+    float sl = dot(sky, vec3(0.299, 0.587, 0.114));
+    vec3 frosted = mix(sky, vec3(sl), 0.28) * 0.86;   // 彩度と明度を落として“くもり”
 
     // 水滴越しのシャープな景色。RGBで屈折量を僅かにずらして色収差（プレミアム感）を出す。
     // 雲のにじみは fbm 1回だけ（ここで一括計算してコストを抑える）。
@@ -153,11 +157,14 @@ const FRAGMENT_BODY = /* glsl */ `
                 * smoothstep(0.35, 1.0, sd.w) * sMask;
     vec2 rn = normalize(rs.xy + 1e-5);
     float rSpec = smoothstep(0.4, 0.96, dot(rn, normalize(LIGHT))) * rs.w;
-    col += vec3(1.0) * (sSpec + rSpec) * 0.18;
+    col += vec3(1.0) * (sSpec + rSpec) * 0.24;
+    // 光に面した縁の鋭いきらめき（水玉の立体感）
+    float sGlint = smoothstep(0.86, 0.99, dot(sn, normalize(LIGHT))) * smoothstep(0.55, 0.95, sd.w) * sMask;
+    col += vec3(1.0) * sGlint * 0.5;
 
-    // レンズの縁のわずかな陰り
-    float rimDark = smoothstep(0.75, 1.0, sd.w) * sMask;
-    col *= 1.0 - rimDark * 0.12;
+    // レンズの縁の陰り（球の輪郭を締める）
+    float rimDark = smoothstep(0.68, 1.0, sd.w) * sMask;
+    col *= 1.0 - rimDark * 0.18;
 
     // 全体の色味ハイライト
     col += uDropTint * mask * 0.05;
