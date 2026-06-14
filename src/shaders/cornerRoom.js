@@ -161,10 +161,16 @@ const FRAGMENT_BODY = /* glsl */ `
     col = mix(uHorizon, col, smoothstep(0.40, 0.60, vp.y));
     col += uSunGlow * exp(-abs(vp.y - 0.46) * 7.0) * 0.20;
 
-    // 夕焼け雲
-    float cl = fbm(vec2(ax * 1.6 + yaw + uTime * 0.008, vp.y * 2.2));
-    float cloudband = smoothstep(0.52, 0.82, cl) * smoothstep(0.44, 0.95, vp.y);
-    col = mix(col, mix(uHorizon, uSunGlow, 0.45), cloudband * 0.4);
+    // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る＝下からの光）
+    vec2 cq = vec2(ax * 1.4 + yaw + uTime * 0.008, vp.y * 2.4);
+    vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
+    float cl = fbm(cq + cwarp * 0.7);
+    float clu = fbm(cq + vec2(0.0, 0.18) + cwarp * 0.7);      // 少し上の密度
+    float cloudband = smoothstep(0.50, 0.72, cl) * smoothstep(0.42, 0.98, vp.y);
+    float underlit = smoothstep(-0.05, 0.08, clu - cl);       // 底面ほど夕陽を受ける
+    vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.6);            // 夕陽に染まる底
+    vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);             // 翳る上面
+    col = mix(col, mix(cloudCool, cloudWarm, underlit), cloudband * 0.5);
 
     // 上空（見上げの報酬）: 高い所に薄い巻雲のすじ＋天頂をわずかに締める
     float high = smoothstep(0.72, 1.05, vp.y);

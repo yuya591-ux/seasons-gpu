@@ -130,10 +130,16 @@ const FRAGMENT_BODY = /* glsl */ `
     col = mix(uHorizon, col, smoothstep(0.42, 0.62, vp.y));
     col += uSunGlow * exp(-abs(vp.y - 0.5) * 7.0) * 0.22; // 地平の残照
 
-    // 夕焼け雲（茜に染まる）
-    float cl = fbm(vec2(ax * 1.6 + yaw + t * 0.008, vp.y * 2.2));
-    float cloudband = smoothstep(0.52, 0.82, cl) * smoothstep(0.46, 0.96, vp.y);
-    col = mix(col, mix(uHorizon, uSunGlow, 0.45), cloudband * 0.4);
+    // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る）
+    vec2 cq = vec2(ax * 1.4 + yaw + t * 0.008, vp.y * 2.4);
+    vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
+    float cl = fbm(cq + cwarp * 0.7);
+    float clu = fbm(cq + vec2(0.0, 0.18) + cwarp * 0.7);
+    float cloudband = smoothstep(0.50, 0.72, cl) * smoothstep(0.46, 0.98, vp.y);
+    float underlit = smoothstep(-0.05, 0.08, clu - cl);
+    vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.6);
+    vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);
+    col = mix(col, mix(cloudCool, cloudWarm, underlit), cloudband * 0.5);
 
     // 遠雷フラッシュ: 夜空と雲がほのかに白む（雷鳴に同期）
     col += uFlash * (0.10 + 0.18 * cloudband) * vec3(0.82, 0.88, 1.0);
