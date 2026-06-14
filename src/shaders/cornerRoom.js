@@ -307,6 +307,21 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // ── 窓の外（街＋空＋隣の壁） ──
     vec3 outside = outsideView(vp, ax, yaw, pitch);
+
+    // 自分の建物の外壁（真下を覗くと、窓台の外側に自分の壁が下へ続く＝乗り出して覗く実感）
+    float lookDown = smoothstep(0.06, 0.32, pitch);
+    if (lookDown > 0.001) {
+      float ledgeY = -0.06 + 0.40 * lookDown + uParallax.y * 0.6;   // 壁の上端(庇)。見下ろすほどせり上がる
+      float onWall = smoothstep(ledgeY, ledgeY - 0.015, p.y);       // ledge より下＝自分の壁
+      float streak = fbm(vec2(p.x * 9.0, p.y * 2.2)) * 0.4 + fbm(vec2(p.x * 30.0, p.y * 0.6)) * 0.14; // 縦の雨だれ汚れ
+      vec3 myWall = mix(vec3(0.085, 0.082, 0.092), vec3(0.155, 0.135, 0.125), streak); // 手前で暗い暖灰コンクリ
+      myWall += uSunGlow * 0.05 * smoothstep(ledgeY - 0.10, ledgeY, p.y);  // 庇のすぐ下に残照の回り込み
+      // 庇/外側の窓台（壁の上端の水平の縁。残照を受けて明るい線）
+      float eave = smoothstep(0.013, 0.0, abs(p.y - ledgeY));
+      outside = mix(outside, myWall, onWall);
+      outside = mix(outside, uSunGlow * 0.35 + vec3(0.06, 0.055, 0.05), eave * 0.6 * lookDown);
+    }
+
     vec4 wall = neighborWall(p, vp, ax, yaw);
     outside = mix(outside, wall.rgb, wall.a);
 
