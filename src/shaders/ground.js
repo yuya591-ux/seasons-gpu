@@ -58,12 +58,16 @@ export const GROUND_GLSL = /* glsl */ `
     ground += mix(uHorizon, uSunGlow, 0.4) * (0.04 + 0.07 * nightAmt);
     // 屋上の縁の立体（夕日が片側）
     ground += uSunGlow * smoothstep(roadWdt + 0.05, roadWdt + 0.01, dRoad) * (1.0 - road) * smoothstep(0.0, 0.6, gf.x) * 0.10;
-    // 屋上/窓の灯り
-    float roofLight = step(0.64, h21(gi + 11.0)) * smoothstep(0.34, 0.05, length(gf - 0.5)) * (1.0 - road);
-    ground += uSunGlow * roofLight * (0.18 + 0.20 * nightAmt);
-    // 街灯（交差点）
+    // 屋上/窓の灯り（夜ほど多く・明るく＝街が灯る）
+    float roofLight = step(0.62 - 0.18 * nightAmt, h21(gi + 11.0)) * smoothstep(0.34, 0.05, length(gf - 0.5)) * (1.0 - road);
+    ground += uSunGlow * roofLight * (0.18 + 0.34 * nightAmt);
+    // 夜の窓灯り（区画に細かくちらほら散る＝夜景のきらめき）
+    vec2 wg = g0 * 4.0; vec2 wgi = floor(wg);
+    float winL = step(0.62, h21(wgi + 33.0)) * smoothstep(0.22, 0.0, length(fract(wg) - 0.5)) * (1.0 - road) * (1.0 - river);
+    ground += mix(uSunGlow, vec3(1.0, 0.9, 0.7), 0.3) * winL * 0.16 * (0.4 + 0.9 * nightAmt);
+    // 街灯（交差点）。夜は明るく
     float lampG = smoothstep(0.09, 0.0, length(gf - 0.5)) * step(0.45, h11(gi.x + gi.y * 3.0 + 7.0)) * road;
-    ground += uSunGlow * lampG * 0.9;
+    ground += uSunGlow * lampG * (0.9 + 0.5 * nightAmt);
     // 人影（道沿いを動く小さな点）
     float ped = step(0.5, h21(gi + 19.0)) * smoothstep(0.05, 0.0, length((gf - vec2(0.5, fract(uTime * 0.05 + blkR))) * vec2(1.3, 1.0))) * road;
     ground = mix(ground, vec3(0.05, 0.04, 0.05), ped * 0.7);
