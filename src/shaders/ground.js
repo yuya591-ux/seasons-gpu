@@ -34,9 +34,15 @@ export const GROUND_GLSL = /* glsl */ `
     roofC *= 0.8 + 0.4 * blkR;
     vec3 roadC = mix(vec3(0.20, 0.19, 0.19), uHorizon * 0.3, 0.4);
     vec3 ground = mix(roofC, roadC, road);
-    // 区画の縁の陰影＝建物の高さの暗示。奥(上)の縁が陰り、手前(下)の縁が明るい＝立体に見える
-    ground *= 1.0 - smoothstep(0.80, 1.0, gf.y) * 0.42 * (1.0 - road);
-    ground *= 1.0 + smoothstep(0.20, 0.0, gf.y) * 0.16 * (1.0 - road);
+    // 区画の縁の陰影＝建物の高さの暗示。高い区画ほど影が濃い＝立体感と高さの差が出る。
+    float bHeight = 0.25 + 0.55 * blkR;             // 区画ごとの高さ
+    ground *= 1.0 - smoothstep(0.82, 1.0, gf.y) * bHeight * 0.7 * (1.0 - road); // 奥(上)の縁＝影
+    ground *= 1.0 + smoothstep(0.18, 0.0, gf.y) * bHeight * 0.3 * (1.0 - road); // 手前(下)の縁＝陽
+    // たまに高層ビル（強い影＋屋上に赤い航空障害灯）
+    float tower = step(0.93, h21(gi + 27.0)) * (1.0 - road);
+    ground *= 1.0 - smoothstep(0.7, 1.0, gf.y) * tower * 0.4;
+    ground += vec3(0.9, 0.15, 0.12) * tower * smoothstep(0.06, 0.0, length(gf - vec2(0.5, 0.35)))
+            * (0.4 + 0.4 * sin(uTime * 1.2 + blkR * 20.0));
     // 川（街を蛇行して流れる。水面が空と灯りを映す＝街の見どころ）
     float riverX = sin(gz * 0.22 + 1.5) * 1.6 + cos(gz * 0.11) * 0.7;
     float river = smoothstep(0.32, 0.22, abs(g0.x - riverX));
