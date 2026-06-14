@@ -82,7 +82,9 @@ export const GROUND_GLSL = /* glsl */ `
       base = mix(base, vec3(0.42, 0.31, 0.25), step(0.58, msel)); // タイル茶
       base = mix(base, vec3(0.35, 0.37, 0.33), step(0.82, msel)); // 防水シート灰緑
       base = mix(base, uHorizon, 0.16) * (0.86 + 0.26 * hBlk);    // 夕暮れの大気を少し含ませる
+      base *= 1.0 - 0.55 * nightAmt;                              // 夜は素地が暗く沈み、灯りが映える
       vec3 roofTop = base;
+      float district = vnoise(hGi * 0.35 + 7.0);                  // 街区ごとの賑わい（夜の灯りの粗密）
       // 前面の壁（こちらを向く陰の面）。西日が片側に差す＋上ほど空の光を受けて明るい＋足元はAO
       float westLit = smoothstep(0.0, 0.7, fract(horizAngle * 0.7 + hBlk));
       vec3 wallCol = base * (0.46 + 0.16 * westLit) * (0.62 + 0.50 * vfrac);
@@ -95,7 +97,7 @@ export const GROUND_GLSL = /* glsl */ `
       float colu = fract((fract(horizAngle * 1.7 + hGi.x * 0.6)) * cols);
       float colBand = smoothstep(0.18, 0.30, colu) * smoothstep(0.86, 0.74, colu);
       float pane = floorBand * colBand * step(0.06, vfrac) * step(vfrac, 0.94);
-      float litW = step(0.62 - 0.22 * nightAmt, h21(vec2(floor(fl), floor(colu + hGi.x)) + hGi + 13.0));
+      float litW = step(0.62 - (0.22 + 0.20 * district) * nightAmt, h21(vec2(floor(fl), floor(colu + hGi.x)) + hGi + 13.0));
       vec3 winLit = mix(uSunGlow, vec3(1.0, 0.92, 0.74), 0.3);
       // 窓は低コントラストの陰影。灯りは夜ほど。昼は段差のかげり程度に抑える（チラつき防止）
       vec3 winFace = mix(wallCol * 0.90, winLit, litW * (0.20 + 0.7 * nightAmt));
@@ -120,8 +122,8 @@ export const GROUND_GLSL = /* glsl */ `
       roofTop = mix(roofTop, base * 0.6, acu * 0.4 * rdet);                                         // 室外機など小物
 
       vec3 bld = mix(wallCol, roofTop, roofness);
-      // 屋上の窓灯り/塔屋のあかり（夜）
-      bld += winLit * roofness * step(0.62 - 0.2 * nightAmt, h21(hGi + 11.0))
+      // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る
+      bld += winLit * roofness * step(0.62 - (0.2 + 0.2 * district) * nightAmt, h21(hGi + 11.0))
            * smoothstep(0.34, 0.12, length(hGf - 0.5)) * (0.08 + 0.26 * nightAmt) * detail;
       // 高層の屋上に赤い航空障害灯（ゆっくり明滅）
       bld += vec3(0.9, 0.16, 0.12) * hTower * roofness
@@ -140,7 +142,7 @@ export const GROUND_GLSL = /* glsl */ `
       vec2 gi = floor(g); vec2 gf = fract(g);
       float blkR = h21(gi + 2.0);
       float dRoad = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
-      vec3 roadC = mix(vec3(0.20, 0.19, 0.19), uHorizon * 0.3, 0.4);
+      vec3 roadC = mix(vec3(0.20, 0.19, 0.19), uHorizon * 0.3, 0.4) * (1.0 - 0.5 * nightAmt);
       ground = roadC;
       // 川（街を蛇行。水面が空と灯りを映す）
       float riverX = sin(gz * 0.22 + 1.5) * 1.6 + cos(gz * 0.11) * 0.7;
@@ -155,11 +157,12 @@ export const GROUND_GLSL = /* glsl */ `
       float dash = step(0.5, fract(gz * 6.0 + gx * 6.0));
       float centerLine = smoothstep(0.012, 0.004, dRoad) * dash;
       ground = mix(ground, vec3(0.55, 0.50, 0.36), centerLine * 0.30 * (1.0 - river));
-      // 街路樹（道の脇に緑の点々）
-      vec2 tg = g0 * 3.2; vec2 tgf = fract(tg);
-      float tree = step(0.66, h21(floor(tg) + 41.0)) * smoothstep(0.30, 0.05, length(tgf - 0.5))
-                 * smoothstep(0.20, 0.12, dRoad) * (1.0 - river);
-      ground = mix(ground, mix(vec3(0.11, 0.19, 0.09), uHorizon * 0.25, 0.2), tree * 0.5);
+      // 街路樹（道の脇に並ぶ緑。点々ではなく丸い樹冠に＝ザラつかせない）
+      vec2 tg = g0 * 2.0; vec2 tgf = fract(tg);
+      float treeFall = (1.0 - smoothstep(0.20, 0.34, length(tgf - 0.5)));
+      float tree = step(0.74, h21(floor(tg) + 41.0)) * treeFall
+                 * smoothstep(0.19, 0.13, dRoad) * (1.0 - river);
+      ground = mix(ground, mix(vec3(0.12, 0.20, 0.10), uHorizon * 0.25, 0.2), tree * 0.6);
       // 西日の長い影（建物が通りへ落とす影＝夕方の立体感）。太陽側に高い区画があれば翳る
       float shadow = 0.0;
       vec2 sdir = vec2(-0.96, 0.28);                 // 太陽（西やや奥）へ向かう方向

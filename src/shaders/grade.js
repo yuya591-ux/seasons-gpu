@@ -40,7 +40,7 @@ export const GRADE_GLSL = /* glsl */ `
     c = mix(c, poster, 0.13);
     // (W4) 紙の塗りムラ（低周波ノイズ。明部では控えめ＝白い紙の地）
     float paper = vnoise(p * uResolution.xy * 0.012) - 0.5;
-    c += paper * 0.020 * (0.6 + 0.4 * (1.0 - l2));
+    c += paper * 0.014 * (0.6 + 0.4 * (1.0 - l2));
     // (W5) ハイライトの滲み（水彩のにじみ）
     c += smoothstep(0.72, 1.0, l2) * vec3(0.03, 0.022, 0.012);
     // (W6) ごく弱い周辺減光（覗き込みの安心感・視線を中央へ）
