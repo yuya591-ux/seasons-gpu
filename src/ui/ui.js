@@ -29,10 +29,17 @@ export function buildUI(opts) {
 
   // ── 起動ゲート（iOS自動再生対策） ──
   const gate = h('div', 'gate')
+  // キーボード・支援技術でも始められるように、ボタンとして振る舞わせる
+  gate.setAttribute('role', 'button')
+  gate.setAttribute('tabindex', '0')
+  gate.setAttribute('aria-label', '眺めて、整う。画面にふれて始める')
   gate.appendChild(h('p', 'gate__title', '眺めて、整う'))
   gate.appendChild(h('p', 'gate__lead', '画面にふれて始める'))
   root.appendChild(gate)
-  gate.addEventListener('click', async () => {
+  let gateStarted = false
+  async function startExperience() {
+    if (gateStarted) return
+    gateStarted = true
     gate.classList.add('gate--hide')
     setTimeout(() => gate.remove(), 800)
     try {
@@ -42,10 +49,22 @@ export function buildUI(opts) {
     }
     poke()
     maybeShowLookHint()
+  }
+  gate.addEventListener('click', startExperience)
+  gate.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault()
+      startExperience()
+    }
   })
+  // 起動時に入口へフォーカス（キーボードでそのまま開始できる）
+  requestAnimationFrame(() => gate.focus())
 
+  // 見回せる情景（窓辺シリーズ）だけでヒントを出す
+  const LOOKABLE = ['cornerRoom', 'windowTown', 'windowMountains', 'windowSea', 'windowPano']
   // 初回のみ: 「見回せる」ことをそっと伝える（localStorageで2回目以降は出さない）
   function maybeShowLookHint() {
+    if (!LOOKABLE.includes(currentScene.render)) return // 見回せない情景では出さない
     try {
       if (localStorage.getItem('seasons_look_hint')) return
     } catch {
@@ -237,12 +256,12 @@ export function buildUI(opts) {
     )
 
     const qRow = h('div', 'setrow')
-    qRow.appendChild(h('span', 'setrow__label', '画質'))
+    qRow.appendChild(h('span', 'setrow__label', '描き込み'))
     const qChips = h('div', 'axis__chips')
     const QUALS = [
-      { id: 'soft', label: 'なめらか' },
-      { id: 'standard', label: '標準' },
-      { id: 'light', label: '軽量' },
+      { id: 'soft', label: 'こまやか' },
+      { id: 'standard', label: 'ふつう' },
+      { id: 'light', label: '軽やか' },
     ]
     const qEls = []
     QUALS.forEach((q) => {
