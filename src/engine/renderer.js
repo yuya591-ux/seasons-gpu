@@ -161,12 +161,13 @@ export function createRenderer(canvas) {
     gl.viewport(0, 0, canvas.width, canvas.height)
   }
 
-  // 夕方→暮れ際を、ループ感の出ないゆっくりした揺れで行き来する。
+  // 時間帯の移ろい（early↔late）を、眺めているうちに感じられる速さで行き来する。
   function driftFactor(seconds) {
-    const period = (scene && scene.driftPeriod) || 300
+    // 情景の driftPeriod を半分に詰め、振幅をフルスイングに（色の変化を体感できるように）
+    const period = ((scene && scene.driftPeriod) || 300) * 0.5
     const w = (2 * Math.PI) / period
-    // 2つの周期を混ぜて単調なループを避ける
-    const v = 0.5 + 0.35 * Math.sin(w * seconds) + 0.15 * Math.sin(w * 2.3 * seconds + 1.0)
+    // 2つの周期を混ぜて単調なループを避けつつ、early↔late をしっかり往復する
+    const v = 0.5 + 0.42 * Math.sin(w * seconds) + 0.08 * Math.sin(w * 2.3 * seconds + 1.0)
     return Math.min(1, Math.max(0, v))
   }
 
@@ -191,7 +192,7 @@ export function createRenderer(canvas) {
     const gapY = panTarget.y - panCur.y
     panCur.x += gapX * 0.12
     panCur.y += gapY * 0.12
-    const clampP = (v) => Math.max(-0.07, Math.min(0.07, v))
+    const clampP = (v) => Math.max(-0.11, Math.min(0.11, v)) // 覗き込み視差の天井（身を乗り出す手応え）
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
     // ごく弱い“息づかい”の揺れ。静止画ではなく、その場に居る気配を出す（窓辺シリーズで効く）。

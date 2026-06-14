@@ -20,6 +20,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uIntensity;  // 街あかりの多さ 0..1
   uniform float uBright;
   uniform vec2 uPan;         // 見回し（x=ヨー, y=ピッチ）
+  uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく効かせる）
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
   uniform float uFoliage;    // 季節の舞い 0=なし 1=紅葉 2=花びら
   uniform float uFlash;      // 遠雷フラッシュ 0..1
@@ -161,8 +162,8 @@ const FRAGMENT_BODY = /* glsl */ `
     col = mix(uHorizon, col, smoothstep(0.40, 0.60, vp.y));
     col += uSunGlow * exp(-abs(vp.y - 0.46) * 7.0) * 0.20;
 
-    // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る＝下からの光）
-    vec2 cq = vec2(ax * 1.4 + yaw + uTime * 0.008, vp.y * 2.4);
+    // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る＝下からの光）。空は遠いのでほぼ動かない
+    vec2 cq = vec2(ax * 1.4 + yaw * 0.18 + uTime * 0.008, vp.y * 2.4);
     vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
     float cl = fbm(cq + cwarp * 0.7);
     float clu = fbm(cq + vec2(0.0, 0.18) + cwarp * 0.7);      // 少し上の密度
@@ -174,7 +175,7 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 上空（見上げの報酬）: 高い所に薄い巻雲のすじ＋天頂をわずかに締める
     float high = smoothstep(0.72, 1.05, vp.y);
-    float cirrus = fbm(vec2(ax * 0.8 + yaw * 0.7 + uTime * 0.004, vp.y * 5.0 - 1.0));
+    float cirrus = fbm(vec2(ax * 0.8 + yaw * 0.15 + uTime * 0.004, vp.y * 5.0 - 1.0));
     col = mix(col, mix(col, uSunGlow, 0.22), high * smoothstep(0.5, 0.78, cirrus) * 0.35);
     col *= 1.0 - high * 0.05;
 
@@ -186,14 +187,14 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 月（far なのでゆっくり動く。淡いハロつき）
     vec2 mn = vec2(-0.72, 0.80);
-    float md = length(vec2((ax + yaw * 0.85) - mn.x, vp.y - mn.y));
+    float md = length(vec2((ax + yaw * 0.10) - mn.x, vp.y - mn.y));
     float moonDisc = smoothstep(0.05, 0.043, md);
-    float moonTex = 0.92 + 0.08 * fbm(vec2((ax + yaw * 0.85) * 30.0, vp.y * 30.0));
+    float moonTex = 0.92 + 0.08 * fbm(vec2((ax + yaw * 0.10) * 30.0, vp.y * 30.0));
     col = mix(col, vec3(0.96, 0.95, 0.90) * moonTex, moonDisc * (0.35 + 0.5 * nightAmt));
     col += vec3(0.9, 0.92, 1.0) * exp(-md * 13.0) * (0.05 + 0.10 * nightAmt);
 
     // 星（夜空に静かに在る。またたかせない＝止まった時間）
-    vec2 sg = vec2((ax + yaw * 0.8) * 14.0, vp.y * 14.0);
+    vec2 sg = vec2((ax + yaw * 0.12) * 14.0, vp.y * 14.0);
     vec2 sid = floor(sg);
     float sn = h21(sid + 3.0);
     float star = step(0.95, sn) * smoothstep(0.05, 0.0, length(fract(sg) - 0.5))
@@ -205,7 +206,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float fi = float(i);
       float bx = fract(uTime * 0.008 + fi * 0.5) * 2.6 - 1.3;
       float byb = 0.66 + fi * 0.05 + sin(uTime * 0.25 + fi) * 0.010;
-      vec2 bp = vec2((ax + yaw * 0.9) - bx, vp.y - byb);
+      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - byb);
       bp.x = abs(bp.x);
       float wing = smoothstep(0.009, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.020);
       col = mix(col, col * 0.55, wing * 0.5);
@@ -215,8 +216,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float litRamp = 0.7 + 0.3 * smoothstep(0.0, 90.0, uTime);
 
     // 奥→手前の住宅街（遠景=低い家＋たまに中層 / 中景=商店街 / 手前=家並み）
-    col = hills(col, vp, ax + yaw * 0.92, 0.50, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
-    col = town(col, vp, ax + yaw * 0.96, 0.46, 0.085, 0.05,
+    col = hills(col, vp, ax + yaw * 0.30, 0.50, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
+    col = town(col, vp, ax + yaw * 0.45 + uParallax.x * 0.3, 0.46, 0.085, 0.05,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.22, 0.45, uIntensity) * litRamp, 1.3, 0.0);
 
     // 空気遠近の霞: 地平で遠い街並みが空に溶ける（奥行き＝退色＝郷愁）
@@ -227,18 +228,18 @@ const FRAGMENT_BODY = /* glsl */ `
     float cityHalo = smoothstep(0.74, 0.42, vp.y) * smoothstep(0.30, 0.45, vp.y);
     col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
 
-    col = town(col, vp, ax + yaw * 1.02, 0.40, 0.14, 0.11,
+    col = town(col, vp, ax + yaw * 0.85 + uParallax.x * 0.8, 0.40, 0.14, 0.11,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.32, 0.55, uIntensity) * litRamp, 7.1, 0.5);
-    col = town(col, vp, ax + yaw * 1.12, 0.32, 0.20, 0.15,
+    col = town(col, vp, ax + yaw * 1.28 + uParallax.x * 1.4, 0.32, 0.20, 0.15,
                uDropTint * 0.82, uSunGlow, mix(0.30, 0.55, uIntensity) * litRamp, 19.3, 1.0);
 
     // 電柱・電線（昭和の住宅街の象徴）。数本だけ、静かに
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      float yl = 0.31 + fi * 0.018 + sin((ax + yaw * 1.12) * 2.0 + fi * 1.7) * 0.010;
+      float yl = 0.31 + fi * 0.018 + sin((ax + yaw * 1.5 + uParallax.x * 1.6) * 2.0 + fi * 1.7) * 0.010;
       col = mix(col, vec3(0.03, 0.03, 0.04), smoothstep(0.0028, 0.0, abs(vp.y - yl)) * 0.7);
     }
-    float poleW = ax + yaw * 1.12;
+    float poleW = ax + yaw * 1.5 + uParallax.x * 1.6;
     float pole = step(abs(fract(poleW / 0.5) - 0.5), 0.010) * step(vp.y, 0.40) * step(0.27, vp.y)
                * step(0.5, h11(floor(poleW / 0.5) + 11.0));
     col = mix(col, vec3(0.03, 0.03, 0.04), pole * 0.7);
@@ -248,7 +249,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float fi = float(i);
       float bx = (h11(fi * 13.0 + 2.0) - 0.5) * 1.8;
       float by = 0.46 + h11(fi * 5.0 + 3.0) * 0.08;
-      float bd = length(vec2((ax + yaw) - bx, vp.y - by) * vec2(1.0, 1.35));
+      float bd = length(vec2((ax + yaw * 0.4) - bx, vp.y - by) * vec2(1.0, 1.35));
       col += vec3(0.9, 0.18, 0.12) * (exp(-bd * 160.0) + exp(-bd * 55.0) * 0.16) * (0.35 + 0.35 * nightAmt);
     }
 
@@ -265,7 +266,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float center = step(abs(persX), 0.02) * step(0.45, fract(depth * 20.0)) * (1.0 - depth * 0.5);
       road = mix(road, vec3(0.6, 0.58, 0.5), center * 0.5);
       // 店先・自販機の灯り（道の両脇から、奥へ点列）
-      float sx = ax + yaw * 1.18;
+      float sx = ax + yaw * 1.8 + uParallax.x * 1.8;
       float cellW = 0.052;
       float shopCell = floor(sx / cellW);
       float fxs = fract(sx / cellW) - 0.5;
@@ -350,8 +351,8 @@ const FRAGMENT_BODY = /* glsl */ `
     outside = applyGlass(outside, p, t, uGlass);
 
     // ── 窓のアパーチャ（室内に切られた窓の開口） ──
-    // 窓は viewer に対して固定。少しだけ見回しに連動して視差（手前の枠がゆっくり動く）
-    vec2 wp = p + vec2(yaw, pitch) * 0.012;
+    // 窓枠は最も手前。見回しに少し、覗き込み(uParallax)に大きく連動して動く＝身を乗り出して窓枠の脇を覗く。
+    vec2 wp = p + vec2(yaw, pitch) * 0.012 + uParallax * 2.4;
     float winL = 0.135, winR = 0.865, winB = 0.135, winT = 0.895;
     // 開口（角を少し丸める）
     float ax0 = smoothstep(winL, winL + 0.012, wp.x) * smoothstep(winR, winR - 0.012, wp.x);

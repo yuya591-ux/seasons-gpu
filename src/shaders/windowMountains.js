@@ -55,21 +55,28 @@ const FRAGMENT_BODY = /* glsl */ `
       float band = smoothstep(r + 0.10, r, p.y) * smoothstep(r - 0.06, r, p.y);
       return mix(col, vec3(0.95, 0.96, 0.96), band * mist);
     }
-    float rR = ridgeLine(x + 0.03, seed, baseY, rough, amp);
-    float slope = rR - r;                                       // 斜面の向き
+    // 斜面シェーディングは近い層(tex>0)のみ。遠い霞んだ層は2つ目のfbmを省いて軽量化。
     float belowTop = smoothstep(r, r - 0.20, p.y);             // 0=稜線 1=谷
-    float shade = clamp(0.55 - slope * 6.0, 0.25, 1.0);        // 朝陽(左)に面する斜面ほど明るい
+    float shade = 0.5;
+    if (tex > 0.01) {
+      float rR = ridgeLine(x + 0.03, seed, baseY, rough, amp);
+      shade = clamp(0.55 - (rR - r) * 6.0, 0.25, 1.0);        // 朝陽(左)に面する斜面ほど明るい
+    }
     vec3 mc = mcol * mix(1.12, 0.70, belowTop) * mix(0.82, 1.12, shade);
-    // 森のテクスチャ（近い山ほど）
-    float forest = (fbm(vec2(x * 26.0 + seed, p.y * 18.0)) - 0.5) * 0.18 * tex;
-    mc *= 1.0 + forest;
+    // 森のテクスチャ（近い山ほど。遠い層はfbmを省く）
+    if (tex > 0.01) {
+      float forest = (fbm(vec2(x * 26.0 + seed, p.y * 18.0)) - 0.5) * 0.18 * tex;
+      mc *= 1.0 + forest;
+    }
     // 朝陽の当たる稜線のリムライト
     mc += uSunGlow * smoothstep(r - 0.015, r, p.y) * lit * 0.35;
     col = mix(col, mc, inside);
-    // 谷にたまる朝霧（稜線の少し下、ゆっくり漂う）
-    float valley = smoothstep(r - 0.04, r - 0.16, p.y) * smoothstep(r - 0.34, r - 0.16, p.y);
-    float drift = 0.6 + 0.4 * fbm(vec2(x * 3.0 + uTime * 0.02, p.y * 4.0));
-    col = mix(col, vec3(0.93, 0.95, 0.97), valley * mist * drift * 0.8);
+    // 谷にたまる朝霧（近い層のみ。遠い層はfbmを省く）
+    if (tex > 0.01) {
+      float valley = smoothstep(r - 0.04, r - 0.16, p.y) * smoothstep(r - 0.34, r - 0.16, p.y);
+      float drift = 0.6 + 0.4 * fbm(vec2(x * 3.0 + uTime * 0.02, p.y * 4.0));
+      col = mix(col, vec3(0.93, 0.95, 0.97), valley * mist * drift * 0.8);
+    }
     return col;
   }
 
