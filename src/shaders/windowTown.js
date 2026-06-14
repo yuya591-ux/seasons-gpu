@@ -84,8 +84,11 @@ const FRAGMENT_BODY = /* glsl */ `
     float peak = (roofType > 0.62) ? (0.5 - abs(fx - bw * 0.5) / max(bw, 0.001)) * amp * 0.7 : 0.0;
     float ridge = ridgeY + (gap > 0.5 ? -0.03 : bh + peak);
     float body = step(p.y, ridge) * step(floorY, p.y); // 足元(floorY)より下は地面に譲る
-    // 建物ごとに色味を少し揺らす（家並みの個体差）
-    vec3 silv = sil * (0.82 + 0.34 * h11(cell * 5.3 + 2.0));
+    // 建物の壁面: 黒いシルエットでなく、夕暮れの光を受けた“見える壁”に
+    float facadeVar = 0.85 + 0.30 * h11(cell * 5.3 + 2.0);
+    vec3 wallTone = mix(uHorizon, vec3(0.50, 0.46, 0.42), 0.5);
+    vec3 silv = mix(sil, wallTone, 0.55) * facadeVar;
+    silv *= 0.93 + 0.07 * step(0.5, fract(fx * 5.0)); // 縦パネルの目地
     col = mix(col, silv, body);
 
     // 窓のグリッド（建物本体のみ・三角屋根の頂部は除く）
