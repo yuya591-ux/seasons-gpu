@@ -235,21 +235,9 @@ const FRAGMENT_BODY = /* glsl */ `
     float cityHalo = smoothstep(0.74, 0.42, vp.y) * smoothstep(0.30, 0.45, vp.y);
     col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
 
+    // 地平のスカイライン（近い街並み）。足元から下は見下ろす地面が描く。
     col = town(col, vp, ax + yaw * 0.85 + uParallax.x * 0.8, 0.40, 0.14, 0.11,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.32, 0.55, uIntensity) * litRamp, 7.1, 0.5);
-    col = town(col, vp, ax + yaw * 1.28 + uParallax.x * 1.4, 0.32, 0.20, 0.15,
-               uDropTint * 0.82, uSunGlow, mix(0.30, 0.55, uIntensity) * litRamp, 19.3, 1.0);
-
-    // 電柱・電線（昭和の住宅街の象徴）。数本だけ、静かに
-    for (int i = 0; i < 3; i++) {
-      float fi = float(i);
-      float yl = 0.31 + fi * 0.018 + sin((ax + yaw * 1.5 + uParallax.x * 1.6) * 2.0 + fi * 1.7) * 0.010;
-      col = mix(col, vec3(0.03, 0.03, 0.04), smoothstep(0.0028, 0.0, abs(vp.y - yl)) * 0.7);
-    }
-    float poleW = ax + yaw * 1.5 + uParallax.x * 1.6;
-    float pole = step(abs(fract(poleW / 0.5) - 0.5), 0.010) * step(vp.y, 0.40) * step(0.27, vp.y)
-               * step(0.5, h11(floor(poleW / 0.5) + 11.0));
-    col = mix(col, vec3(0.03, 0.03, 0.04), pole * 0.7);
 
     // 遠くの高い建物の赤い灯（点滅させず、静かに灯す。1〜2基）
     for (int i = 0; i < 2; i++) {
