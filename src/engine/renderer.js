@@ -117,6 +117,7 @@ export function createRenderer(canvas) {
       uResolution: gl.getUniformLocation(program, 'uResolution'),
       uTime: gl.getUniformLocation(program, 'uTime'),
       uPan: gl.getUniformLocation(program, 'uPan'),
+      uParallax: gl.getUniformLocation(program, 'uParallax'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
       uPano: gl.getUniformLocation(program, 'uPano'),
       uHasPano: gl.getUniformLocation(program, 'uHasPano'),
@@ -171,12 +172,16 @@ export function createRenderer(canvas) {
   function render(now) {
     resize()
     const seconds = (now - startTime) / 1000
-    // 見回しをなめらかに追従
-    panCur.x += (panTarget.x - panCur.x) * 0.12
-    panCur.y += (panTarget.y - panCur.y) * 0.12
+    // 見回しをなめらかに追従。残差を「動きの視差」として使う（首を振ると手前が動く）
+    const gapX = panTarget.x - panCur.x
+    const gapY = panTarget.y - panCur.y
+    panCur.x += gapX * 0.12
+    panCur.y += gapY * 0.12
+    const clampP = (v) => Math.max(-0.05, Math.min(0.05, v))
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
     gl.uniform2f(loc.uPan, panCur.x, panCur.y)
+    if (loc.uParallax) gl.uniform2f(loc.uParallax, clampP(gapX * 0.06), clampP(gapY * 0.04))
     gl.uniform1f(loc.uGlass, glassMode)
     gl.uniform1f(loc.uIntensity, settings.rain)
     // パノラマ写真（あれば）をテクスチャユニット0、深度マップを1に

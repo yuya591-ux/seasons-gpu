@@ -17,6 +17,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uIntensity;  // 立体感（視差の強さ）0..1
   uniform float uBright;
   uniform vec2 uPan;
+  uniform vec2 uParallax;    // 見回しの動きに連動した視差
   uniform float uGlass;
   uniform sampler2D uPano;
   uniform float uHasPano;
@@ -51,18 +52,25 @@ const FRAGMENT_BODY = /* glsl */ `
     float baseU = 0.5 + yaw * 0.16 + (p.x - 0.5) * fovX;
     float baseV = 0.5 - pitch * 0.42 - (p.y - 0.5) * vScale;
 
-    // 立体スウェイ: ごく小さく揺れる視差ベクトル。手前と奥がずれて動き、立体に見える。
-    vec2 sway = vec2(sin(t * 0.32), sin(t * 0.26 + 1.7)) * 0.013 * mix(0.45, 1.7, uIntensity);
+    // 視差 = 常時のかすかな立体スウェイ ＋ 見回しの動きに連動した視差（首を振ると手前が動く）
+    vec2 sway = vec2(sin(t * 0.30), sin(t * 0.25 + 1.7)) * 0.009;
+    vec2 par = (sway + uParallax) * mix(0.6, 2.1, uIntensity);
 
-    // 深度に応じた視差（数回の反復で、近い物が手前に来るよう寄せる＝遮蔽に近い見え方）
+    // 深度に応じて反復し、近い物ほど大きくずらす（遮蔽に近い見え方）
     vec2 uv = vec2(baseU, baseV);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
       float d = sampleDepth(uv);
-      uv = vec2(baseU, baseV) + sway * (d - 0.5);
+      uv = vec2(baseU, baseV) + par * (d - 0.5);
     }
     vec3 col = samplePano(uv);
 
     if (uHasPano < 0.5) col = vec3(0.06, 0.06, 0.08); // 未ロード時
+
+    // 「記憶の風景」グレード: 生写真感を抑え、少し彩度を落として柔らかく
+    float gl = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(gl), col, 0.85);            // 彩度を少し落とす
+    col += smoothstep(0.65, 1.0, gl) * 0.05;   // 柔らかいブルーム
+    col *= vec3(1.03, 1.0, 0.96);              // ほのかな暖かみ
 
     // 窓ガラスの現象（任意）
     col = applyGlass(col, p, t, uGlass);
@@ -74,10 +82,15 @@ const FRAGMENT_BODY = /* glsl */ `
       smoothstep(mx, mx + 0.045, p.x) * smoothstep(mx, mx + 0.045, 1.0 - p.x) *
       smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
     col *= mix(0.86, 1.0, inner);
+
+    // やわらかな周辺減光（記憶の風景らしさ）
+    float vig = 1.0 - 0.22 * smoothstep(0.45, 1.25, distance(p, vec2(0.5)));
+    col *= vig;
+
     col = mix(col, vec3(0.06, 0.055, 0.07), fr);
 
     col *= uBright;
-    col += (h21(frag * uResolution.xy + t) - 0.5) * 0.008;
+    col += (h21(frag * uResolution.xy + t) - 0.5) * 0.016; // ほのかなフィルムグレイン
     gl_FragColor = vec4(col, 1.0);
   }
 `
