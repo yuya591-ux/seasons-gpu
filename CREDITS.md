@@ -45,7 +45,15 @@
 - 風は森を渡る風の録音。冬の雪の夜と、山あいの朝で使用（同じファイルを再利用）。
 - 変更点：Ogg→MP3 へ変換。アプリ内ではループ再生。CC BY-SA 素材は同ライセンス継承。
 
-## 画像・フォント
+## 写真（パノラマ）
 
-- 画像は使用しない（情景はすべてシェーダー計算で生成）。
+| 用途 | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| 立体パノラマの窓（実証用） | `public/pano/town-demo.jpg` | "Nynäshamn NE Equirectangular 360 panoramic" / Simon Inns | CC BY 2.0 — https://creativecommons.org/licenses/by/2.0/ | https://commons.wikimedia.org/wiki/File:Nyn%C3%A4shamn_NE_Equirectangular_360_panoramic_(21205394981).jpg |
+
+- 変更点：表示用に 2048px 幅へ縮小。本番は本人撮影の写真に差し替える想定。
+
+## フォント
+
+- 情景の描画は基本シェーダー計算。写真は上記の「立体パノラマの窓」でのみ使用。
 - フォントは OS 標準（system-ui 等）のみ。同梱しない。

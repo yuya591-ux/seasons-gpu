@@ -6,6 +6,7 @@ import * as clearSky from './clearSky.js'
 import * as windowTown from './windowTown.js'
 import * as windowMountains from './windowMountains.js'
 import * as windowSea from './windowSea.js'
+import * as windowPano from './windowPano.js'
 
 export const SHADERS = {
   rainGlass, // 窓ガラスの雨
@@ -13,6 +14,7 @@ export const SHADERS = {
   windowTown, // 窓辺の下町（多層パララックス・見回し）
   windowMountains, // 窓辺の山あい
   windowSea, // 窓辺の海辺
+  windowPano, // 立体パノラマの窓（360°写真＋深度視差）
 }
 
 /** render 種別からシェーダーを引く（未知なら雨ガラスにフォールバック）。 */
