@@ -1,6 +1,6 @@
 // 全体の結線。器（情景データ）＋レンダラ＋音＋UI をつなぐ。
 
-import { SCENES, DEFAULT_SCENE } from './data/scenes/index.js'
+import { SCENES, DEFAULT_SCENE, pickNowScene } from './data/scenes/index.js'
 import { getState, setScene, updateSettings } from './state.js'
 import { createRenderer } from './engine/renderer.js'
 import { createAudio } from './audio/audio.js'
@@ -29,8 +29,15 @@ function resolveScene(id) {
 
 function start() {
   const state = getState()
-  const scene = resolveScene(state.sceneId)
+  // 起動時は「いま（今の季節・時刻）の窓辺」を開く＝開くたび今と地続きの再訪動機。
+  const scene = pickNowScene()
   const settings = state.settings
+
+  // モーション過敏への配慮: OS設定 prefers-reduced-motion に追従して“息づかい”の揺れを止める
+  const mqReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
+  const applyReduceMotion = () => renderer.setReduceMotion(!!(mqReduce && mqReduce.matches))
+  applyReduceMotion()
+  if (mqReduce && mqReduce.addEventListener) mqReduce.addEventListener('change', applyReduceMotion)
 
   // 遠雷の音に合わせて空をほのかに光らせる（シェーダー情景のみ反応）
   const audio = createAudio({

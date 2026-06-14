@@ -1,7 +1,7 @@
 // 画面のUI。眺める邪魔をしないよう最小限・控えめ。無操作でHUDは静かに消える。
 // 文言は静かで上質に。システム用語は出さない。
 
-import { SCENES } from '../data/scenes/index.js'
+import { SCENES, pickNowScene } from '../data/scenes/index.js'
 
 const h = (tag, cls, text) => {
   const el = document.createElement(tag)
@@ -143,7 +143,11 @@ export function buildUI(opts) {
     const el = h('div', 'panel panel--scene')
     const head = h('div', 'panel__head')
     head.appendChild(h('h2', 'panel__title', '情景を選ぶ'))
+    const nowBtn = h('button', 'iconbtn nowbtn', 'いま')
+    nowBtn.setAttribute('aria-label', '今の季節と時刻に合う窓辺')
+    head.appendChild(nowBtn)
     const close = h('button', 'iconbtn', '×')
+    close.setAttribute('aria-label', '閉じる')
     head.appendChild(close)
     el.appendChild(head)
 
@@ -166,17 +170,7 @@ export function buildUI(opts) {
       body.appendChild(h('span', 'scene-card__desc', scene.desc || ''))
       card.appendChild(sw)
       card.appendChild(body)
-      card.addEventListener('click', () => {
-        if (scene.id !== currentScene.id) {
-          currentScene = scene
-          sceneName.textContent = scene.label
-          if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
-          onApplyScene(scene)
-          markCurrent()
-        }
-        el.classList.remove('panel--open')
-        poke()
-      })
+      card.addEventListener('click', () => selectScene(scene))
       gallery.appendChild(card)
       cards.push({ id: scene.id, card })
     })
@@ -184,6 +178,20 @@ export function buildUI(opts) {
     function markCurrent() {
       cards.forEach(({ id, card }) => card.classList.toggle('scene-card--on', id === currentScene.id))
     }
+
+    function selectScene(scene) {
+      if (scene && scene.id !== currentScene.id) {
+        currentScene = scene
+        sceneName.textContent = scene.label
+        if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
+        onApplyScene(scene)
+        markCurrent()
+      }
+      el.classList.remove('panel--open')
+      poke()
+    }
+
+    nowBtn.addEventListener('click', () => selectScene(pickNowScene()))
 
     close.addEventListener('click', () => {
       el.classList.remove('panel--open')

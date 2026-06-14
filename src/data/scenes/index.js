@@ -53,3 +53,32 @@ export const DEFAULT_SCENE =
   SCENES.find((s) => s.id === 'autumn-dusk-corner-room') ||
   SCENES.find((s) => s.status === 'ready') ||
   SCENES[0]
+
+/** 今の月・時刻から、季節と時間帯を求める。 */
+export function nowAxes(date = new Date()) {
+  const m = date.getMonth() + 1 // 1..12
+  const h = date.getHours()
+  const season = m <= 2 || m === 12 ? 'winter' : m <= 5 ? 'spring' : m <= 8 ? 'summer' : 'autumn'
+  const time =
+    h >= 5 && h < 10 ? 'morning' : h >= 10 && h < 16 ? 'noon' : h >= 16 && h < 19 ? 'dusk' : 'night'
+  return { season, time }
+}
+
+/** 「いま」に最も合う公開情景を選ぶ。季節＋時間帯を重視し、核の角部屋を少し優先する。 */
+export function pickNowScene(date = new Date()) {
+  const { season, time } = nowAxes(date)
+  const candidates = SCENES.filter((s) => s.status === 'ready' && s.public !== false)
+  let best = DEFAULT_SCENE
+  let bestScore = -1
+  for (const s of candidates) {
+    let score = 0
+    if (s.axes.season === season) score += 2
+    if (s.axes.time === time) score += 2
+    if (s.render === 'cornerRoom') score += 1 // 体験の核を少し優先
+    if (score > bestScore) {
+      bestScore = score
+      best = s
+    }
+  }
+  return best
+}

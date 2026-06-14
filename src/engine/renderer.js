@@ -102,6 +102,8 @@ export function createRenderer(canvas) {
   const parallaxBias = { x: 0, y: 0 }
   // 遠雷フラッシュ。雷鳴に合わせて立ち上げ、毎フレーム減衰させる
   let flashLevel = 0
+  // モーション過敏への配慮: 真のときは“息づかい”の揺れを止める（OS設定/設定で切替）
+  let reduceMotion = false
 
   function buildProgram(q, type) {
     const shader = getShader(type)
@@ -192,9 +194,11 @@ export function createRenderer(canvas) {
     const clampP = (v) => Math.max(-0.07, Math.min(0.07, v))
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
-    // ごく弱い“息づかい”の揺れ。静止画ではなく、その場に居る気配を出す（窓辺シリーズで効く）
-    const swayX = Math.sin(seconds * 0.09) * 0.012 + Math.sin(seconds * 0.043 + 1.3) * 0.006
-    const swayY = Math.sin(seconds * 0.06 + 0.7) * 0.006
+    // ごく弱い“息づかい”の揺れ。静止画ではなく、その場に居る気配を出す（窓辺シリーズで効く）。
+    // モーション過敏配慮時は止める。
+    const sm = reduceMotion ? 0 : 1
+    const swayX = (Math.sin(seconds * 0.09) * 0.012 + Math.sin(seconds * 0.043 + 1.3) * 0.006) * sm
+    const swayY = Math.sin(seconds * 0.06 + 0.7) * 0.006 * sm
     gl.uniform2f(loc.uPan, panCur.x + swayX, panCur.y + swayY)
     if (loc.uParallax) {
       gl.uniform2f(
@@ -323,6 +327,10 @@ export function createRenderer(canvas) {
     // 遠雷など。空をほのかに光らせる（雷鳴の少し前に呼ぶと自然）
     triggerFlash(strength) {
       flashLevel = Math.max(flashLevel, strength != null ? strength : 0.8)
+    },
+    // モーション過敏への配慮（OS設定 prefers-reduced-motion 等から）
+    setReduceMotion(b) {
+      reduceMotion = !!b
     },
     setScene(s) {
       scene = s

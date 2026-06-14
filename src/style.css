@@ -2,6 +2,17 @@
   color-scheme: dark;
 }
 
+/* モーション過敏への配慮: 動き/トランジションをほぼ無くす（OS設定に追従） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
