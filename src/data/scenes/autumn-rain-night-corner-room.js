@@ -9,6 +9,7 @@ export default {
   status: 'ready',
   render: 'cornerRoom',
   glass: 'rain', // 窓を流れる雨
+  foliage: 'leaves', // 紅葉が窓の外を舞う
   intensityLabel: '街あかり',
 
   palette: {

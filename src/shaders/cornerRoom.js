@@ -21,6 +21,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uBright;
   uniform vec2 uPan;         // 見回し（x=ヨー, y=ピッチ）
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
+  uniform float uFoliage;    // 季節の舞い 0=なし 1=紅葉 2=花びら
   uniform float uFlash;      // 遠雷フラッシュ 0..1
   uniform vec3 uSkyTop;      // 天頂（暮れの紫紺）
   uniform vec3 uSkyMid;      // 中空
@@ -81,6 +82,33 @@ const FRAGMENT_BODY = /* glsl */ `
       lit *= 0.78 + 0.22 * sin(uTime * 1.3 + h21(wid) * 33.0);
       vec3 wcol = mix(silv * 1.25, light, lit);
       col = mix(col, wcol, rect * below * 0.9);
+    }
+    return col;
+  }
+
+  // 季節の舞い: 紅葉/花びらが窓の外をひらひら落ちる（3層・回転・横揺れ）
+  vec3 foliageOverlay(vec3 col, vec2 p, float t, float mode) {
+    if (mode < 0.5) return col;
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float depth = fi * 0.5;
+      float sc = mix(6.0, 12.0, depth);
+      float sp = mix(0.035, 0.08, depth);
+      vec2 gp = vec2(p.x * sc * 0.7, p.y * sc);
+      gp.y += t * sp * sc;                                   // 落下
+      gp.x += sin(t * 0.5 + fi * 2.0 + p.y * 7.0) * 0.9;     // 横揺れ
+      vec2 id = floor(gp);
+      vec2 f = fract(gp) - 0.5;
+      float n = h21(id + fi * 23.0);
+      if (n < 0.62) continue;                                // まばらに
+      float ang = t * 1.6 * (n - 0.5) * 2.0 + n * 6.2831;    // 回転
+      float ca = cos(ang), sa = sin(ang);
+      vec2 rf = vec2(ca * f.x - sa * f.y, sa * f.x + ca * f.y);
+      float leaf = smoothstep(0.20, 0.10, length(rf * vec2(1.0, 2.2))); // 細長い葉
+      vec3 lc = (mode > 1.5)
+        ? mix(vec3(1.0, 0.82, 0.86), vec3(0.98, 0.7, 0.78), n)    // 花びら（淡紅）
+        : mix(vec3(0.85, 0.4, 0.13), vec3(0.7, 0.16, 0.10), n);   // 紅葉（橙〜紅）
+      col = mix(col, lc, leaf * (0.35 + 0.4 * depth));
     }
     return col;
   }
@@ -226,6 +254,8 @@ const FRAGMENT_BODY = /* glsl */ `
     vec4 wall = neighborWall(p, vp, ax, yaw);
     outside = mix(outside, wall.rgb, wall.a);
 
+    // 窓の外に舞う紅葉/花びら（ガラスの外をひらひら）。アパーチャ内だけに乗る
+    outside = foliageOverlay(outside, p, t, uFoliage);
     // 窓の外に降る雨/雪（ガラス面の現象）。アパーチャ内だけに乗せる
     outside = applyGlass(outside, p, t, uGlass);
 

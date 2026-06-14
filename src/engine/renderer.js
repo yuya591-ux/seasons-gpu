@@ -88,6 +88,7 @@ export function createRenderer(canvas) {
   let quality = 'standard'
   let shaderType = 'rainGlass'
   let glassMode = 0 // 窓辺シリーズのガラス現象 0=なし 1=雨 2=雪
+  let foliageMode = 0 // 季節の舞い 0=なし 1=紅葉 2=花びら
   let scene = null
   let settings = { rain: 0.65, brightness: 1.0, quality: 'standard' }
   let rafId = 0
@@ -128,6 +129,7 @@ export function createRenderer(canvas) {
       uPan: gl.getUniformLocation(program, 'uPan'),
       uParallax: gl.getUniformLocation(program, 'uParallax'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
+      uFoliage: gl.getUniformLocation(program, 'uFoliage'),
       uFlash: gl.getUniformLocation(program, 'uFlash'),
       uPano: gl.getUniformLocation(program, 'uPano'),
       uHasPano: gl.getUniformLocation(program, 'uHasPano'),
@@ -202,6 +204,7 @@ export function createRenderer(canvas) {
       )
     }
     gl.uniform1f(loc.uGlass, glassMode)
+    if (loc.uFoliage) gl.uniform1f(loc.uFoliage, foliageMode)
     if (loc.uFlash) gl.uniform1f(loc.uFlash, flashLevel)
     // フラッシュは素早く立ち、ゆっくり減衰（遠雷のほのかな閃光）
     if (flashLevel > 0.001) flashLevel *= 0.92
@@ -278,6 +281,7 @@ export function createRenderer(canvas) {
 
   const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v))
   const glassOf = (s) => (s && s.glass === 'snow' ? 2 : s && s.glass === 'rain' ? 1 : 0)
+  const foliageOf = (s) => (s && s.foliage === 'petals' ? 2 : s && s.foliage === 'leaves' ? 1 : 0)
 
   return {
     ok: true,
@@ -323,6 +327,7 @@ export function createRenderer(canvas) {
     setScene(s) {
       scene = s
       glassMode = glassOf(s)
+      foliageMode = foliageOf(s)
       loadPano(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
@@ -341,6 +346,7 @@ export function createRenderer(canvas) {
       scene = initialScene
       settings = initialSettings
       glassMode = glassOf(initialScene)
+      foliageMode = foliageOf(initialScene)
       loadPano(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()

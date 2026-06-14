@@ -9,6 +9,7 @@ export default {
   desc: '部屋の窓から見下ろす夕暮れの街。右を向くと隣の建物の壁。指や傾きで見回す。',
   status: 'ready',
   render: 'cornerRoom',
+  foliage: 'leaves', // 紅葉が窓の外を舞う
   intensityLabel: '街あかり', // 灯る窓の多さ
 
   palette: {
