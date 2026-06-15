@@ -110,6 +110,10 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   const isNight = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 暗い palette = 夜
+  // フィルミックなトーンマッピング（ACES）＝写真的なハイライトのころび・階調。実写風へ寄せる核。
+  // Lambert 拡散シェーディングと合わせ、トゥーンの平面感を脱して実物に近い光の乗りにする。
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = isNight ? 1.7 : 1.5 // ACESの沈みを補正（夜はやや明るめ）
   // 光（やわらかなトゥーン陰影。夜は月明かりへ）
   const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.4 : 0.92)
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
@@ -157,7 +161,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   const grad = makeGradient(THREE)
-  const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
+  const toon = (hex) => new THREE.MeshLambertMaterial({ color: hex, gradientMap: grad })
 
   // 窓のテクスチャ（壁に窓の列。乗算マップ＝白地に灰の窓＋夕方に灯る暖色のemissive）。
   function makeWinTex(lit, seed) {
@@ -242,7 +246,7 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const mottleMat = (baseHex, n, spread, rep) => {
-    const m = new THREE.MeshToonMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
+    const m = new THREE.MeshLambertMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
     m.map.repeat.set(rep[0], rep[1])
     return m
   }
@@ -646,7 +650,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── ふわふわの雲（白い球の塊＝立体的な積雲） ──
   const clouds = []
-  const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })
+  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })
   for (let i = 0; i < 11; i++) {
     const g = new THREE.Group()
     const n = 4 + ((R() * 4) | 0)
