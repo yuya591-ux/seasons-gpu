@@ -34,6 +34,21 @@
 | レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
 | --- | --- | --- | --- | --- |
 | 波 | `waves.mp3` | "Waves" / Dsw4 | パブリックドメイン | https://commons.wikimedia.org/wiki/File:Waves.ogg |
+| カモメ | `gulls.mp3` | "Black-headed Gulls (Larus ridibundus) (W1CDR0001402 BD19)" / 録音: Lawrence Shove・提供: The British Library Board | CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/ | https://commons.wikimedia.org/wiki/File:Black-headed_Gulls_(Larus_ridibundus)_(W1CDR0001402_BD19).ogg |
+
+- カモメは実在種 *Chroicocephalus ridibundus*（ユリカモメ）の群れの鳴き声。1971年5月、英国サフォーク州 Havergate Island の湿地で録音。
+- 変更点：Ogg→MP3 へ変換し、波の上にそっと重ねてループ再生。CC BY-SA 素材は同ライセンス継承。
+
+### 情景「朝の谷戸、鶴見・獅子ヶ谷」 — `public/audio/shishigaya-morning-yato/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| ウグイス | `uguisu.mp3` | "Uguisu5707" / Jnn | CC BY 2.1 JP — https://creativecommons.org/licenses/by/2.1/jp/ | https://commons.wikimedia.org/wiki/File:Uguisu5707.ogg |
+| せせらぎ | `stream.mp3` | "Flowing-water-100019" / Fg2 | パブリックドメイン | https://commons.wikimedia.org/wiki/File:Flowing-water-100019.ogg |
+
+- ウグイスは実在種 *Horornis diphone*（ウグイス）の本物のさえずり。2006年、岐阜県・谷汲山 華厳寺で録音。
+- 変更点：いずれも Ogg→MP3 へ変換。せせらぎはループ、ウグイスはゆらぎのある間隔でそっと再生。CC BY 素材は表示で帰属。
+- 風（`winter-snow-night/wind.mp3`）も谷戸の朝に薄く再利用（下記）。
 
 ### 情景「冬の雪の夜／夏の朝（山）」 — `public/audio/winter-snow-night/`
 

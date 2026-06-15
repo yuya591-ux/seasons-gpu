@@ -89,19 +89,20 @@ export function createAudio(opts) {
     schedule()
   }
 
-  // 単発（遠雷）。鳴るたびに音量・低域・再生速度・定位を揺らし「毎回違う距離の雷」に。
+  // 単発再生。遠雷(cue)は音量・低域・速度を大きく揺らし「毎回違う距離の雷」に。
+  // 鳥のさえずり等(cueなし)は、低域フィルタを掛けず自然な高域を残し、ピッチもごく僅かだけ揺らす。
   function playCue(buffer, def) {
     const src = ctx.createBufferSource()
     src.buffer = buffer
-    src.playbackRate.value = 0.9 + Math.random() * 0.25
+    src.playbackRate.value = def.cue ? 0.9 + Math.random() * 0.25 : 0.97 + Math.random() * 0.06
     const g = ctx.createGain()
     const baseGain = def.gain != null ? def.gain : 0.5
-    g.gain.value = baseGain * (0.55 + Math.random() * 0.55)
+    g.gain.value = baseGain * (def.cue ? 0.55 + Math.random() * 0.55 : 0.75 + Math.random() * 0.4)
     let node = src.connect(g)
-    if (ctx.createBiquadFilter) {
+    if (ctx.createBiquadFilter && def.cue) {
       const lp = ctx.createBiquadFilter()
       lp.type = 'lowpass'
-      lp.frequency.value = 600 + Math.random() * 2200 // 遠いほど高域が削れる
+      lp.frequency.value = 600 + Math.random() * 2200 // 遠いほど高域が削れる（雷の距離感）
       node = node.connect(lp)
     }
     if (ctx.createStereoPanner) {

@@ -31,8 +31,11 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 谷戸の朝の気配: 渡る風をうっすら（既存のCC0素材を再利用）。
+  // 谷戸の朝の気配: 渡る風＋谷を縫うせせらぎ＋時折ウグイス。すべてライセンス明確な素材（CREDITS.md）。
   sounds: [
-    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.12, loop: true },
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.10, loop: true },
+    { id: 'stream', label: 'せせらぎ', src: 'audio/shishigaya-morning-yato/stream.mp3', gain: 0.28, loop: true },
+    // ウグイスは鳴き交わすように、ゆらぎのある間隔でそっと（cueなし＝自然な高域を残す）。
+    { id: 'uguisu', label: 'ウグイス', src: 'audio/shishigaya-morning-yato/uguisu.mp3', loop: false, interval: [7, 19], gain: 0.42 },
   ],
 }

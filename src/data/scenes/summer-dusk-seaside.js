@@ -28,8 +28,9 @@ export default {
   driftPeriod: 300,
   phenomena: { waves: { intensity: 0.6 } },
 
-  // 波（パブリックドメイン, Dsw4）。CREDITS.md に記録。
+  // 波（パブリックドメイン, Dsw4）＋遠くのカモメの群れ（英国図書館, CC BY-SA 4.0）。CREDITS.md に記録。
   sounds: [
     { id: 'waves', label: '波', src: 'audio/summer-dusk-seaside/waves.mp3', gain: 0.7, loop: true },
+    { id: 'gulls', label: 'カモメ', src: 'audio/summer-dusk-seaside/gulls.mp3', gain: 0.30, loop: true },
   ],
 }
