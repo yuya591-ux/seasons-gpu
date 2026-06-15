@@ -169,10 +169,20 @@ const FRAGMENT_BODY = /* glsl */ `
       // 区画ごとに「水田／青田」を抽選
       float plot = floor(worldX * (2.5 + valT * 3.0)) + row * 7.0;
       float wet = step(0.45, h21(vec2(plot, row)));
-      vec3 paddyWater = mix(uHorizon, uSkyMid, 0.5) * (0.95 + 0.1 * sin(uTime * 0.3 * mo + row)); // 空を映す水面
+      // 水を張った田は鏡。空を上下反転して映し、風のさざ波でゆらぐ。
+      float breeze = fbm(vec2((worldX) * 9.0 + t * 0.05 * mo, vp.y * 30.0)) - 0.5; // 風のさざ波
+      float reflY = valHi + (valHi - vp.y) * 1.7 + breeze * 0.05;          // 田の面で折り返した空の高さ
+      vec3 paddyWater = mix(uHorizon, uSkyMid, smoothstep(0.52, 0.84, reflY));
+      paddyWater = mix(paddyWater, uSkyTop, smoothstep(0.80, 1.05, reflY));
+      // 流れる雲の映り込み（淡く）
+      float cloudRefl = smoothstep(0.54, 0.74, fbm(vec2((ax + yaw * 0.16) * 1.3 + 7.0, reflY * 2.6)));
+      paddyWater = mix(paddyWater, mix(uSkyMid, vec3(1.0), 0.5), cloudRefl * 0.20);
+      paddyWater *= 0.95 + 0.08 * breeze;                                  // さざ波の陰影
       vec3 paddyGreen = mix(vec3(0.34, 0.42, 0.22), uDropTint, 0.28);     // 稲の青田
       vec3 paddy = mix(paddyGreen, paddyWater, wet);
-      paddy += uSunGlow * wet * smoothstep(0.45, 0.0, abs(ax - sunC.x)) * 0.16; // 水面に朝陽
+      // 朝陽の映り（太陽の真下の田が金色に光る）＋さざ波のきらめき
+      float paddyGlint = smoothstep(0.42, 0.0, abs(ax - sunC.x)) * (0.55 + 0.45 * sin(breeze * 22.0));
+      paddy += uSunGlow * wet * paddyGlint * 0.22; // 水面に朝陽
       vec3 bundC = mix(vec3(0.40, 0.36, 0.26), uHorizon * 0.4, 0.3);      // 畦道
       vec3 valGround = mix(bundC, paddy, bund);
       col = mix(col, valGround, smoothstep(valHi + 0.01, valHi - 0.02, vp.y));
