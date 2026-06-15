@@ -31,8 +31,9 @@ export default {
   driftPeriod: 280,
   phenomena: {},
 
-  // 春の宵の気配: 渡る風をうっすら（既存素材を再利用）
+  // 春の宵の気配: 田や池のカエルの合唱＋渡る風（春の夕暮れの郷愁）。CREDITS.md に全数記録。
   sounds: [
-    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.14, loop: true },
+    { id: 'frogs', label: 'かえる', src: 'audio/spring-dusk-corner-room/frogs.mp3', gain: 0.3, loop: true },
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.12, loop: true },
   ],
 }

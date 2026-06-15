@@ -39,6 +39,15 @@
 - カモメは実在種 *Chroicocephalus ridibundus*（ユリカモメ）の群れの鳴き声。1971年5月、英国サフォーク州 Havergate Island の湿地で録音。
 - 変更点：Ogg→MP3 へ変換し、波の上にそっと重ねてループ再生。CC BY-SA 素材は同ライセンス継承。
 
+### 情景「春の夕暮れ、高台の角部屋」 — `public/audio/spring-dusk-corner-room/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| かえる | `frogs.mp3` | "Froesche rieselfelder" / Guido Gerding (XN) | CC BY-SA 3.0 — https://creativecommons.org/licenses/by-sa/3.0/ | https://commons.wikimedia.org/wiki/File:Froesche_rieselfelder.ogg |
+
+- 水辺のカエルの合唱（Wasserfrösche）。6月、ドイツ・ミュンスター近郊の Rieselfelder で録音。春の宵の田畑の気配に。
+- 変更点：Ogg→MP3 へ変換しループ再生。風（既存）と重ねる。CC BY-SA 素材は同ライセンス継承。
+
 ### 情景「秋の夕暮れ、高台の角部屋」 — `public/audio/autumn-dusk-corner-room/`
 
 | レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
