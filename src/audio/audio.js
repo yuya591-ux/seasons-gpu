@@ -135,7 +135,9 @@ export function createAudio(opts) {
       const src = ctx.createBufferSource()
       src.buffer = buffer
       const g = ctx.createGain()
-      const s = nextStart
+      // タブ非アクティブで setTimeout が間引かれ schedule が遅れても、過去時刻に入れない
+      // （過去開始のプツッ/欠落を防ぐ）。少し先へ寄せて自己修復させる。
+      const s = Math.max(nextStart, now() + 0.06)
       // 先頭で立ち上げ、末尾で落とす（重なり区間でクロスフェード）
       g.gain.setValueAtTime(0.0001, s)
       g.gain.linearRampToValueAtTime(1, s + xf)
@@ -149,7 +151,7 @@ export function createAudio(opts) {
         /* 競合時は無視 */
       }
       nextStart = s + dur - xf // 次は重なり分だけ早く始める
-      const delay = Math.max(60, (nextStart - now() - 1.2) * 1000)
+      const delay = Math.max(60, (nextStart - now() - 1.6) * 1000) // 余裕を持って先に予約（間引き耐性）
       const id = setTimeout(schedule, delay)
       timers.push(id)
     }
