@@ -88,9 +88,13 @@ export const GROUND_GLSL = /* glsl */ `
       base *= 1.0 - 0.55 * nightAmt;                              // 夜は素地が暗く沈み、灯りが映える
       vec3 roofTop = base;
       float district = vnoise(hGi * 0.35 + 7.0);                  // 街区ごとの賑わい（夜の灯りの粗密）
-      // 前面の壁（こちらを向く陰の面）。西日が片側に差す＋上ほど空の光を受けて明るい＋足元はAO
-      float westLit = smoothstep(0.0, 0.7, fract(horizAngle * 0.7 + hBlk));
-      vec3 wallCol = base * (0.46 + 0.16 * westLit) * (0.62 + 0.50 * vfrac);
+      // ひとつの太陽（西＝画面左、低い夕日）で街全体を一貫して照らす。
+      // 視線の左（西）を向く面ほど日が当たり暖かく、右（東）の面は翳る＝陰影が方向で揃う。
+      float sunFacing = smoothstep(-0.55, 0.45, -horizAngle);     // 西(左)を向くほど受光
+      float dayLit = 1.0 - nightAmt;
+      // 前面の壁。受光で明暗、上ほど空の光、足元はAO
+      vec3 wallCol = base * (0.40 + 0.24 * sunFacing) * (0.62 + 0.50 * vfrac);
+      wallCol += uSunGlow * 0.07 * sunFacing * dayLit * (0.35 + 0.65 * vfrac); // 西日の暖かな差し
       // 壁の窓（低周波・遠景/真下/低層では省く＝チラつき防止）。各階の横帯＋控えめな縦割り
       float isTall = step(0.5, hTower);
       float rows = mix(4.0, 11.0, isTall);
@@ -123,6 +127,7 @@ export const GROUND_GLSL = /* glsl */ `
       vec2 acf = fract(hGf * vec2(5.0, 4.0));
       float acu = step(0.72, h21(acg + hGi + 17.0)) * step(0.3, acf.x) * step(acf.x, 0.55) * step(0.3, acf.y) * step(acf.y, 0.6);
       roofTop = mix(roofTop, base * 0.6, acu * 0.4 * rdet);                                         // 室外機など小物
+      roofTop += uSunGlow * 0.06 * dayLit * (0.5 + 0.5 * sunFacing);                                // 屋上に夕日が乗る（上向き面）
 
       vec3 bld = mix(wallCol, roofTop, roofness);
       // 雨に濡れた屋上: 空を鈍く映して暗く沈む（屋上面ほど）
