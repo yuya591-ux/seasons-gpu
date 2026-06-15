@@ -115,17 +115,27 @@ const FRAGMENT_BODY = /* glsl */ `
     silv *= 0.93 + 0.07 * step(0.5, fract(fx * 5.0)); // 縦パネルの目地
     col = mix(col, silv, body);
 
-    // 窓のグリッド（建物本体のみ・三角屋根の頂部は除く）
+    // 窓のグリッド（建物本体のみ・三角屋根の頂部は除く）。一律の格子＝ドット絵感を避け、
+    // 明るさ・色をばらつかせ、縁を柔らかく、灯りに暖色のハロー（光暈）を添える。
     if (body > 0.5 && gap < 0.5) {
       vec2 wc = vec2(wx * winCols, p.y * winRows);
       vec2 wid = floor(wc);
       vec2 wf = fract(wc);
-      float rect = step(0.18, wf.x) * step(wf.x, 0.82) * step(0.24, wf.y) * step(wf.y, 0.86);
+      // 窓のマスク（縁をわずかに柔らかく＝硬い長方形を避ける）
+      float rect = smoothstep(0.16, 0.205, wf.x) * smoothstep(0.84, 0.795, wf.x)
+                 * smoothstep(0.22, 0.27, wf.y) * smoothstep(0.88, 0.83, wf.y);
       float below = step(p.y, ridgeY + bh - 0.012); // 屋根の少し下から窓
-      float lit = step(1.0 - winLit, h21(wid + seed));
-      lit *= 0.78 + 0.22 * sin(uTime * 1.3 + h21(wid) * 33.0); // ちらつき
-      vec3 wcol = mix(silv * 1.25, light, lit);
-      col = mix(col, wcol, rect * below * 0.9);
+      float r = h21(wid + seed);
+      float litOn = step(1.0 - winLit, r);                          // 灯っているか
+      float bright = (0.5 + 0.5 * h21(wid + seed + 4.3))            // 窓ごとに明るさをばらつかせる
+                   * (0.82 + 0.18 * sin(uTime * 1.3 + r * 33.0));   // ゆるいちらつき
+      // 窓色も少しばらつかせる（多くは暖色、たまに白／青白い灯り）
+      vec3 wlight = mix(light, mix(vec3(1.0, 0.87, 0.62), vec3(0.86, 0.93, 1.0), step(0.86, h21(wid + 9.1))), 0.35);
+      vec3 wcol = mix(silv * 1.2, wlight, litOn * bright);
+      col = mix(col, wcol, rect * below * 0.92);
+      // 灯りの暖色ハロー（光暈）。窓の中心からにじむ柔らかな光＝夜の街の温かさ。
+      float halo = exp(-length(wf - vec2(0.5, 0.55)) * 3.2) * litOn * bright;
+      col += wlight * halo * below * 0.10;
     }
 
     // TVアンテナ（昭和の郷愁）。陸屋根にたまに立つ。
