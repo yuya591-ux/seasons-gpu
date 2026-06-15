@@ -18,6 +18,7 @@ import shishigayaMorningYato from './shishigaya-morning-yato.js'
 import kitateraoRooftop from './kitaterao-rooftop.js'
 import kitateraoRooftopNight from './kitaterao-rooftop-night.js'
 import kitateraoWindow3d from './kitaterao-window-3d.js'
+import kitateraoWindow3dNight from './kitaterao-window-3d-night.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
@@ -40,6 +41,7 @@ export const SCENES = [
   kitateraoRooftop,
   kitateraoRooftopNight,
   kitateraoWindow3d,
+  kitateraoWindow3dNight,
   panoDemo,
   splatDemo,
   roomDemo,

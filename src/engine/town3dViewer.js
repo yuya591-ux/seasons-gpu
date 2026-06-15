@@ -83,17 +83,31 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(new THREE.Mesh(skyGeo, skyMat))
   }
 
-  // 光（やわらかなトゥーン陰影）
-  const sun = new THREE.DirectionalLight(sunCol.getHex(), 1.15)
-  sun.position.set(-30, 40, 20)
+  const isNight = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 暗い palette = 夜
+  // 光（やわらかなトゥーン陰影。夜は月明かりへ）
+  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.4 : 1.15)
+  sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
   sun.shadow.mapSize.set(1024, 1024)
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 160
   sun.shadow.camera.left = -60; sun.shadow.camera.right = 60
   sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60
   scene.add(sun)
-  scene.add(new THREE.HemisphereLight(skyTop.getHex(), 0x6b5a44, 0.85))
-  scene.add(new THREE.AmbientLight(0xffffff, 0.18))
+  scene.add(new THREE.HemisphereLight(skyTop.getHex(), 0x6b5a44, isNight ? 0.42 : 0.85))
+  scene.add(new THREE.AmbientLight(0xffffff, isNight ? 0.10 : 0.18))
+  // 夜は月と星
+  if (isNight) {
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
+    moon.position.set(70, 90, -120); scene.add(moon)
+    const starGeo = new THREE.BufferGeometry()
+    const sp = []
+    for (let i = 0; i < 260; i++) {
+      const r = 360, th = Math.random() * Math.PI * 2, ph = Math.random() * Math.PI * 0.5
+      sp.push(Math.cos(th) * Math.sin(ph) * r, Math.cos(ph) * r * 0.9 + 30, -Math.abs(Math.sin(th)) * Math.sin(ph) * r - 30)
+    }
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3))
+    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xeaf0ff, size: 1.4, sizeAttenuation: false, fog: false })))
+  }
 
   const grad = makeGradient(THREE)
   const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
