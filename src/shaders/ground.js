@@ -295,6 +295,13 @@ export const GROUND_GLSL = /* glsl */ `
       ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), smoothstep(0.07, 0.0, gt) * 0.85);
     }
 
+    // 谷あいに溜まる靄（低い土地ほど霞む＝起伏する地形の立体感）。ゆっくり流れる。
+    float ft = terrainH(vec2(horizAngle * hitZ, hitZ));
+    float mistDrift = 0.7 + 0.3 * fbm(vec2(horizAngle * hitZ * 1.5 + uTime * 0.02 * mo, hitZ * 0.8));
+    float valMist = smoothstep(0.30, -0.55, ft)                    // 谷（低地）ほど濃い
+                  * smoothstep(0.04, 0.20, gt) * (1.0 - smoothstep(0.34, 0.55, gt)) // 中景に溜まる
+                  * mistDrift;
+    ground = mix(ground, mix(uHorizon, uSkyMid, 0.5), valMist * (0.10 + 0.16 * (1.0 - nightAmt)));
     // 遠雷の閃光が街をほのかに照らす（空のフラッシュと同期）
     ground += uFlash * vec3(0.82, 0.88, 1.0) * 0.16;
     return ground;
