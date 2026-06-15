@@ -112,11 +112,14 @@ const FRAGMENT_BODY = /* glsl */ `
     col = ridge(col, vp, ax + yaw * 0.22, 1.0, 0.60, 1.2, 0.16, mix(uSkyMid, uHorizon, 0.5), mistAmt, 0.10, 0.0);
     col = ridge(col, vp, ax + yaw * 0.40, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.55), mistAmt * 0.8, 0.18, 0.25);
 
-    // 雲海（中腹に漂う朝霧の海。ゆっくり流れ、近い山が突き出る）
-    float seaY = 0.46;
-    float seaBand = smoothstep(seaY + 0.07, seaY, vp.y) * smoothstep(seaY - 0.11, seaY, vp.y);
-    float seaTex = fbm(vec2((ax + yaw * 0.6) * 2.0 + uTime * 0.015, vp.y * 5.0));
-    col = mix(col, vec3(0.92, 0.94, 0.96), seaBand * smoothstep(0.35, 0.7, seaTex) * mistAmt * 0.7);
+    // 雲海（谷を埋める朝霧の海。上面が起伏してゆっくり流れ、朝陽で縁が染まる。近い山が突き出る）
+    float seaY = 0.47;
+    float seaTop = (fbm(vec2((ax + yaw * 0.6) * 1.5 + uTime * 0.012, 3.0)) - 0.5) * 0.07; // うねる上面
+    float seaBand = smoothstep(seaY + 0.11 + seaTop, seaY + 0.01 + seaTop, vp.y) * smoothstep(seaY - 0.15, seaY + 0.01 + seaTop, vp.y);
+    float seaTex = fbm(vec2((ax + yaw * 0.6) * 2.2 + uTime * 0.015, vp.y * 6.0));
+    vec3 seaCol = mix(vec3(0.90, 0.92, 0.95), mix(vec3(0.96, 0.94, 0.9), uSunGlow, 0.5),
+                      smoothstep(0.02, -0.02, vp.y - (seaY + 0.01 + seaTop)) * 0.6); // 上面の縁が朝陽に染まる
+    col = mix(col, seaCol, seaBand * (0.45 + 0.55 * smoothstep(0.32, 0.7, seaTex)) * mistAmt);
 
     col = ridge(col, vp, ax + yaw * 0.75, 21.0, 0.44, 2.6, 0.24, mix(uDropTint, uSkyMid, 0.28), mistAmt * 0.6, 0.26, 0.5);
     col = ridge(col, vp, ax + yaw * 1.10 + uParallax.x * 0.8, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35, 0.32, 0.8);
