@@ -9,6 +9,7 @@
 
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
+import { BIRDS_GLSL } from './birds.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -226,15 +227,8 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, hedge, onFg);
     }
 
-    // ── 鳥影（谷をゆっくり横切る） ──
-    for (int bi = 0; bi < 2; bi++) {
-      float bfi = float(bi);
-      float bx = fract(t * 0.010 * mo + bfi * 0.4) * 2.6 - 1.3;
-      float by = 0.70 + bfi * 0.03 + sin(t * 0.3 + bfi) * 0.012;
-      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - by); bp.x = abs(bp.x);
-      float wing = smoothstep(0.009, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.020);
-      col = mix(col, col * 0.55, wing * 0.55);
-    }
+    // ── 鳥（はばたきながら谷の空を渡る） ──
+    col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, mo);
 
     // ── 季節の舞い無し（晴天）。窓ガラス現象 ──
     col = mix(applyGlass(col, p, t, uGlass), col, uWindowOpen);
@@ -276,6 +270,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
   return defines + body
 }

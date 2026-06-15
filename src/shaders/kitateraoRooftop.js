@@ -9,6 +9,7 @@
 
 import { GROUND_GLSL } from './ground.js'
 import { GRADE_GLSL } from './grade.js'
+import { BIRDS_GLSL } from './birds.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -196,15 +197,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float post = smoothstep(0.005, 0.0, abs(fract((p.x + yaw * 0.3) * 7.0) - 0.5)) * step(p.y, railY) * step(paraTop + 0.005, p.y);
     col = mix(col, vec3(0.16, 0.16, 0.18), clamp(max(rail, post * 0.85), 0.0, 1.0) * 0.8 * step(p.y, railY + 0.008));
 
-    // 鳥影
-    for (int bi = 0; bi < 2; bi++) {
-      float bfi = float(bi);
-      float bx = fract(t * 0.010 * mo + bfi * 0.4) * 2.6 - 1.3;
-      float by = 0.70 + bfi * 0.03 + sin(t * 0.3 + bfi) * 0.012;
-      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - by); bp.x = abs(bp.x);
-      float wing = smoothstep(0.009, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.020);
-      col = mix(col, col * 0.55, wing * 0.55);
-    }
+    // 鳥（はばたきながら弧を描いて屋上の空を渡る）
+    col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, mo);
 
     col = applyGrade(col, frag);
     // 「かすみを払う」: 水彩のモヤを払い、遠くまで見通す澄んだ眺めに
@@ -228,6 +222,6 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     .replace('//__GROUND__', GROUND_GLSL)
-    .replace('void main()', GRADE_GLSL + '\n  void main()')
+    .replace('void main()', GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
   return defines + body
 }

@@ -4,6 +4,7 @@
 
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
+import { BIRDS_GLSL } from './birds.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -125,16 +126,8 @@ const FRAGMENT_BODY = /* glsl */ `
     col = ridge(col, vp, ax + yaw * 1.10 + uParallax.x * 0.8, 37.0, 0.34, 3.4, 0.28, mix(uDropTint, vec3(0.10, 0.15, 0.10), 0.35), mistAmt * 0.35, 0.32, 0.8);
     col = ridge(col, vp, ax + yaw * 1.55 + uParallax.x * 1.4, 53.0, 0.20, 4.6, 0.30, vec3(0.08, 0.12, 0.08), 0.0, 0.38, 1.0);
 
-    // 渡り鳥の影（V字が空をゆっくり横切る）
-    for (int bi = 0; bi < 3; bi++) {
-      float bfi = float(bi);
-      float bx = fract(t * 0.011 + bfi * 0.33) * 2.6 - 1.3;
-      float by = 0.74 + bfi * 0.03 + sin(t * 0.3 + bfi) * 0.012;
-      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - by);
-      bp.x = abs(bp.x);
-      float wing = smoothstep(0.010, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.022);
-      col = mix(col, col * 0.55, wing * 0.6);
-    }
+    // 渡り鳥（はばたきながら弧を描いて山あいの空を渡る）
+    col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, 1.0);
 
     // ガラス現象（雪・雨）
     col = applyGlass(col, p, t, uGlass);
@@ -164,6 +157,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
   return defines + body
 }

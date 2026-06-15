@@ -7,6 +7,7 @@
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { GROUND_GLSL } from './ground.js'
+import { BIRDS_GLSL } from './birds.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -267,16 +268,8 @@ const FRAGMENT_BODY = /* glsl */ `
                * smoothstep(0.62, 0.85, vp.y);
     col += vec3(0.9, 0.93, 1.0) * star * nightAmt * 0.7;
 
-    // 帰る鳥影（ごくたまに、ゆっくり）。2羽だけ＝静けさを保つ
-    for (int i = 0; i < 2; i++) {
-      float fi = float(i);
-      float bx = fract(uTime * 0.008 + fi * 0.5) * 2.6 - 1.3;
-      float byb = 0.66 + fi * 0.05 + sin(uTime * 0.25 + fi) * 0.010;
-      vec2 bp = vec2((ax + yaw * 0.5) - bx, vp.y - byb);
-      bp.x = abs(bp.x);
-      float wing = smoothstep(0.009, 0.0, abs(bp.y - bp.x * 0.4)) * step(bp.x, 0.020);
-      col = mix(col, col * 0.55, wing * 0.5);
-    }
+    // 帰る鳥影（はばたきながら弧を描いて空を渡る）。
+    col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), uTime, 1.0 - uReduceMotion);
 
     // 時間とともに窓に灯がともる（夕暮れが深まる郷愁）
     float litRamp = 0.7 + 0.3 * smoothstep(0.0, 90.0, uTime);
@@ -629,7 +622,8 @@ const QUALITY_DEFINES = {
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
-    .replace('//__GROUND__', GROUND_GLSL) // 地面関数は outsideView より前に定義する必要がある
+    // 地面・鳥の関数は outsideView より前に定義する必要がある（outsideView から呼ぶため）
+    .replace('//__GROUND__', GROUND_GLSL + '\n' + BIRDS_GLSL)
     .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
   return defines + body
 }
