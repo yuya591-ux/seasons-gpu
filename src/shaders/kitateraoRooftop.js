@@ -67,15 +67,20 @@ const FRAGMENT_BODY = /* glsl */ `
   vec3 longBuilding(vec3 col, vec2 vp, float cxScreen, float w, float baseY, float topY, vec3 wallC, float nightAmt) {
     float dx = abs(vp.x - cxScreen);
     float on = step(dx, w) * step(baseY, vp.y) * step(vp.y, topY);
-    vec3 wc = wallC * (1.0 - 0.5 * nightAmt);
-    // 窓の列（横帯×縦割り）
     float fy = (vp.y - baseY) / max(topY - baseY, 0.001);
+    vec3 wc = wallC * (1.0 - 0.5 * nightAmt);
+    // 縦の陰影（上ほど明るく足元は接地影）＋両端のAO＝平らな箱でなく壁に
+    wc *= 0.80 + 0.22 * fy;
+    wc *= 0.90 + 0.10 * smoothstep(w, w * 0.45, dx);
+    // 窓の列（横帯×縦割り）
     float floors = smoothstep(0.25, 0.4, fract(fy * 4.0)) * smoothstep(0.9, 0.75, fract(fy * 4.0));
     float cols = smoothstep(0.2, 0.32, fract((vp.x - cxScreen) * 90.0)) * smoothstep(0.85, 0.72, fract((vp.x - cxScreen) * 90.0));
     float win = floors * cols;
     vec3 winC = mix(wc * 0.8, mix(uSunGlow, vec3(1.0, 0.92, 0.7), 0.3), 0.3 + 0.6 * nightAmt);
-    wc = mix(wc, winC, win * 0.8);
-    wc += uSunGlow * 0.06; // 陽
+    wc = mix(wc, winC, win * 0.7);
+    // 陸屋根のパラペット（屋上の縁＝少し暗い帯）で天面を締める
+    wc = mix(wc, wallC * 0.58, smoothstep(topY - 0.007, topY - 0.001, vp.y) * step(vp.y, topY));
+    wc += uSunGlow * 0.03; // 陽（控えめ）
     return mix(col, wc, on);
   }
 
@@ -125,7 +130,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float sx = 0.5 + (0.0 - yaw) / asp;
       float yard = step(abs(vp.x - sx), 0.15) * step(0.434, vp.y) * step(vp.y, 0.458);   // 土の校庭
       col = mix(col, mix(vec3(0.64, 0.47, 0.35), uHorizon * 0.4, 0.3), yard * 0.85);
-      col = longBuilding(col, vp, sx - 0.02, 0.105, 0.458, 0.512, mix(vec3(0.80, 0.76, 0.68), uHorizon * 0.4, 0.22), nightAmt);
+      col = longBuilding(col, vp, sx - 0.02, 0.092, 0.458, 0.508, mix(vec3(0.72, 0.69, 0.62), uHorizon * 0.4, 0.34), nightAmt);
       // （さらに北奥）二ツ池の水面がちらり
       float pond = step(abs(vp.x - (sx + 0.05)), 0.045) * step(0.47, vp.y) * step(vp.y, 0.482);
       col = mix(col, mix(uSkyMid, uHorizon, 0.4) * 0.92, pond * 0.6);
