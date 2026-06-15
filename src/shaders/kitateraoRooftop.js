@@ -105,10 +105,21 @@ const FRAGMENT_BODY = /* glsl */ `
     // ── 空（広い屋上の空。澄んだ午後〜夕） ──
     vec3 col = mix(uHorizon, uSkyMid, smoothstep(0.43, 0.78, vp.y));
     col = mix(col, uSkyTop, smoothstep(0.74, 1.0, vp.y));
+    float dayAmt = 1.0 - nightAmt;                                   // 昼度（夜は太陽を出さない）
     vec2 sunC = vec2(-0.45 + sunAz - yaw * 0.2, 0.70);
     float sunDist = distance(vec2(ax, vp.y), sunC);
-    col += uSunGlow * exp(-sunDist * 3.0) * 0.45;
-    col = mix(col, vec3(1.0, 0.97, 0.9), smoothstep(0.05, 0.04, sunDist) * 0.7);
+    col += uSunGlow * exp(-sunDist * 3.0) * 0.45 * dayAmt;
+    col = mix(col, vec3(1.0, 0.97, 0.9), smoothstep(0.05, 0.04, sunDist) * 0.7 * dayAmt);
+    // 夜: 月と星（澄んだ夜空）
+    if (nightAmt > 0.4) {
+      vec2 mn = vec2(0.42 - yaw * 0.15, 0.78);
+      float md = distance(vec2(ax, vp.y), mn);
+      col = mix(col, vec3(0.96, 0.95, 0.90), smoothstep(0.045, 0.038, md) * nightAmt * 0.85); // 月
+      col += vec3(0.9, 0.92, 1.0) * exp(-md * 11.0) * nightAmt * 0.12;                         // 月のハロ
+      vec2 sg = vec2((ax + yaw * 0.12) * 13.0, vp.y * 13.0);
+      float star = step(0.95, h21(floor(sg) + 3.0)) * smoothstep(0.06, 0.0, length(fract(sg) - 0.5)) * smoothstep(0.6, 0.85, vp.y);
+      col += vec3(0.9, 0.93, 1.0) * star * nightAmt * 0.7;                                      // 星
+    }
     // 雲（積雲。ドメインワープでもくもく＋底面が夕日を受け＋縁に銀のリム＝立体的にそびえる雲）
     float cloudT = t * mo;
     float sunSide = smoothstep(0.4, -0.9, ax + yaw * 0.2 - sunAz);   // 太陽側(西=左)ほど暖色に燃える
@@ -127,7 +138,7 @@ const FRAGMENT_BODY = /* glsl */ `
       col += mix(uSunGlow, vec3(1.0), 0.3) * rim * (0.16 + 0.5 * sunSide) * smoothstep(0.50, 1.0, vp.y) * (0.6 - fl * 0.2);
     }
     // 薄明光線（god rays）: 夕日から放射する光の筋＝広い屋上の空の立体感
-    col = godRays(col, vec2(ax, vp.y), sunC, uSunGlow * 0.14, uTime, smoothstep(0.43, 0.55, vp.y));
+    col = godRays(col, vec2(ax, vp.y), sunC, uSunGlow * 0.14 * dayAmt, uTime, smoothstep(0.43, 0.55, vp.y));
 
     // ── 遠景の森の尾根（市民の森）。ぐるりを囲む丘 ──
     float wx = ax + yaw * 0.55;
