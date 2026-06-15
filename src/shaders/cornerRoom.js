@@ -408,6 +408,15 @@ const FRAGMENT_BODY = /* glsl */ `
     roomRefl += uSunGlow * 0.06 * smoothstep(0.03, 0.0, abs(wp.y - 0.40)) * nightRefl; // 室内の横帯（棚など）
     outside = mix(outside, outside * (0.86 - 0.10 * nightRefl) + roomRefl, reflAmt);
 
+    // 窓ガラスの微かな拭き筋・埃（明るい空を背景にした時だけ薄く見える＝本物の窓の気配）。
+    // 暗い街並みの上では出さず、清潔感を保つ。
+    float gLuma = dot(outside, vec3(0.299, 0.587, 0.114));
+    float streak = fbm(vec2(wp.x * 4.0, wp.y * 26.0)) - 0.5;  // 縦に伸びる拭き筋
+    float dust = fbm(vec2(wp.x * 9.0, wp.y * 9.0)) - 0.5;     // まだらな埃
+    float film = (streak * 0.55 + dust * 0.45) * smoothstep(0.42, 0.82, gLuma) * aperture;
+    outside += uSunGlow * max(film, 0.0) * 0.06;             // 光を受けた埃がうっすら明るむ
+    outside -= max(-film, 0.0) * 0.025;                     // 拭き筋のわずかな陰
+
     // ── 室内（翳った壁・窓の見込み(reveal)・窓台・床に落ちる窓あかり） ──
     // 室内は暗い暖色グレー（窓を主役にするため翳らせる）。窓に近い壁ほど外光を受けて明るい。
     vec3 wallCol = mix(vec3(0.032, 0.028, 0.032), uHorizon * 0.12, 0.45);
