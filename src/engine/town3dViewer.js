@@ -10,11 +10,11 @@ const lerp = (a, b, t) => a + (b - a) * t
 
 // トゥーンの段階を作る勾配テクスチャ（3段）。やわらかいセル影。
 function makeGradient(THREE) {
-  const data = new Uint8Array([190, 206, 222, 240, 255]) // ほぼ平坦な柔らかい段階＝手描きイラスト調の陰影（硬い面を出さない）
+  const data = new Uint8Array([182, 200, 216, 232, 248, 255]) // やわらかい段階。Linear補間で陰影をなめらかに（硬い面・トゥーンの帯を出さない＝丸く見える）
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat)
   tex.needsUpdate = true
-  tex.magFilter = THREE.NearestFilter
-  tex.minFilter = THREE.NearestFilter
+  tex.magFilter = THREE.LinearFilter // Nearest→Linear: 陰影の境界を平滑化して角ばり/CG感を減らす
+  tex.minFilter = THREE.LinearFilter
   return tex
 }
 
@@ -136,6 +136,26 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xeaf0ff, size: 1.4, sizeAttenuation: false, fog: false })))
   }
 
+  // 地平のやわらかな光のにじみ（夕陽/街あかりのグロー）。重いポスト処理を使わず、加算スプライト1枚で
+  // 大気のグローを出す（モバイル配慮）。空に光源のにじみがあるだけで“様式化された高品質”に近づく。
+  {
+    const gc = document.createElement('canvas'); gc.width = gc.height = 128
+    const gx = gc.getContext('2d')
+    const grd2 = gx.createRadialGradient(64, 64, 0, 64, 64, 64)
+    grd2.addColorStop(0, 'rgba(255,255,255,0.85)')
+    grd2.addColorStop(0.3, 'rgba(255,255,255,0.40)')
+    grd2.addColorStop(1, 'rgba(255,255,255,0)')
+    gx.fillStyle = grd2; gx.fillRect(0, 0, 128, 128)
+    const glowTex = new THREE.CanvasTexture(gc)
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTex, color: sunCol.clone().lerp(new THREE.Color(0xffffff), 0.35),
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: isNight ? 0.33 : 0.55,
+    }))
+    glow.position.set(0, 16, -190) // 遠い地平。手前の街に隠れて“街の向こうのにじみ”になる
+    glow.scale.set(220, 120, 1)    // 横長＝地平の光の帯
+    scene.add(glow)
+  }
+
   const grad = makeGradient(THREE)
   const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
 
@@ -194,16 +214,27 @@ export async function mountTown3d(parent, opts = {}) {
     return vy + bump
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
+  // 2層構成: 低周波の大きな色斑（草地・土・陰りの“面”の多様さ＝絵画的な地面）＋高周波の細かなムラ（手触り）。
   function makeMottle(baseHex, n, lightSpread) {
-    const c = document.createElement('canvas'); c.width = c.height = 256
+    const S = 320
+    const c = document.createElement('canvas'); c.width = c.height = S
     const x = c.getContext('2d')
     const base = new THREE.Color(baseHex)
-    x.fillStyle = '#' + base.getHexString(); x.fillRect(0, 0, 256, 256)
+    x.fillStyle = '#' + base.getHexString(); x.fillRect(0, 0, S, S)
+    // 大きな色斑（面の変化）: 色相・明度を広めに振り、草地に土や陰りの“地帯”を作る。タイル感を避けるため大半径。
+    const big = Math.max(7, Math.round(n * 0.14))
+    for (let i = 0; i < big; i++) {
+      const col = base.clone().offsetHSL((R() - 0.5) * 0.05, (R() - 0.5) * 0.13, (R() - 0.5) * lightSpread * 1.9)
+      x.globalAlpha = 0.06 + R() * 0.11
+      x.fillStyle = '#' + col.getHexString()
+      x.beginPath(); x.arc(R() * S, R() * S, 70 + R() * 110, 0, 6.283); x.fill()
+    }
+    // 細かなムラ（手描きの手触り）
     for (let i = 0; i < n; i++) {
       const col = base.clone().offsetHSL((R() - 0.5) * 0.03, (R() - 0.5) * 0.06, (R() - 0.5) * lightSpread)
       x.globalAlpha = 0.05 + R() * 0.10
       x.fillStyle = '#' + col.getHexString()
-      x.beginPath(); x.arc(R() * 256, R() * 256, 12 + R() * 46, 0, 6.283); x.fill()
+      x.beginPath(); x.arc(R() * S, R() * S, 15 + R() * 58, 0, 6.283); x.fill()
     }
     x.globalAlpha = 1
     const t = new THREE.CanvasTexture(c)
@@ -228,7 +259,7 @@ export async function mountTown3d(parent, opts = {}) {
     g.computeVertexNormals()
     // 季節で地面の色を替える（雪=淡い白／春=新緑／秋=枯草／夏=くすんだ草地。蛍光緑を避ける）
     const groundHex = weather === 'snow' ? 0xe2e8ec : season === 'spring' ? 0x93a35a : season === 'autumn' ? 0x9c8a4e : 0x8a9060
-    const ground = new THREE.Mesh(g, mottleMat(groundHex, 160, 0.13, [7, 7])) // 草地にムラ＝水彩の手触り
+    const ground = new THREE.Mesh(g, mottleMat(groundHex, 210, 0.15, [4, 4])) // 草地に大小のムラ＝絵画的な地面（反復を減らし大きな色斑を効かせる）
     ground.receiveShadow = true
     town.add(ground)
   }
@@ -450,11 +481,15 @@ export async function mountTown3d(parent, opts = {}) {
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 2.0, 5), trunkMat)
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 2.0, 8), trunkMat) // 幹を8角＝丸く
     tr.position.y = 1.0; g.add(tr)
     const r = 1.6 + R() * 1.4
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMats[(R() * leafMats.length) | 0])
-    leaf.position.y = 2.0 + r * 0.7; leaf.castShadow = true; g.add(leaf)
+    // 葉は分割1の丸い塊＋もう一塊を重ね、角ばりを消して自然な樹冠に（detail0の20面の角を解消）。
+    const leafMat = leafMats[(R() * leafMats.length) | 0]
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMat)
+    leaf.position.y = 2.0 + r * 0.7; leaf.scale.set(1.05, 0.92 + R() * 0.18, 1.05); leaf.castShadow = true; g.add(leaf)
+    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.72, 1), leafMat)
+    leaf2.position.set((R() - 0.5) * r * 0.9, 2.0 + r * 1.25, (R() - 0.5) * r * 0.9); g.add(leaf2) // 上に小さな塊＝樹冠の膨らみ
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
     treesArr.push(g)
@@ -603,7 +638,7 @@ export async function mountTown3d(parent, opts = {}) {
       const ang = (i / 8 - 0.5) * Math.PI * 1.1
       const x = Math.sin(ang) * dist + (R() - 0.5) * 30
       const z = -Math.cos(ang) * dist - 30
-      const m = new THREE.Mesh(new THREE.ConeGeometry(42 + R() * 28, 34 + R() * 28, 5), toon((layer === 0 ? mtnNear : mtnFar).getHex()))
+      const m = new THREE.Mesh(new THREE.ConeGeometry(42 + R() * 28, 34 + R() * 28, 7), toon((layer === 0 ? mtnNear : mtnFar).getHex()))
       m.position.set(x, baseY, z); m.rotation.y = R() * 6
       scene.add(m)
     }
