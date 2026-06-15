@@ -97,6 +97,28 @@ export async function mountTown3d(parent, opts = {}) {
 
   const grad = makeGradient(THREE)
   const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
+
+  // 窓のテクスチャ（壁に窓の列。乗算マップ＝白地に灰の窓＋夕方に灯る暖色のemissive）。
+  function makeWinTex(lit, seed) {
+    const c = document.createElement('canvas'); c.width = 32; c.height = 32
+    const g = c.getContext('2d')
+    g.fillStyle = lit ? '#000000' : '#ffffff'; g.fillRect(0, 0, 32, 32)
+    let s = seed * 2654435761
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff }
+    for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) {
+      if (lit) { g.fillStyle = rnd() < 0.45 ? '#ffd089' : '#0a0a0a' }
+      else { g.fillStyle = '#6f6f78' }
+      g.fillRect(4 + xx * 9, 4 + yy * 7, 5.5, 4.5)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.magFilter = THREE.NearestFilter
+    return t
+  }
+  const winMapBase = makeWinTex(false, 1)
+  const winEmis = [makeWinTex(true, 3), makeWinTex(true, 11), makeWinTex(true, 29), makeWinTex(true, 53)]
+  // 夕方度（空が暗いほど窓が灯る）
+  const duskAmt = Math.min(1, Math.max(0, 1.0 - skyTop.r * 0.9))
   const rng = (seed) => { let s = seed * 9301 + 49297; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280 } }
   const R = rng(7)
 
@@ -128,7 +150,15 @@ export async function mountTown3d(parent, opts = {}) {
   function house(x, z, w, d, h, gable) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(wallCols[(R() * wallCols.length) | 0]))
+    const wm = toon(wallCols[(R() * wallCols.length) | 0])
+    const rep = Math.max(1, Math.round(w / 2.6)), repV = Math.max(1, Math.round(h / 2.4))
+    const m = winMapBase.clone(); m.repeat.set(rep, repV); m.needsUpdate = true
+    wm.map = m
+    if (duskAmt > 0.12) { // 夕方は窓が灯る
+      const e = winEmis[(R() * winEmis.length) | 0].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
+      wm.emissiveMap = e; wm.emissive = new THREE.Color(0xffcaa0); wm.emissiveIntensity = 0.45 + duskAmt * 0.9
+    }
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wm)
     body.position.y = h / 2
     body.castShadow = true; body.receiveShadow = true
     g.add(body)
@@ -201,18 +231,23 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 木立（トゥーンの丸い樹冠＋幹） ──
   const trunkMat = toon(0x6b4a2e)
   const leafMats = [toon(0x5c7c46), toon(0x6f9050), toon(0x4f6e3e)]
-  for (let i = 0; i < 60; i++) {
-    const x = (R() - 0.5) * 130, z = (R() - 0.5) * 120
-    if (Math.abs(x) < 4 && z > -2) continue
+  function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2.0, 5), trunkMat)
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 2.0, 5), trunkMat)
     tr.position.y = 1.0; g.add(tr)
     const r = 1.6 + R() * 1.4
     const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMats[(R() * 3) | 0])
     leaf.position.y = 2.0 + r * 0.7; leaf.castShadow = true; g.add(leaf)
-    g.position.set(x, gy, z); g.scale.setScalar(0.8 + R() * 0.7); town.add(g)
+    g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
   }
+  for (let i = 0; i < 60; i++) {
+    const x = (R() - 0.5) * 130, z = (R() - 0.5) * 120
+    if (Math.abs(x) < 4 && z > -2) continue
+    tree(x, z, 0.8 + R() * 0.7)
+  }
+  // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
+  for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
 
   // ── 祝賀のアドバルーン（紅白の気球＋係留索） ──
   {
@@ -238,17 +273,17 @@ export async function mountTown3d(parent, opts = {}) {
   // ── ふわふわの雲（白い球の塊＝立体的な積雲） ──
   const clouds = []
   const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 11; i++) {
     const g = new THREE.Group()
-    const n = 3 + ((R() * 4) | 0)
+    const n = 4 + ((R() * 4) | 0)
     for (let j = 0; j < n; j++) {
-      const s = 4 + R() * 5
+      const s = 5 + R() * 6
       const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), cloudMat)
-      puff.position.set((R() - 0.5) * 14, (R() - 0.5) * 3, (R() - 0.5) * 8)
-      puff.scale.y = 0.7
+      puff.position.set((R() - 0.5) * 18, (R() - 0.5) * 3, (R() - 0.5) * 9)
+      puff.scale.y = 0.66
       g.add(puff)
     }
-    g.position.set((R() - 0.5) * 220, 48 + R() * 26, -40 - R() * 120)
+    g.position.set((R() - 0.5) * 240, 34 + R() * 20, -55 - R() * 80)
     scene.add(g); clouds.push(g)
   }
 
