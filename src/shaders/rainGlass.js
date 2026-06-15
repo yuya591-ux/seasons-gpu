@@ -68,6 +68,21 @@ const FRAGMENT_BODY = /* glsl */ `
     // 太陽の光芒（地平やや上、画面中央寄り）。雨で弱める。
     float glow = exp(-distance(uv, vec2(0.5, 0.18)) * 3.4);
     col += uSunGlow * glow * (0.9 - 0.35 * uIntensity);
+    // ── 雨ににじむ夕暮れの下町（窓の外。すりガラス越しでぼんやりと） ──
+    // 地平の家並みのシルエット（ゆるい起伏＝場所の気配）
+    float roofY = 0.205 + sin(uv.x * 8.0 + 1.0) * 0.014 + sin(uv.x * 21.0) * 0.008;
+    float roof = smoothstep(roofY + 0.006, roofY - 0.006, y);
+    col = mix(col, mix(uHorizon, vec3(0.16, 0.12, 0.16), 0.62), roof * 0.78);
+    // にじむ街あかり（暖色のボケ。雨で大きく柔らかく、ゆっくり瞬く）。水滴越しに屈折してきらめく。
+    for (int i = 0; i < 8; i++) {
+      float fi = float(i);
+      vec2 lp = vec2(hash21(vec2(fi, 1.3)), 0.085 + 0.12 * hash21(vec2(fi, 2.7)));
+      float d = distance(uv, lp);
+      float tw = 0.75 + 0.25 * sin(uTime * 0.4 + fi * 2.1);
+      vec3 lc = mix(uSunGlow, vec3(1.0, 0.78, 0.5), hash21(vec2(fi, 3.1)));
+      lc = mix(lc, vec3(0.7, 0.85, 1.0), step(0.82, hash21(vec2(fi, 4.5))) * 0.7); // たまに白い灯り
+      col += lc * exp(-d * 26.0) * 0.42 * tw;
+    }
     return col;
   }
 
