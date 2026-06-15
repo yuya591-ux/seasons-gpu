@@ -81,11 +81,16 @@ export async function mountTown3d(parent, opts = {}) {
 
   const scene = new THREE.Scene()
   const pal = opts.palette || {}
+  const season = opts.season || 'summer' // 季節で地面・木の色を替える
+  const weather = opts.weather || null    // 'snow' | 'petals' | null（降るもの）
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
-  // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）
-  scene.fog = new THREE.Fog(skyHorizon.clone().lerp(skyTop, 0.5).getHex(), 55, 215)
+  // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）。雪は濃く冷たく。
+  const fogCol = weather === 'snow'
+    ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.55).getHex()
+    : skyHorizon.clone().lerp(skyTop, 0.5).getHex()
+  scene.fog = new THREE.Fog(fogCol, weather === 'snow' ? 42 : 55, weather === 'snow' ? 180 : 215)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
   {
@@ -177,7 +182,9 @@ export async function mountTown3d(parent, opts = {}) {
       pos.setY(i, heightAt(x, z))
     }
     g.computeVertexNormals()
-    const ground = new THREE.Mesh(g, toon(0x8a9060)) // くすんだ草地（蛍光緑を避ける）
+    // 季節で地面の色を替える（雪=淡い白／春=新緑／秋=枯草／夏=くすんだ草地。蛍光緑を避ける）
+    const groundHex = weather === 'snow' ? 0xe2e8ec : season === 'spring' ? 0x93a35a : season === 'autumn' ? 0x9c8a4e : 0x8a9060
+    const ground = new THREE.Mesh(g, toon(groundHex))
     ground.receiveShadow = true
     town.add(ground)
   }
@@ -384,7 +391,15 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
   const trunkMat = toon(0x6b4a2e)
-  const leafMats = [toon(0x5c7c46), toon(0x6f9050), toon(0x4f6e3e)]
+  // 季節で葉の色を替える（春=桜と新緑の混在／秋=紅葉／冬=暗い常緑／夏=緑）
+  const leafMats =
+    season === 'spring'
+      ? [toon(0xe9b8cf), toon(0xf0c8d8), toon(0x8fb06a), toon(0xe6acc6), toon(0x7fa05c)]
+      : season === 'autumn'
+        ? [toon(0xc97a3a), toon(0xd89a4a), toon(0xa85a36), toon(0x8a7a3e)]
+        : weather === 'snow'
+          ? [toon(0x4e6048), toon(0x586a50), toon(0x44543e)]
+          : [toon(0x5c7c46), toon(0x6f9050), toon(0x4f6e3e)]
   const treesArr = []
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
@@ -392,7 +407,7 @@ export async function mountTown3d(parent, opts = {}) {
     const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 2.0, 5), trunkMat)
     tr.position.y = 1.0; g.add(tr)
     const r = 1.6 + R() * 1.4
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMats[(R() * 3) | 0])
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMats[(R() * leafMats.length) | 0])
     leaf.position.y = 2.0 + r * 0.7; leaf.castShadow = true; g.add(leaf)
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
@@ -539,6 +554,34 @@ export async function mountTown3d(parent, opts = {}) {
     town.add(g); peeps.push(g)
   }
 
+  // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
+  let weatherPts = null
+  if (weather === 'snow' || weather === 'petals') {
+    const N = weather === 'snow' ? 700 : 420
+    const pos = new Float32Array(N * 3)
+    const spd = new Float32Array(N) // 個別の落下速度
+    const phs = new Float32Array(N) // 横揺れ位相
+    for (let i = 0; i < N; i++) {
+      pos[i * 3] = (R() - 0.5) * 200
+      pos[i * 3 + 1] = R() * 80
+      pos[i * 3 + 2] = -120 + R() * 170
+      spd[i] = (weather === 'snow' ? 4 : 2.4) * (0.6 + R() * 0.8)
+      phs[i] = R() * 6.28
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const mat = new THREE.PointsMaterial({
+      color: weather === 'snow' ? 0xfdfdff : 0xf2bcd0,
+      size: weather === 'snow' ? 0.5 : 0.85,
+      transparent: true, opacity: weather === 'snow' ? 0.92 : 0.85,
+      sizeAttenuation: true, fog: true, depthWrite: false,
+    })
+    const pts = new THREE.Points(geo, mat)
+    pts.frustumCulled = false
+    scene.add(pts)
+    weatherPts = { pts, pos, spd, phs, N, swirl: weather === 'petals' ? 2.6 : 0.9 }
+  }
+
   // ── カメラ（高台のマンション上階の窓から街を見下ろす） ──
   const camera = new THREE.PerspectiveCamera(62, W / H, 0.5, 600)
   const eye = new THREE.Vector3(0, 31, 30) // 上階の窓の目線（高く・街の手前）
@@ -610,6 +653,18 @@ export async function mountTown3d(parent, opts = {}) {
       ferris.wheel.rotation.z += dt * 0.12
       const wr = ferris.wheel.rotation.z
       for (const g of ferris.gondolas) g.rotation.z = -wr
+    }
+    // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
+    if (weatherPts) {
+      const { pos, spd, phs, N, swirl } = weatherPts
+      for (let i = 0; i < N; i++) {
+        const k = i * 3
+        pos[k + 1] -= spd[i] * dt
+        pos[k] += Math.sin(t * 0.6 + phs[i]) * swirl * dt
+        pos[k + 2] += Math.cos(t * 0.4 + phs[i]) * swirl * 0.4 * dt
+        if (pos[k + 1] < -14) { pos[k + 1] = 66 + R() * 12; pos[k] = (R() - 0.5) * 200 }
+      }
+      weatherPts.pts.geometry.attributes.position.needsUpdate = true
     }
     // 鳥がはばたきながら空を渡る
     for (const b of birds) {

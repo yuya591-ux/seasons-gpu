@@ -140,7 +140,11 @@ function start() {
       renderer.pause()
       if (splatMode) { splatMode = false; await unmountSplat() }
       try {
-        await mountTown3d(document.body, { palette: (next.palette && next.palette.early) || null })
+        await mountTown3d(document.body, {
+          palette: (next.palette && next.palette.early) || null,
+          season: (next.axes && next.axes.season) || 'summer',
+          weather: next.town3dWeather || null, // 'snow' | 'petals'（降るもの）
+        })
         if (gen !== sceneGen) { await unmountTown3d(); return }
       } catch (e) {
         console.error('3Dの街 表示失敗→通常情景へ:', e)

@@ -19,6 +19,8 @@ import kitateraoRooftop from './kitaterao-rooftop.js'
 import kitateraoRooftopNight from './kitaterao-rooftop-night.js'
 import kitateraoWindow3d from './kitaterao-window-3d.js'
 import kitateraoWindow3dNight from './kitaterao-window-3d-night.js'
+import kitateraoWindow3dSnow from './kitaterao-window-3d-snow.js'
+import kitateraoWindow3dSpring from './kitaterao-window-3d-spring.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
@@ -42,6 +44,8 @@ export const SCENES = [
   kitateraoRooftopNight,
   kitateraoWindow3d,
   kitateraoWindow3dNight,
+  kitateraoWindow3dSnow,
+  kitateraoWindow3dSpring,
   panoDemo,
   splatDemo,
   roomDemo,

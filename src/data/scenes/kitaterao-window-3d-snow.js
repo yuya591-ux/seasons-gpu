@@ -1,0 +1,37 @@
+// 窓辺シリーズ「北寺尾の窓辺、雪の立体の街」。本物の3D（Three.js）の坂の街に、
+// 雪が静かに舞い降りる冬の夕暮れ。地面は淡く白み、常緑は暗く沈み、霞は冷たく濃い。
+// 観覧車は雪の向こうにぼんやり灯る。窓をあけ、身を乗り出して雪の街を見渡せる。
+
+export default {
+  id: 'kitaterao-window-3d-snow',
+  axes: { season: 'winter', weather: 'snow', time: 'dusk' },
+  label: '北寺尾の窓辺、雪の立体の街',
+  desc: '本物の3Dで組んだ坂の街に、粉雪が舞う冬の夕暮れ。白んだ街を窓から見下ろす立体の眺め。',
+  status: 'ready',
+  render: 'town3d', // Three.js ビューア（src/engine/town3dViewer.js）
+  town3dWeather: 'snow', // 雪を降らせる
+
+  palette: {
+    early: {
+      skyTop: '#9fb2c8', // 雪雲の鈍色（やや明るい夕方前）
+      skyMid: '#c3cdd8',
+      horizon: '#e6e2dc', // 雪明かりの淡い地平
+      sunGlow: '#f2ead8',
+      dropTint: '#5a6470', // 冷たい影色
+    },
+    late: {
+      skyTop: '#7c8aa0', // 暮れてゆく鈍色
+      skyMid: '#aab2c0',
+      horizon: '#e2cdb4', // ほのかな残照
+      sunGlow: '#f0dcc0',
+      dropTint: '#4e5664',
+    },
+  },
+  driftPeriod: 320,
+  phenomena: {},
+
+  // 冬の窓辺の風（既存のCC0素材を再利用）。
+  sounds: [
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.16, loop: true },
+  ],
+}
