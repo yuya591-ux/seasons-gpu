@@ -39,6 +39,15 @@
 - カモメは実在種 *Chroicocephalus ridibundus*（ユリカモメ）の群れの鳴き声。1971年5月、英国サフォーク州 Havergate Island の湿地で録音。
 - 変更点：Ogg→MP3 へ変換し、波の上にそっと重ねてループ再生。CC BY-SA 素材は同ライセンス継承。
 
+### 情景「秋の夕暮れ、高台の角部屋」 — `public/audio/autumn-dusk-corner-room/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| 虫の音 | `crickets.mp3` | "Grillo (Cricket)" / Luisalvaz | CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/ | https://commons.wikimedia.org/wiki/File:Grillo_(Cricket).ogg |
+
+- 草むらのコオロギ（*Gryllidae*）の合唱。2014年9月、TASCAM DR-07 で録音。秋の夜長の気配に。
+- 変更点：Ogg→MP3 へ変換しループ再生。ヒグラシ・風（既存）と重ねる。CC BY-SA 素材は同ライセンス継承。
+
 ### 情景「夏の夕暮れ、高台の下町」 — `public/audio/summer-dusk-downtown/`
 
 | レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
