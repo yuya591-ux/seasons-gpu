@@ -174,6 +174,29 @@ export async function mountTown3d(parent, opts = {}) {
     const bump = Math.sin(x * 0.06 + 1.0) * 1.5 + Math.cos(z * 0.05) * 1.7 + Math.sin((x + z) * 0.13) * 0.9
     return vy + bump
   }
+  // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
+  function makeMottle(baseHex, n, lightSpread) {
+    const c = document.createElement('canvas'); c.width = c.height = 256
+    const x = c.getContext('2d')
+    const base = new THREE.Color(baseHex)
+    x.fillStyle = '#' + base.getHexString(); x.fillRect(0, 0, 256, 256)
+    for (let i = 0; i < n; i++) {
+      const col = base.clone().offsetHSL((R() - 0.5) * 0.03, (R() - 0.5) * 0.06, (R() - 0.5) * lightSpread)
+      x.globalAlpha = 0.05 + R() * 0.10
+      x.fillStyle = '#' + col.getHexString()
+      x.beginPath(); x.arc(R() * 256, R() * 256, 12 + R() * 46, 0, 6.283); x.fill()
+    }
+    x.globalAlpha = 1
+    const t = new THREE.CanvasTexture(c)
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    return t
+  }
+  const mottleMat = (baseHex, n, spread, rep) => {
+    const m = new THREE.MeshToonMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
+    m.map.repeat.set(rep[0], rep[1])
+    return m
+  }
+
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
     const g = new THREE.PlaneGeometry(280, 300, 60, 64)
@@ -186,7 +209,7 @@ export async function mountTown3d(parent, opts = {}) {
     g.computeVertexNormals()
     // 季節で地面の色を替える（雪=淡い白／春=新緑／秋=枯草／夏=くすんだ草地。蛍光緑を避ける）
     const groundHex = weather === 'snow' ? 0xe2e8ec : season === 'spring' ? 0x93a35a : season === 'autumn' ? 0x9c8a4e : 0x8a9060
-    const ground = new THREE.Mesh(g, toon(groundHex))
+    const ground = new THREE.Mesh(g, mottleMat(groundHex, 160, 0.13, [7, 7])) // 草地にムラ＝水彩の手触り
     ground.receiveShadow = true
     town.add(ground)
   }
@@ -199,7 +222,7 @@ export async function mountTown3d(parent, opts = {}) {
       rp.setY(i, heightAt(lx, lz - 35) + 0.07)
     }
     rg.computeVertexNormals()
-    const road = new THREE.Mesh(rg, toon(0x474750))
+    const road = new THREE.Mesh(rg, mottleMat(0x474750, 90, 0.10, [2, 10])) // 舗装に濡れ・かすれのムラ
     road.position.z = -35; road.receiveShadow = true; town.add(road)
     // 横の通り（数本）
     for (const cz of [-6, -28, -50]) {

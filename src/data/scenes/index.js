@@ -26,6 +26,19 @@ import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
 
 export const SCENES = [
+  // 本物の3Dの坂の街（四季）＝アプリの主役。ギャラリーの先頭に並べて第一印象にする。
+  kitateraoWindow3d,
+  kitateraoWindow3dNight,
+  kitateraoWindow3dSnow,
+  kitateraoWindow3dSpring,
+  // 角部屋シリーズ（シェーダー）
+  autumnDuskCornerRoom,
+  autumnRainNightCornerRoom,
+  summerMorningCornerRoom,
+  springDuskCornerRoom,
+  springMorningCornerRoom,
+  winterSnowDuskCornerRoom,
+  // 下町・自然・その他のシェーダー情景
   summerRainDusk,
   summerClearNoon,
   summerDuskDowntown,
@@ -33,19 +46,9 @@ export const SCENES = [
   summerRainNightDowntown,
   summerMorningMountains,
   summerDuskSeaside,
-  autumnDuskCornerRoom,
-  autumnRainNightCornerRoom,
-  summerMorningCornerRoom,
-  springDuskCornerRoom,
-  springMorningCornerRoom,
-  winterSnowDuskCornerRoom,
   shishigayaMorningYato,
   kitateraoRooftop,
   kitateraoRooftopNight,
-  kitateraoWindow3d,
-  kitateraoWindow3dNight,
-  kitateraoWindow3dSnow,
-  kitateraoWindow3dSpring,
   panoDemo,
   splatDemo,
   roomDemo,
@@ -90,7 +93,8 @@ export function pickNowScene(date = new Date()) {
     let score = 0
     if (s.axes.season === season) score += 2
     if (s.axes.time === time) score += 2
-    if (s.render === 'cornerRoom') score += 1 // 体験の核を少し優先
+    if (s.render === 'town3d') score += 4 // 本物の3Dの街を主役に（その季節の立体の街で開く）
+    else if (s.render === 'cornerRoom') score += 1 // 角部屋は次点
     if (score > bestScore) {
       bestScore = score
       best = s
