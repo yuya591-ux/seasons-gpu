@@ -415,6 +415,11 @@ export async function mountTown3d(parent, opts = {}) {
   }
   frame()
 
+  // 紙・水彩のトーン（全情景と質感を統一する薄い紙目）。最前景の枠より下。
+  const paper = document.createElement('div')
+  paper.className = 'town3d-paper'
+  stage.appendChild(paper)
+
   // 窓枠（最前景のサッシ）。HTMLオーバーレイ。
   const frame2 = document.createElement('div')
   frame2.className = 'town3d-frame'
