@@ -142,6 +142,10 @@ export const GROUND_GLSL = /* glsl */ `
       float railLine = smoothstep(0.05, 0.012, abs(fract(fl) - 0.16)) * step(0.08, vfrac) * resid;
       wallCol = mix(wallCol, wallCol * 0.62, railLine * nearDetail * 0.55);        // 手すり下の陰
       wallCol += uSunGlow * 0.05 * sunFacing * smoothstep(0.018, 0.0, abs(fract(fl) - 0.16)) * resid * nearDetail; // 手すり上端の光
+      // 各階のスラブ（ベランダ床）が落とす水平の陰＝階ごとの段の立体（最近景のみ・横線で安定）
+      float slabLine = smoothstep(0.035, 0.0, abs(fract(fl) - 0.02)) * step(0.06, vfrac) * resid;
+      wallCol *= 1.0 - slabLine * nearDetail * 0.20;                               // 床スラブ下端の落ち影
+      wallCol += uSunGlow * 0.04 * sunFacing * smoothstep(0.012, 0.0, abs(fract(fl) - 0.06)) * resid * nearDetail; // スラブ上面に夕日
       vec2 ung = vec2(floor(fract(horizAngle * 1.7 + hGi.x * 0.6) * cols), floor(fl));
       float acBox = step(0.80, h21(ung + hGi + 50.0))
                   * smoothstep(0.10, 0.05, abs(colu - 0.5)) * smoothstep(0.06, 0.0, abs(fract(fl) - 0.52));
