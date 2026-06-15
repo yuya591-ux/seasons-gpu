@@ -143,7 +143,8 @@ function start() {
         await mountTown3d(document.body, {
           palette: (next.palette && next.palette.early) || null,
           season: (next.axes && next.axes.season) || 'summer',
-          weather: next.town3dWeather || null, // 'snow' | 'petals'（降るもの）
+          weather: next.town3dWeather || null, // 'snow' | 'petals' | 'leaves'（降るもの）
+          kind: next.town3dKind || 'town', // 'town'（坂の街）| 'yato'（谷戸）
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
       } catch (e) {

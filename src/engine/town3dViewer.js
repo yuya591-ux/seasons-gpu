@@ -84,7 +84,8 @@ export async function mountTown3d(parent, opts = {}) {
   const scene = new THREE.Scene()
   const pal = opts.palette || {}
   const season = opts.season || 'summer' // 季節で地面・木の色を替える
-  const weather = opts.weather || null    // 'snow' | 'petals' | null（降るもの）
+  const weather = opts.weather || null    // 'snow' | 'petals' | 'leaves' | null（降るもの）
+  const kind = opts.kind || 'town'        // 'town'（坂の街）| 'yato'（谷戸＝棚田と茅葺の屋敷）
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
@@ -164,10 +165,26 @@ export async function mountTown3d(parent, opts = {}) {
 
   const town = new THREE.Group()
   scene.add(town)
+  // 街専用の動くもの（谷戸では作らない）。描画ループから参照するので関数スコープで宣言。
+  let adBalloons = []
+  let cars = []
+  let peeps = []
+  let ferris = null
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
   const heightAt = (x, z) => {
+    if (kind === 'yato') {
+      // 谷戸の地形: 中央(|x|<13)が平らな谷底（棚田）、左右の里山が|x|で立ち上がり、奥で向かいの斜面が上がる。
+      let base
+      if (z > 6) base = (z - 6) * 0.6 + 1.5                       // 手前=自分の丘（カメラ側ほど高い）
+      else if (z > -46) base = -2.0 + Math.sin(z * 0.08) * 0.25   // 谷底（ほぼ平ら・低い）
+      else base = -2.0 + (-46 - z) * 0.42                         // 奥の向かいの斜面が立ち上がる
+      const sx = Math.max(0, Math.abs(x) - 13)
+      const hill = sx * 0.9 + Math.pow(sx * 0.12, 1.6) * 7.0       // 左右の里山（谷の縁から立ち上がる）
+      const bump = Math.sin(x * 0.08 + 1.3) * 0.7 + Math.cos(z * 0.07) * 0.6 + Math.sin((x + z) * 0.12) * 0.4
+      return base + hill + bump
+    }
     let vy
     if (z > 0) vy = z * 0.38 + 1.0                               // 手前の丘の肩（カメラ側ほど高い）
     else if (z > -52) vy = z * 0.17                              // 谷へ下る斜面（街が駆け下る）
@@ -214,8 +231,8 @@ export async function mountTown3d(parent, opts = {}) {
     ground.receiveShadow = true
     town.add(ground)
   }
-  // 中央の通り（舗装。電柱が沿い、車・人が行き交う）。地形に沿うリボン。
-  {
+  // 中央の通り（舗装。電柱が沿い、車・人が行き交う）。地形に沿うリボン。街のみ。
+  if (kind !== 'yato') {
     const rg = new THREE.PlaneGeometry(7.5, 130, 1, 56); rg.rotateX(-Math.PI / 2)
     const rp = rg.attributes.position
     for (let i = 0; i < rp.count; i++) {
@@ -235,7 +252,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
-  // ── 建物（低ポリの箱＋切妻屋根） ──
+  // ── 建物・ランドマーク（低ポリの箱＋切妻屋根）。街のみ（谷戸では作らない）。 ──
+  if (kind !== 'yato') {
   const wallCols = [0xd8cfbf, 0xcec0af, 0xc6c0b2, 0xc2b4a4, 0xd0c2ac, 0xbcc0b6]
   const roofCols = [0x59636e, 0x7a5e50, 0x4e5660, 0x6a6258, 0x5e6a5c, 0x86766a] // くすんだ瓦（スレート青/テラコッタ/紺/灰/苔/茶）
   function house(x, z, w, d, h, type) {
@@ -414,6 +432,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     prevTop = top
   }
+  } // ← 建物・ランドマーク（街のみ）ここまで
 
   // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
   const trunkMat = toon(0x6b4a2e)
@@ -439,17 +458,76 @@ export async function mountTown3d(parent, opts = {}) {
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
     treesArr.push(g)
   }
-  for (let i = 0; i < 140; i++) {
-    const x = (R() - 0.5) * 150, z = -100 + R() * 130
-    if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
-    tree(x, z, 0.7 + R() * 0.8)
+  if (kind === 'yato') {
+    // 里山（谷の左右と奥の斜面）を木々で覆う。谷底の棚田には木を置かない。
+    for (let i = 0; i < 155; i++) {
+      const x = (R() - 0.5) * 150, z = -92 + R() * 120
+      if (Math.abs(x) < 14 && z > -46 && z < 8) continue   // 谷底（棚田）は空ける
+      tree(x, z, 0.7 + R() * 0.9)
+    }
+    for (const c of [[-16, 19], [17, 20], [-21, 14], [21, 16]]) tree(c[0], c[1], 1.7 + R() * 0.5) // 手前の額装木立
+  } else {
+    for (let i = 0; i < 140; i++) {
+      const x = (R() - 0.5) * 150, z = -100 + R() * 130
+      if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
+      tree(x, z, 0.7 + R() * 0.8)
+    }
+    // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
+    for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
   }
-  // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
-  for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
 
-  // ── 祝賀のアドバルーン（赤い気球＋下がる細い垂れ幕＋係留索）。小ぶりで本物らしく。 ──
-  const adBalloons = []
-  {
+  // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
+  if (kind === 'yato') {
+    // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
+    const waterMat = toon(0x98bdd2) // 水を張った田（朝空を映す水色・少し濃く）
+    const riceMat = toon(0x6f8a44)  // 青田（稲の緑）
+    const earthMat = toon(0x9c8862) // 畑の土
+    for (let pz = -44; pz <= 2.5; pz += 5.6) {
+      for (let px = -11; px <= 11; px += 5.6) {
+        const jx = (R() - 0.5) * 0.5
+        const gy = heightAt(px + jx, pz)
+        const r = R()
+        const w = 4.9 + R() * 0.4
+        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w), r > 0.5 ? waterMat : (r > 0.25 ? riceMat : earthMat))
+        paddy.position.set(px + jx, gy + 0.12, pz); paddy.receiveShadow = true; town.add(paddy)
+      }
+    }
+    // せせらぎ（谷を縫う細い水の流れ。きらり）
+    for (let i = 0; i < 26; i++) {
+      const z = 2 - i * 1.9, x = Math.sin(z * 0.13 + 0.6) * 3.2 - 1.0, gy = heightAt(x, z)
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 2.0), toon(0xbcd2dc))
+      seg.position.set(x, gy + 0.18, z); town.add(seg)
+    }
+    // 横溝屋敷（谷の主役）: 茅葺の寄棟主屋＋長屋門。屋敷林に抱かれる。
+    {
+      const fx = 0, fz = -18, fgy = heightAt(fx, fz)
+      const g = new THREE.Group(); g.position.set(fx, fgy, fz); g.rotation.y = -0.16; g.scale.setScalar(1.25); town.add(g) // 主役なので大きめ
+      const body = new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 6.5), toon(0xe9e2d2)) // 主屋（白漆喰）
+      body.position.y = 1.6; body.castShadow = true; body.receiveShadow = true; g.add(body)
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(9.1, 1.0, 6.6), toon(0x5e4d3c)); skirt.position.y = 0.5; g.add(skirt) // 下見板（腰壁）
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(7.8, 5.2, 4), toon(0x6a5a3c)) // 茅葺の寄棟（大きく深い・濃い褐色で際立たせる）
+      roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.scale.set(1.0, 1.0, 0.7); roof.castShadow = true; g.add(roof)
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.6, 0.8), toon(0x4e4534)); ridge.position.y = 8.2; g.add(ridge) // 棟
+      const gateBody = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 2.2), toon(0xddd4c4)) // 長屋門
+      gateBody.position.set(0, 1.1, 5.8); gateBody.castShadow = true; g.add(gateBody)
+      const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.4, 4), toon(0x5e5648))
+      gateRoof.rotation.y = Math.PI / 4; gateRoof.position.set(0, 3.0, 5.8); gateRoof.scale.set(1.8, 1.0, 0.6); gateRoof.castShadow = true; g.add(gateRoof)
+      const gateOpen = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.7, 0.3), toon(0x241f18)); gateOpen.position.set(0, 0.95, 6.95); g.add(gateOpen) // 門の通り口（陰）
+    }
+    // 屋敷林（屋敷を抱く高木の木立）
+    for (const c of [[-5, -20], [6, -19], [-4, -27], [7, -26], [0, -29.5], [-7, -24]]) tree(c[0], c[1], 1.4 + R() * 0.6)
+    // 谷の斜面に点在する瓦屋根の農家（数軒）
+    const farmRoof = [toon(0x6a6258), toon(0x7a5e50), toon(0x5e6a5c)]
+    for (const c of [[-19, -8, 0.9], [20, -14, 1.0], [-22, -24, 1.1], [23, -30, 1.0], [-17, -36, 0.9]]) {
+      const gy = heightAt(c[0], c[1])
+      const fg = new THREE.Group(); fg.position.set(c[0], gy, c[1]); fg.scale.setScalar(c[2]); fg.rotation.y = (R() - 0.5) * 0.8; town.add(fg)
+      const fb = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 3.4), toon(0xd8cfbf)); fb.position.y = 1.2; fb.castShadow = true; fg.add(fb)
+      const fr = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.8, 4), farmRoof[(R() * 3) | 0]); fr.rotation.y = Math.PI / 4; fr.position.y = 3.1; fr.scale.set(1.0, 1.0, 0.85); fr.castShadow = true; fg.add(fr)
+    }
+  }
+
+  // ── 祝賀のアドバルーン（赤い気球＋下がる細い垂れ幕＋係留索）。小ぶりで本物らしく。街のみ。 ──
+  if (kind !== 'yato') {
     const x = 13, z = -16, gy = heightAt(x, z)
     const balloon = new THREE.Mesh(new THREE.SphereGeometry(1.7, 16, 12), toon(0xcc3a30))
     balloon.position.set(x, gy + 19, z); town.add(balloon); adBalloons.push(balloon)
@@ -459,9 +537,8 @@ export async function mountTown3d(parent, opts = {}) {
     rope.position.set(x, gy + 12, z); town.add(rope)
   }
 
-  // ── 遠くの遊園地の観覧車（谷の向こうに小さく見える郷愁のランドマーク。ゆっくり回る） ──
-  let ferris = null
-  {
+  // ── 遠くの遊園地の観覧車（谷の向こうに小さく見える郷愁のランドマーク。ゆっくり回る）。街のみ。 ──
+  if (kind !== 'yato') {
     const fx = -26, fz = -66, gy = heightAt(fx, fz)
     const grp = new THREE.Group()
     grp.position.set(fx, gy, fz)
@@ -549,9 +626,10 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(b); birds.push(b)
   }
 
-  // ── 走る車（中央の通りを行き交う。夕方はヘッドライト/テールが灯る） ──
+  // ── 走る車・歩く住民（中央の通りを行き交う）。街のみ（谷戸では作らない）。 ──
+  if (kind !== 'yato') {
   const carCols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0xc8b84a]
-  const cars = []
+  cars = []
   for (let i = 0; i < 6; i++) {
     const g = new THREE.Group()
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 3.4), toon(carCols[i % carCols.length]))
@@ -569,7 +647,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 歩く住民（歩道を行き交う小さな人影） ──
   const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8]
-  const peeps = []
+  peeps = []
   for (let i = 0; i < 10; i++) {
     const g = new THREE.Group()
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.7, 3, 6), toon(peepCols[i % peepCols.length]))
@@ -579,6 +657,7 @@ export async function mountTown3d(parent, opts = {}) {
     g.userData = { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 }
     town.add(g); peeps.push(g)
   }
+  } // ← 車・住民（街のみ）ここまで
 
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
   let weatherPts = null

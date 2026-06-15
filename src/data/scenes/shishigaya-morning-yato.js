@@ -11,6 +11,7 @@ export default {
   status: 'ready',
   render: 'shishigaya',
   intensityLabel: '朝靄',
+  public: false, // 本物の3D版 shishigaya-window-3d に主役を譲り、ギャラリーからは隠す（?dev=1で確認可）
 
   palette: {
     early: {
