@@ -113,51 +113,67 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 ground = lookDownGround(vp, ax, yaw, uParallax.x, nightAmt, uGlass, gmask);
     col = mix(col, ground, gmask);
 
-    // ── 見回すと現れる当時のランドマーク（佇まいのみ。固有の看板・名称は出さない） ──
-    // 各ランドマークは“世界の方位”に固定。画面上の中心 = 方位 - yaw。地平の少し上に建つ。
-    // (1) 小学校（校舎＋校庭）。やや左後ろの方位。
+    // ── 見回すと現れる当時のランドマーク（方位は本人の記憶に基づく。佇まいのみ・固有名/看板は出さない） ──
+    // 基準: 正面(yaw=0)=北。右へ振る(yaw+)=東、左(yaw-)=西。画面中心x = 0.5 + (方位 - yaw)/asp。
+    // (北・徒歩1〜2分) 獅子ヶ谷小学校（校舎＋校庭）。近いので大きめ。
     {
-      float sx = 0.5 + (-0.9 - yaw) / asp;            // 画面x（方位-0.9）
-      col = longBuilding(col, vp, sx, 0.085, 0.45, 0.50, mix(vec3(0.78, 0.74, 0.66), uHorizon * 0.4, 0.25), nightAmt);
-      // 校庭（土の広場＝淡い赤茶の帯）
-      float yard = step(abs(vp.x - (sx + 0.02)), 0.10) * step(0.43, vp.y) * step(vp.y, 0.452);
-      col = mix(col, mix(vec3(0.62, 0.45, 0.34), uHorizon * 0.4, 0.3), yard * 0.8);
+      float sx = 0.5 + (0.0 - yaw) / asp;
+      float yard = step(abs(vp.x - sx), 0.15) * step(0.434, vp.y) * step(vp.y, 0.458);   // 土の校庭
+      col = mix(col, mix(vec3(0.64, 0.47, 0.35), uHorizon * 0.4, 0.3), yard * 0.85);
+      col = longBuilding(col, vp, sx - 0.02, 0.105, 0.458, 0.512, mix(vec3(0.80, 0.76, 0.68), uHorizon * 0.4, 0.22), nightAmt);
+      // （さらに北奥）二ツ池の水面がちらり
+      float pond = step(abs(vp.x - (sx + 0.05)), 0.045) * step(0.47, vp.y) * step(vp.y, 0.482);
+      col = mix(col, mix(uSkyMid, uHorizon, 0.4) * 0.92, pond * 0.6);
     }
-    // (2) 学園のグラウンド＋テニスコート。右手前の方位。
+    // (西すぐ) ユーパリノスの公園＝昔のサッカーのグラウンド（緑の芝＋ゴール）
     {
-      float tx = 0.5 + (0.7 - yaw) / asp;
-      // グラウンド（草＋土）
-      float gr = step(abs(vp.x - tx), 0.12) * step(0.435, vp.y) * step(vp.y, 0.46);
-      col = mix(col, mix(vec3(0.40, 0.46, 0.28), uHorizon * 0.4, 0.3), gr * 0.85);
-      // テニスコート（コートの面＋白線。緑〜青の硬式コート）
-      float cnx = abs(vp.x - (tx - 0.05));
-      float court = step(cnx, 0.045) * step(0.452, vp.y) * step(vp.y, 0.468);
-      vec3 courtC = mix(vec3(0.20, 0.42, 0.34), uHorizon * 0.3, 0.25);
-      col = mix(col, courtC, court);
-      float lines = court * (smoothstep(0.004, 0.0, abs(vp.y - 0.460)) + smoothstep(0.003, 0.0, abs(cnx - 0.02)));
-      col = mix(col, vec3(0.85, 0.88, 0.85), clamp(lines, 0.0, 1.0) * 0.6);
-      // 校舎
-      col = longBuilding(col, vp, tx + 0.08, 0.05, 0.45, 0.495, mix(vec3(0.74, 0.72, 0.66), uHorizon * 0.4, 0.25), nightAmt);
-    }
-    // (3) サッカーのグラウンド（緑の芝＋ゴール）＋左手にゲーム屋。正面やや右の方位。
-    {
-      float fx = 0.5 + (0.1 - yaw) / asp;
-      float pitchM = step(abs(vp.x - fx), 0.14) * step(0.44, vp.y) * step(vp.y, 0.466);
-      vec3 pitchC = mix(vec3(0.26, 0.44, 0.24), uDropTint, 0.2);   // 芝のグラウンド
-      col = mix(col, pitchC, pitchM);
-      // 白線（センター/タッチ）
-      float pl = pitchM * (smoothstep(0.003, 0.0, abs(vp.x - fx)) + smoothstep(0.003, 0.0, abs(vp.y - 0.453)));
+      float fx = 0.5 + (-1.1 - yaw) / asp;
+      float pitchM = step(abs(vp.x - fx), 0.15) * step(0.44, vp.y) * step(vp.y, 0.468);
+      col = mix(col, mix(vec3(0.26, 0.44, 0.24), uDropTint, 0.2), pitchM);
+      float pl = pitchM * (smoothstep(0.003, 0.0, abs(vp.x - fx)) + smoothstep(0.003, 0.0, abs(vp.y - 0.454)));
       col = mix(col, vec3(0.82, 0.86, 0.82), clamp(pl, 0.0, 1.0) * 0.5);
-      // ゴール（両端に小さな白枠）
-      float goal = step(abs(abs(vp.x - fx) - 0.13), 0.004) * step(0.448, vp.y) * step(vp.y, 0.462);
+      float goal = step(abs(abs(vp.x - fx) - 0.14), 0.004) * step(0.45, vp.y) * step(vp.y, 0.464);
       col = mix(col, vec3(0.9, 0.92, 0.9), goal * 0.7);
-      // ゲーム屋（グラウンド左手の箱型の店。看板は描かず佇まいだけ）
-      float sx2 = fx - 0.20;
-      float shop = step(abs(vp.x - sx2), 0.028) * step(0.45, vp.y) * step(vp.y, 0.475);
-      vec3 shopC = mix(vec3(0.55, 0.50, 0.52), uHorizon * 0.4, 0.25);
-      col = mix(col, shopC, shop);
-      // 店先の小さな灯り（夜ほど）
-      col += mix(uSunGlow, vec3(1.0, 0.7, 0.4), 0.4) * step(abs(vp.x - sx2), 0.02) * smoothstep(0.475, 0.47, vp.y) * step(0.467, vp.y) * (0.2 + 0.6 * nightAmt);
+    }
+    // (西〜南西) トップボーイ（ゲーム屋）。グラウンドの左手の箱型の店。
+    {
+      float gx = 0.5 + (-1.5 - yaw) / asp;
+      float shop = step(abs(vp.x - gx), 0.030) * step(0.452, vp.y) * step(vp.y, 0.482);
+      col = mix(col, mix(vec3(0.56, 0.50, 0.52), uHorizon * 0.4, 0.25), shop);
+      col += mix(uSunGlow, vec3(1.0, 0.7, 0.4), 0.4) * step(abs(vp.x - gx), 0.022)
+           * smoothstep(0.482, 0.476, vp.y) * step(0.47, vp.y) * (0.2 + 0.6 * nightAmt); // 店先の灯り
+    }
+    // (北西) 三ツ池公園（大きめ。3つの池＋緑）
+    {
+      float kx = 0.5 + (-0.55 - yaw) / asp;
+      float park = step(abs(vp.x - kx), 0.16) * step(0.45, vp.y) * step(vp.y, 0.472);
+      col = mix(col, mix(vec3(0.22, 0.40, 0.22), uDropTint, 0.3), park * 0.8);
+      for (int ip = 0; ip < 3; ip++) {
+        float pofs = (float(ip) - 1.0) * 0.06;
+        float pw = step(abs(vp.x - (kx + pofs)), 0.026) * step(0.452, vp.y) * step(vp.y, 0.466);
+        col = mix(col, mix(uSkyMid, uHorizon, 0.4) * 0.92, pw * 0.7);
+      }
+    }
+    // (東・徒歩2分) 橘学苑（校舎＋テニスコート・グラウンド）
+    {
+      float tx = 0.5 + (1.1 - yaw) / asp;
+      float gr = step(abs(vp.x - tx), 0.11) * step(0.44, vp.y) * step(vp.y, 0.46);
+      col = mix(col, mix(vec3(0.40, 0.46, 0.28), uHorizon * 0.4, 0.3), gr * 0.85);
+      float cnx = abs(vp.x - (tx - 0.05));
+      float court = step(cnx, 0.05) * step(0.46, vp.y) * step(vp.y, 0.476);
+      col = mix(col, mix(vec3(0.20, 0.42, 0.34), uHorizon * 0.3, 0.25), court);
+      float lines = court * (smoothstep(0.004, 0.0, abs(vp.y - 0.468)) + smoothstep(0.003, 0.0, abs(cnx - 0.025)));
+      col = mix(col, vec3(0.85, 0.88, 0.85), clamp(lines, 0.0, 1.0) * 0.6);
+      col = longBuilding(col, vp, tx + 0.085, 0.05, 0.46, 0.505, mix(vec3(0.74, 0.72, 0.66), uHorizon * 0.4, 0.25), nightAmt);
+    }
+    // (東北東) 立花幼稚園（橘のすぐ北。小さな三角屋根の園舎）
+    {
+      float yx = 0.5 + (0.85 - yaw) / asp;
+      float roofY2 = 0.468 + 0.016 * (1.0 - abs(vp.x - yx) / 0.04);
+      float kbody = step(abs(vp.x - yx), 0.034) * step(0.452, vp.y) * step(vp.y, 0.468);
+      float kroof = step(abs(vp.x - yx), 0.04) * step(0.468, vp.y) * step(vp.y, roofY2);
+      col = mix(col, mix(vec3(0.86, 0.80, 0.62), uHorizon * 0.3, 0.2), kbody);   // 明るい園舎
+      col = mix(col, mix(vec3(0.74, 0.40, 0.30), uHorizon * 0.3, 0.2), kroof);   // 赤い三角屋根
     }
 
     // 地平の霞（遠景を空へなじませる）
