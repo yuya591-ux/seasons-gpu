@@ -108,6 +108,9 @@ export const GROUND_GLSL = /* glsl */ `
       float colBand = smoothstep(0.18, 0.30, colu) * smoothstep(0.86, 0.74, colu);
       float pane = floorBand * colBand * step(0.06, vfrac) * step(vfrac, 0.94);
       float litW = step(0.62 - (0.22 + 0.20 * district) * nightAmt, h21(vec2(floor(fl), floor(colu + hGi.x)) + hGi + 13.0));
+      // 深夜は灯りが一つずつ消えていく（眠りにつく街）。ゆっくり深まり、また目覚める。
+      float sleepDepth = nightAmt * (0.5 - 0.5 * cos(uTime * 0.012 * mo));
+      litW *= step(sleepDepth * 0.6, h21(vec2(floor(fl), floor(colu + hGi.x)) + hGi + 71.0));
       vec3 winLit = mix(uSunGlow, vec3(1.0, 0.92, 0.74), 0.3);
       // 窓は低コントラストの陰影。灯りは夜ほど。昼は段差のかげり程度に抑える（チラつき防止）
       vec3 winFace = mix(wallCol * 0.90, winLit, litW * (0.20 + 0.7 * nightAmt));
@@ -160,8 +163,9 @@ export const GROUND_GLSL = /* glsl */ `
         bShadow = max(bShadow, step(yray + dd * sunElev, _bH));
       }
       bld *= 1.0 - bShadow * 0.30;
-      // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る
+      // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る。深夜は消えていく。
       bld += winLit * roofness * step(0.62 - (0.2 + 0.2 * district) * nightAmt, h21(hGi + 11.0))
+           * step(sleepDepth * 0.6, h21(hGi + 71.0))
            * smoothstep(0.34, 0.12, length(hGf - 0.5)) * (0.08 + 0.26 * nightAmt) * detail;
       // 高層の屋上に赤い航空障害灯（ゆっくり明滅）
       bld += vec3(0.9, 0.16, 0.12) * hTower * roofness
