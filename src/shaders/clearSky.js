@@ -123,7 +123,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col -= max(col - vec3(0.82), 0.0) * 0.5;
 
     // 微量グレインでバンディングを防ぐ
-    col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.012;
+    col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.007;
 
     gl_FragColor = vec4(col, 1.0);
   }

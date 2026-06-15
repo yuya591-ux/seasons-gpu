@@ -144,7 +144,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
     col -= max(col - vec3(0.92), 0.0) * 0.5;
-    col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;
+    col += (h21(frag * uResolution.xy + t) - 0.5) * 0.007;
     gl_FragColor = vec4(col, 1.0);
   }
 `

@@ -7,7 +7,8 @@ import { hexToRgb, mixRgb } from '../util/color.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
 
-const DPR_BY_QUALITY = { soft: 2, standard: 1.5, light: 1 }
+// 解像度（端末のピクセル密度の上限）。荒さ低減のため引き上げ。重い端末は下の自動調整で落とす。
+const DPR_BY_QUALITY = { soft: 3, standard: 2, light: 1.25 }
 
 function compile(gl, type, src) {
   const sh = gl.createShader(type)
@@ -207,12 +208,12 @@ export function createRenderer(canvas) {
     lastFrame = now
     if (adaptCooldown > 0) {
       adaptCooldown--
-    } else if (frameEMA > 22 && renderScale > 0.6) {
-      renderScale = Math.max(0.6, renderScale - 0.1) // 45fps未満が続けば解像度を落とす
-      adaptCooldown = 90
-    } else if (frameEMA < 14 && renderScale < 1.0) {
-      renderScale = Math.min(1.0, renderScale + 0.1) // 70fps超で余裕があれば戻す
-      adaptCooldown = 150
+    } else if (frameEMA > 30 && renderScale > 0.85) {
+      renderScale = Math.max(0.85, renderScale - 0.08) // 33fps未満が続いたときだけ控えめに落とす
+      adaptCooldown = 100
+    } else if (frameEMA < 15 && renderScale < 1.0) {
+      renderScale = Math.min(1.0, renderScale + 0.08) // 余裕があれば速やかに戻す
+      adaptCooldown = 120
     }
     resize()
     const seconds = (now - startTime) / 1000

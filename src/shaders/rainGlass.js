@@ -180,7 +180,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
     // 微量グレインでバンディングを防ぐ
-    col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.012;
+    col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.007;
 
     gl_FragColor = vec4(col, 1.0);
   }
