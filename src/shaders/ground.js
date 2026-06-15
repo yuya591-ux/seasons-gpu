@@ -193,12 +193,24 @@ export const GROUND_GLSL = /* glsl */ `
       // 雨に濡れた路面: 暗く沈み、空と街の灯りを鈍く映す（雨の情景の実在感）
       float wet = step(0.5, glassMode) * step(glassMode, 1.5);
       ground = mix(ground, ground * 0.55 + mix(uSkyMid, uHorizon, 0.5) * 0.10, wet * 0.6);
-      // 川（街を蛇行。水面が空と灯りを映す）
+      // 川（街を蛇行）＋橋＋水面の映り込み
       float riverX = sin(gz * 0.22 + 1.5) * 1.6 + cos(gz * 0.11) * 0.7;
-      float river = smoothstep(0.34, 0.22, abs(g0.x - riverX));
-      vec3 waterC = mix(uSkyMid, uHorizon, 0.55) * 0.72;
-      waterC += uSunGlow * smoothstep(0.12, 0.0, abs(g0.x - riverX + sin(gz * 2.0) * 0.05)) * 0.18;
+      float dRiver = abs(g0.x - riverX);
+      float river = smoothstep(0.34, 0.22, dRiver);
+      // 水面: 空と夕日を映し、さざ波で揺れる。夜は暗く沈んで灯りが点々と映る。
+      vec3 waterC = mix(uSkyMid, uHorizon, 0.5) * (0.74 - 0.34 * nightAmt);
+      float ripple = sin(gz * 9.0 - uTime * 0.5 * mo) * 0.5 + 0.5;
+      waterC += uSunGlow * smoothstep(0.18, 0.0, abs(g0.x - riverX + sin(gz * 2.0) * 0.05)) * (0.14 + 0.22 * ripple); // 夕日の帯
+      waterC += mix(uSunGlow, vec3(1.0, 0.9, 0.7), 0.3) * step(0.86, h21(floor(vec2(g0.x * 6.0, gz * 6.0)))) * nightAmt * 0.5 * ripple; // 夜の灯りの映り
       ground = mix(ground, waterC, river * 0.95);
+      // 橋（一定間隔で川を渡る。橋桁＋欄干＋夜の橋灯）
+      float bridgeT = smoothstep(0.05, 0.022, abs(fract(gz * 0.17 + 0.3) - 0.5));
+      float onBridge = bridgeT * smoothstep(0.46, 0.30, dRiver);
+      vec3 bridgeC = mix(vec3(0.24, 0.21, 0.20), uHorizon * 0.3, 0.35) * (1.0 - 0.45 * nightAmt);
+      ground = mix(ground, bridgeC, onBridge);
+      float rail = bridgeT * smoothstep(0.40, 0.435, dRiver) * smoothstep(0.475, 0.44, dRiver); // 両縁の欄干
+      ground += uSunGlow * rail * (0.3 + 0.7 * nightAmt);
+      river *= 1.0 - onBridge;                          // 橋の上は水を出さない
       // 歩道（道の外縁＝建物際の少し明るい帯）
       float sidewalk = smoothstep(0.16, 0.13, dRoad) * smoothstep(0.085, 0.115, dRoad);
       ground = mix(ground, mix(vec3(0.30, 0.29, 0.28), uHorizon * 0.3, 0.35), sidewalk * 0.5 * (1.0 - river));
