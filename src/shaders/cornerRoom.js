@@ -621,6 +621,24 @@ const FRAGMENT_BODY = /* glsl */ `
               * step(winB - 0.02, wp.y) * step(wp.y, winB + 0.032);     // 鉢（小さな台形）
     col = mix(col, mix(vec3(0.13, 0.09, 0.07), uSunGlow * 0.3, 0.2), pot * 0.88);
 
+    // 窓辺の陽だまりに舞う埃（細かな塵がゆっくり漂い、外光にきらめく＝部屋の空気感・室内側の奥行き）
+    {
+      float dmo = 1.0 - uReduceMotion;
+      // 手前ほど大きくゆっくり、奥ほど小さく速い2層＝空気に厚みが出る
+      for (int dl = 0; dl < 2; dl++) {
+        float dfi = float(dl);
+        float dsc = mix(13.0, 21.0, dfi);
+        vec2 dq = vec2(wp.x * dsc * asp, wp.y * dsc - uTime * (0.04 + dfi * 0.03) * dmo);
+        dq.x += sin(uTime * 0.2 * dmo + wp.y * 8.0 + dfi) * 0.4;   // ゆらゆら横に漂う
+        vec2 did = floor(dq);
+        float dn = h21(did + 5.0 + dfi * 17.0);
+        float mote = step(0.965, dn) * smoothstep(0.16, 0.0, length(fract(dq) - 0.5));
+        float westLit = 0.5 + 0.5 * smoothstep(0.5, -0.6, ax + yaw * 0.2);          // 西（夕日側）ほど明るい
+        float litZone = smoothstep(0.30, 0.72, wp.y) * westLit + floorGlow * 1.2;    // 窓〜床の光の中で光る
+        col += uSunGlow * mote * litZone * (0.07 - dfi * 0.02) * (1.0 - uLeanOut);
+      }
+    }
+
     // 身を乗り出す: 窓枠・桟・カーテン・室内が消えて、景色だけを見渡す
     col = mix(col, outside, uLeanOut);
 
