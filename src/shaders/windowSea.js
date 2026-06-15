@@ -76,6 +76,10 @@ const FRAGMENT_BODY = /* glsl */ `
     // 地平の霞（海と空の境を柔らかく＝郷愁）
     float hazeB = exp(-abs(vp.y - horizon) * 24.0);
     sky = mix(sky, mix(uHorizon, uSunGlow, 0.3), hazeB * 0.4);
+    // 高層の巻雲（薄く流れる筋。上空に奥行きを与える＝空の立体感）
+    float cir = fbm(vec2((ax + yaw * 0.12) * 2.2 + t * 0.004, vp.y * 7.0 - 1.0));
+    float cirrus = smoothstep(0.55, 0.78, cir) * smoothstep(0.66, 1.0, vp.y);
+    sky = mix(sky, mix(uSkyMid, uSunGlow, 0.28 + 0.3 * sun), cirrus * 0.16);
 
     // ── 海面（寄せるうねり・フレネル・夕陽の道・波頭の泡）。穏やかで層を成す本物の海。 ──
     float depth = clamp((horizon - vp.y) / horizon, 0.0, 1.0); // 0=水平線, 1=手前

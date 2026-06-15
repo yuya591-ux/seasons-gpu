@@ -110,6 +110,10 @@ const FRAGMENT_BODY = /* glsl */ `
     float cl = fbm(vec2((ax + yaw * 0.16) * 1.3 + t * 0.006 * mo, vp.y * 2.6));
     float cloud = smoothstep(0.52, 0.72, cl) * smoothstep(0.6, 1.0, vp.y);
     col = mix(col, mix(uSkyMid, vec3(1.0), 0.5), cloud * 0.4);
+    // 高層の巻雲（薄い筋。天頂寄りに奥行きを与える＝朝空の立体感）
+    float cir = fbm(vec2((ax + yaw * 0.10) * 2.4 + t * 0.004 * mo, vp.y * 7.0 - 1.0));
+    float cirrus = smoothstep(0.56, 0.80, cir) * smoothstep(0.72, 1.0, vp.y);
+    col = mix(col, mix(uSkyMid, vec3(1.0), 0.6), cirrus * 0.16);
     // 薄明光線（god rays）: 朝陽から放射する光の筋＝空の立体的な大気
     col = godRays(col, vec2(ax, vp.y), sunC, uSunGlow * 0.13, t, smoothstep(0.52, 0.62, vp.y));
 
