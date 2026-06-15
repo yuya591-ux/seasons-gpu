@@ -64,6 +64,9 @@ const FRAGMENT_BODY = /* glsl */ `
       vec3 haze = mix(uSkyMid, hcol, 0.62);
       vec3 c = mix(haze, hcol, depth);
       c += uSunGlow * smoothstep(0.0, 0.5, wx + 0.4) * (1.0 - depth) * 0.05; // 奥の稜線に残照
+      // 冬は稜線の上部が雪化粧（季節と地続きの遠山）
+      float cap = step(1.5, uGlass) * smoothstep(ridge - 0.05, ridge - 0.006, p.y) * step(p.y, ridge);
+      c = mix(c, vec3(0.90, 0.93, 0.97), cap * 0.72);
       col = mix(col, c, step(p.y, ridge));
     }
     return col;
@@ -270,6 +273,32 @@ const FRAGMENT_BODY = /* glsl */ `
       col += vec3(0.9, 0.18, 0.12) * (exp(-bd * 160.0) + exp(-bd * 55.0) * 0.16) * (0.35 + 0.35 * nightAmt);
     }
 
+    // 銭湯の煙突（郷愁の主役）。街にすっと立ち、夕空へ細い煙がたなびく。見回しで見つかる1本。
+    {
+      float cw = ax + yaw * 0.72 + uParallax.x * 0.6;      // 中景の街と同程度に動く
+      float cx = cw + 0.16;                                 // やや左寄りに立つ（既定の視界に入る）
+      float baseY = 0.42, topY = 0.66;                      // 街の上へすっと抜ける高さ
+      float taper = mix(0.014, 0.008, clamp((vp.y - baseY) / (topY - baseY), 0.0, 1.0)); // 上ほど細い
+      float onShaft = smoothstep(taper, taper * 0.55, abs(cx))
+                    * smoothstep(baseY - 0.005, baseY + 0.01, vp.y)
+                    * smoothstep(topY, topY - 0.006, vp.y);
+      // 街より暗いシルエット＝空に映える。西日が片側に回り込む
+      vec3 brick = mix(uDropTint, mix(uHorizon, vec3(0.42, 0.26, 0.21), 0.5), 0.42);
+      brick += uSunGlow * smoothstep(0.0, taper, cx) * 0.14;
+      col = mix(col, brick, onShaft);
+      col = mix(col, mix(brick, vec3(0.82, 0.82, 0.84), 0.7),
+                onShaft * smoothstep(0.014, 0.0, abs(vp.y - (topY - 0.014))));        // 先端の白帯
+      // 煙（先端から立ちのぼり、風に流れて空へ溶ける）
+      float sy = vp.y - topY;
+      float wind = sin(uTime * 0.18) * 0.4 + 0.5;
+      float sx = cx - sy * (0.30 + 0.22 * wind) - sin(uTime * 0.25 + sy * 6.0) * 0.025; // 上ほど風で流れる
+      float swidth = 0.016 + sy * 0.55;
+      float dens = fbm(vec2(sx * 12.0, sy * 6.0 - uTime * 0.28));
+      float plume = smoothstep(swidth, 0.0, abs(sx)) * smoothstep(0.0, 0.02, sy)
+                  * smoothstep(0.26, 0.015, sy) * smoothstep(0.40, 0.70, dens);
+      col = mix(col, mix(uSkyMid, uSunGlow, 0.4) * 1.05, plume * 0.6);
+    }
+
     // ── 見下ろす街並み（地面のパース投影＝本当に高所から下を眺めている） ──
     float gmask;
     vec3 ground = lookDownGround(vp, ax, yaw, uParallax.x, nightAmt, uGlass, gmask);
@@ -366,9 +395,14 @@ const FRAGMENT_BODY = /* glsl */ `
     float barH = smoothstep(0.006, 0.0, abs(wp.y - 0.52)) * aperture;         // 中央の横框（細く）
     float bars = clamp(max(barV, barH), 0.0, 1.0);
 
-    // ── 窓ガラスのうっすらした映り込み（“ガラス越し”の実在感。上ほど室内の暖色が乗る） ──
-    float reflAmt = (0.025 + 0.05 * smoothstep(0.35, 1.0, wp.y)) * aperture;
-    outside = mix(outside, outside * 0.86 + uSunGlow * 0.10 + vec3(0.015, 0.015, 0.02), reflAmt);
+    // ── 窓ガラスの映り込み（“ガラス越し”の実在感。夜・暗い空ほど室内の暖色が映る） ──
+    float nightRefl = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0);
+    float reflAmt = (0.025 + 0.05 * smoothstep(0.35, 1.0, wp.y) + 0.11 * nightRefl) * aperture;
+    // 室内の映り（天井灯の暖色が上部ほど・ごく淡い横帯で“部屋が映っている”気配）
+    vec3 roomRefl = uSunGlow * (0.08 + 0.14 * nightRefl) + vec3(0.018, 0.016, 0.022);
+    roomRefl += uSunGlow * 0.12 * smoothstep(0.72, 1.0, wp.y) * nightRefl;          // 天井灯の映り
+    roomRefl += uSunGlow * 0.06 * smoothstep(0.03, 0.0, abs(wp.y - 0.40)) * nightRefl; // 室内の横帯（棚など）
+    outside = mix(outside, outside * (0.86 - 0.10 * nightRefl) + roomRefl, reflAmt);
 
     // ── 室内（翳った壁・窓の見込み(reveal)・窓台・床に落ちる窓あかり） ──
     // 室内は暗い暖色グレー（窓を主役にするため翳らせる）。窓に近い壁ほど外光を受けて明るい。

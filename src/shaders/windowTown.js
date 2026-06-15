@@ -75,6 +75,9 @@ const FRAGMENT_BODY = /* glsl */ `
       vec3 haze = mix(uSkyMid, hcol, 0.62);
       vec3 c = mix(haze, hcol, depth);
       c += uSunGlow * smoothstep(0.0, 0.5, wx + 0.4) * (1.0 - depth) * 0.05;
+      // 冬は稜線の上部が雪化粧
+      float cap = step(1.5, uGlass) * smoothstep(ridge - 0.05, ridge - 0.006, p.y) * step(p.y, ridge);
+      c = mix(c, vec3(0.90, 0.93, 0.97), cap * 0.72);
       col = mix(col, c, step(p.y, ridge));
     }
     return col;
