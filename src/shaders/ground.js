@@ -300,6 +300,13 @@ export const GROUND_GLSL = /* glsl */ `
       ground = mix(ground, mix(uHorizon, uSkyMid, 0.35), smoothstep(0.07, 0.0, gt) * 0.85);
     }
 
+    // 流れる雲が地上に落とす大きな影（晴れ間をゆっくり渡る＝空と地が呼応する立体感）。
+    // 風に乗って斜めに流れ、ふちは柔らかい。雨雪/夜では弱める（差す日が無いから）。
+    vec2 cloudCoord = vec2(horizAngle * hitZ, hitZ);
+    float cloudShadow = fbm(cloudCoord * 0.15 + vec2(uTime * 0.017 * mo, uTime * 0.006 * mo) + 9.0);
+    cloudShadow = smoothstep(0.50, 0.80, cloudShadow);            // まばらな雲の塊
+    float clearSky = 1.0 - 0.6 * step(0.5, glassMode);            // 雨/雪は影を弱める
+    ground *= 1.0 - cloudShadow * 0.17 * (1.0 - nightAmt) * clearSky;
     // 谷あいに溜まる靄（低い土地ほど霞む＝起伏する地形の立体感）。ゆっくり流れる。
     float ft = terrainH(vec2(horizAngle * hitZ, hitZ));
     float mistDrift = 0.7 + 0.3 * fbm(vec2(horizAngle * hitZ * 1.5 + uTime * 0.02 * mo, hitZ * 0.8));
