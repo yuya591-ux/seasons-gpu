@@ -10,7 +10,7 @@ const lerp = (a, b, t) => a + (b - a) * t
 
 // トゥーンの段階を作る勾配テクスチャ（3段）。やわらかいセル影。
 function makeGradient(THREE) {
-  const data = new Uint8Array([172, 198, 224, 255]) // 影側を黒く沈めない柔らかいトゥーン段階（くすみ防止）
+  const data = new Uint8Array([190, 206, 222, 240, 255]) // ほぼ平坦な柔らかい段階＝手描きイラスト調の陰影（硬い面を出さない）
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat)
   tex.needsUpdate = true
   tex.magFilter = THREE.NearestFilter
@@ -68,8 +68,8 @@ export async function mountTown3d(parent, opts = {}) {
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
-  // 空気遠近の霞（遠景をやわらかく。中景は溶かさず＝遠くまでくっきり見通せる）
-  scene.fog = new THREE.Fog(skyHorizon.clone().lerp(skyTop, 0.55).getHex(), 75, 300)
+  // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）
+  scene.fog = new THREE.Fog(skyHorizon.clone().lerp(skyTop, 0.5).getHex(), 55, 215)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
   {
@@ -85,7 +85,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   const isNight = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 暗い palette = 夜
   // 光（やわらかなトゥーン陰影。夜は月明かりへ）
-  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.4 : 1.15)
+  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.4 : 0.92)
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
   sun.shadow.mapSize.set(1024, 1024)
@@ -94,8 +94,8 @@ export async function mountTown3d(parent, opts = {}) {
   sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60
   scene.add(sun)
   // 空からの回り込み光（影側を黒く沈めない＝くすみ防止）。地面側は暖色で泥にしない。
-  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.3).getHex(), 0x8a7a60, isNight ? 0.5 : 1.05))
-  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.34))
+  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.55 : 1.25))
+  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.13 : 0.45))
   // 夜は月と星
   if (isNight) {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
@@ -161,7 +161,7 @@ export async function mountTown3d(parent, opts = {}) {
       pos.setY(i, heightAt(x, z))
     }
     g.computeVertexNormals()
-    const ground = new THREE.Mesh(g, toon(0x7c9a54))
+    const ground = new THREE.Mesh(g, toon(0x8a9060)) // くすんだ草地（蛍光緑を避ける）
     ground.receiveShadow = true
     town.add(ground)
   }
@@ -187,8 +187,8 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   // ── 建物（低ポリの箱＋切妻屋根） ──
-  const wallCols = [0xd8cfbf, 0xcdbfae, 0xc8c2b4, 0xbfb0a0, 0xd2c0a8]
-  const roofCols = [0x4a5a72, 0x6a4a3a, 0x44506a, 0x7a4a44]
+  const wallCols = [0xd8cfbf, 0xcec0af, 0xc6c0b2, 0xc2b4a4, 0xd0c2ac, 0xbcc0b6]
+  const roofCols = [0x59636e, 0x7a5e50, 0x4e5660, 0x6a6258, 0x5e6a5c, 0x86766a] // くすんだ瓦（スレート青/テラコッタ/紺/灰/苔/茶）
   function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
@@ -382,10 +382,10 @@ export async function mountTown3d(parent, opts = {}) {
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
     treesArr.push(g)
   }
-  for (let i = 0; i < 60; i++) {
-    const x = (R() - 0.5) * 130, z = (R() - 0.5) * 120
-    if (Math.abs(x) < 4 && z > -2) continue
-    tree(x, z, 0.8 + R() * 0.7)
+  for (let i = 0; i < 140; i++) {
+    const x = (R() - 0.5) * 150, z = -100 + R() * 130
+    if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
+    tree(x, z, 0.7 + R() * 0.8)
   }
   // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
   for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
@@ -554,7 +554,10 @@ export async function mountTown3d(parent, opts = {}) {
   paper.className = 'town3d-paper'
   stage.appendChild(paper)
 
-  // 窓枠（最前景のサッシ）。HTMLオーバーレイ。
+  // 窓枠（最前景のサッシ＋中央の横桟＋窓台＋ガラスの映り込み）。HTMLオーバーレイ。
+  const glass = document.createElement('div'); glass.className = 'town3d-glass'; stage.appendChild(glass)
+  const cross = document.createElement('div'); cross.className = 'town3d-cross'; stage.appendChild(cross)
+  const sill = document.createElement('div'); sill.className = 'town3d-sill'; stage.appendChild(sill)
   const frame2 = document.createElement('div')
   frame2.className = 'town3d-frame'
   stage.appendChild(frame2)

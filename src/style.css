@@ -132,7 +132,8 @@ body {
   background: #11131a;
   opacity: 0;
   transition: opacity 0.9s ease;
-  filter: saturate(1.03) contrast(1.03);
+  /* 参考画像の手描き水彩調へ：彩度を落として暖かみと軽いコントラストを足す（プラスチック感を排除） */
+  filter: saturate(0.78) sepia(0.06) brightness(1.02) contrast(0.98);
 }
 .town3d-stage--in {
   opacity: 1;
@@ -142,37 +143,61 @@ body {
   width: 100%;
   height: 100%;
 }
-/* 窓枠（最前景のサッシ＋中央の縦横の桟）。操作は透過。 */
+/* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   box-shadow:
-    inset 0 0 0 14px rgba(20, 17, 22, 0.96),
-    inset 0 0 0 17px rgba(255, 255, 255, 0.05),
-    inset 0 0 140px 30px rgba(0, 0, 0, 0.5);
+    inset 0 0 0 13px #2b2722,
+    inset 0 0 0 14.5px rgba(255, 255, 255, 0.14),
+    inset 0 0 150px 28px rgba(0, 0, 0, 0.42);
 }
+/* 窓台（下枠を厚く・上端に光＝部屋から覗く手応え） */
+.town3d-frame::after,
+.town3d-sill {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26px;
+  background: linear-gradient(#3a342c, #211d18);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16);
+  z-index: 3;
+}
+/* 中央の縦の桟（アルミの丸み＝左に光・右に陰） */
 .town3d-frame::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 9px;
+  width: 10px;
   transform: translateX(-50%);
-  background: rgba(20, 17, 22, 0.96);
-  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.05), -1px 0 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(90deg, #423c34, #211d18 55%, #423c34);
+  box-shadow: -1px 0 0 rgba(255, 255, 255, 0.12), 1px 0 0 rgba(0, 0, 0, 0.4);
 }
-.town3d-frame::after {
-  content: '';
+/* 中央の横の桟 */
+.town3d-cross {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 13px;
+  right: 13px;
   top: 52%;
-  height: 9px;
-  background: rgba(20, 17, 22, 0.96);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 -1px 0 rgba(255, 255, 255, 0.05);
+  height: 10px;
+  background: linear-gradient(#423c34, #211d18 55%, #423c34);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  pointer-events: none;
+}
+/* ガラスの斜めの映り込み（ごく淡い一条） */
+.town3d-glass {
+  position: absolute;
+  inset: 14px;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 38%, rgba(255, 255, 255, 0.05) 46%, transparent 54%);
 }
 /* 紙・水彩のトーン（薄い紙目を乗算で重ね、3Dを他情景と同じ手触りに） */
 .town3d-paper {
