@@ -105,8 +105,10 @@
 | 用途 | ファイル | 生成サービス / モデル | 設定 |
 | --- | --- | --- | --- |
 | 「夏の雨、夕暮れ」窓の外 | `public/bg/summer-rain-dusk-b.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 12・1280×768 |
+| 「夏の雨の夜」窓の外 | `public/bg/summer-rain-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 33・1280×768 |
 
-- プロンプト: `dreamy painterly dusk over a quiet Japanese small town, deep violet and rose twilight sky, faint distant rooftops and a single far hill on the low horizon, soft mist and rain haze, blurred warm street lights glowing far away, watercolor texture, muted melancholic palette, atmospheric, cinematic soft focus, no people, no text`
+- プロンプト（夕暮れ）: `dreamy painterly dusk over a quiet Japanese small town, deep violet and rose twilight sky, faint distant rooftops and a single far hill on the low horizon, soft mist and rain haze, blurred warm street lights glowing far away, watercolor texture, muted melancholic palette, atmospheric, cinematic soft focus, no people, no text`
+- プロンプト（夜）: `dreamy painterly rainy night over a quiet Japanese town, deep indigo and navy sky, distant blurred rooftops, many small warm glowing window lights and street lamps scattered through the misty distance, soft rain haze, watercolor and gentle realism, calm melancholic healing mood, muted tones, atmospheric bokeh, no people, no text`
 - 生成サービス: Pollinations.AI（https://pollinations.ai/ ・オープンソース）。**無料の Flux モデルのみ**使用（有料モデル・課金は使わない）。生成は無料の Seed ティアのトークンで実施（鍵は `scripts/.pollinations-token`＝`.gitignore` 済でGit非公開）。
 - 扱い: AIによる生成物（オリジナルの雰囲気。既存作品の固有の絵・キャラは模さない）。個人の趣味・非公開用途。手前の雨はシェーダーのまま、奥の背景としてのみ重ねる。
 - 生成ツール: `scripts/gen-bg.mjs`（Flux固定・無料・トークン任意）。プロンプト定義は `scripts/bg-jobs.json`。各情景も `bgPrompt` を携帯し、季節×天気×時間帯ごとに量産しやすい形。

@@ -2,6 +2,7 @@
 // 既存は一切触らない（非破壊・疎結合）。
 
 import summerRainDusk from './summer-rain-dusk.js'
+import summerRainNight from './summer-rain-night.js'
 import summerClearNoon from './summer-clear-noon.js'
 import summerDuskDowntown from './summer-dusk-downtown.js'
 import winterSnowNightDowntown from './winter-snow-night-downtown.js'
@@ -44,6 +45,7 @@ export const SCENES = [
   winterSnowDuskCornerRoom,
   // 下町・自然・その他のシェーダー情景
   summerRainDusk,
+  summerRainNight,
   summerClearNoon,
   summerDuskDowntown,
   winterSnowNightDowntown,

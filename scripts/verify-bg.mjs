@@ -3,17 +3,19 @@
 import { chromium } from 'playwright'
 
 const out = process.argv[2] || 'bg'
+const sceneId = process.argv[3] || 'summer-rain-dusk'
+const port = process.argv[4] || '4790'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
 const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push('PAGEERROR ' + e.message))
 
-await page.goto('http://localhost:4790/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => typeof window.__applyScene === 'function', { timeout: 8000 })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(400)
-await page.evaluate(() => window.__applyScene('summer-rain-dusk'))
+await page.evaluate((id) => window.__applyScene(id), sceneId)
 await page.waitForTimeout(2800) // テクスチャ読み込み＋描画の安定待ち
 await page.screenshot({ path: `scripts/_shots/${out}.png` })
 await browser.close()
