@@ -25,6 +25,14 @@ export const GROUND_GLSL = /* glsl */ `
     bH = mix(baseH, 1.1 + 1.4 * urban, tower) * isBld * (1.0 - isPark);  // 建物高さ
   }
 
+  // 地形の起伏（山坂の多い街＝北寺尾/鶴見の谷戸地形）。大きな尾根/谷＋中くらいの坂。
+  // 建物・街路はこの起伏の上に乗る（坂を登り、谷へ下る街並み）。
+  float terrainH(vec2 g0) {
+    float h = fbm(g0 * 0.075 + 2.3) - 0.5;          // 大きな尾根と谷
+    h += (fbm(g0 * 0.19 + 7.0) - 0.5) * 0.45;        // 中くらいの起伏（坂）
+    return h * 1.5;
+  }
+
   // 戻り: 街色。gmask に被覆マスク(0..1)。lean=覗き込み(uParallax.x), nightAmt=夜度, glassMode=雨雪。
   vec3 lookDownGround(vec2 vp, float ax, float yaw, float lean, float nightAmt, float glassMode, out float gmask) {
     float hY = 0.43;                                   // 地平の画面高さ
@@ -46,35 +54,41 @@ export const GROUND_GLSL = /* glsl */ `
     float zmax = min(zground, 34.0);
     bool hit = false; float hitZ = zmax;
     vec2 hGi = vec2(0.0), hGf = vec2(0.0);
-    float hBH = 0.0, hTower = 0.0, hMat = 0.0, hBlk = 0.0, roofness = 0.0;
+    float hBH = 0.0, hTower = 0.0, hMat = 0.0, hBlk = 0.0, hTerr = 0.0, roofness = 0.0;
     vec2 prevGi = vec2(1e6);
     float zStep = zmax / 48.0;
     for (int i = 1; i <= 48; i++) {
       float z = zStep * float(i);
       float yray = Hcam - slope * z;
+      vec2 g0m = vec2(horizAngle * z, z);
       vec2 gi, gf; float bH, tower, mat, blkR, dRoad;
-      cityCell(vec2(horizAngle * z, z), gi, gf, bH, tower, mat, blkR, dRoad);
-      if (yray <= bH) { hit = true; hitZ = z; break; }
+      cityCell(g0m, gi, gf, bH, tower, mat, blkR, dRoad);
+      if (yray <= terrainH(g0m) + bH) { hit = true; hitZ = z; break; }  // 地形＋建物の高さ場
       prevGi = gi;
     }
 
     vec3 ground;
     if (hit) {
-      // 命中点を二分法で精緻化（壁の輪郭をくっきり）
+      // 命中点を二分法で精緻化（壁/地形の輪郭をくっきり）
       float z0 = max(hitZ - zStep, 0.0), z1 = hitZ;
       for (int r = 0; r < 5; r++) {
         float zm = 0.5 * (z0 + z1);
         float yraym = Hcam - slope * zm;
+        vec2 g0m = vec2(horizAngle * zm, zm);
         vec2 gi, gf; float bH, tower, mat, blkR, dRoad;
-        cityCell(vec2(horizAngle * zm, zm), gi, gf, bH, tower, mat, blkR, dRoad);
-        if (yraym <= bH) { z1 = zm; hGi = gi; hGf = gf; hBH = bH; hTower = tower; hMat = mat; hBlk = blkR; }
+        cityCell(g0m, gi, gf, bH, tower, mat, blkR, dRoad);
+        if (yraym <= terrainH(g0m) + bH) { z1 = zm; hGi = gi; hGf = gf; hBH = bH; hTower = tower; hMat = mat; hBlk = blkR; hTerr = terrainH(g0m); }
         else z0 = zm;
       }
       hitZ = z1;
+    }
+    // 建物（高さ十分）か、地形の地面（道・坂・公園）かで分岐
+    if (hit && hBH > 0.03) {
       float yray = Hcam - slope * hitZ;
+      float surf = hTerr + hBH;
       // 屋上らしさ＝命中高さが上端に近いほど1（なめらか＝壁/屋上のチラつきを出さない）
-      roofness = smoothstep(hBH - 0.12, hBH - 0.02, yray);
-      float vfrac = clamp(yray / max(hBH, 0.05), 0.0, 1.0); // 0=足元 1=屋上
+      roofness = smoothstep(surf - 0.12, surf - 0.02, yray);
+      float vfrac = clamp((yray - hTerr) / max(hBH, 0.05), 0.0, 1.0); // 0=足元(地形) 1=屋上
       float fog = smoothstep(5.0, 30.0, hitZ);            // 遠さ（窓などの細部は遠いほど省く＝チラつき防止）
       // 細部は「遠い」「真下を覗く（壁が潰れる）」「低い建物（壁が細い）」ほど消す＝サブピクセルのザラつき防止
       float detail = (1.0 - fog) * 0.85
@@ -158,9 +172,10 @@ export const GROUND_GLSL = /* glsl */ `
       vec2 g0hit = vec2(horizAngle * hitZ, hitZ);
       for (int s = 1; s <= 3; s++) {
         float dd = float(s) * 0.5;
+        vec2 nb = g0hit + vec2(-0.96 + sunAz * 0.6, 0.28) * dd;
         vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
-        cityCell(g0hit + vec2(-0.96 + sunAz * 0.6, 0.28) * dd, _gi, _gf, _bH, _t, _m, _b, _d);
-        bShadow = max(bShadow, step(yray + dd * sunElev, _bH));
+        cityCell(nb, _gi, _gf, _bH, _t, _m, _b, _d);
+        bShadow = max(bShadow, step(yray + dd * sunElev, terrainH(nb) + _bH)); // 地形＋棟の高さで影
       }
       bld *= 1.0 - bShadow * 0.30;
       // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る。深夜は消えていく。
@@ -176,9 +191,14 @@ export const GROUND_GLSL = /* glsl */ `
       bld *= 1.0 + smoothstep(0.12, 0.42, gt) * 0.18;
       ground = bld;
     } else {
-      // ── 通りへ抜けた：街路レベル（道・川・街路樹・街灯・人・車） ──
-      float gz = zground; float gx = horizAngle * gz;
+      // ── 地形の地面（道・坂・公園・川・街路樹…）。起伏する地面の上に街路が乗る ──
+      float gz = hit ? hitZ : zground; float gx = horizAngle * gz;
       vec2 g0 = vec2(gx, gz);
+      // 坂の陰影: 太陽側へ上る斜面は明るく、下る斜面は翳る（地形の勾配で陰影）
+      float terr = terrainH(g0);
+      vec2 sdir2 = vec2(-0.96 + sunAz * 0.6, 0.28) * 0.5;
+      float terrSun = terrainH(g0) - terrainH(g0 + sdir2);  // 太陽方向への勾配（>0=太陽へ下る=陰）
+      float slopeShade = clamp(0.5 - terrSun * 1.2, 0.0, 1.0); // 0=陰 1=陽
       vec2 g = g0 + vec2(sin(g0.y * 1.7 + 1.0), sin(g0.x * 1.9)) * 0.05;
       g.x += h11(floor(g0.y) * 1.3) * 0.45;
       vec2 gi = floor(g); vec2 gf = fract(g);
@@ -236,11 +256,14 @@ export const GROUND_GLSL = /* glsl */ `
       vec2 sdir = vec2(-0.96 + sunAz * 0.6, 0.28);   // 太陽（西やや奥）へ向かう方向（移ろう）
       for (int s = 1; s <= 4; s++) {
         float dd = float(s) * 0.45;
+        vec2 nb = g0 + sdir * dd;
         vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
-        cityCell(g0 + sdir * dd, _gi, _gf, _bH, _t, _m, _b, _d);
-        shadow = max(shadow, step(dd * sunElev, _bH)); // 影の高さ＝距離×太陽高度（移ろう＝影が伸び縮み）
+        cityCell(nb, _gi, _gf, _bH, _t, _m, _b, _d);
+        shadow = max(shadow, step(terr + dd * sunElev, terrainH(nb) + _bH)); // 地形＋棟で影
       }
       ground *= 1.0 - shadow * 0.28 * (1.0 - river);
+      // 坂の陰影（太陽へ上る斜面は明るく・下る斜面は翳る）＝地形の立体
+      ground *= 0.86 + 0.28 * slopeShade;
       // 街全体をうっすら底上げ（街灯の照り返し）。夜はさらに
       ground += mix(uHorizon, uSunGlow, 0.4) * (0.04 + 0.07 * nightAmt);
       // 街灯（交差点）
