@@ -15,6 +15,7 @@ import springDuskCornerRoom from './spring-dusk-corner-room.js'
 import springMorningCornerRoom from './spring-morning-corner-room.js'
 import winterSnowDuskCornerRoom from './winter-snow-dusk-corner-room.js'
 import shishigayaMorningYato from './shishigaya-morning-yato.js'
+import kitateraoRooftop from './kitaterao-rooftop.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
@@ -34,6 +35,7 @@ export const SCENES = [
   springMorningCornerRoom,
   winterSnowDuskCornerRoom,
   shishigayaMorningYato,
+  kitateraoRooftop,
   panoDemo,
   splatDemo,
   roomDemo,
