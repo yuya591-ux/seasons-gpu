@@ -191,6 +191,10 @@ const FRAGMENT_BODY = /* glsl */ `
     }
 
     col = applyGrade(col, frag);
+    // 「かすみを払う」: 水彩のモヤを払い、遠くまで見通す澄んだ眺めに
+    vec3 clearV = (col - 0.42) * 1.24 + 0.42;
+    clearV = mix(vec3(dot(clearV, vec3(0.299, 0.587, 0.114))), clearV, 1.26);
+    col = mix(col, clearV, uWindowOpen);
     col *= uBright;
     col -= max(col - vec3(0.92), 0.0) * 0.5;
     col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;

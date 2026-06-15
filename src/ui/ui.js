@@ -123,10 +123,15 @@ export function buildUI(opts) {
   root.appendChild(topbar)
 
   // ── 窓をあける/しめる（窓辺の情景でだけ。開けると素通しの澄んだ景色＋そよ風） ──
-  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya']
+  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'kitateraoRooftop']
   const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
   topbar.insertBefore(windowBtn, sceneBtn)
   let windowIsOpen = false
+  function windowLabel() {
+    // 屋上（開けた眺め）は「かすみを払う」、窓辺は「窓をあける」
+    if (currentScene.render === 'kitateraoRooftop') return windowIsOpen ? 'かすみへ戻す' : 'かすみを払う'
+    return windowIsOpen ? '窓をしめる' : '窓をあける'
+  }
   function updateWindowBtn() {
     const show = WINDOW_SCENES.includes(currentScene.render)
     windowBtn.style.display = show ? '' : 'none'
@@ -134,15 +139,17 @@ export function buildUI(opts) {
       windowIsOpen = false
       onToggleWindow && onToggleWindow(false)
     }
-    windowBtn.textContent = windowIsOpen ? '窓をしめる' : '窓をあける'
+    windowBtn.textContent = windowLabel()
+    windowBtn.classList.toggle('is-open', windowIsOpen)
   }
   windowBtn.addEventListener('click', () => {
     windowIsOpen = !windowIsOpen
     onToggleWindow && onToggleWindow(windowIsOpen)
-    windowBtn.textContent = windowIsOpen ? '窓をしめる' : '窓をあける'
+    windowBtn.textContent = windowLabel()
+    windowBtn.classList.toggle('is-open', windowIsOpen)
     poke()
   })
-  updateWindowBtn() // 初期表示（窓辺の情景でだけ出す）
+  updateWindowBtn() // 初期表示（窓辺・屋上の情景でだけ出す）
 
   // ── 情景選択パネル ──
   const panelScene = buildScenePanel()

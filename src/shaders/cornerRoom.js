@@ -608,6 +608,10 @@ const FRAGMENT_BODY = /* glsl */ `
     col *= vig;
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
+    // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす（コントラスト＋発色を上げる）
+    vec3 clearV = (col - 0.42) * 1.22 + 0.42;
+    clearV = mix(vec3(dot(clearV, vec3(0.299, 0.587, 0.114))), clearV, 1.24);
+    col = mix(col, clearV, uWindowOpen);
     col *= uBright;
     col -= max(col - vec3(0.92), 0.0) * 0.5; // 白とび防止
     col += (h21(frag * uResolution.xy + t) - 0.5) * 0.012;

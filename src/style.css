@@ -233,6 +233,19 @@ body.idle .topbar {
 .iconbtn:hover {
   background: rgba(20, 16, 26, 0.5);
 }
+/* 「窓をあける」は効果が分かりやすいよう暖色のアクセントで目立たせる */
+.iconbtn--window {
+  background: rgba(122, 86, 42, 0.46);
+  border-color: rgba(255, 222, 176, 0.40);
+  color: rgba(255, 244, 230, 0.98);
+}
+.iconbtn--window:hover {
+  background: rgba(150, 104, 50, 0.6);
+}
+.iconbtn--window.is-open {
+  background: rgba(86, 120, 150, 0.5);
+  border-color: rgba(190, 224, 255, 0.45);
+}
 
 .slider {
   appearance: none;
