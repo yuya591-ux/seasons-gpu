@@ -150,10 +150,12 @@ const FRAGMENT_BODY = /* glsl */ `
     // 空（夕暮れ）: 下=茜、上=紫紺
     vec3 col = mix(uSkyMid, uSkyTop, smoothstep(0.52, 1.0, vp.y));
     col = mix(uHorizon, col, smoothstep(0.42, 0.62, vp.y));
-    // 地平の残照は西（画面左）ほど明るい＝太陽が西にある気配（街の陰影と方向を揃える）
-    float westBias = 0.6 + 0.8 * smoothstep(0.5, -0.6, ax + yaw * 0.2);
+    // 太陽のゆるやかな移ろい（街の陰影と同じ位相＝光源が一致）
+    float sunAz = sin(uTime * 0.012 * (1.0 - uReduceMotion)) * 0.08;
+    float sunY = 0.47 - (sin(uTime * 0.012) * 0.5 + 0.5) * 0.04;
+    float westBias = 0.6 + 0.8 * smoothstep(0.5 + sunAz, -0.6 + sunAz, ax + yaw * 0.2);
     col += uSunGlow * exp(-abs(vp.y - 0.5) * 7.0) * 0.22 * westBias;
-    col += uSunGlow * exp(-distance(vec2(ax + yaw * 0.2, vp.y), vec2(-0.5, 0.47)) * 4.2) * 0.22; // 西の低い夕日
+    col += uSunGlow * exp(-distance(vec2(ax + yaw * 0.2, vp.y), vec2(-0.5 + sunAz, sunY)) * 4.2) * 0.22; // 西の低い夕日
 
     // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る）
     vec2 cq = vec2(ax * 1.4 + yaw * 0.18 + t * 0.008, vp.y * 2.4);

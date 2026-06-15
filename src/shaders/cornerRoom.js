@@ -192,11 +192,14 @@ const FRAGMENT_BODY = /* glsl */ `
     // 空（夕暮れ）: 下=茜、上=紫紺
     vec3 col = mix(uSkyMid, uSkyTop, smoothstep(0.52, 1.0, vp.y));
     col = mix(uHorizon, col, smoothstep(0.40, 0.60, vp.y));
-    // 地平の残照は西（画面左）ほど明るい＝太陽が西にある気配（街の陰影と方向を揃える）
-    float westBias = 0.6 + 0.8 * smoothstep(0.5, -0.6, ax + yaw * 0.2);
+    // 太陽のゆるやかな移ろい（街の陰影と同じ位相＝光源が一致）
+    float sunAz = sin(uTime * 0.012 * (1.0 - uReduceMotion)) * 0.08;
+    float sunY = 0.45 - (sin(uTime * 0.012) * 0.5 + 0.5) * 0.04;       // ゆっくり沈む
+    // 地平の残照は西（画面左）ほど明るい＝太陽が西にある気配
+    float westBias = 0.6 + 0.8 * smoothstep(0.5 + sunAz, -0.6 + sunAz, ax + yaw * 0.2);
     col += uSunGlow * exp(-abs(vp.y - 0.46) * 7.0) * 0.20 * westBias;
     // 西の低い夕日（やわらかな光球）。沈む太陽の在り処
-    col += uSunGlow * exp(-distance(vec2(ax + yaw * 0.2, vp.y), vec2(-0.5, 0.45)) * 4.2) * 0.22;
+    col += uSunGlow * exp(-distance(vec2(ax + yaw * 0.2, vp.y), vec2(-0.5 + sunAz, sunY)) * 4.2) * 0.22;
 
     // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る＝下からの光）。空は遠いのでほぼ動かない
     vec2 cq = vec2(ax * 1.4 + yaw * 0.18 + uTime * 0.008, vp.y * 2.4);
@@ -447,7 +450,26 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 合成: 外（アパーチャ内）／室内（外側）／桟・サッシ（最前面）
     vec3 col = mix(interior, outside, aperture);
-    col = mix(col, sashCol, bars * 0.85);
+
+    // 桟の断面の丸み＋方向のある陰影（西日が左/上に当たる＝アルミサッシの立体）
+    vec3 sashLit = sashCol * 1.45 + uSunGlow * 0.05;
+    vec3 sashSh  = sashCol * 0.60;
+    vec3 vCol = mix(sashSh, sashLit, smoothstep(-0.004, 0.004, 0.5 - wp.x));  // 縦框: 西(左)が明るい
+    vec3 hCol = mix(sashSh, sashLit, smoothstep(-0.004, 0.004, wp.y - 0.52)); // 横框: 上が明るい
+    col = mix(col, hCol, barH * 0.9);
+    col = mix(col, vCol, barV * 0.9);
+
+    // クレセント錠（中央の召し合わせに小さな金具。鈍く光るアルミ）
+    vec2 lk = (wp - vec2(0.5, 0.52)) * vec2(1.0, asp);                        // アスペクト補正で丸める
+    float lockBody = smoothstep(0.016, 0.010, length(lk * vec2(0.65, 1.7))) * aperture; // 縦長のレバー
+    float lockBase = smoothstep(0.011, 0.006, length(lk)) * aperture;                   // 台座
+    vec3 metal = vec3(0.52, 0.52, 0.55) + uSunGlow * 0.18 * smoothstep(0.004, -0.006, lk.x);
+    col = mix(col, metal, max(lockBody, lockBase) * 0.85);
+    col += vec3(0.9, 0.9, 0.92) * smoothstep(0.0035, 0.0, length(lk - vec2(-0.005, -0.004))) * 0.5 * aperture; // ハイライト点
+
+    // ガラスの斜めの映り込み（窓ガラス特有の一条の光。ごく淡く・上半分に）
+    float sheen = smoothstep(0.07, 0.0, abs((wp.x - 0.5) + (wp.y - 0.5) * 0.6 - 0.16)) * smoothstep(0.35, 0.9, wp.y);
+    col += uSunGlow * sheen * 0.05 * aperture;
 
     // 雪が桟と窓台の上に積もる（uGlass==2=雪のときだけ）
     if (uGlass > 1.5) {

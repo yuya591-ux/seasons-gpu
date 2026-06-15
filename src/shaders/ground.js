@@ -31,6 +31,9 @@ export const GROUND_GLSL = /* glsl */ `
     gmask = smoothstep(hY + 0.02, hY - 0.02, vp.y);
     if (gmask <= 0.001) return mix(uHorizon, uSkyMid, 0.35); // 地平より上は計算しない（軽量化）
     float mo = 1.0 - uReduceMotion;                    // 0=動きを止める（車・人・点滅を静止）
+    // 時刻のゆるやかな移ろい（止まった時間の中の微かな揺らぎ）。沈むほど影が伸びる。
+    float sunAz = sin(uTime * 0.012 * mo) * 0.08;      // 太陽方位のドリフト
+    float sunElev = 0.55 - sin(uTime * 0.012 * mo) * 0.12; // 太陽高度（小=低い夕日=影が長い）
 
     float gt = max(hY - vp.y, 0.004);                  // 0=地平, 大=手前(真下)
     float horizAngle = ax * 1.6 + (yaw + lean * 1.6) * 0.6; // 光線の水平/前方比
@@ -90,7 +93,7 @@ export const GROUND_GLSL = /* glsl */ `
       float district = vnoise(hGi * 0.35 + 7.0);                  // 街区ごとの賑わい（夜の灯りの粗密）
       // ひとつの太陽（西＝画面左、低い夕日）で街全体を一貫して照らす。
       // 視線の左（西）を向く面ほど日が当たり暖かく、右（東）の面は翳る＝陰影が方向で揃う。
-      float sunFacing = smoothstep(-0.55, 0.45, -horizAngle);     // 西(左)を向くほど受光
+      float sunFacing = smoothstep(-0.55, 0.45, -horizAngle + sunAz); // 西(左)を向くほど受光（太陽の移ろいで揺らぐ）
       float dayLit = 1.0 - nightAmt;
       // 前面の壁。受光で明暗、上ほど空の光、足元はAO
       vec3 wallCol = base * (0.40 + 0.24 * sunFacing) * (0.62 + 0.50 * vfrac);
@@ -110,6 +113,17 @@ export const GROUND_GLSL = /* glsl */ `
       vec3 winFace = mix(wallCol * 0.90, winLit, litW * (0.20 + 0.7 * nightAmt));
       wallCol = mix(wallCol, winFace, pane * detail * (0.5 + 0.5 * nightAmt));
       wallCol *= 0.78 + 0.22 * smoothstep(0.0, 0.18, vfrac);  // 足元の接地影(AO)
+
+      // 最前列（ごく近い棟）の作り込み: ベランダの手すり＋壁の室外機。距離で自然に消える。
+      float nearDetail = (1.0 - smoothstep(2.5, 7.5, hitZ)) * detail;
+      float resid = 1.0 - isTall;                                                 // 住宅/団地ほどベランダ
+      float railLine = smoothstep(0.05, 0.012, abs(fract(fl) - 0.16)) * step(0.08, vfrac) * resid;
+      wallCol = mix(wallCol, wallCol * 0.62, railLine * nearDetail * 0.55);        // 手すり下の陰
+      wallCol += uSunGlow * 0.05 * sunFacing * smoothstep(0.018, 0.0, abs(fract(fl) - 0.16)) * resid * nearDetail; // 手すり上端の光
+      vec2 ung = vec2(floor(fract(horizAngle * 1.7 + hGi.x * 0.6) * cols), floor(fl));
+      float acBox = step(0.80, h21(ung + hGi + 50.0))
+                  * smoothstep(0.10, 0.05, abs(colu - 0.5)) * smoothstep(0.06, 0.0, abs(fract(fl) - 0.52));
+      wallCol = mix(wallCol, vec3(0.28, 0.27, 0.26), acBox * nearDetail * 0.5);    // 室外機
 
       // 屋上の設備（真上から見た形＝パラペット/塔屋/水タンク/室外機）。屋上のときだけ・近景ほど精細
       float rdet = roofness * detail;
@@ -142,8 +156,8 @@ export const GROUND_GLSL = /* glsl */ `
       for (int s = 1; s <= 3; s++) {
         float dd = float(s) * 0.5;
         vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
-        cityCell(g0hit + vec2(-0.96, 0.28) * dd, _gi, _gf, _bH, _t, _m, _b, _d);
-        bShadow = max(bShadow, step(yray + dd * 0.55, _bH));
+        cityCell(g0hit + vec2(-0.96 + sunAz * 0.6, 0.28) * dd, _gi, _gf, _bH, _t, _m, _b, _d);
+        bShadow = max(bShadow, step(yray + dd * sunElev, _bH));
       }
       bld *= 1.0 - bShadow * 0.30;
       // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る
@@ -203,12 +217,12 @@ export const GROUND_GLSL = /* glsl */ `
       ground = mix(ground, treeCol, tree * 0.62);
       // 西日の長い影（建物が通りへ落とす影＝夕方の立体感）。太陽側に高い区画があれば翳る
       float shadow = 0.0;
-      vec2 sdir = vec2(-0.96, 0.28);                 // 太陽（西やや奥）へ向かう方向
+      vec2 sdir = vec2(-0.96 + sunAz * 0.6, 0.28);   // 太陽（西やや奥）へ向かう方向（移ろう）
       for (int s = 1; s <= 4; s++) {
         float dd = float(s) * 0.45;
         vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
         cityCell(g0 + sdir * dd, _gi, _gf, _bH, _t, _m, _b, _d);
-        shadow = max(shadow, step(dd * 0.55, _bH));  // 影の高さ＝距離×太陽高度(0.55)
+        shadow = max(shadow, step(dd * sunElev, _bH)); // 影の高さ＝距離×太陽高度（移ろう＝影が伸び縮み）
       }
       ground *= 1.0 - shadow * 0.28 * (1.0 - river);
       // 街全体をうっすら底上げ（街灯の照り返し）。夜はさらに
