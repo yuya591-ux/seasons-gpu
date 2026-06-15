@@ -45,13 +45,13 @@ export const GRADE_GLSL = /* glsl */ `
     float paperC = vnoise(pp * 0.011);                 // 粗い紙の目
     float band = abs(fract(l2 * levels) - 0.5) * 2.0;  // 0=境界 1=面の中央
     float tide = (1.0 - smoothstep(0.0, 0.30, band)) * (0.5 + 0.5 * paperC);
-    c *= 1.0 - tide * 0.10;
-    // (W5) 紙のテクスチャ（粗い目＋細かい繊維。乗算で“紙に乗った絵具”。薄く）
+    c *= 1.0 - tide * 0.07;
+    // (W5) 紙のテクスチャ（粗い目＋細かい繊維。乗算で“紙に乗った絵具”。クリアさ優先で薄く）
     float paperF = vnoise(pp * 0.052 + 11.0);
-    c *= 1.0 - (mix(paperC, paperF, 0.4) - 0.5) * 0.09;
+    c *= 1.0 - (mix(paperC, paperF, 0.4) - 0.5) * 0.055;
     // (W6) 顔料の粒状（granulation）。暗部ほど粒が沈む（薄く）
     float gran = fbm(pp * 0.026 + 4.0);
-    c *= 1.0 - (gran - 0.5) * 0.09 * (1.0 - smoothstep(0.18, 0.62, l2));
+    c *= 1.0 - (gran - 0.5) * 0.05 * (1.0 - smoothstep(0.18, 0.62, l2));
     // (W6b) ウォッシュの濃淡ムラ（大きな筆のムラ。薄く）
     float washVar = fbm(pp * 0.006 + 20.0) - 0.5;
     c *= 1.0 + washVar * 0.06;
