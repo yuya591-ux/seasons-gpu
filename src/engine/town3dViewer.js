@@ -77,6 +77,8 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
+  renderer.shadowMap.autoUpdate = false
   stage.appendChild(renderer.domElement)
 
   const scene = new THREE.Scene()
@@ -591,7 +593,25 @@ export async function mountTown3d(parent, opts = {}) {
     winOpen: 0, winOpenTarget: 0, // 窓をあける（ガラスが横にすべって外気が澄む）
     lean: 0, leanTarget: 0,        // 身を乗り出す（枠を越えて前へ＝視界が広がる）
     fovCur: 62,
-    dispose() { renderer.dispose(); grad.dispose() },
+    dispose() {
+      // シーングラフ全体の geometry/material/texture を解放（連打切替でのGPUメモリ蓄積＝コンテキストロストを防ぐ）
+      try {
+        scene.traverse((o) => {
+          if (o.geometry) o.geometry.dispose()
+          const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : [])
+          for (const m of mats) {
+            if (!m) continue
+            if (m.map && m.map !== winMapBase) m.map.dispose() // 建物ごとの窓テクスチャのクローンを解放
+            if (m.emissiveMap) m.emissiveMap.dispose()
+            m.dispose()
+          }
+        })
+        winMapBase.dispose()
+        for (const e of winEmis) e.dispose()
+        grad.dispose()
+      } catch (e) { /* 無視 */ }
+      renderer.dispose()
+    },
   }
 
   function resize() {
@@ -721,6 +741,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (const c of clouds) { c.position.x += 0.01; if (c.position.x > 130) c.position.x = -130 }
     renderer.render(scene, camera)
   }
+  renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
   frame()
   requestAnimationFrame(() => stage.classList.add('town3d-stage--in'))
 
