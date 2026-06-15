@@ -303,6 +303,10 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, mix(uSkyMid, uSunGlow, 0.4) * 1.05, plume * 0.6);
     }
 
+    // 地平の継ぎ目をなじませる: 立体の近景街と2Dの遠景スカイラインの境を霞で溶かす
+    float seam = smoothstep(0.505, 0.44, vp.y) * smoothstep(0.40, 0.455, vp.y);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.5), seam * 0.45);
+
     // ── 見下ろす街並み（地面のパース投影＝本当に高所から下を眺めている） ──
     float gmask;
     vec3 ground = lookDownGround(vp, ax, yaw, uParallax.x, nightAmt, uGlass, gmask);
