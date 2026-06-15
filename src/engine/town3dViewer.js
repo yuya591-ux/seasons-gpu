@@ -418,6 +418,50 @@ export async function mountTown3d(parent, opts = {}) {
     rope.position.set(x, gy + 12, z); town.add(rope)
   }
 
+  // ── 遠くの遊園地の観覧車（谷の向こうに小さく見える郷愁のランドマーク。ゆっくり回る） ──
+  let ferris = null
+  {
+    const fx = -26, fz = -66, gy = heightAt(fx, fz)
+    const grp = new THREE.Group()
+    grp.position.set(fx, gy, fz)
+    grp.rotation.y = 0.2 // ほんの少し斜め（正面すぎない佇まい）
+    town.add(grp)
+    const R0 = 12, hubY = 16
+    const steelMat = toon(0xb0b6bc)
+    // 支柱（左右のA字脚＝ハブへ集まる）
+    for (const sx of [-1, 1]) {
+      for (const dz of [-3.4, 3.4]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, hubY + 1, 6), steelMat)
+        leg.position.set(sx * 3.0, (hubY) / 2, dz)
+        leg.rotation.z = sx > 0 ? 0.34 : -0.34
+        grp.add(leg)
+      }
+    }
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 7.6, 8), steelMat)
+    axle.rotation.x = Math.PI / 2; axle.position.y = hubY; grp.add(axle)
+    // 回る車輪（XY平面・Z軸回り）。二重リング＋スポーク＋ゴンドラ。
+    const wheel = new THREE.Group()
+    wheel.position.set(0, hubY, 0); grp.add(wheel)
+    for (const rr of [R0, R0 - 0.7]) wheel.add(new THREE.Mesh(new THREE.TorusGeometry(rr, 0.17, 6, 44), steelMat))
+    const N = 12
+    const gondMats = [toon(0xcf5a4e), toon(0xe6cf7a), toon(0x5a86b0), toon(0xe8e2d6), toon(0x6fae8f), toon(0xd98f5a)]
+    const litMat = new THREE.MeshBasicMaterial({ color: 0xfff0c8, fog: true }) // 夕/夜のゴンドラの灯り
+    const gondolas = []
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, R0, 4), steelMat)
+      spoke.position.set(Math.cos(a) * R0 / 2, Math.sin(a) * R0 / 2, 0)
+      spoke.rotation.z = a - Math.PI / 2; wheel.add(spoke)
+      const gond = new THREE.Group()
+      gond.position.set(Math.cos(a) * (R0 + 0.9), Math.sin(a) * (R0 + 0.9), 0)
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 1.6), gondMats[i % gondMats.length]); gond.add(cab)
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.3, 1.8), gondMats[(i + 2) % gondMats.length]); roof.position.y = 0.85; gond.add(roof)
+      if (duskAmt > 0.25) { const lit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.05), litMat); lit.position.z = 0.83; gond.add(lit) }
+      wheel.add(gond); gondolas.push(gond)
+    }
+    ferris = { wheel, gondolas }
+  }
+
   // ── 遠景の低ポリ山（街の奥に重なる尾根。空気遠近で淡く青み＝奥行きの錨） ──
   const mtnNear = skyHorizon.clone().lerp(new THREE.Color(0x6e7e62), 0.7)
   const mtnFar = skyHorizon.clone().lerp(new THREE.Color(0x8a98a6), 0.5)
@@ -561,6 +605,12 @@ export async function mountTown3d(parent, opts = {}) {
     for (const tr of treesArr) tr.rotation.z = Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp
     // アドバルーンがふわり揺れる
     for (const ab of adBalloons) { ab.rotation.z = Math.sin(t * 0.6) * 0.05; ab.position.x += Math.sin(t * 0.5) * 0.002 }
+    // 観覧車がゆっくり回り、ゴンドラは水平を保つ
+    if (ferris) {
+      ferris.wheel.rotation.z += dt * 0.12
+      const wr = ferris.wheel.rotation.z
+      for (const g of ferris.gondolas) g.rotation.z = -wr
+    }
     // 鳥がはばたきながら空を渡る
     for (const b of birds) {
       const u = b.userData
