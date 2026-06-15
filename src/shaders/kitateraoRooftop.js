@@ -243,7 +243,9 @@ const FRAGMENT_BODY = /* glsl */ `
     // ── 足元: 開けた屋上の床（柵・手すり・枠は無し＝遮るもののない眺め） ──
     // 防水シートのコンクリ床。覗き込み(uParallax)・見下ろし(pitch)で手前にせり上がり、
     // 縁の向こうに坂の街がそのまま覗く（身を乗り出すと下の路地まで）。
-    float floorTop = 0.135 + uParallax.y * 0.6 + pitch * 0.75;
+    // 見下ろすと床はあまりせり上がらず、縁の向こうの坂の街がぐっと開ける（下の路地・住民が見える）。
+    // 身を乗り出す/覗き込む(uParallax.y)と縁が下がり、さらに真下まで覗ける。
+    float floorTop = 0.135 + pitch * 0.22 - uParallax.y * 0.5;
     float onFloor = smoothstep(floorTop, floorTop - 0.02, p.y);
     float depthF = max(floorTop - p.y, 0.0);                          // 0=縁 大=手前(足元)
     vec3 floorC = mix(vec3(0.33, 0.33, 0.35), uHorizon * 0.3, 0.18);  // 灰の防水シート

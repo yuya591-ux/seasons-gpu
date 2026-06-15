@@ -289,10 +289,28 @@ export const GROUND_GLSL = /* glsl */ `
       float lampG = smoothstep(0.10, 0.0, length(gf - 0.5)) * step(0.45, h11(gi.x + gi.y * 3.0 + 7.0));
       ground += uSunGlow * lampG * (0.8 + 0.5 * nightAmt) * (1.0 - river);
       ground += uSunGlow * lampG * wet * 0.6 * (1.0 - river); // 濡れた路面に滲む街灯の照り返し
-      // 人影（道沿いを動く小さな点）
-      float ped = step(0.5, h21(gi + 19.0))
-                * smoothstep(0.05, 0.0, length((gf - vec2(0.5, fract(uTime * 0.05 * mo + blkR))) * vec2(1.3, 1.0)));
-      ground = mix(ground, vec3(0.05, 0.04, 0.05), ped * 0.6 * (1.0 - river));
+      // 歩く住民（道沿いを進む人影。頭＋胴＋服の色。近景で見下ろすほど大きくはっきり見える）
+      float nearPed = smoothstep(0.10, 0.40, gt);                          // 手前(見下ろし)ほど
+      float pedScale = mix(0.7, 3.0, nearPed * nearPed);                   // 近いほどぐっと大きくはっきり
+      for (int pi = 0; pi < 2; pi++) {                                     // 1区画に最大2人
+        float pf = float(pi);
+        float has = step(0.5, h21(gi + 19.0 + pf * 7.0));
+        float dir = (h21(gi + 31.0 + pf) > 0.5) ? 1.0 : -1.0;             // 進む向き
+        float lane = 0.32 + 0.36 * h21(gi + 41.0 + pf);                    // 歩道のレーン
+        vec2 pp = vec2(lane, fract(uTime * 0.045 * dir * mo + h21(gi + 5.0 + pf)));
+        vec2 pd = (gf - pp) / vec2(pedScale, pedScale);
+        float bob = abs(sin(uTime * 5.0 * mo + pf * 3.0)) * 0.006;        // 歩く上下動
+        pd.y += bob;
+        float bodyP = smoothstep(0.066, 0.0, length(pd * vec2(2.2, 1.0)) ) * step(-0.03, pd.y); // 縦長の胴
+        float headP = smoothstep(0.040, 0.0, length(pd - vec2(0.0, -0.044)));                   // 頭
+        vec3 clothes = 0.42 + 0.36 * cos(h21(gi + 50.0 + pf) * 9.0 + vec3(0.0, 2.1, 4.2));        // 服の色
+        float on = has * (1.0 - river) * nearPed;
+        ground = mix(ground, ground * 0.35, bodyP * 0.5 * on);                                    // 輪郭の陰でくっきり
+        ground = mix(ground, clothes * (0.72 - 0.2 * nightAmt), smoothstep(0.052, 0.0, length(pd * vec2(2.2, 1.0))) * step(-0.03, pd.y) * 0.9 * on);
+        ground = mix(ground, vec3(0.16, 0.11, 0.09), headP * 0.9 * on);                           // 頭(髪)
+        // 足元の小さな影
+        ground = mix(ground, ground * 0.7, smoothstep(0.05, 0.0, length((gf - pp - vec2(0.0, -0.05)) * vec2(2.0, 4.0))) * 0.4 * on);
+      }
       // 車（縦の道を流れる。ヘッドライト/テール＋前方ビーム）
       float carDir = (blkR > 0.5) ? 1.0 : -1.0;
       float carY = fract(uTime * 0.22 * carDir * mo + blkR);
