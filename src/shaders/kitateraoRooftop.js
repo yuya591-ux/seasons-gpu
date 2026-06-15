@@ -1,11 +1,13 @@
-// 窓辺シリーズ番外「北寺尾の屋上、谷戸を一望」。作者が馴染んだ7階建てマンション（サンライズ北寺尾を想起）の
-// 屋上の抜けた区画から、開けた空の下で周囲を見回す“ほぼ360°”のパノラマ。横浜市鶴見区北寺尾〜獅子ヶ谷の
-// 昭和後期〜平成初期の風景を、地形と佇まいで再現する（実在の商標・看板・固有意匠は模さない）。
-//  ・坂の住宅地が谷へ広がる（見下ろす街＝共有のレイマーチ地面を流用）
+// 窓辺シリーズ番外「北寺尾の屋上、坂の街を一望」。作者の原風景＝急な坂を7割登った先にそびえる
+// 7階建てマンション（サンライズ北寺尾を想起）の屋上。柵も枠も無い開けた屋上に立ち、坂の多い
+// 平成初期の街を“ほぼ360°”見回す。横浜市鶴見区北寺尾〜獅子ヶ谷の地形と佇まいで再現
+// （実在の商標・看板・固有意匠は模さない＝佇まいのみ）。
+//  ・坂の住宅地が谷へ下って広がる（見下ろす街＝共有のレイマーチ地面を流用）
 //  ・尾根を覆う森（獅子ヶ谷市民の森）
-//  ・見回すと現れるランドマーク: 小学校（校舎＋校庭）／学園のテニスコート・グラウンド／
-//    サッカーのグラウンド＋その左手のゲーム屋（いずれも佇まいのみ・固有名は出さない）
-//  ・足元は屋上のパラペットと手すり（窓でなく開けた屋上）
+//  ・見回すと現れる平成初期のランドマーク: 大型スーパー（GMSの佇まい・駐車場・屋上看板）／
+//    パチンコ屋（縦の塔看板・ネオン）／新装開店の電気屋＋祝賀のアドバルーン（紅白の気球）／
+//    小学校・中学校（校舎＋校庭）／学園のグラウンド／公園の池 など（いずれも佇まいのみ）
+//  ・足元は柵のない開けた屋上の床。見下ろす/身を乗り出すと坂の路地まで覗ける
 
 import { GROUND_GLSL } from './ground.js'
 import { GRADE_GLSL } from './grade.js'
@@ -186,40 +188,78 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, mix(vec3(0.74, 0.40, 0.30), uHorizon * 0.3, 0.2), kroof);   // 赤い三角屋根
     }
 
-    // 地平の霞（遠景を空へなじませる）
-    col = mix(col, mix(uHorizon, uSkyMid, 0.4), smoothstep(0.50, 0.43, vp.y) * smoothstep(0.36, 0.45, vp.y) * 0.35);
+    // ── 平成初期の街の大箱ランドマーク（佇まいのみ・固有名/文字/商標は一切出さない） ──
+    // (北東) 大型スーパー（GMSの佇まい）: 平らな大屋根＋広い駐車場＋屋上看板帯。街いちばんの大箱。
+    {
+      float sx = 0.5 + (0.40 - yaw) / asp;
+      float w = 0.14;
+      float lot = step(abs(vp.x - sx), w) * step(0.478, vp.y) * step(vp.y, 0.492);
+      col = mix(col, mix(vec3(0.42, 0.42, 0.44), uHorizon * 0.3, 0.25), lot * 0.85);   // 駐車場
+      float carCell = floor((vp.x - sx) * 44.0);
+      float car = lot * step(0.5, h11(carCell)) * smoothstep(0.006, 0.001, abs(fract((vp.x - sx) * 44.0) - 0.5));
+      col = mix(col, 0.42 + 0.4 * cos(carCell * 1.7 + vec3(0.0, 2.0, 4.0)), car * 0.55); // 駐車中の車
+      col = longBuilding(col, vp, sx, w, 0.492, 0.516, mix(vec3(0.80, 0.78, 0.73), uHorizon * 0.4, 0.22), nightAmt);
+      float sign = step(abs(vp.x - sx), w * 0.72) * step(0.516, vp.y) * step(vp.y, 0.527);
+      col = mix(col, mix(vec3(0.88, 0.86, 0.82), uSunGlow, 0.25 + 0.4 * nightAmt), sign * 0.85); // 屋上看板帯
+    }
+    // (北北西) パチンコ屋: けばけばしい外装＋縦長の塔看板＋夜にちかちか灯る（文字は出さない）
+    {
+      float px2 = 0.5 + (-0.28 - yaw) / asp;
+      col = longBuilding(col, vp, px2, 0.05, 0.47, 0.505, mix(vec3(0.62, 0.50, 0.56), uHorizon * 0.4, 0.2), nightAmt);
+      float tower2 = step(abs(vp.x - (px2 + 0.052)), 0.012) * step(0.47, vp.y) * step(vp.y, 0.55);
+      float blink = 0.5 + 0.5 * sin(t * 3.0 + vp.y * 60.0);
+      vec3 neon = mix(vec3(1.0, 0.3, 0.4), vec3(0.4, 0.7, 1.0), 0.5 + 0.5 * sin(vp.y * 30.0 + t));
+      col = mix(col, neon, tower2 * (0.45 + 0.5 * nightAmt) * (0.5 + 0.5 * blink));   // 縦の塔看板
+      col += neon * step(abs(vp.x - px2), 0.05) * smoothstep(0.5, 0.47, vp.y) * step(0.47, vp.y) * 0.16 * (0.4 + 0.6 * nightAmt);
+    }
+    // (東) 新装開店の電気屋＋祝賀のアドバルーン（空に浮かぶ紅白の気球＋下がる垂れ幕。文字は出さない）
+    {
+      float ex = 0.5 + (0.60 - yaw) / asp;
+      col = longBuilding(col, vp, ex, 0.058, 0.47, 0.50, mix(vec3(0.70, 0.72, 0.74), uHorizon * 0.4, 0.2), nightAmt);
+      col += mix(vec3(1.0, 0.4, 0.3), vec3(0.3, 0.6, 1.0), step(0.5, fract(vp.x * 120.0))) * step(abs(vp.x - ex), 0.05) * smoothstep(0.49, 0.47, vp.y) * step(0.47, vp.y) * 0.12; // 店先の幟
+      float sway = sin(t * 0.5 * mo) * 0.012;
+      vec2 bc = vec2(ax - ((0.60 - yaw) + sway), vp.y - 0.60);
+      float balloon = smoothstep(0.046, 0.040, length(bc * vec2(1.0, 1.15)));
+      vec3 balloonC = mix(vec3(0.93, 0.30, 0.28), vec3(0.96, 0.92, 0.86), step(0.0, sin(atan(bc.y, bc.x) * 6.0))); // 紅白
+      col = mix(col, balloonC, balloon);
+      col += vec3(1.0) * smoothstep(0.05, 0.0, length(bc - vec2(-0.015, 0.018))) * 0.22;     // 気球のハイライト
+      float banner = step(abs(bc.x), 0.012) * step(-0.13, bc.y) * step(bc.y, -0.046);
+      col = mix(col, vec3(0.95, 0.93, 0.88), banner * 0.85);
+      col = mix(col, vec3(0.86, 0.26, 0.22), banner * step(0.5, fract(bc.y * 30.0)) * 0.7);   // 垂れ幕の紅白段
+      float rope = smoothstep(0.003, 0.0, abs(bc.x + (vp.y - 0.60) * 0.04)) * step(0.50, vp.y) * step(vp.y, 0.556);
+      col = mix(col, vec3(0.32, 0.30, 0.30), rope * 0.3);
+    }
+    // (南西) 中学校（小学校より大きい校舎＋広いグラウンド）
+    {
+      float mx2 = 0.5 + (-0.82 - yaw) / asp;
+      float grnd = step(abs(vp.x - mx2), 0.13) * step(0.45, vp.y) * step(vp.y, 0.472);
+      col = mix(col, mix(vec3(0.60, 0.45, 0.33), uHorizon * 0.4, 0.3), grnd * 0.85);          // 土のグラウンド
+      col = longBuilding(col, vp, mx2 - 0.03, 0.10, 0.472, 0.512, mix(vec3(0.74, 0.71, 0.64), uHorizon * 0.4, 0.3), nightAmt);
+    }
 
-    // ── 足元: 屋上のパラペット（立ち上がり）と手すり（開けた屋上＝窓でない） ──
-    // 屋上の床のコンクリ笠木が手前に。覗き込み(uParallax)・見下ろし(pitch)でせり上がる。
-    float paraTop = 0.20 + uParallax.y * 0.5 + pitch * 0.5;
-    float onPara = smoothstep(paraTop, paraTop - 0.015, p.y);
-    vec3 paraC = mix(vec3(0.46, 0.44, 0.43), uHorizon * 0.3, 0.22);   // コンクリの笠木（明るめで存在感）
-    paraC *= 0.88 + 0.12 * fbm(vec2(p.x * 16.0, p.y * 5.0));          // 汚れ・ムラ
-    paraC += uSunGlow * smoothstep(paraTop - 0.04, paraTop, p.y) * 0.16; // 上端に陽
-    paraC *= mix(0.7, 1.0, smoothstep(0.0, 0.10, p.y));              // 足元は陰
-    col = mix(col, paraC, onPara);
-    // 笠木の上端のハイライト（縁の立ち上がり）
-    col += uSunGlow * smoothstep(0.010, 0.0, abs(p.y - paraTop)) * 0.18;
-    // 手すり（笠木の上に水平のパイプ＋支柱）
-    float railY = paraTop + 0.045;
-    float rail = smoothstep(0.006, 0.0, abs(p.y - railY));
-    float post = smoothstep(0.005, 0.0, abs(fract((p.x + yaw * 0.3) * 7.0) - 0.5)) * step(p.y, railY) * step(paraTop + 0.005, p.y);
-    col = mix(col, vec3(0.16, 0.16, 0.18), clamp(max(rail, post * 0.85), 0.0, 1.0) * 0.8 * step(p.y, railY + 0.008));
+    // 地平の霞（遠景を空へなじませる。溶かし過ぎず街と尾根の量感を残す）
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), smoothstep(0.50, 0.43, vp.y) * smoothstep(0.36, 0.45, vp.y) * 0.20);
+
+    // ── 足元: 開けた屋上の床（柵・手すり・枠は無し＝遮るもののない眺め） ──
+    // 防水シートのコンクリ床。覗き込み(uParallax)・見下ろし(pitch)で手前にせり上がり、
+    // 縁の向こうに坂の街がそのまま覗く（身を乗り出すと下の路地まで）。
+    float floorTop = 0.135 + uParallax.y * 0.6 + pitch * 0.75;
+    float onFloor = smoothstep(floorTop, floorTop - 0.02, p.y);
+    float depthF = max(floorTop - p.y, 0.0);                          // 0=縁 大=手前(足元)
+    vec3 floorC = mix(vec3(0.33, 0.33, 0.35), uHorizon * 0.3, 0.18);  // 灰の防水シート
+    floorC *= 0.90 + 0.16 * fbm(vec2(p.x * 9.0, depthF * 12.0));      // 汚れ・水たまりのムラ
+    // 防水シートの継ぎ目（手前ほど広い格子）
+    float seamX = smoothstep(0.05, 0.0, abs(fract(p.x * 7.0 + yaw) - 0.5));
+    float seamY = smoothstep(0.04, 0.0, abs(fract(depthF * 9.0) - 0.5));
+    floorC = mix(floorC, floorC * 0.78, clamp(max(seamX, seamY), 0.0, 1.0) * 0.4);
+    floorC += uSunGlow * smoothstep(floorTop - 0.06, floorTop, p.y) * 0.10; // 縁に夕日
+    floorC *= mix(0.55, 1.0, smoothstep(0.0, 0.14, p.y));            // 足元は陰
+    col = mix(col, floorC, onFloor);
+    // 床の縁の立ち上がりに陽＝屋上に立っている実感（手すりは無し＝開放感）
+    col += uSunGlow * smoothstep(0.009, 0.0, abs(p.y - floorTop)) * 0.13;
 
     // 鳥（はばたきながら弧を描いて屋上の空を渡る）
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, mo);
-
-    // ── 抜けの構造（柱・梁）。あなたが立つ7階の開けた区画の骨組み（最前景・固定） ──
-    // 部屋のない“骨抜け”の区画から景色を一望する手応え。
-    float pillarL = smoothstep(0.055, 0.035, abs(p.x - 0.085)) * step(0.16, p.y);
-    float pillarR = smoothstep(0.055, 0.035, abs(p.x - 0.915)) * step(0.16, p.y);
-    float beam = smoothstep(0.05, 0.03, abs(p.y - 0.93));
-    float frameM = clamp(max(max(pillarL, pillarR), beam), 0.0, 1.0);
-    vec3 frameC = mix(vec3(0.40, 0.38, 0.38), uHorizon * 0.3, 0.2);   // コンクリの柱・梁
-    frameC *= 0.86 + 0.14 * fbm(vec2(p.x * 22.0, p.y * 7.0));         // 打ちっぱなしのムラ・汚れ
-    frameC += uSunGlow * 0.10 * pillarL;                             // 左の柱に陽が回る
-    frameC *= mix(0.78, 1.0, smoothstep(0.16, 0.5, p.y));            // 下ほど陰
-    col = mix(col, frameC, frameM * 0.96);
 
     col = applyGrade(col, frag);
     // 「かすみを払う」: 水彩のモヤを払い、遠くまで見通す澄んだ眺めに
