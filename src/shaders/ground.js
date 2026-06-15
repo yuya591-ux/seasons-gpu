@@ -171,6 +171,20 @@ export const GROUND_GLSL = /* glsl */ `
       vec2 acf = fract(hGf * vec2(5.0, 4.0));
       float acu = step(0.72, h21(acg + hGi + 17.0)) * step(0.3, acf.x) * step(acf.x, 0.55) * step(0.3, acf.y) * step(acf.y, 0.6);
       roofTop = mix(roofTop, base * 0.6, acu * 0.4 * rdet);                                         // 室外機など小物
+      // 住宅の切妻屋根（瓦）。陸屋根でなく棟(ridge)で二面に分けた瓦屋根＝坂の住宅地の佇まい。
+      if (resid > 0.5) {
+        float ridgeAxis = step(0.5, h21(hGi + 12.0));            // 棟の向き（縦/横）
+        float across = mix(hGf.y, hGf.x, ridgeAxis);            // 棟に直交する座標(0..1)
+        float toEave = abs(across - 0.5) * 2.0;                  // 0=棟 1=軒
+        float sunnySide = step(0.5, across);
+        vec3 tile = mix(vec3(0.30, 0.33, 0.40), vec3(0.42, 0.27, 0.21), step(0.5, h21(hGi + 19.0))); // いぶし瓦/赤瓦
+        float face = mix(mix(1.12, 0.84, sunFacing), mix(0.84, 1.12, sunFacing), sunnySide);          // 二面の陰影
+        tile *= face * (1.0 - 0.12 * toEave);
+        tile = mix(tile, tile * 1.18, smoothstep(0.05, 0.0, abs(across - 0.5)));                       // 棟の稜線
+        tile *= 0.96 + 0.08 * sin(mix(hGf.x, hGf.y, ridgeAxis) * 54.0);                                // 瓦の段の筋
+        tile += uSunGlow * 0.05 * sunFacing * dayLit;
+        roofTop = mix(roofTop, tile, roofness * detail * 0.85);
+      }
       roofTop += uSunGlow * 0.06 * dayLit * (0.5 + 0.5 * sunFacing);                                // 屋上に夕日が乗る（上向き面）
 
       vec3 bld = mix(wallCol, roofTop, roofness);
