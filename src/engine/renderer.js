@@ -99,6 +99,9 @@ export function createRenderer(canvas) {
   let frameEMA = 16.7
   let lastFrame = 0
   let adaptCooldown = 60
+  // 窓を開ける（0=閉じてガラス越し, 1=開いて素通し）。トグルでなめらかに開閉。
+  let windowOpen = 0
+  let windowOpenTarget = 0
 
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
   const panCur = { x: 0, y: 0 }
@@ -137,6 +140,7 @@ export function createRenderer(canvas) {
       uPan: gl.getUniformLocation(program, 'uPan'),
       uParallax: gl.getUniformLocation(program, 'uParallax'),
       uReduceMotion: gl.getUniformLocation(program, 'uReduceMotion'),
+      uWindowOpen: gl.getUniformLocation(program, 'uWindowOpen'),
       uSeason: gl.getUniformLocation(program, 'uSeason'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
       uFoliage: gl.getUniformLocation(program, 'uFoliage'),
@@ -232,6 +236,8 @@ export function createRenderer(canvas) {
       )
     }
     if (loc.uReduceMotion) gl.uniform1f(loc.uReduceMotion, reduceMotion ? 1 : 0)
+    windowOpen += (windowOpenTarget - windowOpen) * 0.08 // なめらかに開閉
+    if (loc.uWindowOpen) gl.uniform1f(loc.uWindowOpen, windowOpen)
     if (loc.uSeason) gl.uniform1f(loc.uSeason, seasonMode)
     gl.uniform1f(loc.uGlass, glassMode)
     if (loc.uFoliage) gl.uniform1f(loc.uFoliage, foliageMode)
@@ -361,6 +367,12 @@ export function createRenderer(canvas) {
     // モーション過敏への配慮（OS設定 prefers-reduced-motion 等から）
     setReduceMotion(b) {
       reduceMotion = !!b
+    },
+    setWindowOpen(b) {
+      windowOpenTarget = b ? 1 : 0
+    },
+    isWindowOpen() {
+      return windowOpenTarget > 0.5
     },
     setScene(s) {
       scene = s

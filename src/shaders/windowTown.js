@@ -24,6 +24,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uPan;         // 見回し（指スワイプ）
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
+  uniform float uWindowOpen; // 窓を開けた度合い 0=閉(ガラス越し) 1=開(素通し)
   uniform float uSeason;     // 季節 0=春 1=夏 2=秋 3=冬
   uniform vec3 uSkyTop;      // 天頂（暮れの紫紺）
   uniform vec3 uSkyMid;      // 中空
@@ -238,12 +239,15 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, vec3(0.02, 0.02, 0.04), smoothstep(0.0035, 0.0, abs(p.y - yl)) * 0.8 * step(0.43, wireVp));
     }
 
-    // 窓ガラスの現象（雨・雪）を窓のガラス面に重ねる
-    col = applyGlass(col, p, t, uGlass);
+    // 窓ガラスの現象（雨・雪）を窓のガラス面に重ねる。窓を開けると素通しで消える。
+    col = mix(applyGlass(col, p, t, uGlass), col, uWindowOpen);
+    // 窓を開けると外気が澄んで景色が明るく鮮やかに
+    col *= 1.0 + uWindowOpen * 0.08;
+    col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.0 + uWindowOpen * 0.16);
 
     // レースカーテン（両脇。下町の窓辺にも室内の気配。中央は開けて見える）
-    float curtSway = sin(t * 0.4) * 0.008 + sin(t * 0.19 + 1.0) * 0.005;
-    float cwid = 0.17;
+    float curtSway = (sin(t * 0.4) * 0.008 + sin(t * 0.19 + 1.0) * 0.005) * (1.0 + uWindowOpen * 2.5);
+    float cwid = 0.17 * (1.0 - uWindowOpen * 0.55);
     float gatherL = smoothstep(0.05 + cwid, 0.05, p.x - curtSway);
     float gatherR = smoothstep(0.95 - cwid, 0.95, p.x + curtSway);
     float gather = max(gatherL, gatherR);

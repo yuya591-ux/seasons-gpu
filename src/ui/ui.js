@@ -19,6 +19,7 @@ export function buildUI(opts) {
     onAudioStart, // () => Promise<void>  最初のタップ
     onToggleMute, // (muted) => void
     onVolume, // (v) => void
+    onToggleWindow, // (open) => void  窓をあける/しめる
   } = opts
 
   const root = h('div', 'ui')
@@ -121,6 +122,28 @@ export function buildUI(opts) {
   topbar.appendChild(setBtn)
   root.appendChild(topbar)
 
+  // ── 窓をあける/しめる（窓辺の情景でだけ。開けると素通しの澄んだ景色＋そよ風） ──
+  const WINDOW_SCENES = ['cornerRoom', 'windowTown']
+  const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
+  topbar.insertBefore(windowBtn, sceneBtn)
+  let windowIsOpen = false
+  function updateWindowBtn() {
+    const show = WINDOW_SCENES.includes(currentScene.render)
+    windowBtn.style.display = show ? '' : 'none'
+    if (!show && windowIsOpen) {
+      windowIsOpen = false
+      onToggleWindow && onToggleWindow(false)
+    }
+    windowBtn.textContent = windowIsOpen ? '窓をしめる' : '窓をあける'
+  }
+  windowBtn.addEventListener('click', () => {
+    windowIsOpen = !windowIsOpen
+    onToggleWindow && onToggleWindow(windowIsOpen)
+    windowBtn.textContent = windowIsOpen ? '窓をしめる' : '窓をあける'
+    poke()
+  })
+  updateWindowBtn() // 初期表示（窓辺の情景でだけ出す）
+
   // ── 情景選択パネル ──
   const panelScene = buildScenePanel()
   root.appendChild(panelScene.el)
@@ -205,6 +228,7 @@ export function buildUI(opts) {
         if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
         onApplyScene(scene)
         markCurrent()
+        updateWindowBtn()
       }
       el.classList.remove('panel--open')
       poke()

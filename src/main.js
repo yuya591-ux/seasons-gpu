@@ -162,6 +162,9 @@ function start() {
       updateSettings({ volume: v })
       audio.setVolume(v)
     },
+    onToggleWindow(open) {
+      renderer.setWindowOpen(open)
+    },
   })
 
   // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュ・サムネ生成など）

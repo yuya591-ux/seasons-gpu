@@ -23,6 +23,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uPan;         // 見回し（x=ヨー, y=ピッチ）
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく効かせる）
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
+  uniform float uWindowOpen; // 窓を開けた度合い 0=閉(ガラス越し) 1=開(素通し)
   uniform float uSeason;     // 季節 0=春 1=夏 2=秋 3=冬（網戸/結露の出し分け）
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
   uniform float uFoliage;    // 季節の舞い 0=なし 1=紅葉 2=花びら
@@ -459,27 +460,32 @@ const FRAGMENT_BODY = /* glsl */ `
     float barH = smoothstep(0.006, 0.0, abs(wp.y - 0.52)) * aperture;         // 中央の横框（細く）
     float bars = clamp(max(barV, barH), 0.0, 1.0);
 
-    // ── 窓ガラスの映り込み（“ガラス越し”の実在感。夜・暗い空ほど室内の暖色が映る） ──
+    // ── 窓ガラスの映り込み（透明感優先。昼はほぼ素通し、夜・暗い空でだけ室内が淡く映る） ──
+    // 窓を開けるとガラスの映り・埃・網戸・結露が消え、素通しの澄んだ景色になる。
+    float glassOn = 1.0 - uWindowOpen;
     float nightRefl = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0);
-    float reflAmt = (0.025 + 0.05 * smoothstep(0.35, 1.0, wp.y) + 0.11 * nightRefl) * aperture;
-    // 室内の映り（天井灯の暖色が上部ほど・ごく淡い横帯で“部屋が映っている”気配）
-    vec3 roomRefl = uSunGlow * (0.08 + 0.14 * nightRefl) + vec3(0.018, 0.016, 0.022);
+    // 中央ほどクリアに（縁に近いほどガラスの映りが乗る＝視線の中心は透き通る）
+    float edgeClear = smoothstep(0.30, 0.46, max(abs(wp.x - 0.5), abs(wp.y - 0.5)));
+    float reflAmt = (0.010 + 0.02 * smoothstep(0.45, 1.0, wp.y) + 0.10 * nightRefl) * aperture * (0.5 + 0.5 * edgeClear) * glassOn;
+    vec3 roomRefl = uSunGlow * (0.06 + 0.14 * nightRefl) + vec3(0.012, 0.011, 0.015);
     roomRefl += uSunGlow * 0.12 * smoothstep(0.72, 1.0, wp.y) * nightRefl;          // 天井灯の映り
     roomRefl += uSunGlow * 0.06 * smoothstep(0.03, 0.0, abs(wp.y - 0.40)) * nightRefl; // 室内の横帯（棚など）
-    outside = mix(outside, outside * (0.86 - 0.10 * nightRefl) + roomRefl, reflAmt);
+    outside = mix(outside, outside * (0.94 - 0.12 * nightRefl) + roomRefl, reflAmt);
 
-    // 窓ガラスの微かな拭き筋・埃（明るい空を背景にした時だけ薄く見える＝本物の窓の気配）。
-    // 暗い街並みの上では出さず、清潔感を保つ。
+    // 窓ガラスの拭き筋・埃（縁寄り・明るい空でだけ淡く。中央は出さず透き通らせる）。
     float gLuma = dot(outside, vec3(0.299, 0.587, 0.114));
     float streak = fbm(vec2(wp.x * 4.0, wp.y * 26.0)) - 0.5;  // 縦に伸びる拭き筋
     float dust = fbm(vec2(wp.x * 9.0, wp.y * 9.0)) - 0.5;     // まだらな埃
-    float film = (streak * 0.55 + dust * 0.45) * smoothstep(0.42, 0.82, gLuma) * aperture;
-    outside += uSunGlow * max(film, 0.0) * 0.06;             // 光を受けた埃がうっすら明るむ
-    outside -= max(-film, 0.0) * 0.025;                     // 拭き筋のわずかな陰
+    float film = (streak * 0.55 + dust * 0.45) * smoothstep(0.42, 0.82, gLuma) * aperture * edgeClear * glassOn;
+    outside += uSunGlow * max(film, 0.0) * 0.035;            // 光を受けた埃がうっすら
+    outside -= max(-film, 0.0) * 0.014;                     // 拭き筋のわずかな陰
+    // 窓を開けると外気が澄んで景色が明るく鮮やかに（ガラスの減衰・くすみが消える）
+    outside *= 1.0 + uWindowOpen * 0.08;
+    outside = mix(vec3(dot(outside, vec3(0.299, 0.587, 0.114))), outside, 1.0 + uWindowOpen * 0.16);
 
     // ── 季節で変わる窓ガラスの状態（網戸＝夏／結露＝冬） ──
     // 網戸（夏・雨雪でないとき）: 細かな格子。明るい背景でだけ薄く見え、景色をほんのり和らげる。
-    float summerScreen = step(0.5, uSeason) * step(uSeason, 1.5) * step(uGlass, 0.5) * aperture;
+    float summerScreen = step(0.5, uSeason) * step(uSeason, 1.5) * step(uGlass, 0.5) * aperture * glassOn;
     if (summerScreen > 0.001) {
       // 細い縦横の糸（網戸）。明るい背景でだけ薄く見え、景色をほんのり和らげる。
       float wireX = smoothstep(0.16, 0.0, abs(fract(wp.x * 95.0 * asp) - 0.5));
@@ -490,7 +496,7 @@ const FRAGMENT_BODY = /* glsl */ `
       outside -= summerScreen * (0.4 + 0.6 * bright) * wire * 0.04; // 糸の影（明るい所ほど見える）
     }
     // 結露（冬・雪）: 縁ほど曇り、暖かい中央は晴れる。曇りを縦に晴らす水滴の筋。
-    float winterCond = (step(2.5, uSeason) + step(1.5, uGlass)) * aperture;
+    float winterCond = (step(2.5, uSeason) + step(1.5, uGlass)) * aperture * glassOn;
     if (winterCond > 0.001) {
       float dc = distance(wp, vec2(0.5, 0.52));
       float fog = clamp(smoothstep(0.15, 0.42, dc) + smoothstep(0.32, 0.13, wp.y) * 0.45, 0.0, 1.0);
@@ -551,7 +557,7 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // ガラスの斜めの映り込み（窓ガラス特有の一条の光。ごく淡く・上半分に）
     float sheen = smoothstep(0.07, 0.0, abs((wp.x - 0.5) + (wp.y - 0.5) * 0.6 - 0.16)) * smoothstep(0.35, 0.9, wp.y);
-    col += uSunGlow * sheen * 0.05 * aperture;
+    col += uSunGlow * sheen * 0.05 * aperture * glassOn;
 
     // 雪が桟と窓台の上に積もる（uGlass==2=雪のときだけ）
     if (uGlass > 1.5) {
@@ -565,8 +571,9 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // ── 窓辺の室内（“部屋に居て外を眺めている”最後のピース） ──
     // レースカーテン（両脇に寄せた薄手。やわらかく揺れ光を透かす。中央は開けて見える）
-    float curtSway = sin(uTime * 0.4) * 0.008 + sin(uTime * 0.19 + 1.0) * 0.005;
-    float cwid = 0.19;
+    // 窓を開けると外気でカーテンが大きく揺れる（そよ風）
+    float curtSway = (sin(uTime * 0.4) * 0.008 + sin(uTime * 0.19 + 1.0) * 0.005) * (1.0 + uWindowOpen * 2.5);
+    float cwid = 0.19 * (1.0 - uWindowOpen * 0.55); // 窓を開けるとカーテンを脇へ寄せる
     float gatherL = smoothstep(winL + cwid, winL - 0.01, wp.x - curtSway);
     float gatherR = smoothstep(winR - cwid, winR + 0.01, wp.x + curtSway);
     float gather = max(gatherL, gatherR);
