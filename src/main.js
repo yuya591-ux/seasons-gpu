@@ -23,6 +23,14 @@ if (!renderer) {
   start()
 }
 
+// オフラインでも開ける（PWA）。本番のみ・対応ブラウザのみ。失敗は静かに無視。
+// 一度訪れれば、電波が無くても・将来サーバが消えても眺められる（「自分がいなくなっても動く」）。
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(BASE + 'sw.js', { scope: BASE }).catch(() => {})
+  })
+}
+
 function resolveScene(id) {
   return SCENES.find((s) => s.id === id && s.status === 'ready') || DEFAULT_SCENE
 }
