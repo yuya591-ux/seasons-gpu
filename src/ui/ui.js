@@ -90,6 +90,8 @@ export function buildUI(opts) {
   // ── HUD（情景名・音） ──
   const hud = h('div', 'hud')
   const sceneName = h('p', 'hud__scene', currentScene.label)
+  sceneName.setAttribute('aria-live', 'polite') // 情景の切替を支援技術へ伝える
+  sceneName.setAttribute('role', 'status')
   const audioRow = h('div', 'hud__audio')
   const muteBtn = h('button', 'iconbtn', settings.muted ? '♪̸' : '♪')
   muteBtn.setAttribute('aria-label', '音のオン・オフ')
@@ -183,7 +185,22 @@ export function buildUI(opts) {
   root.appendChild(panelSet.el)
   setBtn.addEventListener('click', () => {
     panelSet.el.classList.add('panel--open')
+    const c = panelSet.el.querySelector('.panel__head .iconbtn')
+    if (c) requestAnimationFrame(() => c.focus()) // 開いたらパネル内へフォーカス（キーボード操作）
     poke()
+  })
+
+  // Escape でどのパネルも閉じる（キーボード・支援技術への配慮）
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return
+    let closed = false
+    ;[panelScene.el, panelSet.el].forEach((p) => {
+      if (p.classList.contains('panel--open')) {
+        p.classList.remove('panel--open')
+        closed = true
+      }
+    })
+    if (closed) poke()
   })
 
   // ── 無操作で消えるHUD ──
@@ -272,6 +289,7 @@ export function buildUI(opts) {
       open() {
         markCurrent()
         el.classList.add('panel--open')
+        requestAnimationFrame(() => close.focus()) // 開いたらパネル内へフォーカス
       },
     }
   }
