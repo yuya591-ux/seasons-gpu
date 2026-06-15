@@ -56,8 +56,8 @@ export const GROUND_GLSL = /* glsl */ `
     vec2 hGi = vec2(0.0), hGf = vec2(0.0);
     float hBH = 0.0, hTower = 0.0, hMat = 0.0, hBlk = 0.0, hTerr = 0.0, roofness = 0.0;
     vec2 prevGi = vec2(1e6);
-    float zStep = zmax / 48.0;
-    for (int i = 1; i <= 48; i++) {
+    float zStep = zmax / 36.0;           // 歩数を48→36に削減（画素あたりの反復を減らし発熱を抑える）
+    for (int i = 1; i <= 36; i++) {
       float z = zStep * float(i);
       float yray = Hcam - slope * z;
       vec2 g0m = vec2(horizAngle * z, z);
@@ -71,7 +71,7 @@ export const GROUND_GLSL = /* glsl */ `
     if (hit) {
       // 命中点を二分法で精緻化（壁/地形の輪郭をくっきり）
       float z0 = max(hitZ - zStep, 0.0), z1 = hitZ;
-      for (int r = 0; r < 5; r++) {
+      for (int r = 0; r < 6; r++) {        // 二分法を1回増やし、粗い歩幅でも輪郭を保つ
         float zm = 0.5 * (z0 + z1);
         float yraym = Hcam - slope * zm;
         vec2 g0m = vec2(horizAngle * zm, zm);

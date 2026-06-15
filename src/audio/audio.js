@@ -24,6 +24,63 @@ export function createAudio(opts) {
   const now = () => ctx.currentTime
   const targetVol = () => (muted ? 0.0001 : Math.max(0.0001, volume))
 
+  // iPhone/iPad は既定で Web Audio を着信音チャンネル（消音スイッチで黙る）に流す。
+  // 無音の <audio> をループ再生してページの音声セッションを「再生(playback)」に保つと、
+  // Web Audio がメディア音量（音量ボタン）側に乗り、マナーモードでも音量に応じて鳴る。
+  const isIOS =
+    /iP(hone|od|ad)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  let silentTag = null
+  let silentUrl = null
+  // 0.5秒の8bitモノラル無音WAVを生成（巨大なbase64を埋め込まず軽量に）。
+  function makeSilentWavUrl() {
+    const sr = 8000
+    const n = Math.floor(sr * 0.5)
+    const buf = new ArrayBuffer(44 + n)
+    const v = new DataView(buf)
+    const wr = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)) }
+    wr(0, 'RIFF'); v.setUint32(4, 36 + n, true); wr(8, 'WAVE')
+    wr(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true) // PCM
+    v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr, true)
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true)
+    wr(36, 'data'); v.setUint32(40, n, true)
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128) // 8bit無音=128
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+  }
+  // ユーザー操作の中で呼ぶ（消音スイッチ回避の鍵＝ジェスチャ起点での再生）。
+  function unlockMediaSession() {
+    if (!isIOS) return
+    try {
+      if (!silentTag) {
+        silentUrl = makeSilentWavUrl()
+        silentTag = document.createElement('audio')
+        silentTag.src = silentUrl
+        silentTag.loop = true
+        silentTag.setAttribute('playsinline', '')
+        silentTag.setAttribute('webkit-playsinline', '')
+        silentTag.muted = false
+        silentTag.volume = 1 // 中身が無音なので可聴にはならないが「再生中」と認識させる
+      }
+      const p = silentTag.play()
+      if (p && p.catch) p.catch(() => {})
+    } catch {
+      /* 無視 */
+    }
+  }
+  // 復帰時（タブ切替・割り込み後）に音脈と無音タグを起こし直す。
+  let rearmBound = false
+  function bindRearm() {
+    if (rearmBound) return
+    rearmBound = true
+    const rearm = () => {
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {})
+      if (started) unlockMediaSession()
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) rearm() })
+    window.addEventListener('focus', rearm)
+    document.addEventListener('touchend', rearm, { passive: true })
+  }
+
   function ensureContext() {
     if (ctx) return
     const AC = window.AudioContext || window.webkitAudioContext
@@ -32,6 +89,7 @@ export function createAudio(opts) {
     master = ctx.createGain()
     master.gain.value = 0.0001 // 無音から始めてフェードイン
     master.connect(ctx.destination)
+    bindRearm()
   }
 
   async function loadBuffer(src) {
@@ -217,6 +275,7 @@ export function createAudio(opts) {
     async start() {
       ensureContext()
       if (!ctx) return
+      unlockMediaSession() // ジェスチャ起点で無音タグを再生＝iOSの消音スイッチを回避
       if (ctx.state === 'suspended') await ctx.resume()
       started = true
       if (currentScene) await playScene(currentScene, false)

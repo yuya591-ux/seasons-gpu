@@ -7,8 +7,9 @@ import { hexToRgb, mixRgb } from '../util/color.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
 
-// 解像度（端末のピクセル密度の上限）。荒さ低減のため引き上げ。重い端末は下の自動調整で落とす。
-const DPR_BY_QUALITY = { soft: 3, standard: 2.5, light: 1.5 }
+// 解像度（端末のピクセル密度の上限）。レイマーチは画素数で重さが決まるため控えめに。
+// 荒さは FXAA＋アンシャープで補う。重い端末は下の自動調整でさらに落とす。
+const DPR_BY_QUALITY = { soft: 2.25, standard: 1.75, light: 1.4 }
 
 // ── 後処理アンチエイリアス（FXAA）──
 // 情景はフルスクリーン三角形に手続き的に描かれるため、輪郭（step境界）がジャギる。
@@ -200,6 +201,7 @@ export function createRenderer(canvas) {
   let renderScale = 1.0
   let frameEMA = 16.7
   let lastFrame = 0
+  let lastRenderTime = 0 // 約30fpsへ間引くための前回描画時刻（GPU負荷と発熱を半減）
   let adaptCooldown = 60
   // 窓を開ける（0=閉じてガラス越し, 1=開いて素通し）。トグルでなめらかに開閉。
   let windowOpen = 0
@@ -307,19 +309,23 @@ export function createRenderer(canvas) {
   }
 
   function render(now) {
-    // フレーム時間を測り、重い端末では描画解像度を自動調整（滑らかさ優先・回復したら戻す）
+    // 次フレームを先に予約し、約30fpsに間引く（アンビエントに60fpsは不要＝GPU負荷と発熱を約半減）
+    rafId = requestAnimationFrame(render)
+    if (now - lastRenderTime < 30) return // ~33fps上限（描画をスキップしてGPUを休ませる）
+    lastRenderTime = now
+    // フレーム時間を測り、重い端末では描画解像度を自動調整（発熱を抑え滑らかさを保つ）
     if (lastFrame > 0) {
       const dt = now - lastFrame
-      if (dt > 0 && dt < 200) frameEMA = frameEMA * 0.9 + dt * 0.1
+      if (dt > 0 && dt < 300) frameEMA = frameEMA * 0.9 + dt * 0.1
     }
     lastFrame = now
     if (adaptCooldown > 0) {
       adaptCooldown--
-    } else if (frameEMA > 32 && renderScale > 0.9) {
-      renderScale = Math.max(0.9, renderScale - 0.06) // 31fps未満が続いたときだけ控えめに落とす（解像感を優先し下げ幅は小さく）
-      adaptCooldown = 100
-    } else if (frameEMA < 15 && renderScale < 1.0) {
-      renderScale = Math.min(1.0, renderScale + 0.08) // 余裕があれば速やかに戻す
+    } else if (frameEMA > 42 && renderScale > 0.6) {
+      renderScale = Math.max(0.6, renderScale - 0.1) // 24fps未満が続けば解像度を落として発熱/カクつきを抑える
+      adaptCooldown = 60
+    } else if (frameEMA < 26 && renderScale < 1.0) {
+      renderScale = Math.min(1.0, renderScale + 0.06) // 余裕があればゆっくり戻す
       adaptCooldown = 120
     }
     resize()
@@ -407,7 +413,7 @@ export function createRenderer(canvas) {
       gl.uniform2f(fxaaLoc.uResolution, canvas.width, canvas.height)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }
-    rafId = requestAnimationFrame(render)
+    // 次フレームは関数冒頭で予約済み（二重予約を避ける）
   }
 
   function play() {

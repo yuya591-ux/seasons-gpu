@@ -497,10 +497,14 @@ export async function mountTown3d(parent, opts = {}) {
 
   const clock = new THREE.Clock()
   let lastT = 0
+  let lastDraw = -1
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
     const t = clock.getElapsedTime()
+    // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
+    if (t - lastDraw < 0.032) return
+    lastDraw = t
     const dt = Math.min(0.05, t - lastT); lastT = t
     // 車が通りを行き交う
     for (const c of cars) {
