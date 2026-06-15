@@ -579,10 +579,17 @@ const FRAGMENT_BODY = /* glsl */ `
     float gatherL = smoothstep(winL + cwid, winL - 0.01, wp.x - curtSway);
     float gatherR = smoothstep(winR - cwid, winR + 0.01, wp.x + curtSway);
     float gather = max(gatherL, gatherR);
-    float folds = 0.55 + 0.45 * sin(wp.x * 95.0 + sin(wp.y * 3.0 + uTime * 0.25) * 1.4); // 縦の襞＋ゆらぎ
+    // 縦の襞（2周波の重なり＝太い襞の中に細い襞）＝立体的な布
+    float foldPhase = wp.x * 60.0 + sin(wp.y * 3.0 + uTime * 0.25) * 1.4;
+    float foldHi = sin(foldPhase) * 0.5 + 0.5;                       // 0=谷(陰) 1=山(光)
+    float foldLo = sin(wp.x * 17.0 + curtSway * 8.0) * 0.5 + 0.5;    // ゆるい大きな襞
+    float folds = mix(foldLo, foldHi, 0.6);
     float vext = smoothstep(winT + 0.03, winT - 0.02, wp.y) * smoothstep(winB - 0.08, winB + 0.05, wp.y);
-    float laceA = gather * vext * (0.24 + 0.18 * folds);
-    vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * folds);
+    // 谷(陰)は厚く不透明、山(光)は薄く透ける＝逆光のレースの立体感
+    float laceA = gather * vext * (0.30 - 0.12 * foldHi);
+    vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.58 + 0.50 * folds);
+    lace += uSunGlow * smoothstep(0.75, 1.0, foldHi) * 0.12;         // 襞の山に外光が抜ける
+    lace *= 0.82 + 0.18 * smoothstep(0.0, 0.45, wp.y);              // 下ほど僅かに陰
     col = mix(col, lace, laceA);
 
     // 窓辺の観葉植物（左下にそっと。外光に透ける葉のシルエットと鉢）
