@@ -8,6 +8,7 @@ import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
 import { createTilt } from './ui/tilt.js'
 import { mountSplat, unmountSplat, applySplatTilt, resetSplatTilt } from './engine/splatViewer.js'
+import { mountTown3d, unmountTown3d, applyTown3dLook, resetTown3dLook } from './engine/town3dViewer.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
 
@@ -54,6 +55,7 @@ function start() {
     },
   })
   let splatMode = false
+  let town3dMode = false
   // 端末の傾き: スプラット情景は3Dの見回し、それ以外はシェーダーの視差に振り分ける
   const tilt = createTilt({
     onTilt: (nx, ny) => {
@@ -69,7 +71,7 @@ function start() {
   audio.setVolume(settings.volume)
 
   // シェーダー描画は非スプラット情景で起動する（スプラットは別ビューアで表示）
-  const firstShaderScene = scene.render === 'splat' ? DEFAULT_SCENE : scene
+  const firstShaderScene = (scene.render === 'splat' || scene.render === 'town3d') ? DEFAULT_SCENE : scene
   const ok = renderer.start(firstShaderScene, settings)
   if (!ok) {
     canvas.hidden = true
@@ -102,6 +104,7 @@ function start() {
       splatMode = true
       canvas.style.display = 'none'
       renderer.pause()
+      if (town3dMode) { town3dMode = false; await unmountTown3d() }
       try {
         // 読み込み中の下地は情景の空色に（黒からの唐突な切替を避ける）
         const bg = (next.palette && next.palette.early && next.palette.early.skyMid) || null
@@ -120,10 +123,35 @@ function start() {
         renderer.resume()
         renderer.setScene(DEFAULT_SCENE)
       }
+    } else if (next.render === 'town3d') {
+      // 本物の3Dの街（Three.js）。窓から立体の街を見下ろす。
+      town3dMode = true
+      canvas.style.display = 'none'
+      renderer.pause()
+      if (splatMode) { splatMode = false; await unmountSplat() }
+      try {
+        await mountTown3d(document.body, { palette: (next.palette && next.palette.early) || null })
+        if (gen !== sceneGen) { await unmountTown3d(); return }
+      } catch (e) {
+        console.error('3Dの街 表示失敗→通常情景へ:', e)
+        await unmountTown3d()
+        if (gen !== sceneGen) return
+        town3dMode = false
+        canvas.style.display = ''
+        renderer.resume()
+        renderer.setScene(DEFAULT_SCENE)
+      }
     } else {
       if (splatMode) {
         splatMode = false
         await unmountSplat()
+        if (gen !== sceneGen) return
+        canvas.style.display = ''
+        renderer.resume()
+      }
+      if (town3dMode) {
+        town3dMode = false
+        await unmountTown3d()
         if (gen !== sceneGen) return
         canvas.style.display = ''
         renderer.resume()
