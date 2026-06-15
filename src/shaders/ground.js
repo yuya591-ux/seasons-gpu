@@ -128,7 +128,12 @@ export const GROUND_GLSL = /* glsl */ `
       vec3 winLit = mix(uSunGlow, vec3(1.0, 0.92, 0.74), 0.3);
       // 窓は低コントラストの陰影。灯りは夜ほど。昼は段差のかげり程度に抑える（チラつき防止）
       vec3 winFace = mix(wallCol * 0.90, winLit, litW * (0.20 + 0.7 * nightAmt));
-      wallCol = mix(wallCol, winFace, pane * detail * (0.5 + 0.5 * nightAmt));
+      // 昼の窓ガラスは空を映す＋たまに夕日が反射してきらめく（街の質感）
+      vec3 skyRefl = mix(uSkyMid, uSunGlow, 0.3 + 0.4 * sunFacing);
+      winFace = mix(winFace, skyRefl, dayLit * (0.30 + 0.30 * sunFacing));
+      float glint = step(0.90, h21(vec2(floor(fl), floor(colu + hGi.x)) + hGi + 91.0)) * sunFacing * dayLit;
+      winFace += uSunGlow * glint * 0.5;                      // 夕日の窓きらめき
+      wallCol = mix(wallCol, winFace, pane * detail);
       wallCol *= 0.78 + 0.22 * smoothstep(0.0, 0.18, vfrac);  // 足元の接地影(AO)
 
       // 最前列（ごく近い棟）の作り込み: ベランダの手すり＋壁の室外機。距離で自然に消える。
