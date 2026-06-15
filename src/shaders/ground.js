@@ -21,7 +21,8 @@ export const GROUND_GLSL = /* glsl */ `
     float urban = vnoise(gi * 0.07 + 3.0) * (1.0 - 0.7 * uLowRise); // 都心度（低層情景では抑える）
     tower = step(0.93 - 0.20 * urban + 0.6 * uLowRise, h21(gi + 27.0)); // 低層では高層をほぼ無くす
     float isPark = step(0.92 - 0.06 * uLowRise, mat) * (1.0 - tower); // 緑地（低層では少し増える）
-    float baseH = ((0.16 + 0.28 * urban) + (0.28 + 0.46 * urban) * blkR) * (1.0 - 0.42 * uLowRise); // 低層は背が低い
+    // 住宅は2階建て相当まで背を持たせ、上から見ても壁と影が立つ立体感を出す（平らな貼り絵を脱する）
+    float baseH = ((0.26 + 0.30 * urban) + (0.40 + 0.50 * urban) * blkR) * (1.0 - 0.24 * uLowRise);
     bH = mix(baseH, 1.1 + 1.4 * urban, tower) * isBld * (1.0 - isPark);  // 建物高さ
   }
 
@@ -226,7 +227,7 @@ export const GROUND_GLSL = /* glsl */ `
       bld += vec3(0.9, 0.16, 0.12) * hTower * roofness
            * smoothstep(0.16, 0.0, length(hGf - 0.5)) * (0.5 + 0.5 * sin(uTime * 1.2 * mo + hBlk * 20.0));
       // 空気遠近（遠い箱ほど霞んで空へ）。溶かし過ぎず、遠景もシルエットを残す＝奥行きが立つ
-      bld = mix(bld, mix(uHorizon, uSkyMid, 0.4), fog * 0.5);
+      bld = mix(bld, mix(uHorizon, uSkyMid, 0.4), fog * 0.42);
       // 近景（手前の棟）を持ち上げ、かつ近いほどコントラストを増す＝精細感と奥行き
       float nearK = smoothstep(0.12, 0.42, gt);
       bld *= 1.0 + nearK * 0.14;
