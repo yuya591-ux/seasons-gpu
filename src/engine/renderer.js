@@ -227,7 +227,7 @@ export function createRenderer(canvas) {
     const gapY = panTarget.y - panCur.y
     panCur.x += gapX * 0.12
     panCur.y += gapY * 0.12
-    const clampP = (v) => Math.max(-0.11, Math.min(0.11, v)) // 覗き込み視差の天井（身を乗り出す手応え）
+    const clampP = (v) => Math.max(-0.14, Math.min(0.14, v)) // 覗き込み視差の天井（身を乗り出す手応え・3D感）
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
     // ごく弱い“息づかい”の揺れ。静止画ではなく、その場に居る気配を出す（窓辺シリーズで効く）。
@@ -239,8 +239,8 @@ export function createRenderer(canvas) {
     if (loc.uParallax) {
       gl.uniform2f(
         loc.uParallax,
-        clampP(gapX * 0.06 + parallaxBias.x),
-        clampP(gapY * 0.04 + parallaxBias.y),
+        clampP(gapX * 0.09 + parallaxBias.x),
+        clampP(gapY * 0.06 + parallaxBias.y),
       )
     }
     if (loc.uReduceMotion) gl.uniform1f(loc.uReduceMotion, reduceMotion ? 1 : 0)
