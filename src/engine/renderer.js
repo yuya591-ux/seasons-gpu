@@ -185,6 +185,25 @@ export function createRenderer(canvas) {
     }
   }
 
+  // 窓の外の背景画像（任意。Flux生成画像など）。情景が bg を持つときだけ読み込む。
+  // 本番は保存済みPNGを表示するだけ＝実行時に外部APIを叩かない（外部AI生成の組み込み方針）。
+  let bgTex = null
+  let bgReady = 0
+  let bgKey = null
+  function loadBg(s) {
+    const key = s && s.bg ? s.bg : null
+    if (key === bgKey) return
+    bgKey = key
+    if (bgTex) gl.deleteTexture(bgTex) // 旧テクスチャを解放（GPUメモリの累積を防ぐ）
+    bgTex = null
+    bgReady = 0
+    if (!key) return
+    loadTexture(BASE + s.bg, (tex) => {
+      bgTex = tex
+      bgReady = tex ? 1 : 0
+    })
+  }
+
   let program = null
   let loc = {}
   let quality = 'standard'
@@ -258,6 +277,8 @@ export function createRenderer(canvas) {
       uFlash: gl.getUniformLocation(program, 'uFlash'),
       uPano: gl.getUniformLocation(program, 'uPano'),
       uHasPano: gl.getUniformLocation(program, 'uHasPano'),
+      uBg: gl.getUniformLocation(program, 'uBg'),
+      uHasBg: gl.getUniformLocation(program, 'uHasBg'),
       uDepth: gl.getUniformLocation(program, 'uDepth'),
       uHasDepth: gl.getUniformLocation(program, 'uHasDepth'),
       uIntensity: gl.getUniformLocation(program, 'uIntensity'),
@@ -389,6 +410,13 @@ export function createRenderer(canvas) {
       gl.uniform1i(loc.uDepth, 1)
       gl.uniform1f(loc.uHasDepth, panoDepthReady)
     }
+    // 窓の外の背景画像（あれば）をテクスチャユニット2に。屈折座標でサンプルするのはシェーダー側。
+    if (loc.uBg) {
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, bgTex)
+      gl.uniform1i(loc.uBg, 2)
+      gl.uniform1f(loc.uHasBg, bgReady)
+    }
     gl.uniform1f(loc.uBright, settings.brightness)
     if (scene) {
       const c = currentColors(seconds)
@@ -452,13 +480,19 @@ export function createRenderer(canvas) {
       panoReady = 0
       panoDepthReady = 0
       panoKey = null
+      bgTex = null
+      bgReady = 0
+      bgKey = null
       fbo = null
       fboTex = null
       fboW = 0
       fboH = 0
       buildFxaa()
       if (buildProgram(quality, shaderType)) {
-        if (scene) loadPano(scene)
+        if (scene) {
+          loadPano(scene)
+          loadBg(scene)
+        }
         resize()
         play()
       }
@@ -542,6 +576,7 @@ export function createRenderer(canvas) {
       // 見回しの可動域（情景ごと）。屋上などは広げてほぼ360°見渡せる。
       basePanX = (s && s.panX) || 2.6
       loadPano(s)
+      loadBg(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
       panTarget.y = 0
@@ -564,6 +599,7 @@ export function createRenderer(canvas) {
       lowRiseMode = initialScene && initialScene.lowRise ? 1 : 0
       basePanX = (initialScene && initialScene.panX) || 2.6
       loadPano(initialScene)
+      loadBg(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()
       play()

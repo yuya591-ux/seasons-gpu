@@ -11,6 +11,14 @@ export default {
   render: 'rainGlass', // 描画タイプ（src/shaders/index.js）
   intensityLabel: '雨脚', // 設定スライダーの名前
 
+  // ── 窓の外の背景画像（任意の格上げ層）──
+  // シェーダーの雨（屈折・曇り・きらめき）は土台のまま、奥の「絵」だけ Flux 生成画像で底上げできる。
+  // 画像は開発時に scripts/gen-bg.mjs で生成して public/bg/ に保存し、下の bg を有効化するだけ（本番はAPIを叩かない）。
+  // 情景が「背景プロンプト」を携えることで、季節×天気×時間帯ごとの量産がしやすい。
+  bgPrompt:
+    'watercolor and soft realism blend, nostalgic Japanese countryside at dusk, glowing crimson and amber sunset sky, low silhouette of distant blurred rooftops and trees along the bottom, soft hazy rainy atmosphere, melancholic calm, muted dusty colors, painterly bokeh, no people, no text',
+  // bg: 'bg/summer-rain-dusk.jpg', // ← 生成画像を保存したら有効化（雨粒がこの絵を屈折させる）
+
   // 色パレット（#rrggbb）。キーフレーム配列で持ち、将来は時刻でさらに細かく移ろわせられる。
   palette: {
     // 夕方の入り（まだ光が残る）

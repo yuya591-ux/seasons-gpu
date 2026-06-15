@@ -1,0 +1,23 @@
+[
+  {
+    "name": "summer-rain-dusk-a",
+    "prompt": "watercolor and soft realism blend, nostalgic Japanese countryside at dusk, glowing crimson and amber sunset sky filling the upper two thirds, a low silhouette of distant blurred rooftops and trees along the bottom quarter, soft hazy rainy atmosphere, melancholic calm, muted dusty colors, painterly, dreamy bokeh, no people, no text",
+    "seed": 7,
+    "width": 1280,
+    "height": 768
+  },
+  {
+    "name": "summer-rain-dusk-b",
+    "prompt": "dreamy painterly dusk over a quiet Japanese small town, deep violet and rose twilight sky, faint distant rooftops and a single far hill on the low horizon, soft mist and rain haze, blurred warm street lights glowing far away, watercolor texture, muted melancholic palette, atmospheric, cinematic soft focus, no people, no text",
+    "seed": 12,
+    "width": 1280,
+    "height": 768
+  },
+  {
+    "name": "summer-rain-dusk-c",
+    "prompt": "nostalgic rainy evening landscape, soft glowing apricot and mauve sky, layered misty distant hills with a low row of blurred village houses at the bottom, hazy depth, watercolor and gentle realism, calm and healing mood, dusty muted tones, painterly bokeh, no people, no text",
+    "seed": 23,
+    "width": 1280,
+    "height": 768
+  }
+]

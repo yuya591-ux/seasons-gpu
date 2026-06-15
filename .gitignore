@@ -4,3 +4,7 @@ dist
 *.log
 .vite
 scripts/_shots
+# 外部AI生成の鍵は開発環境のみ・Gitに上げない（外部AI生成の組み込み方針）
+.env
+.env.local
+scripts/.pollinations-token

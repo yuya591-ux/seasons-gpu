@@ -24,6 +24,8 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec3 uSunGlow;     // 光芒
   uniform vec3 uDropTint;    // 水滴のハイライト
   uniform float uFlash;      // 遠雷フラッシュ 0..1
+  uniform sampler2D uBg;     // 窓の外の風景（Flux生成画像。任意）
+  uniform float uHasBg;      // 背景画像があるか 0/1
 
   float hash21(vec2 p) {
     p = fract(p * vec2(123.34, 345.45));
@@ -84,6 +86,25 @@ const FRAGMENT_BODY = /* glsl */ `
       col += lc * exp(-d * 26.0) * 0.42 * tw;
     }
     return col;
+  }
+
+  // 窓の外（背景）。Flux生成画像があればそれを土台に、なければ手続きの夕焼けを描く。
+  // どちらも同じ“屈折オフセット付き座標”で呼ばれるため、雨粒が背景を歪める核心の表現は共通で効く。
+  // ＝シェーダーの現象（屈折・曇り・きらめき）は土台のまま、奥の「絵」だけ画像で格上げする二層構成。
+  vec3 outside(vec2 uv) {
+    if (uHasBg < 0.5) return skyBase(uv); // 画像なしの情景は従来どおり（非破壊）
+    // 画像は上端＝空（FLIP_Y無効で読み込み）。画面の上を空に合わせ、下端3%は窓の桟に隠れる帯として切る
+    // （構図上もともと隠れる位置＝匿名生成の透かし対策も兼ねる）。
+    vec2 tuv = vec2(clamp(uv.x, 0.0, 1.0), clamp((1.0 - uv.y) * 0.97, 0.0, 1.0));
+    vec3 t = texture2D(uBg, tuv).rgb;
+    // 時間帯の移ろい（夕→暮れ）を画像にもそっと乗せる。画像の質感は壊さず色みだけ寄せる。
+    float y = clamp(uv.y, 0.0, 1.0);
+    vec3 mood = 0.5 + mix(uHorizon, uSkyMid, smoothstep(0.0, 0.7, y));
+    t = mix(t, t * mood, 0.18);
+    // にじむ街あかり（暖色のボケ）を地平にごく薄く重ね、雨夕の温度感を深める（水滴越しに屈折してきらめく）
+    float glow = exp(-distance(uv, vec2(0.5, 0.2)) * 3.0);
+    t += uSunGlow * glow * 0.08 * (1.0 - 0.4 * uIntensity);
+    return t;
   }
 
   // 一面の細かい水滴（生成と乾きをゆっくり繰り返す）。
@@ -149,7 +170,7 @@ const FRAGMENT_BODY = /* glsl */ `
     vec2 refr = (sd.xy * sMask + rs.xy * rMask * 1.3) * 0.052 * mix(0.6, 1.25, rain);
 
     // 曇りガラスの下地（結露でくもる。水のある所だけ晴れて景色が見える＝雨らしさの核）
-    vec3 sky = skyBase(frag);
+    vec3 sky = outside(frag);
     float sl = dot(sky, vec3(0.299, 0.587, 0.114));
     vec3 frosted = mix(sky, vec3(sl), 0.28) * 0.86;   // 彩度と明度を落として“くもり”
 
@@ -158,9 +179,9 @@ const FRAGMENT_BODY = /* glsl */ `
     float clouds = fbm((frag + refr) * vec2(2.6, 2.2) + vec2(t * 0.011, t * 0.005));
     float shade = smoothstep(0.45, 0.85, clouds) * 0.5;
     vec3 baseC = vec3(
-      skyBase(frag + refr * 1.06).r,
-      skyBase(frag + refr).g,
-      skyBase(frag + refr * 0.94).b
+      outside(frag + refr * 1.06).r,
+      outside(frag + refr).g,
+      outside(frag + refr * 0.94).b
     );
     vec3 sharp = mix(baseC, baseC * 0.84, shade) * 1.06;
 
