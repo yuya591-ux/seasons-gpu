@@ -37,8 +37,10 @@ export default {
     town: { lights: 0.7 },
   },
 
-  // ヒグラシ（既存の素材を再利用）。出典・ライセンスは CREDITS.md に記録済み。
+  // ヒグラシ＋夕暮れに時折カラス（夕焼けの郷愁）。出典・ライセンスは CREDITS.md に全数記録。
   sounds: [
     { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.5, loop: true },
+    // カラスは鳴き交わすように、ゆらぎのある間隔でそっと（cueなし＝自然な高域）。
+    { id: 'crow', label: 'カラス', src: 'audio/summer-dusk-downtown/crow.mp3', loop: false, interval: [16, 38], gain: 0.32 },
   ],
 }

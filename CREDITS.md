@@ -39,6 +39,16 @@
 - カモメは実在種 *Chroicocephalus ridibundus*（ユリカモメ）の群れの鳴き声。1971年5月、英国サフォーク州 Havergate Island の湿地で録音。
 - 変更点：Ogg→MP3 へ変換し、波の上にそっと重ねてループ再生。CC BY-SA 素材は同ライセンス継承。
 
+### 情景「夏の夕暮れ、高台の下町」 — `public/audio/summer-dusk-downtown/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| カラス | `crow.mp3` | "Carrion Crow (Corvus corone) (W1CDR0001425 BD18)" / 録音: Lawrence Shove・提供: The British Library Board | CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/ | https://commons.wikimedia.org/wiki/File:Carrion_Crow_(Corvus_corone)_(W1CDR0001425_BD18).ogg |
+
+- カラスは実在種 *Corvus corone*（ハシボソガラス）の鳴き声。1961年4月、英国デヴォン州 Culver で録音。
+- 変更点：Ogg→MP3 へ変換し、夕暮れにゆらぎのある間隔でそっと鳴らす。CC BY-SA 素材は同ライセンス継承。
+- ヒグラシ（`summer-rain-dusk/higurashi.mp3`）も再利用（上記に記録）。
+
 ### 情景「朝の谷戸、鶴見・獅子ヶ谷」 — `public/audio/shishigaya-morning-yato/`
 
 | レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
