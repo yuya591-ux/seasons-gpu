@@ -109,9 +109,23 @@ const FRAGMENT_BODY = /* glsl */ `
     float sunDist = distance(vec2(ax, vp.y), sunC);
     col += uSunGlow * exp(-sunDist * 3.0) * 0.45;
     col = mix(col, vec3(1.0, 0.97, 0.9), smoothstep(0.05, 0.04, sunDist) * 0.7);
-    // 雲
-    float cl = fbm(vec2((ax + yaw * 0.16) * 1.2 + t * 0.006 * mo, vp.y * 2.4));
-    col = mix(col, mix(uSkyMid, vec3(1.0), 0.5), smoothstep(0.52, 0.72, cl) * smoothstep(0.56, 1.0, vp.y) * 0.4);
+    // 雲（積雲。ドメインワープでもくもく＋底面が夕日を受け＋縁に銀のリム＝立体的にそびえる雲）
+    float cloudT = t * mo;
+    float sunSide = smoothstep(0.4, -0.9, ax + yaw * 0.2 - sunAz);   // 太陽側(西=左)ほど暖色に燃える
+    for (int L = 0; L < 2; L++) {
+      float fl = float(L);
+      vec2 cq = vec2((ax + yaw * 0.16) * 1.3 + yaw * (0.06 - fl * 0.03) + cloudT * (0.010 - fl * 0.004) + fl * 5.0, vp.y * (2.6 - fl * 0.9));
+      vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
+      float cl = fbm(cq + cwarp * 0.8);
+      float clu = fbm(cq + vec2(0.0, 0.14) + cwarp * 0.8);
+      float cb = smoothstep(0.50, 0.68, cl) * smoothstep(0.50, 1.0, vp.y);
+      float underlit = smoothstep(-0.06, 0.10, clu - cl);
+      vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.5 + 0.35 * sunSide);
+      vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);
+      col = mix(col, mix(cloudCool, cloudWarm, underlit), cb * (0.55 - fl * 0.16));
+      float rim = smoothstep(0.48, 0.60, cl) * smoothstep(0.68, 0.56, cl);
+      col += mix(uSunGlow, vec3(1.0), 0.3) * rim * (0.16 + 0.5 * sunSide) * smoothstep(0.50, 1.0, vp.y) * (0.6 - fl * 0.2);
+    }
     // 薄明光線（god rays）: 夕日から放射する光の筋＝広い屋上の空の立体感
     col = godRays(col, vec2(ax, vp.y), sunC, uSunGlow * 0.14, uTime, smoothstep(0.43, 0.55, vp.y));
 
