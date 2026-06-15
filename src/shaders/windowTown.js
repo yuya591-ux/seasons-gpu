@@ -177,6 +177,9 @@ const FRAGMENT_BODY = /* glsl */ `
       vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.55 + 0.30 * westWarm);
       vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);
       col = mix(col, mix(cloudCool, cloudWarm, underlit), cb * (0.52 - fl * 0.14));
+      // 太陽に面した雲の縁が輝く銀の縁取り（立体的な雲のふくらみ）
+      float rim = smoothstep(0.52, 0.64, cl) * smoothstep(0.72, 0.60, cl);
+      col += mix(uSunGlow, vec3(1.0), 0.3) * rim * (0.18 + 0.5 * westWarm) * smoothstep(0.44, 1.0, vp.y) * (0.6 - fl * 0.2);
       cloudband = max(cloudband, cb);
     }
 
