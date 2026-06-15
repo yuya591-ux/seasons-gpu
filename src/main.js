@@ -140,12 +140,64 @@ function start() {
     }
   }
 
+  // ── おやすみタイマー：眺めているうちに、そっと暗転して音が引いて休む（眺めて寝落ちる） ──
+  // 触れればいつでも静かに戻る。暗転しきったら描画と音を止めてバッテリーも守る。
+  const sleepOverlay = document.createElement('div')
+  sleepOverlay.className = 'sleep-overlay'
+  const sleepWord = document.createElement('p')
+  sleepWord.className = 'sleep-word'
+  sleepWord.textContent = 'おやすみなさい'
+  sleepOverlay.appendChild(sleepWord)
+  document.body.appendChild(sleepOverlay)
+  let sleepTimer = 0
+  let sleepFading = false
+  function cancelSleep() {
+    clearTimeout(sleepTimer)
+    sleepTimer = 0
+    if (sleepFading) {
+      sleepFading = false
+      sleepOverlay.classList.remove('sleep-overlay--on', 'sleep-overlay--done')
+      renderer.resume()
+      const st = getState().settings
+      audio.setVolume(st.volume) // 音量を戻す
+      audio.setMuted(st.muted)
+    }
+  }
+  function startSleepFade() {
+    sleepFading = true
+    sleepOverlay.classList.add('sleep-overlay--on') // CSSで約26秒かけて暗転
+    const startVol = getState().settings.volume
+    const t0 = performance.now()
+    const dur = 26000
+    function ramp() {
+      if (!sleepFading) return
+      const k = Math.min(1, (performance.now() - t0) / dur)
+      audio.setVolume(startVol * (1 - k)) // 音を静かに絞る
+      if (k < 1) requestAnimationFrame(ramp)
+      else {
+        sleepOverlay.classList.add('sleep-overlay--done')
+        renderer.pause() // 暗転しきったら休む（描画停止＝発熱/電池に配慮）
+        audio.setMuted(true)
+      }
+    }
+    requestAnimationFrame(ramp)
+  }
+  function onSleepTimer(min) {
+    cancelSleep()
+    if (min > 0) sleepTimer = setTimeout(startSleepFade, min * 60000)
+  }
+  // 眠りの暗転中に触れたら、そっと眺めへ戻す
+  ;['pointerdown', 'keydown'].forEach((ev) =>
+    window.addEventListener(ev, () => { if (sleepFading) cancelSleep() }, { passive: true }),
+  )
+
   buildUI({
     initialScene: scene,
     settings,
     onApplyScene(next) {
       applyScene(next)
     },
+    onSleepTimer,
     onSettings(patch) {
       updateSettings(patch)
       renderer.setSettings(getState().settings)

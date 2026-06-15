@@ -21,6 +21,7 @@ export function buildUI(opts) {
     onVolume, // (v) => void
     onToggleWindow, // (open) => void  窓をあける/しめる
     onToggleLean, // (lean) => void  身を乗り出す/もどる
+    onSleepTimer, // (minutes) => void  おやすみタイマー（0=なし）
   } = opts
 
   const root = h('div', 'ui')
@@ -343,6 +344,32 @@ export function buildUI(opts) {
     tiltChips.appendChild(tiltBtn)
     tiltRow.appendChild(tiltChips)
     el.appendChild(tiltRow)
+
+    // おやすみタイマー：眺めているうちに、そっと暗くなって休む
+    const sleepRow = h('div', 'setrow')
+    sleepRow.appendChild(h('span', 'setrow__label', 'おやすみ'))
+    const sleepChips = h('div', 'axis__chips')
+    const SLEEPS = [
+      { m: 0, label: 'なし' },
+      { m: 15, label: '15分' },
+      { m: 30, label: '30分' },
+      { m: 60, label: '60分' },
+    ]
+    const sEls = []
+    SLEEPS.forEach((s) => {
+      const chip = h('button', 'chip', s.label)
+      chip.classList.toggle('chip--on', (settings.sleep || 0) === s.m)
+      chip.addEventListener('click', () => {
+        settings.sleep = s.m
+        sEls.forEach((e) => e.chip.classList.toggle('chip--on', e.m === s.m))
+        onSleepTimer && onSleepTimer(s.m)
+        poke()
+      })
+      sleepChips.appendChild(chip)
+      sEls.push({ m: s.m, chip })
+    })
+    sleepRow.appendChild(sleepChips)
+    el.appendChild(sleepRow)
 
     close.addEventListener('click', () => {
       el.classList.remove('panel--open')

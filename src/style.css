@@ -466,3 +466,35 @@ body.idle .topbar {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* おやすみタイマー：ゆっくり暗転して休む（触れれば戻る） */
+.sleep-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6; /* UIの上から静かに覆う */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #080610;
+  opacity: 0;
+  pointer-events: none; /* 触れても下へ通し、window でwake判定 */
+  transition: opacity 26s linear;
+}
+.sleep-overlay--on {
+  opacity: 0.97;
+}
+.sleep-overlay--done {
+  opacity: 1;
+  transition: opacity 1.4s ease;
+}
+.sleep-word {
+  margin: 0;
+  color: rgba(238, 233, 244, 0.72);
+  font-size: 1.05rem;
+  letter-spacing: 0.34em;
+  opacity: 0;
+  transition: opacity 5s ease 8s; /* 暗転の途中でそっと浮かぶ */
+}
+.sleep-overlay--on .sleep-word {
+  opacity: 0.66;
+}
