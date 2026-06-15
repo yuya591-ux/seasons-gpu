@@ -89,17 +89,17 @@ const FRAGMENT_BODY = /* glsl */ `
   // 一面の細かい水滴（生成と乾きをゆっくり繰り返す）。
   // 戻り: xy=中心からの相対方向, z=マスク, w=正規化距離(0:中心 .. 1:ふち)
   vec4 staticDroplets(vec2 uv, float t) {
-    vec2 cells = vec2(24.0, 24.0);                 // 数を絞り、一粒ずつ確かなレンズに
+    vec2 cells = vec2(19.0, 19.0);                 // さらに数を絞り、一粒ずつ確かなレンズに（散乱したボケ＝汚れ感を排す）
     vec2 g = uv * cells;
     vec2 id = floor(g);
     vec2 f = fract(g) - 0.5;
     float n = hash21(id);
     float n2 = hash21(id + 13.7);
-    float exists = step(0.34, hash21(id + 4.1));   // 全マスには付かない（まばら＝本物の付き方）
+    float exists = step(0.56, hash21(id + 4.1));   // 約4割だけに付く（まばら＝本物の付き方・ノイズに見せない）
     vec2 c = (vec2(n, n2) - 0.5) * 0.55;
     vec2 dir = f - c;
     float dist = length(dir);
-    float r = (0.14 + 0.20 * n) * exists;
+    float r = (0.17 + 0.10 * n) * exists;          // 大きさを揃える（バラバラの大小＝ゴミ感を排す）
     float drop = smoothstep(r, r * 0.32, dist) * exists;
     float life = sin(t * 0.25 + n * 30.0) * 0.5 + 0.5;
     drop *= smoothstep(0.12, 0.6, life);
