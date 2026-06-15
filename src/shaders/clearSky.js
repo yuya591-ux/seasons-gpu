@@ -3,6 +3,7 @@
 // パレットの5色は雨ガラスと共通の名前を使い、ここでは空・雲・陽射しとして解釈する。
 
 import { GRADE_GLSL } from './grade.js'
+import { BIRDS_GLSL } from './birds.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -18,6 +19,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uTime;
   uniform float uIntensity;  // 陽炎・雲の強さ 0..1
   uniform float uBright;     // 明るさ
+  uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=止める
   uniform vec3 uSkyTop;      // 天頂の青
   uniform vec3 uSkyMid;      // 中空
   uniform vec3 uHorizon;     // 地平（淡い）
@@ -103,11 +105,24 @@ const FRAGMENT_BODY = /* glsl */ `
     float smallMask = smoothstep(0.60, 0.72, small) * smoothstep(0.56, 0.74, uv.y) * (1.0 - smoothstep(0.86, 1.0, uv.y));
     col = mix(col, mix(uDropTint, vec3(1.0, 0.99, 0.97), 0.4), smallMask * 0.5);
 
-    // 遠くの木立のシルエット（夏の郷愁・緑）。最下部に、もやでかすませて薄く。
+    // 夏空を高く渡る鳥（小さく・はばたきながら）。
+    col = flyingBirds(col, vec2((uv.x - 0.5) * asp, uv.y), t, 1.0 - uReduceMotion);
+
+    // 遠くのなだらかな丘（空気遠近で青く霞む＝奥行き）。木立より奥に薄く。
     float treeTop = 0.085 + fbm(vec2(cuv.x * 6.0, 3.0)) * 0.035;
+    float hillTop = 0.125 + fbm(vec2(cuv.x * 2.6 + 5.0, 1.0)) * 0.035;
+    float hill = smoothstep(hillTop + 0.012, hillTop - 0.012, uv.y) * step(treeTop, uv.y);
+    col = mix(col, mix(uHorizon, vec3(0.34, 0.44, 0.42), 0.5), hill * 0.5);
+    // 遠くの木立のシルエット（夏の郷愁・緑）。もやでかすませて。
     float tree = smoothstep(treeTop + 0.006, treeTop - 0.006, uv.y);
     vec3 green = mix(vec3(0.16, 0.27, 0.15), uHorizon, 0.4); // 夏の濃い緑＋距離のもや
     col = mix(col, green, tree * 0.85);
+    // 手前の夏草の野原（陽の当たる明るい緑。細かな揺らぎでべた塗りを避ける）
+    float fieldMask = smoothstep(treeTop, treeTop - 0.05, uv.y);
+    vec3 field = mix(vec3(0.20, 0.33, 0.17), vec3(0.28, 0.40, 0.19), clamp((treeTop - uv.y) * 6.0, 0.0, 1.0));
+    field *= 0.92 + 0.14 * (fbm(vec2(cuv.x * 70.0, uv.y * 130.0 + t * 0.3)) - 0.5) * 2.0; // 草のきらめき
+    field += uSunGlow * 0.04 * (1.0 - smoothstep(treeTop - 0.05, treeTop, uv.y));         // 陽だまり
+    col = mix(col, field, fieldMask * 0.7);
 
     // 地平の白いもや（暑さ）。白とびしない程度に。
     col = mix(col, mix(col, uHorizon, 0.45), heat * 0.3);
@@ -138,6 +153,6 @@ const QUALITY_DEFINES = {
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GRADE_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
   return defines + body
 }
