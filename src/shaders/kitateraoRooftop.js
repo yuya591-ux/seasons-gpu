@@ -274,6 +274,37 @@ const FRAGMENT_BODY = /* glsl */ `
     // 床の縁の立ち上がりに陽＝屋上に立っている実感（手すりは無し＝開放感）
     col += uSunGlow * smoothstep(0.009, 0.0, abs(p.y - floorTop)) * 0.13;
 
+    // ── 真下を覗く: 見下ろす/身を乗り出すと、マンション直下の坂の小路と歩く住民が大きく見える ──
+    // （窓を開けて/乗り出して下を覗くと近所の人が歩いている、という原風景の手応え）
+    float peek = smoothstep(0.18, 0.40, pitch + max(uParallax.y, 0.0) * 2.5);
+    if (peek > 0.01) {
+      float laneTop = floorTop + 0.15;
+      float inLane = smoothstep(floorTop - 0.004, floorTop + 0.012, p.y) * smoothstep(laneTop, laneTop - 0.025, p.y) * peek;
+      vec3 lane = mix(vec3(0.25, 0.24, 0.24), uHorizon * 0.3, 0.25);              // 小路のアスファルト
+      lane *= 0.9 + 0.12 * fbm(vec2(p.x * 22.0, p.y * 9.0));
+      lane = mix(lane, vec3(0.5, 0.49, 0.36), smoothstep(0.004, 0.0, abs(fract(p.x * 8.0 + yaw) - 0.5)) * 0.18); // 白線
+      // 歩く住民（数人。大きくはっきり。横に歩き、足を運ぶ）
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float dir = (i == 1) ? -1.0 : 1.0;
+        float px3 = fract((uTime * (0.028 + 0.008 * fi) * dir * mo) + fi * 0.37 + h11(fi + 3.0));
+        vec2 pc = vec2(p.x - px3, p.y - (floorTop + 0.062 + fi * 0.012));
+        float stride = sin(uTime * 5.5 * mo + fi * 2.0);
+        pc.y -= abs(stride) * 0.004;                                              // 歩く上下動
+        float body = smoothstep(0.030, 0.0, length(pc * vec2(2.4, 1.0))) * step(-0.05, pc.y);
+        float head = smoothstep(0.016, 0.0, length(pc - vec2(0.0, 0.036)));
+        float legs = smoothstep(0.006, 0.0, abs(pc.x - stride * 0.01)) * step(-0.05, pc.y) * step(pc.y, -0.02); // 足
+        vec3 clo = 0.40 + 0.36 * cos(h11(fi + 7.0) * 9.0 + vec3(0.0, 2.1, 4.2));  // 服の色
+        lane = mix(lane, lane * 0.4, (body + legs) * 0.4);                        // 接地の陰
+        lane = mix(lane, clo, body * 0.9);
+        lane = mix(lane, clo * 0.6, legs * 0.85);
+        lane = mix(lane, vec3(0.15, 0.10, 0.08), head * 0.9);                     // 頭(髪)
+      }
+      // 直下の小さな庭・植木（住宅の隙間の緑）
+      lane = mix(lane, vec3(0.20, 0.34, 0.17), step(0.82, h11(floor(p.x * 9.0 + yaw))) * smoothstep(laneTop, laneTop - 0.02, p.y) * smoothstep(floorTop + 0.10, laneTop, p.y) * 0.5);
+      col = mix(col, lane, inLane);
+    }
+
     // 鳥（はばたきながら弧を描いて屋上の空を渡る）
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, mo);
 
