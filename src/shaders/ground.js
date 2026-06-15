@@ -30,7 +30,7 @@ export const GROUND_GLSL = /* glsl */ `
   float terrainH(vec2 g0) {
     float h = fbm(g0 * 0.075 + 2.3) - 0.5;          // 大きな尾根と谷
     h += (fbm(g0 * 0.19 + 7.0) - 0.5) * 0.45;        // 中くらいの起伏（坂）
-    return h * 1.5;
+    return h * 1.5 * (1.0 + uLowRise * 0.7);         // 坂の住宅地(低層)は起伏を強め＝街が丘を駆け上り下る
   }
 
   // 戻り: 街色。gmask に被覆マスク(0..1)。lean=覗き込み(uParallax.x), nightAmt=夜度, glassMode=雨雪。
