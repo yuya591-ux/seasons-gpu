@@ -197,9 +197,9 @@ const FRAGMENT_BODY = /* glsl */ `
     col = town(col, vp, ax + yaw * 0.45 + uParallax.x * 0.3, 0.50, 0.10, 0.06,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0, 0.40);
 
-    // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（奥行き）
+    // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（退色は控えめ＝奥行きを残し濁らせない）
     float haze = smoothstep(0.60, 0.44, vp.y) * smoothstep(0.34, 0.50, vp.y);
-    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.40);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.24);
 
     // 街あかりの照り返し（夜の湿った空気に滲む光害のドーム）
     float nightAmt = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0);
@@ -211,9 +211,9 @@ const FRAGMENT_BODY = /* glsl */ `
     col = town(col, vp, ax + yaw * 1.28 + uParallax.x * 1.4, 0.30, 0.26, 0.18,
                uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5, 0.20);
 
-    // 地平の継ぎ目をなじませる: 立体の近景街と2Dの遠景スカイラインの境を霞で溶かす
+    // 地平の継ぎ目をなじませる: 立体の近景街と2Dの遠景スカイラインの境（溶かし過ぎない）
     float seam = smoothstep(0.505, 0.44, vp.y) * smoothstep(0.40, 0.455, vp.y);
-    col = mix(col, mix(uHorizon, uSkyMid, 0.5), seam * 0.5);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.5), seam * 0.32);
 
     // 高層ビルの赤色航空障害灯（ゆっくり点滅）
     for (int bi = 0; bi < 3; bi++) {
