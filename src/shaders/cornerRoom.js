@@ -176,19 +176,19 @@ const FRAGMENT_BODY = /* glsl */ `
       vec2 id = floor(gp);
       vec2 f = fract(gp) - 0.5;
       float n = h21(id + fi * 23.0);
-      if (n < 0.82) continue;                                   // ぐっとまばらに（静けさ優先）
+      if (n < 0.86) continue;                                   // さらにまばらに（丸ボケの散乱感＝ゴミ感を排す）
       // ひらひら回転（風が強いほど速く舞う）＝木の葉のフラッター
       float ang = t * (1.4 + 1.6 * abs(gust)) * (n - 0.5) * 2.0 + n * 6.2831;
       float ca = cos(ang), sa = sin(ang);
       vec2 rf = vec2(ca * f.x - sa * f.y, sa * f.x + ca * f.y);
-      // 横から見た葉は薄く（回転で見え隠れ）＝立体的なひらめき
-      float thin = mix(2.2, 1.0, abs(sin(ang)));
-      float leaf = smoothstep(0.17, 0.07, length(rf * vec2(1.0, thin)));
+      // 常に縦長の楕円（真円のボケ円にしない＝花弁/葉の形に見せる）。回転で薄く見え隠れ。
+      float thin = mix(2.6, 1.5, abs(sin(ang)));
+      float leaf = smoothstep(0.125, 0.075, length(rf * vec2(1.0, thin))); // 小さく・縁をやや締める
       vec3 lc = (mode > 1.5)
         ? mix(vec3(0.98, 0.84, 0.88), vec3(0.95, 0.74, 0.80), n)  // 花びら（淡紅）
         : mix(vec3(0.80, 0.47, 0.22), vec3(0.62, 0.30, 0.17), n); // 紅葉（落ち着いた橙茶）
       lc *= 0.85 + 0.30 * abs(cos(ang));                         // 面の向きで明暗（受光）
-      col = mix(col, lc, leaf * (0.20 + 0.26 * depth));
+      col = mix(col, lc, leaf * (0.15 + 0.19 * depth));          // 不透明度を下げる（控えめに舞う）
     }
     return col;
   }
