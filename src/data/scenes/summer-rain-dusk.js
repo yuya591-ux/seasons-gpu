@@ -17,7 +17,7 @@ export default {
   // 情景が「背景プロンプト」を携えることで、季節×天気×時間帯ごとの量産がしやすい。
   bgPrompt:
     'watercolor and soft realism blend, nostalgic Japanese countryside at dusk, glowing crimson and amber sunset sky, low silhouette of distant blurred rooftops and trees along the bottom, soft hazy rainy atmosphere, melancholic calm, muted dusty colors, painterly bokeh, no people, no text',
-  // bg: 'bg/summer-rain-dusk.jpg', // ← 生成画像を保存したら有効化（雨粒がこの絵を屈折させる）
+  bg: 'bg/summer-rain-dusk-b.jpg', // 窓の外の風景（Flux生成・紫の下町と灯り）。雨粒がこの絵を屈折させる
 
   // 色パレット（#rrggbb）。キーフレーム配列で持ち、将来は時刻でさらに細かく移ろわせられる。
   palette: {

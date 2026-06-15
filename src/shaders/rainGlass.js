@@ -172,7 +172,8 @@ const FRAGMENT_BODY = /* glsl */ `
     // 曇りガラスの下地（結露でくもる。水のある所だけ晴れて景色が見える＝雨らしさの核）
     vec3 sky = outside(frag);
     float sl = dot(sky, vec3(0.299, 0.587, 0.114));
-    vec3 frosted = mix(sky, vec3(sl), 0.28) * 0.86;   // 彩度と明度を落として“くもり”
+    // 背景画像があるときは“濡れガラスのくもり”をやや強め、写真が素通しに見えないようにする（手続き背景は従来のまま）
+    vec3 frosted = mix(sky, vec3(sl), 0.28 + 0.10 * uHasBg) * (0.86 - 0.03 * uHasBg);
 
     // 水滴越しのシャープな景色。RGBで屈折量を僅かにずらして色収差（プレミアム感）を出す。
     // 雲のにじみは fbm 1回だけ（ここで一括計算してコストを抑える）。
@@ -193,7 +194,8 @@ const FRAGMENT_BODY = /* glsl */ `
                 * smoothstep(0.35, 1.0, sd.w) * sMask;
     vec2 rn = normalize(rs.xy + 1e-5);
     float rSpec = smoothstep(0.4, 0.96, dot(rn, normalize(LIGHT))) * rs.w;
-    col += vec3(1.0) * (sSpec + rSpec) * 0.24;
+    // 背景画像のときは白い鏡面ハイライトを少し抑え、筋が傷のように浮かないようにする
+    col += vec3(1.0) * (sSpec + rSpec) * (0.24 - 0.06 * uHasBg);
     // 光に面した縁の鋭いきらめき（水玉の立体感）
     float sGlint = smoothstep(0.86, 0.99, dot(sn, normalize(LIGHT))) * smoothstep(0.55, 0.95, sd.w) * sMask;
     col += vec3(1.0) * sGlint * 0.5;
