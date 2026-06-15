@@ -8,9 +8,12 @@ const errs = []
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
 await page.goto('http://localhost:4790/seasons/?dev=1', { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(400)
+await page.waitForTimeout(900)
+// 起動時の「いま」の情景が落ち着いてから指定情景へ。確実に切り替わるよう二度当てる。
 await page.evaluate((id) => window.__applyScene && window.__applyScene(id), sceneId)
-await page.waitForTimeout(1800)
+await page.waitForTimeout(700)
+await page.evaluate((id) => window.__applyScene && window.__applyScene(id), sceneId)
+await page.waitForTimeout(2000)
 await page.screenshot({ path: `scripts/_shots/${out}_front.png` })
 if (down) {
   const box = await page.locator('#scene').boundingBox()
@@ -21,5 +24,7 @@ if (down) {
   await page.waitForTimeout(1400)
   await page.screenshot({ path: `scripts/_shots/${out}_down.png` })
 }
-console.log('shader errors:', errs.filter((e) => /shader|compile|GLSL|uniform/i.test(e)).slice(0, 4).join(' | ') || 'none')
+const hud = await page.evaluate(() => { const e = document.querySelector('.hud__scene'); return e ? e.textContent : '?' })
+const shaderErr = errs.filter((e) => /shader|compile|GLSL|uniform|コンパイル|失敗/i.test(e))
+console.log('hud:', hud, '| shader errors:', shaderErr.slice(0, 4).join(' | ') || 'none')
 await browser.close()
