@@ -92,7 +92,8 @@ export async function mountTown3d(parent, opts = {}) {
   const fogCol = weather === 'snow'
     ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.55).getHex()
     : skyHorizon.clone().lerp(skyTop, 0.5).getHex()
-  scene.fog = new THREE.Fog(fogCol, weather === 'snow' ? 42 : 55, weather === 'snow' ? 180 : 215)
+  // 霞を一段強め、中景の低ポリを空気遠近で溶かして奥行きと水彩感を出す（手前は鮮明に保つ）。
+  scene.fog = new THREE.Fog(fogCol, weather === 'snow' ? 40 : 50, weather === 'snow' ? 165 : 188)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
   {
@@ -650,6 +651,10 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 窓枠のHTMLオーバーレイ（最前景のサッシ＋横桟＋窓台＋ガラスの映り込み＋紙目）──
   // frame() から参照するので先に生成する。あける／乗り出すで毎フレーム動かす。
+  // 大気のトーン（空のほのかな光のにじみ＋周辺減光）＝シネマ調の奥行きで低ポリを格上げ。
+  const atmo = document.createElement('div')
+  atmo.className = 'town3d-atmo'
+  stage.appendChild(atmo)
   const paper = document.createElement('div')
   paper.className = 'town3d-paper'
   stage.appendChild(paper)
