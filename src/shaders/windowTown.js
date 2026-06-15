@@ -158,16 +158,23 @@ const FRAGMENT_BODY = /* glsl */ `
     col += uSunGlow * exp(-abs(vp.y - 0.5) * 7.0) * 0.22 * westBias;
     col += uSunGlow * exp(-distance(vec2(ax + yaw * 0.2, vp.y), vec2(-0.5 + sunAz, sunY)) * 4.2) * 0.22; // 西の低い夕日
 
-    // 夕焼け雲（立体的に。底が夕陽で染まり、上面は翳る）
-    vec2 cq = vec2(ax * 1.4 + yaw * 0.18 + t * 0.008, vp.y * 2.4);
-    vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
-    float cl = fbm(cq + cwarp * 0.7);
-    float clu = fbm(cq + vec2(0.0, 0.18) + cwarp * 0.7);
-    float cloudband = smoothstep(0.50, 0.72, cl) * smoothstep(0.46, 0.98, vp.y);
-    float underlit = smoothstep(-0.05, 0.08, clu - cl);
-    vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.6);
-    vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);
-    col = mix(col, mix(cloudCool, cloudWarm, underlit), cloudband * 0.5);
+    // 夕焼け雲（2層・立体的。底が夕陽で染まり上面は翳る。ゆっくり流れて形が変わる）
+    float cloudT = t * (1.0 - uReduceMotion);
+    float westWarm = smoothstep(0.3, -0.5, ax + yaw * 0.2 - sunAz);
+    float cloudband = 0.0;
+    for (int L = 0; L < 2; L++) {
+      float fl = float(L);
+      vec2 cq = vec2(ax * 1.4 + yaw * (0.18 - fl * 0.07) + cloudT * (0.012 - fl * 0.005) + fl * 5.0, vp.y * (2.4 - fl * 0.8));
+      vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
+      float cl = fbm(cq + cwarp * 0.8);
+      float clu = fbm(cq + vec2(0.0, 0.16) + cwarp * 0.8);
+      float cb = smoothstep(0.52, 0.70, cl) * smoothstep(0.44, 1.0, vp.y);
+      float underlit = smoothstep(-0.06, 0.10, clu - cl);
+      vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.55 + 0.30 * westWarm);
+      vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);
+      col = mix(col, mix(cloudCool, cloudWarm, underlit), cb * (0.52 - fl * 0.14));
+      cloudband = max(cloudband, cb);
+    }
 
     // 遠雷フラッシュ: 夜空と雲がほのかに白む（雷鳴に同期）
     col += uFlash * (0.10 + 0.18 * cloudband) * vec3(0.82, 0.88, 1.0);
