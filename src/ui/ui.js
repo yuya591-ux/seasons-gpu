@@ -342,6 +342,18 @@ export function buildUI(opts) {
       poke()
     })
     tiltChips.appendChild(tiltBtn)
+    // 全画面（対応ブラウザのみ。没入のため画面いっぱいに）
+    if (document.fullscreenEnabled) {
+      const fsBtn = h('button', 'chip', '全画面')
+      const syncFs = () => fsBtn.classList.toggle('chip--on', !!document.fullscreenElement)
+      fsBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+        else document.documentElement.requestFullscreen().catch(() => {})
+        poke()
+      })
+      document.addEventListener('fullscreenchange', syncFs)
+      tiltChips.appendChild(fsBtn)
+    }
     tiltRow.appendChild(tiltChips)
     el.appendChild(tiltRow)
 
