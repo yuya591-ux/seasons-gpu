@@ -198,10 +198,12 @@ export const GROUND_GLSL = /* glsl */ `
       // 高層の屋上に赤い航空障害灯（ゆっくり明滅）
       bld += vec3(0.9, 0.16, 0.12) * hTower * roofness
            * smoothstep(0.16, 0.0, length(hGf - 0.5)) * (0.5 + 0.5 * sin(uTime * 1.2 * mo + hBlk * 20.0));
-      // 空気遠近（遠い箱ほど霞んで空へ）
-      bld = mix(bld, mix(uHorizon, uSkyMid, 0.4), fog * 0.7);
-      // 近景（手前の棟）を持ち上げ
-      bld *= 1.0 + smoothstep(0.12, 0.42, gt) * 0.18;
+      // 空気遠近（遠い箱ほど霞んで空へ）。溶かし過ぎず、遠景もシルエットを残す＝奥行きが立つ
+      bld = mix(bld, mix(uHorizon, uSkyMid, 0.4), fog * 0.5);
+      // 近景（手前の棟）を持ち上げ、かつ近いほどコントラストを増す＝精細感と奥行き
+      float nearK = smoothstep(0.12, 0.42, gt);
+      bld *= 1.0 + nearK * 0.14;
+      bld = mix(bld, (bld - 0.45) * 1.14 + 0.45, nearK * 0.5); // 近景ほど締まってくっきり
       ground = bld;
     } else {
       // ── 地形の地面（道・坂・公園・川・街路樹…）。起伏する地面の上に街路が乗る ──
