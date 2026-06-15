@@ -23,6 +23,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uPan;         // 見回し（x=ヨー, y=ピッチ）
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく効かせる）
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
+  uniform float uSeason;     // 季節 0=春 1=夏 2=秋 3=冬（網戸/結露の出し分け）
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
   uniform float uFoliage;    // 季節の舞い 0=なし 1=紅葉 2=花びら
   uniform float uFlash;      // 遠雷フラッシュ 0..1
@@ -423,6 +424,35 @@ const FRAGMENT_BODY = /* glsl */ `
     float film = (streak * 0.55 + dust * 0.45) * smoothstep(0.42, 0.82, gLuma) * aperture;
     outside += uSunGlow * max(film, 0.0) * 0.06;             // 光を受けた埃がうっすら明るむ
     outside -= max(-film, 0.0) * 0.025;                     // 拭き筋のわずかな陰
+
+    // ── 季節で変わる窓ガラスの状態（網戸＝夏／結露＝冬） ──
+    // 網戸（夏・雨雪でないとき）: 細かな格子。明るい背景でだけ薄く見え、景色をほんのり和らげる。
+    float summerScreen = step(0.5, uSeason) * step(uSeason, 1.5) * step(uGlass, 0.5) * aperture;
+    if (summerScreen > 0.001) {
+      // 細い縦横の糸（網戸）。明るい背景でだけ薄く見え、景色をほんのり和らげる。
+      float wireX = smoothstep(0.16, 0.0, abs(fract(wp.x * 95.0 * asp) - 0.5));
+      float wireY = smoothstep(0.16, 0.0, abs(fract(wp.y * 95.0) - 0.5));
+      float wire = max(wireX, wireY);
+      float bright = smoothstep(0.42, 0.82, gLuma);
+      outside *= 1.0 - summerScreen * 0.045;                 // 網戸ごしの微かな減光
+      outside -= summerScreen * (0.4 + 0.6 * bright) * wire * 0.04; // 糸の影（明るい所ほど見える）
+    }
+    // 結露（冬・雪）: 縁ほど曇り、暖かい中央は晴れる。曇りを縦に晴らす水滴の筋。
+    float winterCond = (step(2.5, uSeason) + step(1.5, uGlass)) * aperture;
+    if (winterCond > 0.001) {
+      float dc = distance(wp, vec2(0.5, 0.52));
+      float fog = clamp(smoothstep(0.15, 0.42, dc) + smoothstep(0.32, 0.13, wp.y) * 0.45, 0.0, 1.0);
+      // 伝う水滴（数本。曇りを晴らして奥が明るく覗く）
+      float colId = floor(wp.x * 12.0);
+      float dripX = fract(wp.x * 12.0) - 0.5;
+      float dActive = step(0.72, h21(vec2(colId, 3.0)));
+      float dHead = fract(h21(vec2(colId, 7.0)) + uTime * 0.015 * (1.0 - uReduceMotion));
+      float trail = smoothstep(0.06, 0.0, abs(dripX)) * smoothstep(0.0, 0.05, dHead - (1.0 - (wp.y - winB) / (winT - winB))) * dActive;
+      fog *= 1.0 - trail * 0.9;                              // 水滴が通った筋は曇りが晴れる
+      vec3 fogCol = mix(outside, vec3(0.80, 0.84, 0.90), 0.7);
+      outside = mix(outside, fogCol, fog * winterCond * 0.6);
+      outside += vec3(0.04) * trail * winterCond * 0.4;      // 晴れた筋は少し明るい
+    }
 
     // ── 室内（翳った壁・窓の見込み(reveal)・窓台・床に落ちる窓あかり） ──
     // 室内は暗い暖色グレー（窓を主役にするため翳らせる）。窓に近い壁ほど外光を受けて明るい。

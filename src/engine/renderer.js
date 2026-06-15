@@ -89,6 +89,7 @@ export function createRenderer(canvas) {
   let shaderType = 'rainGlass'
   let glassMode = 0 // 窓辺シリーズのガラス現象 0=なし 1=雨 2=雪
   let foliageMode = 0 // 季節の舞い 0=なし 1=紅葉 2=花びら
+  let seasonMode = 1 // 季節 0=春 1=夏 2=秋 3=冬（窓の状態＝網戸/結露の出し分け）
   let scene = null
   let settings = { rain: 0.65, brightness: 1.0, quality: 'standard' }
   let rafId = 0
@@ -131,6 +132,7 @@ export function createRenderer(canvas) {
       uPan: gl.getUniformLocation(program, 'uPan'),
       uParallax: gl.getUniformLocation(program, 'uParallax'),
       uReduceMotion: gl.getUniformLocation(program, 'uReduceMotion'),
+      uSeason: gl.getUniformLocation(program, 'uSeason'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
       uFoliage: gl.getUniformLocation(program, 'uFoliage'),
       uFlash: gl.getUniformLocation(program, 'uFlash'),
@@ -210,6 +212,7 @@ export function createRenderer(canvas) {
       )
     }
     if (loc.uReduceMotion) gl.uniform1f(loc.uReduceMotion, reduceMotion ? 1 : 0)
+    if (loc.uSeason) gl.uniform1f(loc.uSeason, seasonMode)
     gl.uniform1f(loc.uGlass, glassMode)
     if (loc.uFoliage) gl.uniform1f(loc.uFoliage, foliageMode)
     if (loc.uFlash) gl.uniform1f(loc.uFlash, flashLevel)
@@ -289,6 +292,10 @@ export function createRenderer(canvas) {
   const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v))
   const glassOf = (s) => (s && s.glass === 'snow' ? 2 : s && s.glass === 'rain' ? 1 : 0)
   const foliageOf = (s) => (s && s.foliage === 'petals' ? 2 : s && s.foliage === 'leaves' ? 1 : 0)
+  const seasonOf = (s) => {
+    const id = (s && s.id) || ''
+    return id.indexOf('spring') === 0 ? 0 : id.indexOf('autumn') === 0 ? 2 : id.indexOf('winter') === 0 ? 3 : 1
+  }
 
   return {
     ok: true,
@@ -339,6 +346,7 @@ export function createRenderer(canvas) {
       scene = s
       glassMode = glassOf(s)
       foliageMode = foliageOf(s)
+      seasonMode = seasonOf(s)
       loadPano(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
@@ -358,6 +366,7 @@ export function createRenderer(canvas) {
       settings = initialSettings
       glassMode = glassOf(initialScene)
       foliageMode = foliageOf(initialScene)
+      seasonMode = seasonOf(initialScene)
       loadPano(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()

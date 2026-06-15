@@ -24,6 +24,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uPan;         // 見回し（指スワイプ）
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
+  uniform float uSeason;     // 季節 0=春 1=夏 2=秋 3=冬
   uniform vec3 uSkyTop;      // 天頂（暮れの紫紺）
   uniform vec3 uSkyMid;      // 中空
   uniform vec3 uHorizon;     // 地平（茜）
