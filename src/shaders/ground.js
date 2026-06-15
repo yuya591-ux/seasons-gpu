@@ -146,6 +146,15 @@ export const GROUND_GLSL = /* glsl */ `
       float railLine = smoothstep(0.05, 0.012, abs(fract(fl) - 0.16)) * step(0.08, vfrac) * resid;
       wallCol = mix(wallCol, wallCol * 0.62, railLine * nearDetail * 0.55);        // 手すり下の陰
       wallCol += uSunGlow * 0.05 * sunFacing * smoothstep(0.018, 0.0, abs(fract(fl) - 0.16)) * resid * nearDetail; // 手すり上端の光
+      // 物干しの洗濯物（ベランダの手すりに干された色とりどりの衣類＝生活感）。最近景の住宅のみ。
+      float ucol = fract(horizAngle * 1.7 + hGi.x * 0.6);                          // 建物面の横方向座標
+      float hangBand = smoothstep(0.05, 0.0, abs(fract(fl) - 0.11)) * step(0.10, vfrac) * resid; // 手すりのすぐ下
+      vec2 lcell = vec2(floor(ucol * cols * 3.0), floor(fl));
+      float hasLaundry = step(0.45, h21(lcell + hGi + 3.0)) * step(0.5, h21(hGi + 9.0)); // 干してある家
+      vec3 laundryC = 0.55 + 0.40 * cos(h21(lcell + 22.0) * 8.0 + vec3(0.0, 2.1, 4.2)); // 色とりどり
+      laundryC = mix(laundryC, vec3(0.92, 0.92, 0.90), step(0.6, h21(lcell + 31.0)));    // 半分は白いシーツ/シャツ
+      float litem = smoothstep(0.30, 0.18, abs(fract(ucol * cols * 3.0) - 0.5));         // 衣類の列
+      wallCol = mix(wallCol, laundryC, hangBand * hasLaundry * litem * nearDetail * 0.7);
       // 各階のスラブ（ベランダ床）が落とす水平の陰＝階ごとの段の立体（最近景のみ・横線で安定）
       float slabLine = smoothstep(0.035, 0.0, abs(fract(fl) - 0.02)) * step(0.06, vfrac) * resid;
       wallCol *= 1.0 - slabLine * nearDetail * 0.20;                               // 床スラブ下端の落ち影
