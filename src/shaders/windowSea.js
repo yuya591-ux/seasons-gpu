@@ -6,6 +6,7 @@ import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { BIRDS_GLSL } from './birds.js'
 import { GODRAYS_GLSL } from './godrays.js'
+import { FRAME_GLSL } from './frame.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -155,15 +156,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col = applyGlass(col, p, t, uGlass);
 
     vec3 preFrame = col; // 乗り出し用（枠前の景色）
-    // 窓枠
-    float mx = 0.05, my = 0.05;
-    float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
-    float inner =
-      smoothstep(mx, mx + 0.045, p.x) * smoothstep(mx, mx + 0.045, 1.0 - p.x) *
-      smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
-    col *= mix(0.85, 1.0, inner);
-    col = mix(col, vec3(0.06, 0.055, 0.07), fr);
-    col = mix(col, preFrame, uLeanOut); // 身を乗り出す＝枠が消えて景色だけ
+    col = windowSash(col, p, preFrame, uLeanOut); // 窓辺の額装（全情景で統一）
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
@@ -181,6 +174,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n' + FRAME_GLSL + '\n  void main()')
   return defines + body
 }

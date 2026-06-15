@@ -8,6 +8,7 @@ import { GRADE_GLSL } from './grade.js'
 import { GROUND_GLSL } from './ground.js'
 import { GODRAYS_GLSL } from './godrays.js'
 import { BIRDS_GLSL } from './birds.js'
+import { FRAME_GLSL } from './frame.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -268,15 +269,8 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 preFrame = col;                         // 枠・カーテン前の景色（乗り出し用）
     col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds) * (1.0 - uLeanOut));
 
-    // 窓枠（最前景のサッシ・固定）。乗り出すと消える。
-    float mx = 0.05, my = 0.05;
-    float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
-    float inner =
-      smoothstep(mx, mx + 0.045, p.x) * smoothstep(mx, mx + 0.045, 1.0 - p.x) *
-      smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
-    col *= mix(0.84, 1.0, inner);            // 枠の内側を少し翳らせる
-    col = mix(col, vec3(0.05, 0.045, 0.06), fr); // サッシ本体
-    col = mix(col, preFrame, uLeanOut);          // 身を乗り出す＝枠が消えて景色だけ
+    // 窓枠（最前景のサッシ＋桟＋窓台・固定）。乗り出すと消える。全情景で統一。
+    col = windowSash(col, p, preFrame, uLeanOut);
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす
@@ -301,6 +295,6 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     .replace('//__GROUND__', GROUND_GLSL) // 地面関数は town/main より前に定義する必要がある
-    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + GODRAYS_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
+    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + GODRAYS_GLSL + '\n' + BIRDS_GLSL + '\n' + FRAME_GLSL + '\n  void main()')
   return defines + body
 }
