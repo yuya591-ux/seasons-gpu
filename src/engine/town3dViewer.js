@@ -197,13 +197,39 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 大きなランドマーク（大型スーパー＝平らな大箱＋看板） ──
   {
-    const x = 22, z = -18, gy = heightAt(x, z)
+    const x = 24, z = -20, gy = heightAt(x, z)
     const g = new THREE.Group()
     const body = new THREE.Mesh(new THREE.BoxGeometry(20, 9, 14), toon(0xe0d8c8))
     body.position.y = 4.5; body.castShadow = true; body.receiveShadow = true; g.add(body)
     const sign = new THREE.Mesh(new THREE.BoxGeometry(16, 2.2, 0.6), toon(0xc23a2c))
     sign.position.set(0, 10, 7.1); g.add(sign)
     g.position.set(x, gy, z); g.rotation.y = -0.3; town.add(g)
+  }
+  // ── パチンコ屋（けばけばしい外装＋縦長のネオン塔看板＋色の輪が灯る） ──
+  {
+    const x = -22, z = -28, gy = heightAt(x, z)
+    const b = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 7), toon(0xb0788c))
+    b.position.set(x, gy + 3, z); b.castShadow = true; town.add(b)
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(1.5, 13, 1.5), new THREE.MeshBasicMaterial({ color: 0xff3a6a, fog: true }))
+    tower.position.set(x + 3.4, gy + 10.5, z); town.add(tower)
+    const ringC = [0xffe24a, 0x4ad0ff, 0xff5ad0, 0x6aff6a, 0xffa030]
+    for (let k = 0; k < 5; k++) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.22, 6, 14), new THREE.MeshBasicMaterial({ color: ringC[k], fog: true }))
+      ring.position.set(x + 3.4, gy + 5 + k * 1.9, z); ring.rotation.x = Math.PI / 2; town.add(ring)
+    }
+  }
+  // ── 新装開店の電気屋（バルーンの真下。カラフルな庇＋幟） ──
+  {
+    const x = 12, z = -14, gy = heightAt(x, z)
+    const b = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 6), toon(0xc8ccd0))
+    b.position.set(x, gy + 2.5, z); b.castShadow = true; town.add(b)
+    const awn = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.5, 2.2), toon(0xd23a4a))
+    awn.position.set(x, gy + 3.4, z + 3.4); town.add(awn)
+    // 店先の幟（赤白の細い旗）
+    for (let k = -2; k <= 2; k++) {
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 0.7), toon(k % 2 ? 0xffffff : 0xd23a4a))
+      flag.position.set(x + k * 1.8, gy + 1.2, z + 4.4); town.add(flag)
+    }
   }
 
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
@@ -380,6 +406,11 @@ export async function mountTown3d(parent, opts = {}) {
   frame2.className = 'town3d-frame'
   stage.appendChild(frame2)
   requestAnimationFrame(() => stage.classList.add('town3d-stage--in'))
+
+  // 検証用: 見回しを外から設定（?dev=1 のサムネ/撮影で角度を指定）
+  if (/[?&]dev=1/.test(location.search)) {
+    window.__town3dSetView = (y, p) => { if (active) { active.yaw = y || 0; active.pitch = p || 0 } }
+  }
 
   // スワイプで見回す（自前のポインタ操作）。
   let dragging = false, lx = 0, ly = 0

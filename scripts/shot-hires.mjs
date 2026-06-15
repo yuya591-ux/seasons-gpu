@@ -11,8 +11,11 @@ await page.waitForTimeout(700)
 await page.evaluate((sid) => window.__applyScene && window.__applyScene(sid), id)
 await page.waitForTimeout(1600)
 if (yaw !== 0 || pitch !== 0) {
-  await page.evaluate(([y, pt]) => window.__renderer && window.__renderer.setPanTarget(y, pt), [yaw, pitch])
-  await page.waitForTimeout(1600)
+  await page.evaluate(([y, pt]) => {
+    if (window.__town3dSetView) window.__town3dSetView(y, pt)
+    else if (window.__renderer) window.__renderer.setPanTarget(y, pt)
+  }, [yaw, pitch])
+  await page.waitForTimeout(1200)
 }
 await page.addStyleTag({ content: '.ui{display:none !important}' })
 await page.waitForTimeout(200)
