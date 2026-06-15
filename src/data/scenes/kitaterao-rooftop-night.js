@@ -12,6 +12,7 @@ export default {
   lowRise: true,
   intensityLabel: '街あかり',
   panX: 3.0, // ほぼ360°見渡せる
+  public: false, // 昼の屋上と同じ理由でギャラリーから隠す（?dev=1で確認可・将来は3Dの屋上で復活させたい）
 
   palette: {
     early: {

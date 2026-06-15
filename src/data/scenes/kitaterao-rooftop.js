@@ -12,6 +12,7 @@ export default {
   render: 'kitateraoRooftop',
   lowRise: true,
   intensityLabel: '街あかり',
+  public: false, // 美術評価ワースト（浮く箱・スケール破綻）。本物の3Dの街が同じ北寺尾をより良く見せるため、当面ギャラリーから隠す（?dev=1で確認可・将来は3Dの屋上で復活させたい）
   panX: 3.0, // 屋上は見回しの可動域を広げてほぼ360°見渡せる
 
   palette: {
