@@ -8,6 +8,7 @@ import * as windowMountains from './windowMountains.js'
 import * as windowSea from './windowSea.js'
 import * as windowPano from './windowPano.js'
 import * as cornerRoom from './cornerRoom.js'
+import * as shishigaya from './shishigaya.js'
 
 export const SHADERS = {
   rainGlass, // 窓ガラスの雨
@@ -17,6 +18,7 @@ export const SHADERS = {
   windowSea, // 窓辺の海辺
   windowPano, // 立体パノラマの窓（360°写真＋深度視差）
   cornerRoom, // 高台の角部屋（室内＋窓＋街＋隣の壁の遮蔽）
+  shishigaya, // 鶴見・獅子ヶ谷の谷戸（出身地の再現）
 }
 
 /** render 種別からシェーダーを引く（未知なら雨ガラスにフォールバック）。 */

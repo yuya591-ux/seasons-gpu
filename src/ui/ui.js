@@ -123,7 +123,7 @@ export function buildUI(opts) {
   root.appendChild(topbar)
 
   // ── 窓をあける/しめる（窓辺の情景でだけ。開けると素通しの澄んだ景色＋そよ風） ──
-  const WINDOW_SCENES = ['cornerRoom', 'windowTown']
+  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya']
   const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
   topbar.insertBefore(windowBtn, sceneBtn)
   let windowIsOpen = false
