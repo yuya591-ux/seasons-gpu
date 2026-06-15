@@ -326,6 +326,24 @@ export async function mountTown3d(parent, opts = {}) {
     aw.position.set(x, gy + 2.5, z + 2.4); town.add(aw)
   }
 
+  // ── 自動販売機（街角に灯る。昼夜とも光る前面＝平成の郷愁） ──
+  const vmCols = [0xc83838, 0x3a64c8, 0xe0a420]
+  for (const spot of [[-30, -7, 3], [11, -5, 2], [-7, -31, 2], [26, -8, 2]]) {
+    for (let k = 0; k < spot[2]; k++) {
+      const x = spot[0] + k * 1.3, z = spot[1], gy = heightAt(x, z)
+      const vm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.8), toon(vmCols[k % 3])); vm.position.set(x, gy + 1.0, z); vm.castShadow = true; town.add(vm)
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.4, 0.06), new THREE.MeshBasicMaterial({ color: 0xfff2cc, fog: true })); panel.position.set(x, gy + 1.15, z + 0.44); town.add(panel)
+    }
+  }
+  // ── 児童公園（砂場・すべり台・ブランコの骨組み） ──
+  {
+    const px = -16, pz = -23, gy = heightAt(px, pz)
+    const sand = new THREE.Mesh(new THREE.BoxGeometry(5, 0.25, 5), toon(0xd6c69a)); sand.position.set(px, gy + 0.12, pz); sand.receiveShadow = true; town.add(sand)
+    const slide = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.16, 3), toon(0xcc3a4a)); slide.position.set(px + 3, gy + 1.0, pz); slide.rotation.x = 0.5; slide.castShadow = true; town.add(slide)
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.16, 0.16), toon(0x6a8aa0)); bar.position.set(px - 2.5, gy + 2.0, pz); town.add(bar)
+    for (const sx of [-4.0, -1.0]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.13, 2.0, 0.13), toon(0x6a8aa0)); post.position.set(px + sx, gy + 1.0, pz); post.castShadow = true; town.add(post) }
+  }
+
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
   const poleMat = toon(0x6a5c4a)
   let prevTop = null
