@@ -18,10 +18,10 @@ export const GROUND_GLSL = /* glsl */ `
     float roadWdt = 0.11 + 0.09 * ave;
     float isBld = step(roadWdt, dRoad);                 // 1=区画(箱)・0=道（硬い境界）
     mat = h21(gi + 5.0);
-    float urban = vnoise(gi * 0.07 + 3.0);              // 都心度（大=高層密集 / 小=低層の住宅地）
-    tower = step(0.93 - 0.20 * urban, h21(gi + 27.0));  // 都心ほど高層が増える
-    float isPark = step(0.92, mat) * (1.0 - tower);     // 緑地（公園）
-    float baseH = (0.16 + 0.28 * urban) + (0.28 + 0.46 * urban) * blkR; // 都心ほど背が高い
+    float urban = vnoise(gi * 0.07 + 3.0) * (1.0 - 0.7 * uLowRise); // 都心度（低層情景では抑える）
+    tower = step(0.93 - 0.20 * urban + 0.6 * uLowRise, h21(gi + 27.0)); // 低層では高層をほぼ無くす
+    float isPark = step(0.92 - 0.06 * uLowRise, mat) * (1.0 - tower); // 緑地（低層では少し増える）
+    float baseH = ((0.16 + 0.28 * urban) + (0.28 + 0.46 * urban) * blkR) * (1.0 - 0.42 * uLowRise); // 低層は背が低い
     bH = mix(baseH, 1.1 + 1.4 * urban, tower) * isBld * (1.0 - isPark);  // 建物高さ
   }
 

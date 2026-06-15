@@ -8,6 +8,7 @@ export default {
   desc: '夜明けの桜色の空と、窓の外を舞う花びら。澄んだ朝の街を見下ろす。',
   status: 'ready',
   render: 'cornerRoom',
+  lowRise: true,
   foliage: 'petals', // 花びらが窓の外を舞う
   intensityLabel: '街あかり',
 

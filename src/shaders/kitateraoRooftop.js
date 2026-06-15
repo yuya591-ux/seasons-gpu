@@ -26,6 +26,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uPan;
   uniform vec2 uParallax;
   uniform float uReduceMotion;
+  uniform float uLowRise;     // 低層住宅地化 0=通常の街 1=低い家並み
   uniform float uWindowOpen;   // 屋上では未使用（互換のため受ける）
   uniform float uGlass;
   uniform float uFlash;

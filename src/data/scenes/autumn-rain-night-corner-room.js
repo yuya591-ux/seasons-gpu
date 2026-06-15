@@ -8,6 +8,7 @@ export default {
   desc: '窓を流れる雨と、眼下の街あかり。時おり遠雷。指や傾きで見回す。',
   status: 'ready',
   render: 'cornerRoom',
+  lowRise: true,
   glass: 'rain', // 窓を流れる雨
   foliage: 'leaves', // 紅葉が窓の外を舞う
   intensityLabel: '街あかり',

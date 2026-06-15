@@ -8,6 +8,7 @@ export default {
   desc: '舞う雪と、窓の桟に積もる白。眼下に冷たい街あかり。指や傾きで見回す。',
   status: 'ready',
   render: 'cornerRoom',
+  lowRise: true,
   glass: 'snow', // 窓に舞い、桟に積もる雪
   intensityLabel: '街あかり',
 

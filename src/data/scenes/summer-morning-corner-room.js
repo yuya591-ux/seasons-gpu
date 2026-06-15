@@ -8,6 +8,7 @@ export default {
   desc: '朝靄にかすむ街を、部屋の窓から見下ろす。指や傾きで見回す。',
   status: 'ready',
   render: 'cornerRoom',
+  lowRise: true,
   intensityLabel: '街あかり',
 
   palette: {

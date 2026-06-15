@@ -90,6 +90,7 @@ export function createRenderer(canvas) {
   let glassMode = 0 // 窓辺シリーズのガラス現象 0=なし 1=雨 2=雪
   let foliageMode = 0 // 季節の舞い 0=なし 1=紅葉 2=花びら
   let seasonMode = 1 // 季節 0=春 1=夏 2=秋 3=冬（窓の状態＝網戸/結露の出し分け）
+  let lowRiseMode = 0 // 0=通常の街 1=低層住宅地（北寺尾など坂の住宅地）
   let scene = null
   let settings = { rain: 0.65, brightness: 1.0, quality: 'standard' }
   let rafId = 0
@@ -142,6 +143,7 @@ export function createRenderer(canvas) {
       uReduceMotion: gl.getUniformLocation(program, 'uReduceMotion'),
       uWindowOpen: gl.getUniformLocation(program, 'uWindowOpen'),
       uSeason: gl.getUniformLocation(program, 'uSeason'),
+      uLowRise: gl.getUniformLocation(program, 'uLowRise'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
       uFoliage: gl.getUniformLocation(program, 'uFoliage'),
       uFlash: gl.getUniformLocation(program, 'uFlash'),
@@ -239,6 +241,7 @@ export function createRenderer(canvas) {
     windowOpen += (windowOpenTarget - windowOpen) * 0.08 // なめらかに開閉
     if (loc.uWindowOpen) gl.uniform1f(loc.uWindowOpen, windowOpen)
     if (loc.uSeason) gl.uniform1f(loc.uSeason, seasonMode)
+    if (loc.uLowRise) gl.uniform1f(loc.uLowRise, lowRiseMode)
     gl.uniform1f(loc.uGlass, glassMode)
     if (loc.uFoliage) gl.uniform1f(loc.uFoliage, foliageMode)
     if (loc.uFlash) gl.uniform1f(loc.uFlash, flashLevel)
@@ -379,6 +382,7 @@ export function createRenderer(canvas) {
       glassMode = glassOf(s)
       foliageMode = foliageOf(s)
       seasonMode = seasonOf(s)
+      lowRiseMode = s && s.lowRise ? 1 : 0
       // 見回しの可動域（情景ごと）。屋上などは広げてほぼ360°見渡せる。
       PAN_LIMIT.x = (s && s.panX) || 2.6
       loadPano(s)
@@ -401,6 +405,7 @@ export function createRenderer(canvas) {
       glassMode = glassOf(initialScene)
       foliageMode = foliageOf(initialScene)
       seasonMode = seasonOf(initialScene)
+      lowRiseMode = initialScene && initialScene.lowRise ? 1 : 0
       PAN_LIMIT.x = (initialScene && initialScene.panX) || 2.6
       loadPano(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false

@@ -10,6 +10,7 @@ export default {
   desc: '馴染みの7階建ての屋上から、坂の住宅地と森、思い出のグラウンドを見渡す。見回せる開けた眺め。',
   status: 'ready',
   render: 'kitateraoRooftop',
+  lowRise: true,
   intensityLabel: '街あかり',
   panX: 3.0, // 屋上は見回しの可動域を広げてほぼ360°見渡せる
 
