@@ -220,6 +220,24 @@ const FRAGMENT_BODY = /* glsl */ `
       cloudband = max(cloudband, cb);
     }
 
+    // 雨上がりの虹（雨の情景で、ゆるやかな周期で空が明るむ局面に薄く架かる）。夜には出さない。
+    float dayAmtRb = clamp(dot(uSkyTop, vec3(1.6)), 0.0, 1.0);
+    float isRain = step(0.5, uGlass) * step(uGlass, 1.5) * dayAmtRb;
+    float clearing = smoothstep(0.55, 0.88, sin(uTime * 0.016 * (1.0 - uReduceMotion)) * 0.5 + 0.5);
+    if (isRain * clearing > 0.001) {
+      vec2 rdv = vec2(ax + yaw * 0.2 - sunAz, vp.y + 0.02);         // 反太陽点（画面下）。ピクセルで真円
+      float rd = length(rdv);
+      float skyGate = smoothstep(0.50, 0.62, vp.y);                // 高い空にだけ（街の上）
+      float t2 = (rd - 0.82) / 0.05;                               // 主虹の帯（-1..1）
+      float arc = smoothstep(1.0, 0.0, abs(t2)) * skyGate;
+      float hue = t2 * 0.5 + 0.5;                                  // 0=内(紫) .. 1=外(赤)
+      vec3 spec = 0.6 + 0.4 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + (1.0 - hue) * 0.85));
+      col += spec * arc * isRain * clearing * 0.16;                // 主虹
+      float arc2 = smoothstep(1.0, 0.0, abs((rd - 0.92) / 0.04)) * skyGate;
+      col += spec.zyx * arc2 * isRain * clearing * 0.06;           // 副虹（淡く・色順は逆）
+      col += vec3(0.02, 0.018, 0.014) * clearing * isRain * skyGate; // 空が明るむ
+    }
+
     // 上空（見上げの報酬）: 高い所に薄い巻雲のすじ＋天頂をわずかに締める
     float high = smoothstep(0.72, 1.05, vp.y);
     float cirrus = fbm(vec2(ax * 0.8 + yaw * 0.15 + uTime * 0.004, vp.y * 5.0 - 1.0));
