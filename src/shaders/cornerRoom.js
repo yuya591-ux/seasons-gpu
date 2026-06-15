@@ -151,26 +151,35 @@ const FRAGMENT_BODY = /* glsl */ `
   // 季節の舞い: 紅葉/花びらが窓の外をひらひら落ちる（3層・回転・横揺れ）
   vec3 foliageOverlay(vec3 col, vec2 p, float t, float mode) {
     if (mode < 0.5) return col;
+    // 突風（ゆるやかにうねる風）。葉が一斉に流される瞬間を生む＝自然な舞い
+    float gust = sin(t * 0.27) * 0.6 + sin(t * 0.11 + 1.3) * 0.4;
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      float depth = fi * 0.5;
+      float depth = fi * 0.5;                                  // 0:奥 .. 1:手前
       float sc = mix(6.0, 12.0, depth);
       float sp = mix(0.035, 0.08, depth);
       vec2 gp = vec2(p.x * sc * 0.7, p.y * sc);
-      gp.y += t * sp * sc;                                   // 落下
-      gp.x += sin(t * 0.5 + fi * 2.0 + p.y * 7.0) * 0.9;     // 横揺れ
+      gp.y += t * sp * sc;                                      // 落下
+      // 横の動き: ゆっくりの蛇行＋突風で流れる＋細かなひらめき
+      gp.x += sin(t * 0.5 + fi * 2.0 + p.y * 6.0) * 0.7;
+      gp.x += gust * (0.7 + 0.5 * depth) * 1.2;
+      gp.x += sin(t * 2.3 + p.y * 13.0 + fi) * 0.10;
       vec2 id = floor(gp);
       vec2 f = fract(gp) - 0.5;
       float n = h21(id + fi * 23.0);
-      if (n < 0.81) continue;                                // ぐっとまばらに（静けさ優先）
-      float ang = t * 1.6 * (n - 0.5) * 2.0 + n * 6.2831;    // 回転
+      if (n < 0.82) continue;                                   // ぐっとまばらに（静けさ優先）
+      // ひらひら回転（風が強いほど速く舞う）＝木の葉のフラッター
+      float ang = t * (1.4 + 1.6 * abs(gust)) * (n - 0.5) * 2.0 + n * 6.2831;
       float ca = cos(ang), sa = sin(ang);
       vec2 rf = vec2(ca * f.x - sa * f.y, sa * f.x + ca * f.y);
-      float leaf = smoothstep(0.16, 0.08, length(rf * vec2(1.0, 2.2))); // 小さめの葉
+      // 横から見た葉は薄く（回転で見え隠れ）＝立体的なひらめき
+      float thin = mix(2.2, 1.0, abs(sin(ang)));
+      float leaf = smoothstep(0.17, 0.07, length(rf * vec2(1.0, thin)));
       vec3 lc = (mode > 1.5)
         ? mix(vec3(0.98, 0.84, 0.88), vec3(0.95, 0.74, 0.80), n)  // 花びら（淡紅）
-        : mix(vec3(0.78, 0.46, 0.22), vec3(0.64, 0.32, 0.18), n); // 紅葉（落ち着いた橙茶）
-      col = mix(col, lc, leaf * (0.20 + 0.24 * depth));
+        : mix(vec3(0.80, 0.47, 0.22), vec3(0.62, 0.30, 0.17), n); // 紅葉（落ち着いた橙茶）
+      lc *= 0.85 + 0.30 * abs(cos(ang));                         // 面の向きで明暗（受光）
+      col = mix(col, lc, leaf * (0.20 + 0.26 * depth));
     }
     return col;
   }
