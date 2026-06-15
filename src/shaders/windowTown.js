@@ -241,6 +241,16 @@ const FRAGMENT_BODY = /* glsl */ `
     // 窓ガラスの現象（雨・雪）を窓のガラス面に重ねる
     col = applyGlass(col, p, t, uGlass);
 
+    // レースカーテン（両脇。下町の窓辺にも室内の気配。中央は開けて見える）
+    float curtSway = sin(t * 0.4) * 0.008 + sin(t * 0.19 + 1.0) * 0.005;
+    float cwid = 0.17;
+    float gatherL = smoothstep(0.05 + cwid, 0.05, p.x - curtSway);
+    float gatherR = smoothstep(0.95 - cwid, 0.95, p.x + curtSway);
+    float gather = max(gatherL, gatherR);
+    float curtFolds = 0.55 + 0.45 * sin(p.x * 95.0 + sin(p.y * 3.0 + t * 0.25) * 1.4);
+    vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * curtFolds);
+    col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds));
+
     // 窓枠（最前景のサッシ・固定）
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
