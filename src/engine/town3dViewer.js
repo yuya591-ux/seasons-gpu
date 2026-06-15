@@ -348,9 +348,10 @@ export async function mountTown3d(parent, opts = {}) {
     prevTop = top
   }
 
-  // ── 木立（トゥーンの丸い樹冠＋幹） ──
+  // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
   const trunkMat = toon(0x6b4a2e)
   const leafMats = [toon(0x5c7c46), toon(0x6f9050), toon(0x4f6e3e)]
+  const treesArr = []
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
@@ -360,6 +361,8 @@ export async function mountTown3d(parent, opts = {}) {
     const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMats[(R() * 3) | 0])
     leaf.position.y = 2.0 + r * 0.7; leaf.castShadow = true; g.add(leaf)
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
+    g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
+    treesArr.push(g)
   }
   for (let i = 0; i < 60; i++) {
     const x = (R() - 0.5) * 130, z = (R() - 0.5) * 120
@@ -412,6 +415,19 @@ export async function mountTown3d(parent, opts = {}) {
     }
     g.position.set((R() - 0.5) * 240, 34 + R() * 20, -55 - R() * 80)
     scene.add(g); clouds.push(g)
+  }
+
+  // ── 渡る鳥（はばたきながら空を弧で渡る。数羽） ──
+  const birds = []
+  const birdMat = new THREE.MeshBasicMaterial({ color: isNight ? 0x223044 : 0x3a3a40, fog: true })
+  for (let i = 0; i < 5; i++) {
+    const b = new THREE.Group()
+    for (const s of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), birdMat)
+      wing.position.x = s * 0.6; b.add(wing); wing.userData.side = s
+    }
+    b.userData = { cx: (R() - 0.5) * 40, cz: -40 - R() * 40, rad: 18 + R() * 16, yy: 30 + R() * 14, sp: 0.12 + R() * 0.08, ph: R() * 6.28 }
+    scene.add(b); birds.push(b)
   }
 
   // ── 走る車（中央の通りを行き交う。夕方はヘッドライト/テールが灯る） ──
@@ -485,6 +501,19 @@ export async function mountTown3d(parent, opts = {}) {
       if (u.z < -88) u.z = 20
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * 5 + u.ph)) * 0.06, u.z)
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
+    }
+    // 木がそよ風に揺れる
+    for (const tr of treesArr) tr.rotation.z = Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp
+    // アドバルーンがふわり揺れる
+    for (const ab of adBalloons) { ab.rotation.z = Math.sin(t * 0.6) * 0.05; ab.position.x += Math.sin(t * 0.5) * 0.002 }
+    // 鳥がはばたきながら空を渡る
+    for (const b of birds) {
+      const u = b.userData
+      const a = t * u.sp + u.ph
+      b.position.set(u.cx + Math.cos(a) * u.rad, u.yy + Math.sin(a * 0.7) * 2.0, u.cz + Math.sin(a) * u.rad)
+      b.rotation.y = -a + Math.PI / 2
+      const flap = Math.sin(t * 9 + u.ph) * 0.5
+      b.children.forEach((w) => { w.rotation.z = w.userData.side * flap })
     }
     // 見回しをなめらかに（息づかいの微揺れ付き）
     const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
