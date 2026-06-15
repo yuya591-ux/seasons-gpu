@@ -492,6 +492,18 @@ export async function mountTown3d(parent, opts = {}) {
         paddy.position.set(px + jx, gy + 0.12, pz); paddy.receiveShadow = true; town.add(paddy)
       }
     }
+    // 畦道（あぜ）: 棚田を仕切る細い土の畝。水田の縁取り＝棚田らしさ。区画の境界に立てる。
+    const bundMat = toon(0x8a7656)
+    for (let bz = -46.8; bz <= 5.5; bz += 5.6) {
+      const gy = heightAt(0, bz)
+      const b = new THREE.Mesh(new THREE.BoxGeometry(25, 0.5, 0.7), bundMat)
+      b.position.set(0, gy + 0.3, bz); b.castShadow = true; b.receiveShadow = true; town.add(b)
+    }
+    for (let bx = -13.8; bx <= 13.8; bx += 5.6) {
+      const gy = heightAt(bx, -21)
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 50), bundMat)
+      b.position.set(bx, gy + 0.3, -21); b.castShadow = true; b.receiveShadow = true; town.add(b)
+    }
     // せせらぎ（谷を縫う細い水の流れ。きらり）
     for (let i = 0; i < 26; i++) {
       const z = 2 - i * 1.9, x = Math.sin(z * 0.13 + 0.6) * 3.2 - 1.0, gy = heightAt(x, z)
@@ -689,9 +701,11 @@ export async function mountTown3d(parent, opts = {}) {
     weatherPts = { pts, pos, spd, phs, N, swirl: weather === 'snow' ? 0.9 : weather === 'petals' ? 2.6 : 3.0 }
   }
 
-  // ── カメラ（高台のマンション上階の窓から街を見下ろす） ──
+  // ── カメラ（高台のマンション上階の窓から見下ろす）。谷戸は少し低く寄せて谷を見渡す ──
   const camera = new THREE.PerspectiveCamera(62, W / H, 0.5, 600)
-  const eye = new THREE.Vector3(0, 31, 30) // 上階の窓の目線（高く・街の手前）
+  const eye = kind === 'yato'
+    ? new THREE.Vector3(0, 28, 27)  // 谷戸: 少し低く・谷へ寄る（棚田と茅葺屋敷が映える）
+    : new THREE.Vector3(0, 31, 30)  // 街: 高台の上階から見下ろす
   active = {
     renderer, scene, camera, stage, raf: 0,
     yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0,
