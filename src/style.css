@@ -246,6 +246,19 @@ body.idle .topbar {
   background: rgba(86, 120, 150, 0.5);
   border-color: rgba(190, 224, 255, 0.45);
 }
+/* 「乗り出す」＝景色だけを見渡すモード。緑系のアクセントで区別 */
+.iconbtn--lean {
+  background: rgba(60, 110, 80, 0.46);
+  border-color: rgba(180, 230, 200, 0.4);
+  color: rgba(240, 255, 246, 0.98);
+}
+.iconbtn--lean:hover {
+  background: rgba(74, 134, 96, 0.6);
+}
+.iconbtn--lean.is-open {
+  background: rgba(120, 96, 50, 0.5);
+  border-color: rgba(255, 224, 180, 0.45);
+}
 
 .slider {
   appearance: none;

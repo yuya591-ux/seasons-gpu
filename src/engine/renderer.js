@@ -104,6 +104,10 @@ export function createRenderer(canvas) {
   // 窓を開ける（0=閉じてガラス越し, 1=開いて素通し）。トグルでなめらかに開閉。
   let windowOpen = 0
   let windowOpenTarget = 0
+  // 身を乗り出す（0=窓辺, 1=枠が消えて景色だけを180°見渡す）。開けた後の一段深いモード。
+  let leanOut = 0
+  let leanOutTarget = 0
+  let basePanX = 2.6 // 情景ごとの基本可動域（lean-out で広げる）
 
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
   const panCur = { x: 0, y: 0 }
@@ -143,6 +147,7 @@ export function createRenderer(canvas) {
       uParallax: gl.getUniformLocation(program, 'uParallax'),
       uReduceMotion: gl.getUniformLocation(program, 'uReduceMotion'),
       uWindowOpen: gl.getUniformLocation(program, 'uWindowOpen'),
+      uLeanOut: gl.getUniformLocation(program, 'uLeanOut'),
       uSeason: gl.getUniformLocation(program, 'uSeason'),
       uLowRise: gl.getUniformLocation(program, 'uLowRise'),
       uGlass: gl.getUniformLocation(program, 'uGlass'),
@@ -239,8 +244,12 @@ export function createRenderer(canvas) {
       )
     }
     if (loc.uReduceMotion) gl.uniform1f(loc.uReduceMotion, reduceMotion ? 1 : 0)
-    windowOpen += (windowOpenTarget - windowOpen) * 0.08 // なめらかに開閉
+    windowOpen += (windowOpenTarget - windowOpen) * 0.06 // なめらかに開閉（少しゆっくり＝開閉が分かる）
+    leanOut += (leanOutTarget - leanOut) * 0.06
     if (loc.uWindowOpen) gl.uniform1f(loc.uWindowOpen, windowOpen)
+    if (loc.uLeanOut) gl.uniform1f(loc.uLeanOut, leanOut)
+    // 乗り出すと可動域を広げて景色を180°見渡せる
+    PAN_LIMIT.x = basePanX + leanOut * Math.max(0, 3.14 - basePanX)
     if (loc.uSeason) gl.uniform1f(loc.uSeason, seasonMode)
     if (loc.uLowRise) gl.uniform1f(loc.uLowRise, lowRiseMode)
     gl.uniform1f(loc.uGlass, glassMode)
@@ -374,9 +383,17 @@ export function createRenderer(canvas) {
     },
     setWindowOpen(b) {
       windowOpenTarget = b ? 1 : 0
+      if (!b) leanOutTarget = 0 // 閉じると乗り出しも戻す
     },
     isWindowOpen() {
       return windowOpenTarget > 0.5
+    },
+    setLeanOut(b) {
+      leanOutTarget = b ? 1 : 0
+      if (b) windowOpenTarget = 1 // 乗り出すには開いている前提
+    },
+    isLeanOut() {
+      return leanOutTarget > 0.5
     },
     setScene(s) {
       scene = s
@@ -385,7 +402,7 @@ export function createRenderer(canvas) {
       seasonMode = seasonOf(s)
       lowRiseMode = s && s.lowRise ? 1 : 0
       // 見回しの可動域（情景ごと）。屋上などは広げてほぼ360°見渡せる。
-      PAN_LIMIT.x = (s && s.panX) || 2.6
+      basePanX = (s && s.panX) || 2.6
       loadPano(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
@@ -407,7 +424,7 @@ export function createRenderer(canvas) {
       foliageMode = foliageOf(initialScene)
       seasonMode = seasonOf(initialScene)
       lowRiseMode = initialScene && initialScene.lowRise ? 1 : 0
-      PAN_LIMIT.x = (initialScene && initialScene.panX) || 2.6
+      basePanX = (initialScene && initialScene.panX) || 2.6
       loadPano(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()

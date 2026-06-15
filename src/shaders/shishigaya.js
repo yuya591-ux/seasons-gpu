@@ -27,6 +27,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uParallax;
   uniform float uReduceMotion;
   uniform float uWindowOpen;
+  uniform float uLeanOut;
   uniform float uGlass;
   uniform vec3 uSkyTop;
   uniform vec3 uSkyMid;
@@ -236,12 +237,13 @@ const FRAGMENT_BODY = /* glsl */ `
     col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.0 + uWindowOpen * 0.16);
 
     // ── レースカーテン（両脇）＋窓枠 ──
+    vec3 preFrame = col;                          // 乗り出し用（枠・カーテン前の景色）
     float curtSway = (sin(t * 0.4) * 0.008 + sin(t * 0.19 + 1.0) * 0.005) * (1.0 + uWindowOpen * 2.5);
     float cwid = 0.17 * (1.0 - uWindowOpen * 0.55);
     float gather = max(smoothstep(0.05 + cwid, 0.05, p.x - curtSway), smoothstep(0.95 - cwid, 0.95, p.x + curtSway));
     float curtFolds = 0.55 + 0.45 * sin(p.x * 95.0 + sin(p.y * 3.0 + t * 0.25) * 1.4);
     vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * curtFolds);
-    col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds));
+    col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds) * (1.0 - uLeanOut));
 
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
@@ -249,6 +251,7 @@ const FRAGMENT_BODY = /* glsl */ `
                   smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
     col *= mix(0.85, 1.0, inner);
     col = mix(col, vec3(0.06, 0.055, 0.06), fr);
+    col = mix(col, preFrame, uLeanOut);           // 身を乗り出す＝枠が消えて景色だけ
 
     col = applyGrade(col, frag);
     // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす

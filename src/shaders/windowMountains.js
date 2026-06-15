@@ -20,6 +20,8 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uBright;
   uniform vec2 uPan;
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
+  uniform float uWindowOpen;
+  uniform float uLeanOut;
   uniform float uGlass;
   uniform vec3 uSkyTop;
   uniform vec3 uSkyMid;
@@ -97,8 +99,11 @@ const FRAGMENT_BODY = /* glsl */ `
     // 朝の空
     vec3 col = mix(uHorizon, uSkyMid, smoothstep(0.3, 0.66, vp.y));
     col = mix(col, uSkyTop, smoothstep(0.62, 1.0, vp.y));
+    // 高層の雲（見回すと流れる＝空も動く）。featurelessな空の不感帯を解消。
+    float mcl = fbm(vec2((ax + yaw * 0.55) * 1.1 + uTime * 0.005, vp.y * 2.2));
+    col = mix(col, mix(uSkyMid, vec3(1.0), 0.5), smoothstep(0.5, 0.72, mcl) * smoothstep(0.6, 1.0, vp.y) * 0.35);
     // 朝陽（世界に固定。首を振ると視界の中を移動する）。円盤＋薄明光線
-    vec2 sunC = vec2(-0.25 - yaw * 0.2, 0.72);
+    vec2 sunC = vec2(-0.25 - yaw * 0.6, 0.72);
     float sunDist = distance(vec2(ax, vp.y), sunC);
     float sun = exp(-sunDist * 3.0);
     col += uSunGlow * sun * 0.5;
@@ -132,6 +137,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // ガラス現象（雪・雨）
     col = applyGlass(col, p, t, uGlass);
 
+    vec3 preFrame = col; // 乗り出し用（枠前の景色）
     // 窓枠
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
@@ -140,6 +146,7 @@ const FRAGMENT_BODY = /* glsl */ `
       smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
     col *= mix(0.85, 1.0, inner);
     col = mix(col, vec3(0.06, 0.06, 0.07), fr);
+    col = mix(col, preFrame, uLeanOut); // 身を乗り出す＝枠が消えて景色だけ
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;

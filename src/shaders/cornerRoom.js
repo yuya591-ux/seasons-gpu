@@ -26,6 +26,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
   uniform float uLowRise;     // 低層住宅地化 0=通常の街 1=低い家並み
   uniform float uWindowOpen; // 窓を開けた度合い 0=閉(ガラス越し) 1=開(素通し)
+  uniform float uLeanOut;    // 身を乗り出す 0=窓辺 1=枠が消えて景色だけ
   uniform float uSeason;     // 季節 0=春 1=夏 2=秋 3=冬（網戸/結露の出し分け）
   uniform float uGlass;      // 窓ガラスの現象 0=なし 1=雨 2=雪
   uniform float uFoliage;    // 季節の舞い 0=なし 1=紅葉 2=花びら
@@ -451,7 +452,8 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 桟（窓を上下2枚＋中央の縦框で田の字に近い割り付け）
     float barV = smoothstep(0.006, 0.0, abs(wp.x - 0.5)) * aperture;          // 中央の縦框（細く）
-    float barH = smoothstep(0.006, 0.0, abs(wp.y - 0.52)) * aperture;         // 中央の横框（細く）
+    float sashY = 0.52 + uWindowOpen * 0.30;                                  // 開けると下窓がせり上がる
+    float barH = smoothstep(0.006, 0.0, abs(wp.y - sashY)) * aperture;        // 中央の横框（開閉で動く）
     float bars = clamp(max(barV, barH), 0.0, 1.0);
 
     // ── 窓ガラスの映り込み（透明感優先。昼はほぼ素通し、夜・暗い空でだけ室内が淡く映る） ──
@@ -597,8 +599,11 @@ const FRAGMENT_BODY = /* glsl */ `
               * step(winB - 0.02, wp.y) * step(wp.y, winB + 0.032);     // 鉢（小さな台形）
     col = mix(col, mix(vec3(0.13, 0.09, 0.07), uSunGlow * 0.3, 0.2), pot * 0.88);
 
-    // 室内全体のごく弱い周辺減光（奥行き）
-    float vig = 1.0 - 0.34 * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));
+    // 身を乗り出す: 窓枠・桟・カーテン・室内が消えて、景色だけを見渡す
+    col = mix(col, outside, uLeanOut);
+
+    // 室内全体のごく弱い周辺減光（奥行き）。乗り出すと弱める。
+    float vig = 1.0 - 0.34 * (1.0 - 0.7 * uLeanOut) * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));
     col *= vig;
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩

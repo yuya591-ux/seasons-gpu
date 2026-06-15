@@ -20,6 +20,7 @@ export function buildUI(opts) {
     onToggleMute, // (muted) => void
     onVolume, // (v) => void
     onToggleWindow, // (open) => void  窓をあける/しめる
+    onToggleLean, // (lean) => void  身を乗り出す/もどる
   } = opts
 
   const root = h('div', 'ui')
@@ -122,31 +123,48 @@ export function buildUI(opts) {
   topbar.appendChild(setBtn)
   root.appendChild(topbar)
 
-  // ── 窓をあける/しめる（窓辺の情景でだけ。開けると素通しの澄んだ景色＋そよ風） ──
-  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'kitateraoRooftop']
+  // ── 窓をあける/しめる＋身を乗り出す（窓辺の情景でだけ） ──
+  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop']
   const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
-  topbar.insertBefore(windowBtn, sceneBtn)
+  const leanBtn = h('button', 'iconbtn iconbtn--lean', '乗り出す')
+  topbar.insertBefore(leanBtn, sceneBtn)
+  topbar.insertBefore(windowBtn, leanBtn)
   let windowIsOpen = false
+  let leanIsOut = false
+  function isRoof() {
+    return currentScene.render === 'kitateraoRooftop'
+  }
   function windowLabel() {
     // 屋上（開けた眺め）は「かすみを払う」、窓辺は「窓をあける」
-    if (currentScene.render === 'kitateraoRooftop') return windowIsOpen ? 'かすみへ戻す' : 'かすみを払う'
+    if (isRoof()) return windowIsOpen ? 'かすみへ戻す' : 'かすみを払う'
     return windowIsOpen ? '窓をしめる' : '窓をあける'
   }
   function updateWindowBtn() {
     const show = WINDOW_SCENES.includes(currentScene.render)
     windowBtn.style.display = show ? '' : 'none'
-    if (!show && windowIsOpen) {
-      windowIsOpen = false
-      onToggleWindow && onToggleWindow(false)
+    // 乗り出すは屋上以外の窓辺の情景で（枠が消えて景色だけを見渡す）
+    leanBtn.style.display = show && !isRoof() ? '' : 'none'
+    if (!show) {
+      if (windowIsOpen) { windowIsOpen = false; onToggleWindow && onToggleWindow(false) }
+      if (leanIsOut) { leanIsOut = false; onToggleLean && onToggleLean(false) }
     }
     windowBtn.textContent = windowLabel()
     windowBtn.classList.toggle('is-open', windowIsOpen)
+    leanBtn.textContent = leanIsOut ? 'もどる' : '乗り出す'
+    leanBtn.classList.toggle('is-open', leanIsOut)
   }
   windowBtn.addEventListener('click', () => {
     windowIsOpen = !windowIsOpen
     onToggleWindow && onToggleWindow(windowIsOpen)
-    windowBtn.textContent = windowLabel()
-    windowBtn.classList.toggle('is-open', windowIsOpen)
+    if (!windowIsOpen && leanIsOut) { leanIsOut = false; onToggleLean && onToggleLean(false) } // 閉じたら乗り出しも戻す
+    updateWindowBtn()
+    poke()
+  })
+  leanBtn.addEventListener('click', () => {
+    leanIsOut = !leanIsOut
+    onToggleLean && onToggleLean(leanIsOut)
+    if (leanIsOut) windowIsOpen = true // 乗り出すには開ける
+    updateWindowBtn()
     poke()
   })
   updateWindowBtn() // 初期表示（窓辺・屋上の情景でだけ出す）

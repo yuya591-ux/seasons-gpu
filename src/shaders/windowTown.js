@@ -26,6 +26,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=動きを止める
   uniform float uLowRise;     // 低層住宅地化 0=通常の街 1=低い家並み
   uniform float uWindowOpen; // 窓を開けた度合い 0=閉(ガラス越し) 1=開(素通し)
+  uniform float uLeanOut;    // 身を乗り出す 0=窓辺 1=景色だけ
   uniform float uSeason;     // 季節 0=春 1=夏 2=秋 3=冬
   uniform vec3 uSkyTop;      // 天頂（暮れの紫紺）
   uniform vec3 uSkyMid;      // 中空
@@ -254,9 +255,10 @@ const FRAGMENT_BODY = /* glsl */ `
     float gather = max(gatherL, gatherR);
     float curtFolds = 0.55 + 0.45 * sin(p.x * 95.0 + sin(p.y * 3.0 + t * 0.25) * 1.4);
     vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * curtFolds);
-    col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds));
+    vec3 preFrame = col;                         // 枠・カーテン前の景色（乗り出し用）
+    col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds) * (1.0 - uLeanOut));
 
-    // 窓枠（最前景のサッシ・固定）
+    // 窓枠（最前景のサッシ・固定）。乗り出すと消える。
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
     float inner =
@@ -264,6 +266,7 @@ const FRAGMENT_BODY = /* glsl */ `
       smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
     col *= mix(0.84, 1.0, inner);            // 枠の内側を少し翳らせる
     col = mix(col, vec3(0.05, 0.045, 0.06), fr); // サッシ本体
+    col = mix(col, preFrame, uLeanOut);          // 身を乗り出す＝枠が消えて景色だけ
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす

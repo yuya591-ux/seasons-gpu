@@ -20,6 +20,8 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uBright;
   uniform vec2 uPan;
   uniform vec2 uParallax;    // 身を乗り出す/覗き込む並進視差（近景ほど大きく）
+  uniform float uWindowOpen;
+  uniform float uLeanOut;
   uniform float uGlass;
   uniform vec3 uSkyTop;
   uniform vec3 uSkyMid;
@@ -55,7 +57,7 @@ const FRAGMENT_BODY = /* glsl */ `
 
     float horizon = 0.52;
     float sunAz = -0.05;                  // 世界に固定した夕陽の方位
-    float sunScreenX = sunAz - yaw * 0.25; // 夕陽は遠いのでほとんど動かない
+    float sunScreenX = sunAz - yaw * 0.55; // 見回すと夕陽も視界の中を移動する
 
     // ── 空（夕暮れ・水平線に沈む夕陽・層雲・地平の霞） ──
     vec3 sky = mix(uHorizon, uSkyMid, smoothstep(horizon, 0.82, vp.y));
@@ -66,8 +68,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float sunDisc = smoothstep(0.058, 0.046, sunDist);     // 太陽円盤（水平線に半分沈む）
     sky += uSunGlow * sun * 0.7;
     sky = mix(sky, mix(uSunGlow, vec3(1.0, 0.96, 0.86), 0.45), sunDisc * 0.92);
-    // 横に伸びる層雲（夕陽で底が染まる）
-    float cl = fbm(vec2((ax + yaw * 0.18) * 1.2 + t * 0.006, vp.y * 3.0));
+    // 横に伸びる層雲（夕陽で底が染まる。見回すと流れる＝空も動く）
+    float cl = fbm(vec2((ax + yaw * 0.45) * 1.2 + t * 0.006, vp.y * 3.0));
     float cloud = smoothstep(0.5, 0.75, cl) * smoothstep(horizon + 0.02, 0.96, vp.y);
     sky = mix(sky, mix(uHorizon, uSunGlow, 0.5), cloud * 0.35);
     // 地平の霞（海と空の境を柔らかく＝郷愁）
@@ -138,6 +140,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // ガラス現象
     col = applyGlass(col, p, t, uGlass);
 
+    vec3 preFrame = col; // 乗り出し用（枠前の景色）
     // 窓枠
     float mx = 0.05, my = 0.05;
     float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
@@ -146,6 +149,7 @@ const FRAGMENT_BODY = /* glsl */ `
       smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
     col *= mix(0.85, 1.0, inner);
     col = mix(col, vec3(0.06, 0.055, 0.07), fr);
+    col = mix(col, preFrame, uLeanOut); // 身を乗り出す＝枠が消えて景色だけ
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;

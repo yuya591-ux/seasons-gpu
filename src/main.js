@@ -165,6 +165,9 @@ function start() {
     onToggleWindow(open) {
       renderer.setWindowOpen(open)
     },
+    onToggleLean(lean) {
+      renderer.setLeanOut(lean)
+    },
   })
 
   // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュ・サムネ生成など）
