@@ -245,6 +245,19 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, hedge, onFg);
     }
 
+    // 朝の光に舞う細かな塵（谷あいの空気感。2層でゆっくり漂い、朝陽側ほどきらめく）
+    for (int dl = 0; dl < 2; dl++) {
+      float dfi = float(dl);
+      float dsc = mix(12.0, 19.0, dfi);
+      vec2 dq = vec2(p.x * dsc * asp, p.y * dsc - t * (0.03 + dfi * 0.02) * mo);
+      dq.x += sin(t * 0.2 * mo + p.y * 7.0 + dfi) * 0.4;                          // ゆらゆら横に漂う
+      vec2 did = floor(dq); float dn = h21(did + 7.0 + dfi * 13.0);
+      float mote = step(0.975, dn) * smoothstep(0.13, 0.0, length(fract(dq) - 0.5));
+      float lit = smoothstep(0.30, 0.50, vp.y) * (1.0 - smoothstep(0.52, 0.66, vp.y)) // 谷〜中景の空気の層
+                * (0.5 + 0.5 * smoothstep(0.3, -0.4, ax + yaw * 0.18 - sunAz));       // 朝陽側で明るい
+      col += uSunGlow * mote * lit * (0.05 - dfi * 0.015) * (1.0 - uLeanOut);
+    }
+
     // ── 鳥（はばたきながら谷の空を渡る） ──
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, mo);
 
