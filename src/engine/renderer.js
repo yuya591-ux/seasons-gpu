@@ -94,6 +94,11 @@ export function createRenderer(canvas) {
   let settings = { rain: 0.65, brightness: 1.0, quality: 'standard' }
   let rafId = 0
   const startTime = performance.now()
+  // 描画解像度の自動調整（重い端末ではフレーム時間を見て解像度を落とし、滑らかさを保つ）
+  let renderScale = 1.0
+  let frameEMA = 16.7
+  let lastFrame = 0
+  let adaptCooldown = 60
 
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
   const panCur = { x: 0, y: 0 }
@@ -154,7 +159,7 @@ export function createRenderer(canvas) {
   }
 
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, DPR_BY_QUALITY[quality] || 1.5)
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_BY_QUALITY[quality] || 1.5) * renderScale
     const w = Math.floor(canvas.clientWidth * dpr)
     const h = Math.floor(canvas.clientHeight * dpr)
     if (canvas.width !== w || canvas.height !== h) {
@@ -188,6 +193,21 @@ export function createRenderer(canvas) {
   }
 
   function render(now) {
+    // フレーム時間を測り、重い端末では描画解像度を自動調整（滑らかさ優先・回復したら戻す）
+    if (lastFrame > 0) {
+      const dt = now - lastFrame
+      if (dt > 0 && dt < 200) frameEMA = frameEMA * 0.9 + dt * 0.1
+    }
+    lastFrame = now
+    if (adaptCooldown > 0) {
+      adaptCooldown--
+    } else if (frameEMA > 22 && renderScale > 0.6) {
+      renderScale = Math.max(0.6, renderScale - 0.1) // 45fps未満が続けば解像度を落とす
+      adaptCooldown = 90
+    } else if (frameEMA < 14 && renderScale < 1.0) {
+      renderScale = Math.min(1.0, renderScale + 0.1) // 70fps超で余裕があれば戻す
+      adaptCooldown = 150
+    }
     resize()
     const seconds = (now - startTime) / 1000
     // 見回しをなめらかに追従。残差を「動きの視差」として使う（首を振ると手前が動く）
