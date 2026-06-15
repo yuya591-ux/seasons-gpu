@@ -12,18 +12,18 @@ export default {
 
   palette: {
     early: {
-      skyTop: '#5e84bc', // 澄んだ午後の空
-      skyMid: '#a8c4dc',
-      horizon: '#f6dcb6', // 暖かな地平
-      sunGlow: '#ffe6bc',
+      skyTop: '#4a68a8', // 澄んだ午後の深い青
+      skyMid: '#a4c0da',
+      horizon: '#f8d09a', // 暖かな金の地平
+      sunGlow: '#ffdca2',
       dropTint: '#2e4428',
     },
     late: {
-      skyTop: '#3e4a78',
-      skyMid: '#7e7e9c',
-      horizon: '#f0a878', // 夕焼け
-      sunGlow: '#ffcf9a',
-      dropTint: '#283a24',
+      skyTop: '#36366a', // 紫紺へ沈む
+      skyMid: '#8a6486',
+      horizon: '#f4884e', // 燃える夕焼け
+      sunGlow: '#ff9a50',
+      dropTint: '#243420',
     },
   },
   driftPeriod: 300,

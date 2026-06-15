@@ -220,14 +220,25 @@ export async function mountTown3d(parent, opts = {}) {
     house(c[0], c[1], 5 + R() * 1.5, 5 + R() * 1.5, 4 + R() * 2, R() < 0.7)
   }
 
-  // ── 大きなランドマーク（大型スーパー＝平らな大箱＋看板） ──
+  // ── 大きなランドマーク（大型スーパー＝平らな大箱＋駐車場＋屋上看板） ──
   {
     const x = 24, z = -20, gy = heightAt(x, z)
     const g = new THREE.Group()
     const body = new THREE.Mesh(new THREE.BoxGeometry(20, 9, 14), toon(0xe0d8c8))
     body.position.y = 4.5; body.castShadow = true; body.receiveShadow = true; g.add(body)
     const sign = new THREE.Mesh(new THREE.BoxGeometry(16, 2.2, 0.6), toon(0xc23a2c))
-    sign.position.set(0, 10, 7.1); g.add(sign)
+    sign.position.set(0, 9.6, 7.1); g.add(sign)
+    // 屋上の看板塔（街から見える大きな看板）
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(12, 3.2, 0.8), toon(0xd23a4a))
+    tower.position.set(0, 11.4, 0); g.add(tower)
+    // 駐車場（店の手前の舗装）＋駐車中の車
+    const lot = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 13), toon(0x63636b))
+    lot.position.set(0, 0.15, 15); lot.receiveShadow = true; g.add(lot)
+    const pcols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a]
+    for (let i = 0; i < 12; i++) {
+      const car = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 3.2), toon(pcols[i % pcols.length]))
+      car.position.set(-9.5 + (i % 6) * 3.8, 0.8, 12.5 + ((i / 6) | 0) * 4.5); car.castShadow = true; g.add(car)
+    }
     g.position.set(x, gy, z); g.rotation.y = -0.3; town.add(g)
   }
   // ── パチンコ屋（けばけばしい外装＋縦長のネオン塔看板＋色の輪が灯る） ──
