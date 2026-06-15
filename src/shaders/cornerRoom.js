@@ -314,6 +314,33 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, mix(uSkyMid, uSunGlow, 0.4) * 1.05, plume * 0.6);
     }
 
+    // 観覧車（川辺の遊園地。ゆっくり回り夜は色とりどりに灯る）。右手の遠景に静かに。
+    {
+      float wmo = 1.0 - uReduceMotion;
+      float asp = uResolution.x / uResolution.y;
+      vec2 wd = vec2((ax + yaw * 0.7 - 0.10) / asp, vp.y - 0.56);
+      wd.y *= uResolution.y / uResolution.x;            // 画面で真円に
+      float wr = length(wd);
+      if (wr < 0.22) {
+        float PI = 3.14159265;
+        float R = 0.15;
+        float ang = atan(wd.y, wd.x);
+        float rot = uTime * 0.05 * wmo;
+        vec3 frame = mix(uDropTint, uHorizon, 0.35);    // 暗い骨組み
+        float rim = smoothstep(0.009, 0.0, abs(wr - R));
+        float spoke = smoothstep(0.040, 0.0, abs(fract((ang + rot) / (2.0 * PI) * 12.0) - 0.5)) * smoothstep(R, 0.0, wr);
+        float hub = smoothstep(0.014, 0.006, wr);
+        float leg = smoothstep(0.010, 0.0, abs(abs(wd.x) - (-wd.y) * 0.5)) * step(wd.y, 0.0) * step(-0.20, wd.y); // 支柱(A字)
+        col = mix(col, frame, clamp(rim + spoke * 0.55 + hub + leg, 0.0, 1.0) * 0.7);
+        // ゴンドラ（リム上・等間隔・回転。夜は色とりどりに灯る）
+        float gN = 12.0;
+        float gA = (ang + rot) / (2.0 * PI) * gN;
+        float gondola = smoothstep(0.30, 0.0, abs(fract(gA) - 0.5) * 2.0) * smoothstep(0.020, 0.006, abs(wr - R));
+        vec3 gcol = mix(uSunGlow, 0.55 + 0.45 * cos(floor(gA) * 1.3 + vec3(0.0, 2.1, 4.2)), nightAmt);
+        col += gcol * gondola * (0.35 + 0.85 * nightAmt);
+      }
+    }
+
     // 地平の継ぎ目をなじませる: 立体の近景街と2Dの遠景スカイラインの境を霞で溶かす
     float seam = smoothstep(0.505, 0.44, vp.y) * smoothstep(0.40, 0.455, vp.y);
     col = mix(col, mix(uHorizon, uSkyMid, 0.5), seam * 0.45);
