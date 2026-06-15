@@ -21,6 +21,7 @@ import kitateraoWindow3d from './kitaterao-window-3d.js'
 import kitateraoWindow3dNight from './kitaterao-window-3d-night.js'
 import kitateraoWindow3dSnow from './kitaterao-window-3d-snow.js'
 import kitateraoWindow3dSpring from './kitaterao-window-3d-spring.js'
+import kitateraoWindow3dAutumn from './kitaterao-window-3d-autumn.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
@@ -29,8 +30,9 @@ export const SCENES = [
   // 本物の3Dの坂の街（四季）＝アプリの主役。ギャラリーの先頭に並べて第一印象にする。
   kitateraoWindow3d,
   kitateraoWindow3dNight,
-  kitateraoWindow3dSnow,
   kitateraoWindow3dSpring,
+  kitateraoWindow3dAutumn,
+  kitateraoWindow3dSnow,
   // 角部屋シリーズ（シェーダー）
   autumnDuskCornerRoom,
   autumnRainNightCornerRoom,

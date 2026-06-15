@@ -582,8 +582,9 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
   let weatherPts = null
-  if (weather === 'snow' || weather === 'petals') {
-    const N = weather === 'snow' ? 700 : 420
+  if (weather === 'snow' || weather === 'petals' || weather === 'leaves') {
+    const N = weather === 'snow' ? 700 : weather === 'petals' ? 420 : 360
+    const baseSpd = weather === 'snow' ? 4 : weather === 'petals' ? 2.4 : 2.0
     const pos = new Float32Array(N * 3)
     const spd = new Float32Array(N) // 個別の落下速度
     const phs = new Float32Array(N) // 横揺れ位相
@@ -591,21 +592,22 @@ export async function mountTown3d(parent, opts = {}) {
       pos[i * 3] = (R() - 0.5) * 200
       pos[i * 3 + 1] = R() * 80
       pos[i * 3 + 2] = -120 + R() * 170
-      spd[i] = (weather === 'snow' ? 4 : 2.4) * (0.6 + R() * 0.8)
+      spd[i] = baseSpd * (0.6 + R() * 0.8)
       phs[i] = R() * 6.28
     }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     const mat = new THREE.PointsMaterial({
-      color: weather === 'snow' ? 0xfdfdff : 0xf2bcd0,
-      size: weather === 'snow' ? 0.5 : 0.85,
+      color: weather === 'snow' ? 0xfdfdff : weather === 'petals' ? 0xf2bcd0 : 0xcf7e38, // 落ち葉=暖色の橙
+      size: weather === 'snow' ? 0.5 : weather === 'petals' ? 0.85 : 0.95,
       transparent: true, opacity: weather === 'snow' ? 0.92 : 0.85,
       sizeAttenuation: true, fog: true, depthWrite: false,
     })
     const pts = new THREE.Points(geo, mat)
     pts.frustumCulled = false
     scene.add(pts)
-    weatherPts = { pts, pos, spd, phs, N, swirl: weather === 'petals' ? 2.6 : 0.9 }
+    // 落ち葉・花びらは大きく舞う（横揺れを強く）。雪はまっすぐ静かに落ちる。
+    weatherPts = { pts, pos, spd, phs, N, swirl: weather === 'snow' ? 0.9 : weather === 'petals' ? 2.6 : 3.0 }
   }
 
   // ── カメラ（高台のマンション上階の窓から街を見下ろす） ──
