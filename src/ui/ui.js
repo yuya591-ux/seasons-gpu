@@ -64,7 +64,7 @@ export function buildUI(opts) {
   requestAnimationFrame(() => gate.focus())
 
   // 見回せる情景（窓辺シリーズ）だけでヒントを出す
-  const LOOKABLE = ['cornerRoom', 'windowTown', 'windowMountains', 'windowSea', 'windowPano']
+  const LOOKABLE = ['cornerRoom', 'windowTown', 'windowMountains', 'windowSea', 'windowPano', 'town3d']
   // 初回のみ: 「見回せる」ことをそっと伝える（localStorageで2回目以降は出さない）
   function maybeShowLookHint() {
     if (!LOOKABLE.includes(currentScene.render)) return // 見回せない情景では出さない
@@ -127,7 +127,7 @@ export function buildUI(opts) {
   root.appendChild(topbar)
 
   // ── 窓をあける/しめる＋身を乗り出す（窓辺の情景でだけ） ──
-  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop']
+  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop', 'town3d']
   const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
   const leanBtn = h('button', 'iconbtn iconbtn--lean', '乗り出す')
   topbar.insertBefore(leanBtn, sceneBtn)
@@ -428,6 +428,12 @@ export function buildUI(opts) {
   return {
     setSceneLabel(text) {
       sceneName.textContent = text
+    },
+    // 情景を替えたら窓は閉じた状態から（ボタン表示と描画のズレを防ぐ）。通知はしない。
+    resetWindow() {
+      windowIsOpen = false
+      leanIsOut = false
+      updateWindowBtn()
     },
   }
 }

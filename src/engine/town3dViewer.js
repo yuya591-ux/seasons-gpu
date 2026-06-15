@@ -22,15 +22,31 @@ export function isTown3dActive() {
   return !!active
 }
 
-// 見回し（スワイプ）。nx,ny は累積の相対量。
+// 見回し（スワイプ）。nx,ny は累積の相対量。乗り出すと見回せる幅が広がる。
 export function applyTown3dLook(dx, dy) {
   if (!active) return
-  active.yaw = Math.max(-0.9, Math.min(0.9, active.yaw + dx * 1.4))
-  active.pitch = Math.max(-0.35, Math.min(0.5, active.pitch + dy * 1.0))
+  const l = active.lean || 0
+  const yawMax = 0.9 + l * 0.7   // 乗り出すと左右に大きく見渡せる
+  const pitchUp = 0.5 + l * 0.28
+  const pitchDn = 0.35 + l * 0.2
+  active.yaw = Math.max(-yawMax, Math.min(yawMax, active.yaw + dx * 1.4))
+  active.pitch = Math.max(-pitchDn, Math.min(pitchUp, active.pitch + dy * 1.0))
 }
 
 export function resetTown3dLook() {
   if (active) { active.yawTarget = 0; active.pitchTarget = 0 }
+}
+
+// 窓をあける／しめる（ガラスが横にすべって外気が澄む）。
+export function setTown3dWindowOpen(open) {
+  if (active) active.winOpenTarget = open ? 1 : 0
+}
+
+// 身を乗り出す／もどる（枠を越えて前へ＝視界が広がる）。乗り出すには窓をあける。
+export function setTown3dLean(lean) {
+  if (!active) return
+  active.leanTarget = lean ? 1 : 0
+  if (lean) active.winOpenTarget = 1
 }
 
 export async function unmountTown3d() {
@@ -485,6 +501,9 @@ export async function mountTown3d(parent, opts = {}) {
   active = {
     renderer, scene, camera, stage, raf: 0,
     yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0,
+    winOpen: 0, winOpenTarget: 0, // 窓をあける（ガラスが横にすべって外気が澄む）
+    lean: 0, leanTarget: 0,        // 身を乗り出す（枠を越えて前へ＝視界が広がる）
+    fovCur: 62,
     dispose() { renderer.dispose(); grad.dispose() },
   }
 
@@ -498,6 +517,20 @@ export async function mountTown3d(parent, opts = {}) {
   const clock = new THREE.Clock()
   let lastT = 0
   let lastDraw = -1
+
+  // ── 窓枠のHTMLオーバーレイ（最前景のサッシ＋横桟＋窓台＋ガラスの映り込み＋紙目）──
+  // frame() から参照するので先に生成する。あける／乗り出すで毎フレーム動かす。
+  const paper = document.createElement('div')
+  paper.className = 'town3d-paper'
+  stage.appendChild(paper)
+  const glass = document.createElement('div'); glass.className = 'town3d-glass'; stage.appendChild(glass)
+  const cross = document.createElement('div'); cross.className = 'town3d-cross'; stage.appendChild(cross)
+  const sill = document.createElement('div'); sill.className = 'town3d-sill'; stage.appendChild(sill)
+  const frame2 = document.createElement('div')
+  frame2.className = 'town3d-frame'
+  stage.appendChild(frame2)
+  let clarityCur = -1
+
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
@@ -537,34 +570,53 @@ export async function mountTown3d(parent, opts = {}) {
       const flap = Math.sin(t * 9 + u.ph) * 0.5
       b.children.forEach((w) => { w.rotation.z = w.userData.side * flap })
     }
+    // 窓をあける／身を乗り出すをなめらかに追従（少しゆっくり＝動きがはっきり分かる）
+    active.winOpen += (active.winOpenTarget - active.winOpen) * 0.07
+    active.lean += (active.leanTarget - active.lean) * 0.06
+    const wo = active.winOpen, lean = active.lean
+
     // 見回しをなめらかに（息づかいの微揺れ付き）
     const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
     const pitch = active.pitch
-    camera.position.copy(eye)
+    // 乗り出すとカメラを前へ・下へ寄せ、画角を広げる（枠を越えて街へ顔を出す立体感）
+    const ex = 0
+    const ey = eye.y - lean * 4.5
+    const ez = eye.z - lean * 9.0
+    camera.position.set(ex, ey, ez)
+    const fov = 62 + lean * 7
+    if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     const look = new THREE.Vector3(
-      eye.x + Math.sin(yaw) * 18,
-      eye.y - 12 + pitch * 14 + Math.sin(t * 0.5) * 0.05, // 街を見下ろす角度（やや水平寄り＝街と空が映える）
-      eye.z - Math.cos(yaw) * 22,
+      ex + Math.sin(yaw) * 18,
+      ey - 12 - lean * 4 + pitch * 14 + Math.sin(t * 0.5) * 0.05, // 乗り出すほど街を見下ろす
+      ez - Math.cos(yaw) * 22,
     )
     camera.lookAt(look)
+
+    // 窓ガラスと横桟は、あけると横へすべって消える（引き違い窓）。乗り出すと枠ごと外へ退く。
+    glass.style.transform = `translateX(${(wo * 96).toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
+    glass.style.opacity = ((1 - wo * 0.92) * (1 - lean)).toFixed(3)
+    cross.style.transform = `translateX(${(wo * 96).toFixed(1)}%)`
+    cross.style.opacity = ((1 - wo) * (1 - lean)).toFixed(3)
+    // サッシ・窓台は乗り出すと拡大しながら退いて外気だけに（枠を通り抜ける手応え）
+    frame2.style.transform = `scale(${(1 + lean * 0.55).toFixed(3)})`
+    frame2.style.opacity = (1 - lean * 0.96).toFixed(3)
+    sill.style.transform = `translateY(${(lean * 130).toFixed(1)}%)`
+    sill.style.opacity = (1 - lean * 0.9).toFixed(3)
+    paper.style.opacity = (0.14 * (1 - lean * 0.6)).toFixed(3)
+    // ガラス越しのくすみを、あけ／乗り出しに応じて晴らす（外気が澄む）。変化時だけ書き換え。
+    const clarity = Math.min(1, wo * 0.6 + lean * 0.7)
+    if (Math.abs(clarity - clarityCur) > 0.004) {
+      clarityCur = clarity
+      stage.style.filter =
+        `saturate(${lerp(0.78, 0.95, clarity).toFixed(3)}) sepia(${lerp(0.06, 0.02, clarity).toFixed(3)}) ` +
+        `brightness(${lerp(1.02, 1.06, clarity).toFixed(3)}) contrast(0.98)`
+    }
+
     // 雲がゆっくり流れる
     for (const c of clouds) { c.position.x += 0.01; if (c.position.x > 130) c.position.x = -130 }
     renderer.render(scene, camera)
   }
   frame()
-
-  // 紙・水彩のトーン（全情景と質感を統一する薄い紙目）。最前景の枠より下。
-  const paper = document.createElement('div')
-  paper.className = 'town3d-paper'
-  stage.appendChild(paper)
-
-  // 窓枠（最前景のサッシ＋中央の横桟＋窓台＋ガラスの映り込み）。HTMLオーバーレイ。
-  const glass = document.createElement('div'); glass.className = 'town3d-glass'; stage.appendChild(glass)
-  const cross = document.createElement('div'); cross.className = 'town3d-cross'; stage.appendChild(cross)
-  const sill = document.createElement('div'); sill.className = 'town3d-sill'; stage.appendChild(sill)
-  const frame2 = document.createElement('div')
-  frame2.className = 'town3d-frame'
-  stage.appendChild(frame2)
   requestAnimationFrame(() => stage.classList.add('town3d-stage--in'))
 
   // 検証用: 見回しを外から設定（?dev=1 のサムネ/撮影で角度を指定）

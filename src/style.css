@@ -191,13 +191,17 @@ body {
   z-index: 2;
   pointer-events: none;
 }
-/* ガラスの斜めの映り込み（ごく淡い一条） */
+/* ガラスらしい斜めの映り込み（2筋）＋ごく淡い空の冷色。あけると横へすべって消えるのが見える */
 .town3d-glass {
   position: absolute;
   inset: 14px;
   z-index: 2;
   pointer-events: none;
-  background: linear-gradient(120deg, transparent 38%, rgba(255, 255, 255, 0.05) 46%, transparent 54%);
+  transform-origin: center;
+  background:
+    linear-gradient(118deg, transparent 30%, rgba(255, 255, 255, 0.11) 44%, rgba(255, 255, 255, 0.03) 49%, transparent 56%),
+    linear-gradient(118deg, transparent 62%, rgba(255, 255, 255, 0.06) 71%, transparent 80%),
+    linear-gradient(160deg, rgba(200, 218, 236, 0.06), transparent 45%);
 }
 /* 紙・水彩のトーン（薄い紙目を乗算で重ね、3Dを他情景と同じ手触りに） */
 .town3d-paper {

@@ -8,7 +8,14 @@ import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
 import { createTilt } from './ui/tilt.js'
 import { mountSplat, unmountSplat, applySplatTilt, resetSplatTilt } from './engine/splatViewer.js'
-import { mountTown3d, unmountTown3d, applyTown3dLook, resetTown3dLook } from './engine/town3dViewer.js'
+import {
+  mountTown3d,
+  unmountTown3d,
+  applyTown3dLook,
+  resetTown3dLook,
+  setTown3dWindowOpen,
+  setTown3dLean,
+} from './engine/town3dViewer.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
 
@@ -100,6 +107,9 @@ function start() {
     }
     setScene(next.id)
     audio.setScene(next)
+    // 情景を替えたら窓は閉じた状態から始める（ボタンと描画のズレを防ぐ）
+    renderer.setWindowOpen(false)
+    if (ui && ui.resetWindow) ui.resetWindow()
     if (next.render === 'splat') {
       splatMode = true
       canvas.style.display = 'none'
@@ -219,7 +229,7 @@ function start() {
     window.addEventListener(ev, () => { if (sleepFading) cancelSleep() }, { passive: true }),
   )
 
-  buildUI({
+  const ui = buildUI({
     initialScene: scene,
     settings,
     onApplyScene(next) {
@@ -251,10 +261,12 @@ function start() {
       audio.setVolume(v)
     },
     onToggleWindow(open) {
-      renderer.setWindowOpen(open)
+      if (town3dMode) setTown3dWindowOpen(open) // 3Dの街は窓ガラスがすべって開く
+      else renderer.setWindowOpen(open)
     },
     onToggleLean(lean) {
-      renderer.setLeanOut(lean)
+      if (town3dMode) setTown3dLean(lean) // 3Dの街はカメラが枠を越えて前へ
+      else renderer.setLeanOut(lean)
     },
   })
 
@@ -263,6 +275,8 @@ function start() {
     window.__renderer = renderer
     window.__applyScene = (id) => applyScene(resolveScene(id), false)
     window.__sceneIds = SCENES.filter((s) => s.public !== false && s.status === 'ready').map((s) => s.id)
+    window.__town3dWindow = (b) => setTown3dWindowOpen(b) // 検証用: 3Dの街の窓をあける/しめる
+    window.__town3dLean = (b) => setTown3dLean(b) // 検証用: 3Dの街で身を乗り出す/もどる
     window.__sleepNow = () => startSleepFade() // 検証用: おやすみの暗転を即時に起こす
     window.__sleepState = () => ({ fading: sleepFading, on: sleepOverlay.classList.contains('sleep-overlay--on') })
   }
