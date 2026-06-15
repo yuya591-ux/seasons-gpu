@@ -481,6 +481,39 @@ const FRAGMENT_BODY = /* glsl */ `
       col = mix(col, vec3(0.92, 0.94, 0.99), snowCap * 0.9);
     }
 
+    // ── 窓辺の室内（“部屋に居て外を眺めている”最後のピース） ──
+    // レースカーテン（両脇に寄せた薄手。やわらかく揺れ光を透かす。中央は開けて見える）
+    float curtSway = sin(uTime * 0.4) * 0.008 + sin(uTime * 0.19 + 1.0) * 0.005;
+    float cwid = 0.19;
+    float gatherL = smoothstep(winL + cwid, winL - 0.01, wp.x - curtSway);
+    float gatherR = smoothstep(winR - cwid, winR + 0.01, wp.x + curtSway);
+    float gather = max(gatherL, gatherR);
+    float folds = 0.55 + 0.45 * sin(wp.x * 95.0 + sin(wp.y * 3.0 + uTime * 0.25) * 1.4); // 縦の襞＋ゆらぎ
+    float vext = smoothstep(winT + 0.03, winT - 0.02, wp.y) * smoothstep(winB - 0.08, winB + 0.05, wp.y);
+    float laceA = gather * vext * (0.24 + 0.18 * folds);
+    vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * folds);
+    col = mix(col, lace, laceA);
+
+    // 窓辺の観葉植物（左下にそっと。外光に透ける葉のシルエットと鉢）
+    vec2 plBase = vec2(winL + 0.125, winB + 0.012);
+    vec2 plc = wp - plBase;
+    float plant = 0.0;
+    for (int i = 0; i < 6; i++) {
+      float fi = float(i);
+      float a = (-0.7 + fi * 0.26) + sin(uTime * 0.5 + fi) * 0.045;    // 葉の角度（そよぐ）
+      vec2 dir = vec2(sin(a), cos(a));
+      float along = dot(plc, dir);
+      float perp = dot(plc, vec2(dir.y, -dir.x));
+      float w = 0.020 * clamp(1.0 - along / 0.135, 0.0, 1.0);          // 先細り
+      float blade = step(0.0, along) * smoothstep(0.135, 0.0, along) * smoothstep(w, 0.0, abs(perp));
+      plant = max(plant, blade);
+    }
+    vec3 leafCol = mix(vec3(0.07, 0.12, 0.06), uSunGlow * 0.4, 0.22);  // 暗い葉＋外光の透け
+    col = mix(col, leafCol, plant * 0.88);
+    float pot = step(abs(wp.x - plBase.x), 0.040 - (wp.y - winB) * 0.18)
+              * step(winB - 0.02, wp.y) * step(wp.y, winB + 0.032);     // 鉢（小さな台形）
+    col = mix(col, mix(vec3(0.13, 0.09, 0.07), uSunGlow * 0.3, 0.2), pot * 0.88);
+
     // 室内全体のごく弱い周辺減光（奥行き）
     float vig = 1.0 - 0.34 * smoothstep(0.40, 1.25, distance(p, vec2(0.5, 0.52)));
     col *= vig;
