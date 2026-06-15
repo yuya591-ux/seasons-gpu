@@ -28,23 +28,38 @@ export const GRADE_GLSL = /* glsl */ `
     // 6) 全体をほんの少し明るく柔らかく（夜の重さ→宵の柔らかさ）
     c = c * 0.97 + 0.03;
 
-    // ===== ほんの少し水彩/絵画調（僕の夏休み風）=====
+    // ===== 水彩画の質感（紙・顔料の溜まり・ウォッシュ・にじみ）=====
     float l2 = dot(c, vec3(0.299, 0.587, 0.114));
+    vec2 pp = p * uResolution.xy;
     // (W1) 西日の暖色を薄く
-    c += vec3(0.016, 0.005, -0.014);
-    // (W2) 中間トーンだけ彩度を少し戻す（退色しすぎ防止＝絵の具の発色）
+    c += vec3(0.014, 0.004, -0.012);
+    // (W2) 中間トーンの彩度を少し戻す（絵具の発色）
     float mid = smoothstep(0.15, 0.5, l2) * smoothstep(0.95, 0.55, l2);
-    c = mix(vec3(l2), c, 1.0 + 0.10 * mid);
-    // (W3) ごく弱いポスタライズ（絵の具の階調。段差を出さない量）
-    vec3 poster = floor(c * 15.0 + 0.5) / 15.0;
-    c = mix(c, poster, 0.13);
-    // (W4) 紙の塗りムラ（低周波ノイズ。明部では控えめ＝白い紙の地）
-    float paper = vnoise(p * uResolution.xy * 0.012) - 0.5;
-    c += paper * 0.014 * (0.6 + 0.4 * (1.0 - l2));
-    // (W5) ハイライトの滲み（水彩のにじみ）
-    c += smoothstep(0.72, 1.0, l2) * vec3(0.03, 0.022, 0.012);
-    // (W6) ごく弱い周辺減光（覗き込みの安心感・視線を中央へ）
-    c *= 1.0 - smoothstep(0.45, 0.96, length(p - 0.5)) * 0.10;
+    c = mix(vec3(l2), c, 1.0 + 0.12 * mid);
+    // (W3) ウォッシュ＝平らな色面に寄せる（塗り分けの面。色相は保つ）
+    float levels = 6.0;
+    float ql = floor(l2 * levels + 0.5) / levels;
+    vec3 wash = c * clamp(ql / max(l2, 0.04), 0.50, 1.8);
+    c = mix(c, wash, 0.42);
+    // (W4) tide line＝ウォッシュ境界に顔料が溜まる暗い縁（水彩の最大の決め手）
+    float paperC = vnoise(pp * 0.011);                 // 粗い紙の目
+    float band = abs(fract(l2 * levels) - 0.5) * 2.0;  // 0=境界 1=面の中央
+    float tide = (1.0 - smoothstep(0.0, 0.30, band)) * (0.5 + 0.5 * paperC);
+    c *= 1.0 - tide * 0.16;
+    // (W5) 紙のテクスチャ（粗い目＋細かい繊維。乗算で“紙に乗った絵具”）
+    float paperF = vnoise(pp * 0.052 + 11.0);
+    c *= 1.0 - (mix(paperC, paperF, 0.4) - 0.5) * 0.15;
+    // (W6) 顔料の粒状（granulation）。暗部ほど粒が沈む
+    float gran = fbm(pp * 0.026 + 4.0);
+    c *= 1.0 - (gran - 0.5) * 0.15 * (1.0 - smoothstep(0.18, 0.62, l2));
+    // (W6b) ウォッシュの濃淡ムラ（絵具の含みが不均一＝大きな筆のムラ）
+    float washVar = fbm(pp * 0.006 + 20.0) - 0.5;
+    c *= 1.0 + washVar * 0.10;
+    // (W7) ハイライトのにじみ＋最明部に残る紙の白
+    c += smoothstep(0.70, 1.0, l2) * vec3(0.03, 0.022, 0.012) * (0.6 + 0.4 * paperC);
+    c = mix(c, mix(c, vec3(1.0, 0.985, 0.95), 0.5), smoothstep(0.84, 1.0, l2));
+    // (W8) 四隅が紙へ褪せる（絵の縁）
+    c *= 1.0 - smoothstep(0.45, 1.0, length(p - 0.5)) * 0.12;
     return clamp(c, 0.0, 1.0);
   }
 `
