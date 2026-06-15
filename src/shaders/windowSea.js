@@ -5,6 +5,7 @@
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { BIRDS_GLSL } from './birds.js'
+import { GODRAYS_GLSL } from './godrays.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -101,6 +102,8 @@ const FRAGMENT_BODY = /* glsl */ `
     water = mix(water, vec3(0.84, 0.88, 0.91), foam * 0.18);
 
     vec3 col = (vp.y > horizon) ? sky : water;
+    // 薄明光線（god rays）: 夕陽から放射する光の筋＝空の立体的な大気
+    col = godRays(col, vec2(ax, vp.y), vec2(sunScreenX, horizon + 0.02), uSunGlow * 0.13, t, smoothstep(horizon, horizon + 0.08, vp.y));
 
     // 遠い島影（世界に固定。空気遠近で淡く霞む。低くなだらかに。）
     float islX = 0.42 - yaw * 0.45;
@@ -167,6 +170,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n  void main()')
   return defines + body
 }

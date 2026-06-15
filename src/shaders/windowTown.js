@@ -6,6 +6,7 @@
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { GROUND_GLSL } from './ground.js'
+import { GODRAYS_GLSL } from './godrays.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -181,6 +182,8 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 遠雷フラッシュ: 夜空と雲がほのかに白む（雷鳴に同期）
     col += uFlash * (0.10 + 0.18 * cloudband) * vec3(0.82, 0.88, 1.0);
+    // 薄明光線（god rays）: 夕日から放射する光の筋＝空の立体的な大気
+    col = godRays(col, vec2(ax, vp.y), vec2(-0.5 + sunAz, sunY), uSunGlow * 0.13, t, smoothstep(0.46, 0.56, vp.y));
 
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
     col = hills(col, vp, ax + yaw * 0.30, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
@@ -291,6 +294,6 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     .replace('//__GROUND__', GROUND_GLSL) // 地面関数は town/main より前に定義する必要がある
-    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
+    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + GODRAYS_GLSL + '\n  void main()')
   return defines + body
 }

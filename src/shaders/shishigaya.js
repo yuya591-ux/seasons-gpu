@@ -10,6 +10,7 @@
 import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { BIRDS_GLSL } from './birds.js'
+import { GODRAYS_GLSL } from './godrays.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -109,6 +110,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float cl = fbm(vec2((ax + yaw * 0.16) * 1.3 + t * 0.006 * mo, vp.y * 2.6));
     float cloud = smoothstep(0.52, 0.72, cl) * smoothstep(0.6, 1.0, vp.y);
     col = mix(col, mix(uSkyMid, vec3(1.0), 0.5), cloud * 0.4);
+    // 薄明光線（god rays）: 朝陽から放射する光の筋＝空の立体的な大気
+    col = godRays(col, vec2(ax, vp.y), sunC, uSunGlow * 0.13, t, smoothstep(0.52, 0.62, vp.y));
 
     // ── 市民の森（尾根を覆う森）。奥ほど青く霞む3層 ──
     float worldX = ax + yaw * 0.5;
@@ -273,6 +276,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n  void main()')
   return defines + body
 }

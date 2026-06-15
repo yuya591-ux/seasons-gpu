@@ -8,6 +8,7 @@ import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { GROUND_GLSL } from './ground.js'
 import { BIRDS_GLSL } from './birds.js'
+import { GODRAYS_GLSL } from './godrays.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -205,6 +206,8 @@ const FRAGMENT_BODY = /* glsl */ `
     col += uSunGlow * exp(-abs(vp.y - 0.46) * 7.0) * 0.20 * westBias;
     // 西の低い夕日（やわらかな光球）。沈む太陽の在り処
     col += uSunGlow * exp(-distance(vec2(ax + yaw * 0.2, vp.y), vec2(-0.5 + sunAz, sunY)) * 4.2) * 0.22;
+    // 薄明光線（god rays）: 夕日から放射状に伸びる光の筋＝空の立体的な大気
+    col = godRays(col, vec2(ax + yaw * 0.2, vp.y), vec2(-0.5 + sunAz, sunY), uSunGlow * 0.16, uTime, smoothstep(0.42, 0.50, vp.y));
 
     // 夕焼け雲（2層・立体的。底が夕陽で染まり上面は翳る。ゆっくり流れて形が変わる）
     float cloudT = uTime * (1.0 - uReduceMotion);
@@ -629,7 +632,7 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     // 地面・鳥の関数は outsideView より前に定義する必要がある（outsideView から呼ぶため）
-    .replace('//__GROUND__', GROUND_GLSL + '\n' + BIRDS_GLSL)
+    .replace('//__GROUND__', GROUND_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL)
     .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
   return defines + body
 }

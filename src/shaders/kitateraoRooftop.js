@@ -10,6 +10,7 @@
 import { GROUND_GLSL } from './ground.js'
 import { GRADE_GLSL } from './grade.js'
 import { BIRDS_GLSL } from './birds.js'
+import { GODRAYS_GLSL } from './godrays.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -104,6 +105,8 @@ const FRAGMENT_BODY = /* glsl */ `
     // 雲
     float cl = fbm(vec2((ax + yaw * 0.16) * 1.2 + t * 0.006 * mo, vp.y * 2.4));
     col = mix(col, mix(uSkyMid, vec3(1.0), 0.5), smoothstep(0.52, 0.72, cl) * smoothstep(0.56, 1.0, vp.y) * 0.4);
+    // 薄明光線（god rays）: 夕日から放射する光の筋＝広い屋上の空の立体感
+    col = godRays(col, vec2(ax, vp.y), sunC, uSunGlow * 0.14, uTime, smoothstep(0.43, 0.55, vp.y));
 
     // ── 遠景の森の尾根（市民の森）。ぐるりを囲む丘 ──
     float wx = ax + yaw * 0.55;
@@ -235,6 +238,6 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     .replace('//__GROUND__', GROUND_GLSL)
-    .replace('void main()', GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
+    .replace('void main()', GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n  void main()')
   return defines + body
 }
