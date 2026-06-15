@@ -287,6 +287,37 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(g); clouds.push(g)
   }
 
+  // ── 走る車（中央の通りを行き交う。夕方はヘッドライト/テールが灯る） ──
+  const carCols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0xc8b84a]
+  const cars = []
+  for (let i = 0; i < 6; i++) {
+    const g = new THREE.Group()
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 3.4), toon(carCols[i % carCols.length]))
+    body.position.y = 0.55; body.castShadow = true; g.add(body)
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 1.7), toon(0x26323e)); cab.position.set(0, 1.05, -0.1); g.add(cab)
+    const dir = (i % 2 === 0) ? 1 : -1
+    if (duskAmt > 0.2) { // ライト
+      const lc = dir > 0 ? 0xfff0c0 : 0xff5a3a
+      const light = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 0.1), new THREE.MeshBasicMaterial({ color: lc, fog: true }))
+      light.position.set(0, 0.5, dir > 0 ? -1.7 : 1.7); g.add(light)
+    }
+    g.userData = { dir, lane: dir > 0 ? -1.5 : 1.5, speed: 7 + R() * 5, z: -90 + R() * 110 }
+    town.add(g); cars.push(g)
+  }
+
+  // ── 歩く住民（歩道を行き交う小さな人影） ──
+  const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8]
+  const peeps = []
+  for (let i = 0; i < 10; i++) {
+    const g = new THREE.Group()
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.7, 3, 6), toon(peepCols[i % peepCols.length]))
+    body.position.y = 0.7; body.castShadow = true; g.add(body)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), toon(0xf0c49c)); head.position.y = 1.35; g.add(head)
+    const dir = (i % 2 === 0) ? 1 : -1
+    g.userData = { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 }
+    town.add(g); peeps.push(g)
+  }
+
   // ── カメラ（高台のマンション上階の窓から街を見下ろす） ──
   const camera = new THREE.PerspectiveCamera(62, W / H, 0.5, 600)
   const eye = new THREE.Vector3(0, 31, 30) // 上階の窓の目線（高く・街の手前）
@@ -304,10 +335,30 @@ export async function mountTown3d(parent, opts = {}) {
   window.addEventListener('resize', resize)
 
   const clock = new THREE.Clock()
+  let lastT = 0
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
     const t = clock.getElapsedTime()
+    const dt = Math.min(0.05, t - lastT); lastT = t
+    // 車が通りを行き交う
+    for (const c of cars) {
+      const u = c.userData
+      u.z += u.dir * u.speed * dt
+      if (u.z > 22) u.z = -95
+      if (u.z < -95) u.z = 22
+      c.position.set(u.lane, heightAt(u.lane, u.z) + 0.1, u.z)
+      c.rotation.y = u.dir > 0 ? 0 : Math.PI
+    }
+    // 住民が歩道を歩く（少し上下に弾む）
+    for (const p of peeps) {
+      const u = p.userData
+      u.z += u.dir * u.speed * dt
+      if (u.z > 20) u.z = -88
+      if (u.z < -88) u.z = 20
+      p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * 5 + u.ph)) * 0.06, u.z)
+      p.rotation.y = u.dir > 0 ? 0 : Math.PI
+    }
     // 見回しをなめらかに（息づかいの微揺れ付き）
     const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
     const pitch = active.pitch
