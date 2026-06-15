@@ -10,6 +10,48 @@ const BASE = import.meta.env.BASE_URL || '/'
 // 解像度（端末のピクセル密度の上限）。荒さ低減のため引き上げ。重い端末は下の自動調整で落とす。
 const DPR_BY_QUALITY = { soft: 3, standard: 2, light: 1.25 }
 
+// ── 後処理アンチエイリアス（FXAA）──
+// 情景はフルスクリーン三角形に手続き的に描かれるため、輪郭（step境界）がジャギる。
+// 一度オフスクリーンに描いてから FXAA で全輪郭をなめらかにし、画質の荒さを抑える。
+const FXAA_VS = /* glsl */ `
+  attribute vec2 aPosition;
+  void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
+`
+const FXAA_FS = /* glsl */ `
+  precision highp float;
+  uniform sampler2D uTex;
+  uniform vec2 uResolution;
+  void main() {
+    vec2 inv = 1.0 / uResolution;
+    vec2 uv = gl_FragCoord.xy * inv;
+    vec3 rgbM  = texture2D(uTex, uv).rgb;
+    vec3 rgbNW = texture2D(uTex, uv + vec2(-1.0, -1.0) * inv).rgb;
+    vec3 rgbNE = texture2D(uTex, uv + vec2( 1.0, -1.0) * inv).rgb;
+    vec3 rgbSW = texture2D(uTex, uv + vec2(-1.0,  1.0) * inv).rgb;
+    vec3 rgbSE = texture2D(uTex, uv + vec2( 1.0,  1.0) * inv).rgb;
+    vec3 luma = vec3(0.299, 0.587, 0.114);
+    float lM = dot(rgbM, luma);
+    float lNW = dot(rgbNW, luma), lNE = dot(rgbNE, luma);
+    float lSW = dot(rgbSW, luma), lSE = dot(rgbSE, luma);
+    float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
+    float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+    // 平坦な領域は処理しない（ノイズ/グレインを保つ・無駄な滲みを避ける）
+    if (lMax - lMin < 0.018) { gl_FragColor = vec4(rgbM, 1.0); return; }
+    vec2 dir;
+    dir.x = -((lNW + lNE) - (lSW + lSE));
+    dir.y =  ((lNW + lSW) - (lNE + lSE));
+    float reduce = max((lNW + lNE + lSW + lSE) * 0.25 * 0.125, 1.0 / 128.0);
+    float rcpMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);
+    dir = clamp(dir * rcpMin, -8.0, 8.0) * inv;
+    vec3 rA = 0.5 * (texture2D(uTex, uv + dir * (1.0 / 3.0 - 0.5)).rgb
+                   + texture2D(uTex, uv + dir * (2.0 / 3.0 - 0.5)).rgb);
+    vec3 rB = rA * 0.5 + 0.25 * (texture2D(uTex, uv + dir * -0.5).rgb
+                               + texture2D(uTex, uv + dir *  0.5).rgb);
+    float lB = dot(rB, luma);
+    gl_FragColor = vec4((lB < lMin || lB > lMax) ? rA : rB, 1.0);
+  }
+`
+
 function compile(gl, type, src) {
   const sh = gl.createShader(type)
   gl.shaderSource(sh, src)
@@ -35,6 +77,57 @@ export function createRenderer(canvas) {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
   }
   setupBuffer()
+
+  // ── FXAA 用のオフスクリーン（FBO＋カラーテクスチャ）と仕上げプログラム ──
+  let fxaaProgram = null
+  let fxaaLoc = {}
+  let fxaaAttrib = -1
+  let sceneAttrib = -1
+  let fbo = null
+  let fboTex = null
+  let fboW = 0
+  let fboH = 0
+  let aaEnabled = true // 品質 light では負荷を避けて素通し
+  function buildFxaa() {
+    const vs = compile(gl, gl.VERTEX_SHADER, FXAA_VS)
+    const fs = compile(gl, gl.FRAGMENT_SHADER, FXAA_FS)
+    if (!vs || !fs) return false
+    const p = gl.createProgram()
+    gl.attachShader(p, vs)
+    gl.attachShader(p, fs)
+    gl.linkProgram(p)
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      console.error('FXAAプログラムのリンクに失敗:', gl.getProgramInfoLog(p))
+      return false
+    }
+    fxaaProgram = p
+    fxaaAttrib = gl.getAttribLocation(p, 'aPosition')
+    fxaaLoc = {
+      uTex: gl.getUniformLocation(p, 'uTex'),
+      uResolution: gl.getUniformLocation(p, 'uResolution'),
+    }
+    return true
+  }
+  buildFxaa()
+  // オフスクリーンを画面サイズに合わせて確保（サイズ変化時のみ作り直す）
+  function ensureFBO(w, h) {
+    if (!fxaaProgram) return
+    if (!fbo) fbo = gl.createFramebuffer()
+    if (!fboTex || fboW !== w || fboH !== h) {
+      if (!fboTex) fboTex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, fboTex)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      fboW = w
+      fboH = h
+    }
+  }
 
   // パノラマ写真＋深度マップ（任意）。情景が pano を持つときだけ読み込む。
   let panoTex = null
@@ -137,6 +230,7 @@ export function createRenderer(canvas) {
     program = p
     gl.useProgram(program)
     const aPosition = gl.getAttribLocation(program, 'aPosition')
+    sceneAttrib = aPosition
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
     gl.enableVertexAttribArray(aPosition)
     gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0)
@@ -167,6 +261,7 @@ export function createRenderer(canvas) {
     }
     quality = q
     shaderType = type
+    aaEnabled = q !== 'light' && !!fxaaProgram // 低品質端末では後処理を省いて軽く保つ
     return true
   }
 
@@ -228,6 +323,17 @@ export function createRenderer(canvas) {
     panCur.x += gapX * 0.12
     panCur.y += gapY * 0.12
     const clampP = (v) => Math.max(-0.14, Math.min(0.14, v)) // 覗き込み視差の天井（身を乗り出す手応え・3D感）
+    // 情景プログラムを現用に戻し（前フレームの仕上げで FXAA が現用のため）、頂点を結び直す
+    gl.useProgram(program)
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.enableVertexAttribArray(sceneAttrib)
+    gl.vertexAttribPointer(sceneAttrib, 2, gl.FLOAT, false, 0, 0)
+    // アンチエイリアス時は一旦オフスクリーンへ描く
+    if (aaEnabled) {
+      ensureFBO(canvas.width, canvas.height)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+      gl.viewport(0, 0, canvas.width, canvas.height)
+    }
     gl.uniform2f(loc.uResolution, canvas.width, canvas.height)
     gl.uniform1f(loc.uTime, seconds)
     // ごく弱い“息づかい”の揺れ。静止画ではなく、その場に居る気配を出す（窓辺シリーズで効く）。
@@ -280,6 +386,20 @@ export function createRenderer(canvas) {
       gl.uniform3fv(loc.uDropTint, c.dropTint)
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    // 仕上げ: オフスクリーンを FXAA で画面へ（輪郭をなめらかに＝荒さ低減）
+    if (aaEnabled) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.viewport(0, 0, canvas.width, canvas.height)
+      gl.useProgram(fxaaProgram)
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+      gl.enableVertexAttribArray(fxaaAttrib)
+      gl.vertexAttribPointer(fxaaAttrib, 2, gl.FLOAT, false, 0, 0)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, fboTex)
+      gl.uniform1i(fxaaLoc.uTex, 0)
+      gl.uniform2f(fxaaLoc.uResolution, canvas.width, canvas.height)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
     rafId = requestAnimationFrame(render)
   }
 
@@ -313,12 +433,17 @@ export function createRenderer(canvas) {
     'webglcontextrestored',
     () => {
       setupBuffer()
-      // 喪失でテクスチャは無効化される。状態をリセットして現在の情景のパノラマを再ロード。
+      // 喪失でテクスチャ/FBOは無効化される。状態をリセットして作り直す。
       panoTex = null
       panoDepthTex = null
       panoReady = 0
       panoDepthReady = 0
       panoKey = null
+      fbo = null
+      fboTex = null
+      fboW = 0
+      fboH = 0
+      buildFxaa()
       if (buildProgram(quality, shaderType)) {
         if (scene) loadPano(scene)
         resize()
