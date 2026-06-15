@@ -11,6 +11,7 @@ export default {
   status: 'ready',
   render: 'kitateraoRooftop',
   intensityLabel: '街あかり',
+  panX: 3.0, // 屋上は見回しの可動域を広げてほぼ360°見渡せる
 
   palette: {
     early: {

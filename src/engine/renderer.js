@@ -379,6 +379,8 @@ export function createRenderer(canvas) {
       glassMode = glassOf(s)
       foliageMode = foliageOf(s)
       seasonMode = seasonOf(s)
+      // 見回しの可動域（情景ごと）。屋上などは広げてほぼ360°見渡せる。
+      PAN_LIMIT.x = (s && s.panX) || 2.6
       loadPano(s)
       // 情景を変えたら見回しを正面へ戻す
       panTarget.x = 0
@@ -399,6 +401,7 @@ export function createRenderer(canvas) {
       glassMode = glassOf(initialScene)
       foliageMode = foliageOf(initialScene)
       seasonMode = seasonOf(initialScene)
+      PAN_LIMIT.x = (initialScene && initialScene.panX) || 2.6
       loadPano(initialScene)
       if (!buildProgram(initialSettings.quality, initialScene.render || 'rainGlass')) return false
       resize()

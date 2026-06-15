@@ -178,6 +178,10 @@ export const GROUND_GLSL = /* glsl */ `
         bShadow = max(bShadow, step(yray + dd * sunElev, terrainH(nb) + _bH)); // 地形＋棟の高さで影
       }
       bld *= 1.0 - bShadow * 0.30;
+      // 坂の陰影: 建物の建つ斜面が太陽へ上るほど明るく、下るほど翳る＝地形と一貫した光
+      vec2 sdirB = vec2(-0.96 + sunAz * 0.6, 0.28) * 0.5;
+      float terrSunB = hTerr - terrainH(g0hit + sdirB);  // >0=太陽へ下る斜面=陰
+      bld *= 0.90 + 0.22 * clamp(0.5 - terrSunB * 1.3, 0.0, 1.0);
       // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る。深夜は消えていく。
       bld += winLit * roofness * step(0.62 - (0.2 + 0.2 * district) * nightAmt, h21(hGi + 11.0))
            * step(sleepDepth * 0.6, h21(hGi + 71.0))
