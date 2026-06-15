@@ -28,7 +28,9 @@ export default {
   driftPeriod: 320,
   phenomena: {},
 
+  // 夏の夜の街＝虫の音（コオロギ）＋ごく淡い夜風（既存のCC0素材を再利用）。
   sounds: [
-    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.16, loop: true },
+    { id: 'mushi', label: '虫の音', src: 'audio/autumn-dusk-corner-room/crickets.mp3', gain: 0.4, loop: true },
+    { id: 'wind', label: '夜風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.08, loop: true },
   ],
 }

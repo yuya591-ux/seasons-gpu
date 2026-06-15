@@ -29,8 +29,9 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 窓辺の風（既存のCC0素材を再利用）。
+  // 夏の昼下がりの街＝アブラゼミの蝉時雨＋ごく淡い風（既存のCC0素材を再利用）。
   sounds: [
-    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.14, loop: true },
+    { id: 'semi', label: '蝉', src: 'audio/summer-clear-noon/aburazemi.mp3', gain: 0.32, loop: true },
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.07, loop: true },
   ],
 }

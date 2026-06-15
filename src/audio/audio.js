@@ -60,6 +60,10 @@ export function createAudio(opts) {
         silentTag.setAttribute('webkit-playsinline', '')
         silentTag.muted = false
         silentTag.volume = 1 // 中身が無音なので可聴にはならないが「再生中」と認識させる
+        // 割り込み等で止められたら自動で再生し直す（消音スイッチ回避を維持）
+        const resume = () => { if (started) { const q = silentTag.play(); if (q && q.catch) q.catch(() => {}) } }
+        silentTag.addEventListener('pause', resume)
+        silentTag.addEventListener('ended', resume)
       }
       const p = silentTag.play()
       if (p && p.catch) p.catch(() => {})
@@ -73,7 +77,8 @@ export function createAudio(opts) {
     if (rearmBound) return
     rearmBound = true
     const rearm = () => {
-      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {})
+      // 'suspended' だけでなく iOS の 'interrupted'（電話/アラーム後）も起こし直す
+      if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
       if (started) unlockMediaSession()
     }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) rearm() })
@@ -89,6 +94,10 @@ export function createAudio(opts) {
     master = ctx.createGain()
     master.gain.value = 0.0001 // 無音から始めてフェードイン
     master.connect(ctx.destination)
+    // 割り込みで running から外れたら、復帰操作時に起こし直せるよう監視
+    ctx.onstatechange = () => {
+      if (started && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
+    }
     bindRearm()
   }
 
