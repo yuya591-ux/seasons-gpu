@@ -8,7 +8,7 @@ import { hexToRgb, mixRgb } from '../util/color.js'
 const BASE = import.meta.env.BASE_URL || '/'
 
 // 解像度（端末のピクセル密度の上限）。荒さ低減のため引き上げ。重い端末は下の自動調整で落とす。
-const DPR_BY_QUALITY = { soft: 3, standard: 2, light: 1.25 }
+const DPR_BY_QUALITY = { soft: 3, standard: 2.5, light: 1.5 }
 
 // ── 後処理アンチエイリアス（FXAA）──
 // 情景はフルスクリーン三角形に手続き的に描かれるため、輪郭（step境界）がジャギる。
@@ -35,8 +35,12 @@ const FXAA_FS = /* glsl */ `
     float lSW = dot(rgbSW, luma), lSE = dot(rgbSE, luma);
     float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
     float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
-    // 平坦な領域は処理しない（ノイズ/グレインを保つ・無駄な滲みを避ける）
-    if (lMax - lMin < 0.018) { gl_FragColor = vec4(rgbM, 1.0); return; }
+    // 平坦な領域は AA せず、ごく軽い先鋭化だけ（解像感を底上げ）
+    vec3 blur4 = (rgbNW + rgbNE + rgbSW + rgbSE) * 0.25;
+    if (lMax - lMin < 0.018) {
+      gl_FragColor = vec4(clamp(rgbM + (rgbM - blur4) * 0.18, 0.0, 1.0), 1.0);
+      return;
+    }
     vec2 dir;
     dir.x = -((lNW + lNE) - (lSW + lSE));
     dir.y =  ((lNW + lSW) - (lNE + lSE));
@@ -48,7 +52,10 @@ const FXAA_FS = /* glsl */ `
     vec3 rB = rA * 0.5 + 0.25 * (texture2D(uTex, uv + dir * -0.5).rgb
                                + texture2D(uTex, uv + dir *  0.5).rgb);
     float lB = dot(rB, luma);
-    gl_FragColor = vec4((lB < lMin || lB > lMax) ? rA : rB, 1.0);
+    vec3 aa = (lB < lMin || lB > lMax) ? rA : rB;
+    // アンシャープマスク（FXAA とソフトな手続き描画で失われた解像感を取り戻す＝くっきり）
+    aa += (aa - blur4) * 0.42;
+    gl_FragColor = vec4(clamp(aa, 0.0, 1.0), 1.0);
   }
 `
 
@@ -308,8 +315,8 @@ export function createRenderer(canvas) {
     lastFrame = now
     if (adaptCooldown > 0) {
       adaptCooldown--
-    } else if (frameEMA > 30 && renderScale > 0.85) {
-      renderScale = Math.max(0.85, renderScale - 0.08) // 33fps未満が続いたときだけ控えめに落とす
+    } else if (frameEMA > 32 && renderScale > 0.9) {
+      renderScale = Math.max(0.9, renderScale - 0.06) // 31fps未満が続いたときだけ控えめに落とす（解像感を優先し下げ幅は小さく）
       adaptCooldown = 100
     } else if (frameEMA < 15 && renderScale < 1.0) {
       renderScale = Math.min(1.0, renderScale + 0.08) // 余裕があれば速やかに戻す
