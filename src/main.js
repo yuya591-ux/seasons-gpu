@@ -235,6 +235,8 @@ function start() {
     window.__renderer = renderer
     window.__applyScene = (id) => applyScene(resolveScene(id), false)
     window.__sceneIds = SCENES.filter((s) => s.public !== false && s.status === 'ready').map((s) => s.id)
+    window.__sleepNow = () => startSleepFade() // 検証用: おやすみの暗転を即時に起こす
+    window.__sleepState = () => ({ fading: sleepFading, on: sleepOverlay.classList.contains('sleep-overlay--on') })
   }
 
   // 起動時の情景を適用（暗転なし。導入は起動ゲートが担う）
