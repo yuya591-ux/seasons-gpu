@@ -521,11 +521,20 @@ const FRAGMENT_BODY = /* glsl */ `
     float edgeDist = min(min(wp.x - winL, winR - wp.x), min(wp.y - winB, winT - wp.y));
     float intoRoom = clamp(-edgeDist, 0.0, 0.5);
     float nearWin = smoothstep(0.30, 0.0, intoRoom);
-    // 見込み（窓の縁のすぐ内側が壁の厚みで陰る＝開口の立体感）
-    float reveal = smoothstep(0.0, 0.03, intoRoom) * smoothstep(0.14, 0.035, intoRoom);
+    // 見込み（窓の縁のすぐ内側＝壁の厚み）。どの面かで方向のある陰影をつけ、開口が壁に深く切られた立体に。
+    float reveal = smoothstep(0.0, 0.03, intoRoom) * smoothstep(0.16, 0.035, intoRoom);
+    float dL = wp.x - winL, dR = winR - wp.x, dB = wp.y - winB, dT = winT - wp.y;
+    float mE = min(min(dL, dR), min(dB, dT));                 // = edgeDist（最も近い縁）
+    float isR = step(dR, mE + 0.0002);                        // 右の見込み面（西＝太陽を向く）
+    float isB = step(dB, mE + 0.0002);                        // 下の見込み（窓台＝空を向く）
+    float isL = step(dL, mE + 0.0002);                        // 左の見込み（東＝翳る）
+    float isT = step(dT, mE + 0.0002);                        // 上の見込み（下を向く＝翳る）
+    float jambLit = clamp(isR + isB, 0.0, 1.0);
+    float jambSh = clamp(isL + isT, 0.0, 1.0);
     vec3 interior = wallCol * (0.42 + 0.75 * nearWin);
     interior += uSunGlow * nearWin * 0.05;
-    interior *= 1.0 - reveal * 0.5;
+    interior += uSunGlow * reveal * jambLit * 0.10;           // 受光する見込み面（西日が回り込む）
+    interior *= 1.0 - reveal * (0.22 + 0.40 * jambSh);        // 翳る見込み面ほど暗く落ちる
     // 窓台（下の見込み＝水平面で外光を受けて明るい）
     float sillBand = smoothstep(winB, winB - 0.05, wp.y) * step(winL - 0.03, wp.x) * step(wp.x, winR + 0.03);
     interior = mix(interior, uSunGlow * 0.30 + vec3(0.045, 0.04, 0.045), sillBand * 0.6);
