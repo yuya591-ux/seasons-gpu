@@ -100,6 +100,13 @@ const FRAGMENT_BODY = /* glsl */ `
     float crestLine = sin(swuv.y * 4.5 - t * 0.6) * 0.5 + 0.5;
     float foam = smoothstep(0.74, 0.96, crestLine + ripple * 0.4) * smoothstep(0.30, 0.85, depth);
     water = mix(water, vec3(0.84, 0.88, 0.91), foam * 0.18);
+    // うねりの「面の傾き」で陰影と反射を変える＝平らな海でなく3Dに起伏して寄せる
+    float swellSlope = cos(swuv.y * 1.9 - t * 0.5) * 0.5
+                     + cos(swuv.y * 4.1 + swuv.x * 0.4 - t * 0.8) * 0.27;
+    water *= 1.0 + swellSlope * 0.10;                       // 受光する面は明るく、谷は翳る
+    // 水平線側へ立ち上がる面ほど空と夕陽を映す（フレネル×傾き）
+    float skyFace = smoothstep(-0.1, 0.6, swellSlope) * (0.35 + 0.65 * fres);
+    water = mix(water, mix(uHorizon, uSunGlow, sun * 0.5 + 0.15), skyFace * 0.12);
 
     vec3 col = (vp.y > horizon) ? sky : water;
     // 薄明光線（god rays）: 夕陽から放射する光の筋＝空の立体的な大気
