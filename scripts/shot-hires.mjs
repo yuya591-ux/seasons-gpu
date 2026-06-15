@@ -3,6 +3,7 @@ import { chromium } from 'playwright'
 const id = process.argv[2] || 'autumn-dusk-corner-room'
 const yaw = parseFloat(process.argv[3] || '0')   // 見回し（ヨー）。ランドマークを正面へ
 const pitch = parseFloat(process.argv[4] || '0') // 見上げ/見下ろし
+const outName = process.argv[5] || 'hires'        // 出力ファイル名（並行作業の衝突回避用）
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
 await page.goto('http://localhost:4790/seasons/?dev=1', { waitUntil: 'networkidle' })
@@ -19,6 +20,6 @@ if (yaw !== 0 || pitch !== 0) {
 }
 await page.addStyleTag({ content: '.ui{display:none !important}' })
 await page.waitForTimeout(200)
-await page.screenshot({ path: `scripts/_shots/hires.png` })
+await page.screenshot({ path: `scripts/_shots/${outName}.png` })
 await browser.close()
-console.log('hires:', id)
+console.log('hires:', id, '->', outName)

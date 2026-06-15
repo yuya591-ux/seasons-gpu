@@ -10,7 +10,7 @@ const lerp = (a, b, t) => a + (b - a) * t
 
 // トゥーンの段階を作る勾配テクスチャ（3段）。やわらかいセル影。
 function makeGradient(THREE) {
-  const data = new Uint8Array([150, 185, 220, 255]) // 影側を沈め過ぎない柔らかいトゥーン段階
+  const data = new Uint8Array([172, 198, 224, 255]) // 影側を黒く沈めない柔らかいトゥーン段階（くすみ防止）
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat)
   tex.needsUpdate = true
   tex.magFilter = THREE.NearestFilter
@@ -68,8 +68,8 @@ export async function mountTown3d(parent, opts = {}) {
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
-  // 空気遠近の霞（遠景をやわらかく溶かす。濁らせない程度に）
-  scene.fog = new THREE.Fog(skyHorizon.clone().lerp(skyTop, 0.3).getHex(), 36, 150)
+  // 空気遠近の霞（遠景をやわらかく。中景は溶かさず＝遠くまでくっきり見通せる）
+  scene.fog = new THREE.Fog(skyHorizon.clone().lerp(skyTop, 0.55).getHex(), 75, 300)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
   {
@@ -93,8 +93,9 @@ export async function mountTown3d(parent, opts = {}) {
   sun.shadow.camera.left = -60; sun.shadow.camera.right = 60
   sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60
   scene.add(sun)
-  scene.add(new THREE.HemisphereLight(skyTop.getHex(), 0x6b5a44, isNight ? 0.42 : 0.85))
-  scene.add(new THREE.AmbientLight(0xffffff, isNight ? 0.10 : 0.18))
+  // 空からの回り込み光（影側を黒く沈めない＝くすみ防止）。地面側は暖色で泥にしない。
+  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.3).getHex(), 0x8a7a60, isNight ? 0.5 : 1.05))
+  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.34))
   // 夜は月と星
   if (isNight) {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
@@ -131,8 +132,9 @@ export async function mountTown3d(parent, opts = {}) {
   }
   const winMapBase = makeWinTex(false, 1)
   const winEmis = [makeWinTex(true, 3), makeWinTex(true, 11), makeWinTex(true, 29), makeWinTex(true, 53)]
-  // 夕方度（空が暗いほど窓が灯る）
-  const duskAmt = Math.min(1, Math.max(0, 1.0 - skyTop.r * 0.9))
+  // 灯り度（空の明るさで決める。明るい昼=窓は灯らない／夕暮れ=ほのか／夜=煌々と）
+  const skyBright = (skyTop.r + skyTop.g + skyTop.b) / 3
+  const duskAmt = Math.min(1, Math.max(0, (0.56 - skyBright) * 2.4))
   const rng = (seed) => { let s = seed * 9301 + 49297; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280 } }
   const R = rng(7)
 
@@ -143,9 +145,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
   const heightAt = (x, z) => {
     let vy
-    if (z > 0) vy = z * 0.42 + 1.0                               // 手前の急な丘の肩（カメラ側ほど高い）
-    else if (z > -52) vy = z * 0.18                              // 谷へ下る斜面（街が駆け下る）
-    else vy = -52 * 0.18 + (-52 - z) * 0.5                        // 向かいの丘・遠山が立ち上がる
+    if (z > 0) vy = z * 0.38 + 1.0                               // 手前の丘の肩（カメラ側ほど高い）
+    else if (z > -52) vy = z * 0.17                              // 谷へ下る斜面（街が駆け下る）
+    else vy = -52 * 0.17 + (-52 - z) * 0.16                       // 向かいの丘がゆるやかに立ち上がる（空を塞がない）
     const bump = Math.sin(x * 0.06 + 1.0) * 1.5 + Math.cos(z * 0.05) * 1.7 + Math.sin((x + z) * 0.13) * 0.9
     return vy + bump
   }
@@ -159,15 +161,35 @@ export async function mountTown3d(parent, opts = {}) {
       pos.setY(i, heightAt(x, z))
     }
     g.computeVertexNormals()
-    const ground = new THREE.Mesh(g, toon(0x86a65c))
+    const ground = new THREE.Mesh(g, toon(0x7c9a54))
     ground.receiveShadow = true
     town.add(ground)
+  }
+  // 中央の通り（舗装。電柱が沿い、車・人が行き交う）。地形に沿うリボン。
+  {
+    const rg = new THREE.PlaneGeometry(7.5, 130, 1, 56); rg.rotateX(-Math.PI / 2)
+    const rp = rg.attributes.position
+    for (let i = 0; i < rp.count; i++) {
+      const lx = rp.getX(i), lz = rp.getZ(i)
+      rp.setY(i, heightAt(lx, lz - 35) + 0.07)
+    }
+    rg.computeVertexNormals()
+    const road = new THREE.Mesh(rg, toon(0x474750))
+    road.position.z = -35; road.receiveShadow = true; town.add(road)
+    // 横の通り（数本）
+    for (const cz of [-6, -28, -50]) {
+      const cg = new THREE.PlaneGeometry(120, 6, 48, 1); cg.rotateX(-Math.PI / 2)
+      const cp = cg.attributes.position
+      for (let i = 0; i < cp.count; i++) { const lx = cp.getX(i), lz = cp.getZ(i); cp.setY(i, heightAt(lx, lz + cz) + 0.06) }
+      cg.computeVertexNormals()
+      const cr = new THREE.Mesh(cg, toon(0x474750)); cr.position.z = cz; cr.receiveShadow = true; town.add(cr)
+    }
   }
 
   // ── 建物（低ポリの箱＋切妻屋根） ──
   const wallCols = [0xd8cfbf, 0xcdbfae, 0xc8c2b4, 0xbfb0a0, 0xd2c0a8]
   const roofCols = [0x4a5a72, 0x6a4a3a, 0x44506a, 0x7a4a44]
-  function house(x, z, w, d, h, gable) {
+  function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
     const wm = toon(wallCols[(R() * wallCols.length) | 0])
@@ -182,18 +204,31 @@ export async function mountTown3d(parent, opts = {}) {
     body.position.y = h / 2
     body.castShadow = true; body.receiveShadow = true
     g.add(body)
-    if (gable) {
-      // 切妻屋根（三角柱）
-      const rg = new THREE.CylinderGeometry(d * 0.62, d * 0.62, w, 3, 1)
-      rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
-      const roof = new THREE.Mesh(rg, toon(roofCols[(R() * roofCols.length) | 0]))
-      roof.position.y = h + d * 0.30
-      roof.scale.y = 0.7
-      roof.castShadow = true
-      g.add(roof)
-    } else {
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.02, 0.4, d * 1.02), toon(0x9a9488))
-      cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
+    if (type === 'house') {
+      // 切妻 or 寄棟の瓦屋根
+      const rc = roofCols[(R() * roofCols.length) | 0]
+      if (R() < 0.6) {
+        const rg = new THREE.CylinderGeometry(d * 0.62, d * 0.62, w, 3, 1)
+        rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
+        const roof = new THREE.Mesh(rg, toon(rc)); roof.position.y = h + d * 0.30; roof.scale.y = 0.7; roof.castShadow = true; g.add(roof)
+      } else {
+        const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.74, d * 0.62, 4); rg.rotateY(Math.PI / 4)
+        const roof = new THREE.Mesh(rg, toon(rc)); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
+      }
+    } else if (type === 'apt') {
+      // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.5, d * 1.04), toon(0x8a8478)); cap.position.y = h + 0.25; cap.castShadow = true; g.add(cap)
+      const floors = Math.max(2, Math.round(h / 2.8))
+      const balMat = toon(0xbcb6a8), railMat = toon(0x68686c)
+      for (let f = 1; f < floors; f++) {
+        const yy = f * (h / floors)
+        const slab = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.18, 0.85), balMat); slab.position.set(0, yy, d / 2 + 0.38); g.add(slab)
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.5, 0.1), railMat); rail.position.set(0, yy + 0.32, d / 2 + 0.78); g.add(rail)
+      }
+    } else { // mid: 陸屋根＋塔屋＋屋上の水タンク
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(0x9a9488)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
+      const ph = new THREE.Mesh(new THREE.BoxGeometry(w * 0.32, 1.8, d * 0.32), toon(0x8a8478)); ph.position.set(-w * 0.2, h + 1.1, -d * 0.1); ph.castShadow = true; g.add(ph)
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(d * 0.17, d * 0.17, 1.5, 8), toon(0x6e6a64)); tank.position.set(w * 0.24, h + 1.0, d * 0.2); tank.castShadow = true; g.add(tank)
     }
     g.position.set(x, gy, z)
     g.rotation.y = (R() - 0.5) * 0.5
@@ -204,20 +239,23 @@ export async function mountTown3d(parent, opts = {}) {
   for (let zi = -11; zi <= 2; zi++) {
     for (let xi = -8; xi <= 8; xi++) {
       if (Math.abs(xi) < 1.6 && zi > -3) continue // 手前中央は道（街を見通す抜け）
-      if (R() < 0.14) continue // 密な街（抜けは少なめ）
+      if (R() < 0.08) continue // 密な街（抜けは僅か）
       const x = xi * 9 + (R() - 0.5) * 3
       const z = zi * 9 + (R() - 0.5) * 3
       const far = (zi + 11) / 13 // 0=奥 1=手前
       const w = lerp(3.2, 5.5, far) + R() * 1.4
       const d = lerp(3.2, 5.5, far) + R() * 1.4
-      const h = (R() < 0.16) ? lerp(8, 16, R()) : lerp(3, 6, far) + R() * 2
-      house(x, z, w, d, h, h < 7 && R() < 0.7)
+      // 高さの分布を広げ、均質な高層の壁を避ける（低い家が主役・たまに中層/団地）
+      const tall = R() < 0.12
+      const h = tall ? lerp(8, 18, R() * R()) : lerp(2.6, 5.5, far) + R() * 2.2
+      const type = h > 8.5 ? (R() < 0.55 ? 'apt' : 'mid') : (R() < 0.22 ? 'apt' : 'house')
+      house(x, z, w, d, h, type)
     }
   }
 
   // ── 自分の丘の近所（手前の両脇の家。緑だけの近景を埋め、自分も坂の街に居る感じに） ──
   for (const c of [[-13, 24], [13, 25], [-19, 19], [20, 20], [-10, 28], [11, 29]]) {
-    house(c[0], c[1], 5 + R() * 1.5, 5 + R() * 1.5, 4 + R() * 2, R() < 0.7)
+    house(c[0], c[1], 5 + R() * 1.5, 5 + R() * 1.5, 4 + R() * 2, R() < 0.7 ? 'house' : 'apt')
   }
 
   // ── 大きなランドマーク（大型スーパー＝平らな大箱＋駐車場＋屋上看板） ──
@@ -241,17 +279,17 @@ export async function mountTown3d(parent, opts = {}) {
     }
     g.position.set(x, gy, z); g.rotation.y = -0.3; town.add(g)
   }
-  // ── パチンコ屋（けばけばしい外装＋縦長のネオン塔看板＋色の輪が灯る） ──
+  // ── パチンコ屋（建物＋縦長の袖看板。夜/夕にだけネオンが煌々と灯る。昼は派手にしない） ──
   {
     const x = -22, z = -28, gy = heightAt(x, z)
-    const b = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 7), toon(0xb0788c))
-    b.position.set(x, gy + 3, z); b.castShadow = true; town.add(b)
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(1.5, 13, 1.5), new THREE.MeshBasicMaterial({ color: 0xff3a6a, fog: true }))
-    tower.position.set(x + 3.4, gy + 10.5, z); town.add(tower)
-    const ringC = [0xffe24a, 0x4ad0ff, 0xff5ad0, 0x6aff6a, 0xffa030]
-    for (let k = 0; k < 5; k++) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.22, 6, 14), new THREE.MeshBasicMaterial({ color: ringC[k], fog: true }))
-      ring.position.set(x + 3.4, gy + 5 + k * 1.9, z); ring.rotation.x = Math.PI / 2; town.add(ring)
+    const b = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 7), toon(0xa07888))
+    b.position.set(x, gy + 3, z); b.castShadow = true; b.receiveShadow = true; town.add(b)
+    const neonOn = duskAmt > 0.25
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 0.4), neonOn ? new THREE.MeshBasicMaterial({ color: 0xff5a7a, fog: true }) : toon(0xcc6a7a))
+    sign.position.set(x + 4.3, gy + 9, z); town.add(sign)
+    if (neonOn) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(2.7, 9.4, 0.18), new THREE.MeshBasicMaterial({ color: 0x6ad0ff, fog: true }))
+      edge.position.set(x + 4.3, gy + 9, z - 0.16); town.add(edge)
     }
   }
   // ── 新装開店の電気屋（バルーンの真下。カラフルな庇＋幟） ──
@@ -331,25 +369,32 @@ export async function mountTown3d(parent, opts = {}) {
   // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
   for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
 
-  // ── 祝賀のアドバルーン（紅白の気球＋係留索） ──
+  // ── 祝賀のアドバルーン（赤い気球＋下がる細い垂れ幕＋係留索）。小ぶりで本物らしく。 ──
+  const adBalloons = []
   {
-    const x = 12, z = -10, gy = heightAt(x, z)
-    const balloon = new THREE.Mesh(new THREE.SphereGeometry(2.4, 16, 12), toon(0xd83a30))
-    balloon.position.set(x, gy + 22, z); balloon.castShadow = false; town.add(balloon)
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(2.42, 2.42, 0.8, 16, 1, true), new THREE.MeshToonMaterial({ color: 0xf4f0e8, gradientMap: grad, side: THREE.DoubleSide }))
-    band.position.copy(balloon.position); town.add(band)
-    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 19, 4), new THREE.MeshBasicMaterial({ color: 0x555555, fog: true }))
-    rope.position.set(x, gy + 11, z); town.add(rope)
+    const x = 13, z = -16, gy = heightAt(x, z)
+    const balloon = new THREE.Mesh(new THREE.SphereGeometry(1.7, 16, 12), toon(0xcc3a30))
+    balloon.position.set(x, gy + 19, z); town.add(balloon); adBalloons.push(balloon)
+    const banner = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4.5, 0.1), toon(0xf2ede2))
+    banner.position.set(x, gy + 15.5, z); town.add(banner); adBalloons.push(banner)
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 13, 4), new THREE.MeshBasicMaterial({ color: 0x666666, fog: true }))
+    rope.position.set(x, gy + 12, z); town.add(rope)
   }
 
-  // ── 遠景の低ポリ山（街を囲む丘・尾根） ──
-  for (let i = 0; i < 7; i++) {
-    const ang = (i / 7) * Math.PI - Math.PI * 0.5
-    const dist = 120
-    const x = Math.sin(ang) * dist, z = -Math.cos(ang) * dist - 20
-    const m = new THREE.Mesh(new THREE.ConeGeometry(30 + R() * 20, 22 + R() * 18, 5), toon(0x6e7e62))
-    m.position.set(x, 6, z); m.rotation.y = R() * 6
-    scene.add(m)
+  // ── 遠景の低ポリ山（街の奥に重なる尾根。空気遠近で淡く青み＝奥行きの錨） ──
+  const mtnNear = skyHorizon.clone().lerp(new THREE.Color(0x6e7e62), 0.7)
+  const mtnFar = skyHorizon.clone().lerp(new THREE.Color(0x8a98a6), 0.5)
+  for (let layer = 0; layer < 2; layer++) {
+    const dist = layer === 0 ? 150 : 210
+    const baseY = layer === 0 ? 4 : 10
+    for (let i = 0; i < 9; i++) {
+      const ang = (i / 8 - 0.5) * Math.PI * 1.1
+      const x = Math.sin(ang) * dist + (R() - 0.5) * 30
+      const z = -Math.cos(ang) * dist - 30
+      const m = new THREE.Mesh(new THREE.ConeGeometry(42 + R() * 28, 34 + R() * 28, 5), toon((layer === 0 ? mtnNear : mtnFar).getHex()))
+      m.position.set(x, baseY, z); m.rotation.y = R() * 6
+      scene.add(m)
+    }
   }
 
   // ── ふわふわの雲（白い球の塊＝立体的な積雲） ──
