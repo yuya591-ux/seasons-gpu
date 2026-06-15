@@ -11,6 +11,7 @@ import { GLASS_GLSL } from './glass.js'
 import { GRADE_GLSL } from './grade.js'
 import { BIRDS_GLSL } from './birds.js'
 import { GODRAYS_GLSL } from './godrays.js'
+import { FRAME_GLSL } from './frame.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -169,9 +170,13 @@ const FRAGMENT_BODY = /* glsl */ `
       float rowH = 0.018 + valT * 0.045;                                  // 手前ほど畦の間隔が広い
       float row = floor(vp.y / rowH + worldX * 0.3);
       float rowf = fract(vp.y / rowH + worldX * 0.3);
-      float bund = smoothstep(0.0, 0.12, rowf) * smoothstep(0.0, 0.12, 1.0 - rowf); // 畦道（区画の縁）
+      float bund = smoothstep(0.0, 0.12, rowf) * smoothstep(0.0, 0.12, 1.0 - rowf); // 横の畦道
+      // 縦の畦道も入れて田を「2次元の区画」に（横縞だけのバーコード状を解消）
+      float plotX = worldX * (2.5 + valT * 3.0);
+      float vbund = smoothstep(0.0, 0.10, fract(plotX + row * 0.27)) * smoothstep(0.0, 0.10, 1.0 - fract(plotX + row * 0.27));
+      float bund2 = min(bund, vbund);
       // 区画ごとに「水田／青田」を抽選
-      float plot = floor(worldX * (2.5 + valT * 3.0)) + row * 7.0;
+      float plot = floor(plotX + row * 0.27) + row * 7.0;
       float wet = step(0.45, h21(vec2(plot, row)));
       // 水を張った田は鏡。空を上下反転して映し、風のさざ波でゆらぐ。
       float breeze = fbm(vec2((worldX) * 9.0 + t * 0.05 * mo, vp.y * 30.0)) - 0.5; // 風のさざ波
@@ -188,7 +193,7 @@ const FRAGMENT_BODY = /* glsl */ `
       float paddyGlint = smoothstep(0.42, 0.0, abs(ax - sunC.x)) * (0.55 + 0.45 * sin(breeze * 22.0));
       paddy += uSunGlow * wet * paddyGlint * 0.22; // 水面に朝陽
       vec3 bundC = mix(vec3(0.40, 0.36, 0.26), uHorizon * 0.4, 0.3);      // 畦道
-      vec3 valGround = mix(bundC, paddy, bund);
+      vec3 valGround = mix(bundC, paddy, bund2);
       col = mix(col, valGround, smoothstep(valHi + 0.01, valHi - 0.02, vp.y));
       // せせらぎ（谷を縫う細い流れ。きらめく）
       float brookX = sin(vp.y * 14.0 + 1.0) * 0.05 - 0.18;
@@ -275,13 +280,7 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * curtFolds);
     col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds) * (1.0 - uLeanOut));
 
-    float mx = 0.05, my = 0.05;
-    float fr = max(max(step(p.x, mx), step(1.0 - mx, p.x)), max(step(p.y, my), step(1.0 - my, p.y)));
-    float inner = smoothstep(mx, mx + 0.045, p.x) * smoothstep(mx, mx + 0.045, 1.0 - p.x) *
-                  smoothstep(my, my + 0.045, p.y) * smoothstep(my, my + 0.045, 1.0 - p.y);
-    col *= mix(0.85, 1.0, inner);
-    col = mix(col, vec3(0.06, 0.055, 0.06), fr);
-    col = mix(col, preFrame, uLeanOut);           // 身を乗り出す＝枠が消えて景色だけ
+    col = windowSash(col, p, preFrame, uLeanOut); // 窓辺の額装（全情景で統一）
 
     col = applyGrade(col, frag);
     // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす
@@ -303,6 +302,6 @@ const QUALITY_DEFINES = {
 
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n' + FRAME_GLSL + '\n  void main()')
   return defines + body
 }
