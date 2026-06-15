@@ -51,10 +51,22 @@ const FRAGMENT_BODY = /* glsl */ `
   }
 //__GROUND__
 
-  // 遠い緑の稜線
+  // 遠景の山なみ（盆地の街を囲む遠山）。3層の稜線、奥ほど青く霞む空気遠近で街が山へ収束する。
   vec3 hills(vec3 col, vec2 p, float wx, float ridgeY, vec3 hcol) {
-    float h = ridgeY + (fbm(vec2(wx * 1.3 + 5.0, 0.0)) - 0.5) * 0.10;
-    return mix(col, hcol, step(p.y, h));
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float depth = fi / 2.0;                            // 0=奥(遠) .. 1=手前(近)
+      float yb = ridgeY + 0.13 - depth * 0.085;          // 奥の尾根ほど高く立つ
+      float freq = mix(0.8, 2.0, depth);
+      float amp = mix(0.05, 0.12, depth);
+      float ridge = yb + (fbm(vec2(wx * freq + fi * 9.0, 0.0)) - 0.5) * amp * 2.0;
+      // 遠いほど青く霞むが、空よりは確かに濃いシルエットに（見えるように）
+      vec3 haze = mix(uSkyMid, hcol, 0.62);
+      vec3 c = mix(haze, hcol, depth);
+      c += uSunGlow * smoothstep(0.0, 0.5, wx + 0.4) * (1.0 - depth) * 0.05; // 奥の稜線に残照
+      col = mix(col, c, step(p.y, ridge));
+    }
+    return col;
   }
 
   // 住宅街の一区画。cell ごとに建物タイプ（一軒家/商店/アパート/中層/空き地）を抽選し、

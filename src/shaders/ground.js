@@ -131,6 +131,16 @@ export const GROUND_GLSL = /* glsl */ `
       // 雪が屋上に積もる（屋上面は厚く・壁の縁はうっすら）＝立体の雪化粧
       float snowB = step(1.5, glassMode);
       bld = mix(bld, vec3(0.88, 0.90, 0.96), snowB * (0.22 + 0.58 * roofness));
+      // 隣の棟が落とす影（太陽側に高い棟があれば、この面は翳る）＝棟どうしの立体
+      float bShadow = 0.0;
+      vec2 g0hit = vec2(horizAngle * hitZ, hitZ);
+      for (int s = 1; s <= 3; s++) {
+        float dd = float(s) * 0.5;
+        vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
+        cityCell(g0hit + vec2(-0.96, 0.28) * dd, _gi, _gf, _bH, _t, _m, _b, _d);
+        bShadow = max(bShadow, step(yray + dd * 0.55, _bH));
+      }
+      bld *= 1.0 - bShadow * 0.30;
       // 屋上の窓灯り/塔屋のあかり（夜）。賑わう街区ほど灯る
       bld += winLit * roofness * step(0.62 - (0.2 + 0.2 * district) * nightAmt, h21(hGi + 11.0))
            * smoothstep(0.34, 0.12, length(hGf - 0.5)) * (0.08 + 0.26 * nightAmt) * detail;
