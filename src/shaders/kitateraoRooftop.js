@@ -200,6 +200,18 @@ const FRAGMENT_BODY = /* glsl */ `
     // 鳥（はばたきながら弧を描いて屋上の空を渡る）
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, mo);
 
+    // ── 抜けの構造（柱・梁）。あなたが立つ7階の開けた区画の骨組み（最前景・固定） ──
+    // 部屋のない“骨抜け”の区画から景色を一望する手応え。
+    float pillarL = smoothstep(0.055, 0.035, abs(p.x - 0.085)) * step(0.16, p.y);
+    float pillarR = smoothstep(0.055, 0.035, abs(p.x - 0.915)) * step(0.16, p.y);
+    float beam = smoothstep(0.05, 0.03, abs(p.y - 0.93));
+    float frameM = clamp(max(max(pillarL, pillarR), beam), 0.0, 1.0);
+    vec3 frameC = mix(vec3(0.40, 0.38, 0.38), uHorizon * 0.3, 0.2);   // コンクリの柱・梁
+    frameC *= 0.86 + 0.14 * fbm(vec2(p.x * 22.0, p.y * 7.0));         // 打ちっぱなしのムラ・汚れ
+    frameC += uSunGlow * 0.10 * pillarL;                             // 左の柱に陽が回る
+    frameC *= mix(0.78, 1.0, smoothstep(0.16, 0.5, p.y));            // 下ほど陰
+    col = mix(col, frameC, frameM * 0.96);
+
     col = applyGrade(col, frag);
     // 「かすみを払う」: 水彩のモヤを払い、遠くまで見通す澄んだ眺めに
     vec3 clearV = (col - 0.42) * 1.24 + 0.42;
