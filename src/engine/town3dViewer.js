@@ -91,10 +91,11 @@ export async function mountTown3d(parent, opts = {}) {
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
   // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）。雪は濃く冷たく。
   const fogCol = weather === 'snow'
-    ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.55).getHex()
-    : skyHorizon.clone().lerp(skyTop, 0.5).getHex()
+    ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.5).getHex()
+    : skyHorizon.clone().lerp(skyTop, 0.42).getHex() // 地平の色をより残し、暖かな空気の層に
   // 霞を一段強め、中景の低ポリを空気遠近で溶かして奥行きと水彩感を出す（手前は鮮明に保つ）。
-  scene.fog = new THREE.Fog(fogCol, weather === 'snow' ? 40 : 50, weather === 'snow' ? 165 : 188)
+  // near を手前へ・far を近くへ寄せて、遠景〜中景がやわらかな大気に溶ける絵画的な奥行きにする。
+  scene.fog = new THREE.Fog(fogCol, weather === 'snow' ? 38 : 44, weather === 'snow' ? 158 : 172)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
   {
@@ -113,7 +114,7 @@ export async function mountTown3d(parent, opts = {}) {
   const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.4 : 0.92)
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
-  sun.shadow.mapSize.set(1024, 1024)
+  sun.shadow.mapSize.set(2048, 2048) // 影は一度だけ焼く静的影なので、高精細化しても実行時コストは増えない（精度↑）
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 160
   sun.shadow.camera.left = -60; sun.shadow.camera.right = 60
   sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60
