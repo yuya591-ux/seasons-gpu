@@ -139,24 +139,30 @@ export async function mountTown3d(parent, opts = {}) {
   const town = new THREE.Group()
   scene.add(town)
 
-  // ── 起伏する地面（坂の街＝丘を駆け下る緑〜土の地面） ──
+  // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
+  // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
+  const heightAt = (x, z) => {
+    let vy
+    if (z > 0) vy = z * 0.42 + 1.0                               // 手前の急な丘の肩（カメラ側ほど高い）
+    else if (z > -52) vy = z * 0.18                              // 谷へ下る斜面（街が駆け下る）
+    else vy = -52 * 0.18 + (-52 - z) * 0.5                        // 向かいの丘・遠山が立ち上がる
+    const bump = Math.sin(x * 0.06 + 1.0) * 1.5 + Math.cos(z * 0.05) * 1.7 + Math.sin((x + z) * 0.13) * 0.9
+    return vy + bump
+  }
+  // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
-    const g = new THREE.PlaneGeometry(260, 260, 48, 48)
+    const g = new THREE.PlaneGeometry(280, 300, 60, 64)
     g.rotateX(-Math.PI / 2)
     const pos = g.attributes.position
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i)
-      // 手前(z>0=カメラ側)が高く、奥(z<0)へ下る坂＋ゆるい起伏
-      const slope = -z * 0.10
-      const bump = Math.sin(x * 0.06 + 1.0) * 1.4 + Math.cos(z * 0.05) * 1.6 + Math.sin((x + z) * 0.13) * 0.8
-      pos.setY(i, slope + bump)
+      pos.setY(i, heightAt(x, z))
     }
     g.computeVertexNormals()
     const ground = new THREE.Mesh(g, toon(0x86a65c))
     ground.receiveShadow = true
     town.add(ground)
   }
-  const heightAt = (x, z) => -z * 0.10 + Math.sin(x * 0.06 + 1.0) * 1.4 + Math.cos(z * 0.05) * 1.6 + Math.sin((x + z) * 0.13) * 0.8
 
   // ── 建物（低ポリの箱＋切妻屋根） ──
   const wallCols = [0xd8cfbf, 0xcdbfae, 0xc8c2b4, 0xbfb0a0, 0xd2c0a8]
