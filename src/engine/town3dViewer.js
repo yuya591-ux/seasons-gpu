@@ -198,7 +198,7 @@ export async function mountTown3d(parent, opts = {}) {
   for (let zi = -11; zi <= 2; zi++) {
     for (let xi = -8; xi <= 8; xi++) {
       if (Math.abs(xi) < 1.6 && zi > -3) continue // 手前中央は道（街を見通す抜け）
-      if (R() < 0.26) continue
+      if (R() < 0.14) continue // 密な街（抜けは少なめ）
       const x = xi * 9 + (R() - 0.5) * 3
       const z = zi * 9 + (R() - 0.5) * 3
       const far = (zi + 11) / 13 // 0=奥 1=手前
@@ -244,6 +244,26 @@ export async function mountTown3d(parent, opts = {}) {
       const flag = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 0.7), toon(k % 2 ? 0xffffff : 0xd23a4a))
       flag.position.set(x + k * 1.8, gy + 1.2, z + 4.4); town.add(flag)
     }
+  }
+
+  // ── 鳥居（神社の入口。赤い門＝郷愁の目印） ──
+  {
+    const x = -14, z = -42, gy = heightAt(x, z)
+    const red = toon(0xc0392b)
+    for (const sx of [-2.6, 2.6]) {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 7.5, 8), red)
+      p.position.set(x + sx, gy + 3.75, z); p.castShadow = true; town.add(p)
+    }
+    const top = new THREE.Mesh(new THREE.BoxGeometry(8, 0.7, 1.1), red); top.position.set(x, gy + 7.4, z); top.castShadow = true; town.add(top)
+    const top2 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.45, 0.8), red); top2.position.set(x, gy + 6.3, z); town.add(top2)
+  }
+  // ── 商店街（小さな店が並ぶ一角＋色とりどりの庇） ──
+  for (let i = 0; i < 7; i++) {
+    const x = -34 + i * 5.2, z = -10, gy = heightAt(x, z)
+    const b = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.6, 4.4), toon(wallCols[i % wallCols.length]))
+    b.position.set(x, gy + 1.8, z); b.castShadow = true; b.receiveShadow = true; town.add(b)
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.35, 1.5), toon([0xc23a2c, 0x3a6a9a, 0x3e8a4a, 0xd8a030][i % 4]))
+    aw.position.set(x, gy + 2.5, z + 2.4); town.add(aw)
   }
 
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
