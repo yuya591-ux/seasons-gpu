@@ -12,6 +12,7 @@ import autumnDuskCornerRoom from './autumn-dusk-corner-room.js'
 import autumnRainNightCornerRoom from './autumn-rain-night-corner-room.js'
 import summerMorningCornerRoom from './summer-morning-corner-room.js'
 import springDuskCornerRoom from './spring-dusk-corner-room.js'
+import springMorningCornerRoom from './spring-morning-corner-room.js'
 import winterSnowDuskCornerRoom from './winter-snow-dusk-corner-room.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
@@ -29,6 +30,7 @@ export const SCENES = [
   autumnRainNightCornerRoom,
   summerMorningCornerRoom,
   springDuskCornerRoom,
+  springMorningCornerRoom,
   winterSnowDuskCornerRoom,
   panoDemo,
   splatDemo,
