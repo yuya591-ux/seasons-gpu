@@ -1,6 +1,7 @@
 // 情景レジストリ。新しい情景の追加は「データファイルを作って、ここに1行 import で足す」だけ。
 // 既存は一切触らない（非破壊・疎結合）。
 
+import photoWindowTown from './photo-window-town.js'
 import summerRainDusk from './summer-rain-dusk.js'
 import summerRainNight from './summer-rain-night.js'
 import summerClearNoon from './summer-clear-noon.js'
@@ -29,6 +30,8 @@ import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
 
 export const SCENES = [
+  // 実写の窓（Flux写真が主役）＝最も実写。ショーケースとして先頭に。
+  photoWindowTown,
   // 本物の3Dの坂の街（四季）＝アプリの主役。ギャラリーの先頭に並べて第一印象にする。
   kitateraoWindow3d,
   kitateraoWindow3dNight,

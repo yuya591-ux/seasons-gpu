@@ -10,6 +10,7 @@ import * as windowPano from './windowPano.js'
 import * as cornerRoom from './cornerRoom.js'
 import * as shishigaya from './shishigaya.js'
 import * as kitateraoRooftop from './kitateraoRooftop.js'
+import * as photoWindow from './photoWindow.js'
 
 export const SHADERS = {
   rainGlass, // 窓ガラスの雨
@@ -21,6 +22,7 @@ export const SHADERS = {
   cornerRoom, // 高台の角部屋（室内＋窓＋街＋隣の壁の遮蔽）
   shishigaya, // 鶴見・獅子ヶ谷の谷戸（出身地の再現）
   kitateraoRooftop, // 北寺尾の屋上パノラマ（馴染みの一望風景）
+  photoWindow, // 実写の窓（Flux生成の写真を主役にした窓辺）
 }
 
 /** render 種別からシェーダーを引く（未知なら雨ガラスにフォールバック）。 */

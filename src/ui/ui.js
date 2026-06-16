@@ -64,7 +64,7 @@ export function buildUI(opts) {
   requestAnimationFrame(() => gate.focus())
 
   // 見回せる情景（窓辺シリーズ）だけでヒントを出す
-  const LOOKABLE = ['cornerRoom', 'windowTown', 'windowMountains', 'windowSea', 'windowPano', 'town3d']
+  const LOOKABLE = ['cornerRoom', 'windowTown', 'windowMountains', 'windowSea', 'windowPano', 'town3d', 'photoWindow']
   // 初回のみ: 「見回せる」ことをそっと伝える（localStorageで2回目以降は出さない）
   function maybeShowLookHint() {
     if (!LOOKABLE.includes(currentScene.render)) return // 見回せない情景では出さない
