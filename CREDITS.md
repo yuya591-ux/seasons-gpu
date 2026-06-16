@@ -106,6 +106,7 @@
 | --- | --- | --- | --- |
 | 「夏の雨、夕暮れ」窓の外 | `public/bg/summer-rain-dusk-b.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 12・1280×768 |
 | 「夏の雨の夜」窓の外 | `public/bg/summer-rain-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 33・1280×768 |
+| 「秋の雨、夕暮れ」窓の外（雨ガラス越し・水彩寄り） | `public/bg/autumn-rain-dusk.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 71・縦580×1015（超解像なし＝雨で和らぐ画調を維持） |
 | 「北寺尾の窓辺、立体の街」奥の実写遠景 | `public/bg/town3d-day.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 5・1536×640 |
 | 「立体の街（夜）」奥の実写遠景 | `public/bg/town3d-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 6・1536×640 |
 | 「立体の街（紅葉）」奥の実写遠景 | `public/bg/town3d-autumn.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 8・1536×640 |
@@ -132,6 +133,7 @@
 - プロンプト（実写の窓・春の朝）: `photorealistic photograph view from a window of a quiet Japanese residential neighborhood on a spring morning, cherry blossom trees in soft pink full bloom, low tiled-roof houses and a narrow lane, gentle warm morning sunlight with light haze, distant green hills, calm nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（実写の窓・秋の紅葉）: `photorealistic photograph view from a window of a quiet Japanese residential neighborhood in autumn, vivid red and orange maple foliage, low tiled-roof houses and a narrow sloping lane, warm late afternoon sunlight and light haze, distant hills in autumn colors, calm nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（実写の窓・雪の里）: `photorealistic photograph view from a window of a quiet Japanese mountain village in winter, fresh snow covering low tiled roofs and a narrow lane, bare trees and a few evergreens, soft overcast snowy light, gentle falling snow, distant white hills fading into haze, calm nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
+- プロンプト（秋の雨、夕暮れ＝雨ガラスの水彩寄り背景）: `watercolor and soft realism blend, nostalgic Japanese countryside town in autumn at dusk, glowing amber and crimson sunset sky, distant blurred rooftops and red-orange autumn trees along the bottom, soft hazy rainy atmosphere, melancholic calm, muted dusty autumn colors, painterly bokeh, no people, no text`
 - プロンプト（立体の街の奥の実写遠景）: `photographic hazy distant view of a sprawling Japanese hillside residential town, low houses and small apartment blocks climbing green forested hills, soft summer afternoon haze, muted nostalgic tones, deep atmospheric perspective, gentle soft focus in the far distance, realistic, no text, no people, no watermark`
 - 生成サービス: Pollinations.AI（https://pollinations.ai/ ・オープンソース）。**無料の Flux モデルのみ**使用（有料モデル・課金は使わない）。生成は無料の Seed ティアのトークンで実施（鍵は `scripts/.pollinations-token`＝`.gitignore` 済でGit非公開）。
 - 扱い: AIによる生成物（オリジナルの雰囲気。既存作品の固有の絵・キャラは模さない）。個人の趣味・非公開用途。手前の雨はシェーダーのまま、奥の背景としてのみ重ねる。
