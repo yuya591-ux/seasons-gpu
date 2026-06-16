@@ -730,6 +730,32 @@ export async function mountTown3d(parent, opts = {}) {
     const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.32, 8), potMat); pot.position.set(px, py + 0.16, pz); pot.castShadow = true; town.add(pot)
     const pl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25 + R() * 0.1, 0), potGreens[(R() * potGreens.length) | 0]); pl.position.set(px, py + 0.48, pz); pl.scale.y = 1.2; pl.castShadow = true; town.add(pl)
   }
+  // ── 赤い丸ポスト（日本の街の象徴。通り沿いに1本） ──
+  {
+    const px = 4.0, pz = -8, py = heightAt(px, pz)
+    const g = new THREE.Group(); g.position.set(px, py, pz)
+    const red = toon(0xb83128)
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8), red); leg.position.y = 0.2; g.add(leg)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 1.5, 12), red); body.position.y = 0.95; body.castShadow = true; g.add(body)
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), red); dome.position.y = 1.7; g.add(dome)
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 0.05), toon(0x201a18)); slot.position.set(0, 1.36, 0.33); g.add(slot) // 投函口
+    town.add(g)
+  }
+  // ── 停止線（横断歩道の手前・白い太線＝近景の路面標示） ──
+  {
+    const sz = -1.3
+    const line = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.03, 0.42), new THREE.MeshLambertMaterial({ color: 0xc8c4ba }))
+    line.position.set(-1.6, heightAt(-1.6, sz) + 0.085, sz); town.add(line)
+  }
+  // ── バス停の標識（細い支柱＋丸看板＝通りの生活感） ──
+  {
+    const px = -4.2, pz = -26, py = heightAt(px, pz)
+    const g = new THREE.Group(); g.position.set(px, py, pz)
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 6), toon(0x9a9488)); pole.position.y = 1.3; pole.castShadow = true; g.add(pole)
+    const sign = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 16), toon(0xe8e2d0)); sign.rotation.x = Math.PI / 2; sign.position.set(0, 2.5, 0.1); g.add(sign)
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 8, 20), toon(0x3a6a4a)); ring.position.set(0, 2.5, 0.16); g.add(ring)
+    town.add(g)
+  }
   } // ← 建物・ランドマーク（街のみ）ここまで
 
   // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
