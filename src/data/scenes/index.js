@@ -6,6 +6,8 @@ import photoWindowDusk from './photo-window-dusk.js'
 import photoWindowNight from './photo-window-night.js'
 import photoWindowSea from './photo-window-sea.js'
 import photoWindowSpring from './photo-window-spring.js'
+import photoWindowWinter from './photo-window-winter.js'
+import photoWindowAutumn from './photo-window-autumn.js'
 import summerRainDusk from './summer-rain-dusk.js'
 import summerRainNight from './summer-rain-night.js'
 import summerClearNoon from './summer-clear-noon.js'
@@ -40,6 +42,8 @@ export const SCENES = [
   photoWindowNight,
   photoWindowSea,
   photoWindowSpring,
+  photoWindowAutumn,
+  photoWindowWinter,
   // 本物の3Dの坂の街（四季）＝アプリの主役。ギャラリーの先頭に並べて第一印象にする。
   kitateraoWindow3d,
   kitateraoWindow3dNight,
