@@ -435,6 +435,8 @@ export async function mountTown3d(parent, opts = {}) {
   const roofMats = roofCols.map((c) => mottleMat(c, 60, 0.13, [3, 2]))
   // 屋上・壁の雑多な設備（室外機/水タンク/塔屋/アンテナ）の共有マテリアル＝見下ろしの密度＝実写の生活感。
   const acMat = toon(0xd8d4c6), tankMat = toon(0x6e6a64), phMat = toon(0x8a8478), antMat = toon(0x46464c)
+  // 屋上に干す布団の色（くすんだ生活色・上から見下ろす窓に映える彩り）。共有マテリアルで描画数を抑える。
+  const futonMats = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xd8c8a0, 0xb0b8a8, 0xd0cabc].map(toon)
   // 陸屋根の屋上に雑多な設備を載せる（共有マテリアルで描画数を抑える）。
   function addRoofClutter(g, w, d, h) {
     const ph = new THREE.Mesh(new THREE.BoxGeometry(w * 0.3, 1.6, d * 0.3), phMat) // 塔屋（階段室）
@@ -449,6 +451,15 @@ export async function mountTown3d(parent, opts = {}) {
     if (R() < 0.55) { // アンテナ（細い支柱）
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 4), antMat)
       pole.position.set(-w * 0.3, h + 1.5, d * 0.25); g.add(pole)
+    }
+    // 屋上に布団を干す（平らな色面＝窓から見下ろすと映える生活の彩り。昭和平成の風物詩）。晴天の昼夕のみ・雪は除く。
+    if (!SNOW && R() < 0.5) {
+      const nf = 1 + ((R() * 3) | 0)
+      for (let i = 0; i < nf; i++) {
+        const fw = w * 0.26 + R() * w * 0.16, fd = d * 0.34 + R() * d * 0.12
+        const fut = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.09, fd), futonMats[(R() * futonMats.length) | 0])
+        fut.position.set((R() - 0.5) * w * 0.5, h + 0.07, (R() - 0.5) * d * 0.45); fut.castShadow = true; g.add(fut)
+      }
     }
   }
   function house(x, z, w, d, h, type) {
