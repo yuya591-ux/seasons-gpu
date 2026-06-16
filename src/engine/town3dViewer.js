@@ -1005,16 +1005,25 @@ export async function mountTown3d(parent, opts = {}) {
   if (kind !== 'yato') {
   const carCols = [0xb0564a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0xc8b84a]
   cars = []
+  const wheelMat = toon(0x18181c), glassMat = toon(0x8aa2b4)
   for (let i = 0; i < 6; i++) {
     const g = new THREE.Group()
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 3.4), toon(carCols[i % carCols.length]))
-    body.position.y = 0.55; body.castShadow = true; g.add(body)
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 1.7), toon(0x26323e)); cab.position.set(0, 1.05, -0.1); g.add(cab)
+    const col = carCols[i % carCols.length]
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 3.4), toon(col))
+    body.position.y = 0.66; body.castShadow = true; g.add(body)
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.54, 0.52, 1.8), glassMat); cabin.position.set(0, 1.12, -0.1); g.add(cabin) // 窓(水色ガラス)
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.12, 1.55), toon(col)); roof.position.set(0, 1.42, -0.1); roof.castShadow = true; g.add(roof) // 屋根(車体色)
+    for (const wx of [-0.82, 0.82]) for (const wz of [-1.05, 1.1]) { // 4輪
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 8), wheelMat)
+      wheel.rotation.z = Math.PI / 2; wheel.position.set(wx, 0.32, wz); g.add(wheel)
+    }
     const dir = (i % 2 === 0) ? 1 : -1
-    if (duskAmt > 0.2) { // ライト
-      const lc = dir > 0 ? 0xfff0c0 : 0xff5a3a
-      const light = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 0.1), new THREE.MeshBasicMaterial({ color: lc, fog: true }))
-      light.position.set(0, 0.5, dir > 0 ? -1.7 : 1.7); g.add(light)
+    // テールランプ（赤・常時）
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.16, 0.08), new THREE.MeshBasicMaterial({ color: 0xc23a2c, fog: true }))
+    tail.position.set(0, 0.6, dir > 0 ? 1.72 : -1.72); g.add(tail)
+    if (duskAmt > 0.2) { // ヘッドライト（夕/夜）
+      const light = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }))
+      light.position.set(0, 0.58, dir > 0 ? -1.72 : 1.72); g.add(light)
     }
     g.userData = { dir, lane: dir > 0 ? -1.5 : 1.5, speed: 7 + R() * 5, z: -90 + R() * 110 }
     town.add(g); cars.push(g)
@@ -1022,12 +1031,16 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 歩く住民（歩道を行き交う小さな人影） ──
   const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8]
+  const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24]
+  const skinMat = toon(0xf0c49c)
   peeps = []
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 11; i++) {
     const g = new THREE.Group()
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.7, 3, 6), toon(peepCols[i % peepCols.length]))
-    body.position.y = 0.7; body.castShadow = true; g.add(body)
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), toon(0xf0c49c)); head.position.y = 1.35; g.add(head)
+    const legs = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.58, 0.32), toon(pantsCols[(R() * pantsCols.length) | 0])); legs.position.y = 0.4; legs.castShadow = true; g.add(legs) // ズボン
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.42, 3, 6), toon(peepCols[i % peepCols.length])); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 上着
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 8, 6), skinMat); head.position.y = 1.42; g.add(head)
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.245, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.62), toon(hairCols[(R() * hairCols.length) | 0])); hair.position.y = 1.45; g.add(hair) // 髪
+    g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
     const dir = (i % 2 === 0) ? 1 : -1
     g.userData = { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 }
     town.add(g); peeps.push(g)
