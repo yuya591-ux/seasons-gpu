@@ -813,15 +813,18 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
   const trunkMat = toon(0x6b4a2e)
-  // 季節で葉の色を替える（春=桜と新緑の混在／秋=紅葉／冬=暗い常緑／夏=緑）
-  const leafMats =
+  // 季節で葉色を「下＝陰の濃い色／上＝陽の当たる淡い色」の対で持つ＝樹冠に陰影の立体（綿玉のベタ球を脱す）。
+  // 同じ添字どうしが対（春の桜/新緑、秋の紅葉/常緑…「種」が揃う）。春=桜と新緑、秋=紅葉＋常緑、冬=暗い常緑、夏=緑。
+  const [leafBase, leafHi] =
     season === 'spring'
-      ? [toon(0xe9b8cf), toon(0xf0c8d8), toon(0x8fb06a), toon(0xe6acc6), toon(0x7fa05c)]
+      ? [[0xd99cb8, 0xcf90ad, 0x7fa05c, 0xd29ab4], [0xf3d4e2, 0xf7e6ee, 0x9ec078, 0xedccdc]] // 桜（陰の薔薇色→陽の白桜）＋新緑
       : season === 'autumn'
-        ? [toon(0xc97a3a), toon(0xd89a4a), toon(0xa85a36), toon(0x8a7a3e), toon(0x4e6048), toon(0x586a50)] // 紅葉に常緑(杉/松)を混ぜる＝赤の中の緑で里山のリアリティ
+        ? [[0xb86a32, 0xa85a36, 0x9a6a30, 0x4e6048, 0x586a50], [0xe0a858, 0xd89a4a, 0xc98a40, 0x687a54, 0x70845a]] // 紅葉＋常緑(杉松)
         : weather === 'snow'
-          ? [toon(0x4e6048), toon(0x586a50), toon(0x44543e)]
-          : [toon(0x5c7c46), toon(0x6f9050), toon(0x4f6e3e)]
+          ? [[0x44543e, 0x4e6048, 0x42503c], [0x586a50, 0x627458, 0x54664e]]
+          : [[0x4f6e3e, 0x547640, 0x5c7c46], [0x6f9050, 0x7a9c5a, 0x82a262]]
+  const leafBaseMats = leafBase.map(toon)
+  const leafHiMats = leafHi.map(toon)
   const treesArr = []
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
@@ -829,11 +832,18 @@ export async function mountTown3d(parent, opts = {}) {
     const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.38, 2.3, 7), trunkMat) // 幹を少し高く細く＝幹が見える
     tr.position.y = 1.15; tr.castShadow = true; g.add(tr)
     const r = 1.6 + R() * 1.4
-    // 葉は丸い塊を2房重ね、房ごとに葉色を選んで濃淡を出す＝角ばらず自然な樹冠（同色ベタの平面感を解消）。
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMats[(R() * leafMats.length) | 0])
-    leaf.position.y = 2.1 + r * 0.7; leaf.scale.set(1.05, 0.92 + R() * 0.18, 1.05); leaf.castShadow = true; g.add(leaf)
-    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.72, 1), leafMats[(R() * leafMats.length) | 0])
-    leaf2.position.set((R() - 0.5) * r * 0.95, 2.1 + r * 1.25, (R() - 0.5) * r * 0.9); leaf2.scale.set(1.0, 0.95, 1.0); leaf2.castShadow = true; g.add(leaf2) // 上の房（別の葉色で濃淡）
+    const ci = (R() * leafBaseMats.length) | 0 // 木ごとの「種」（下＝陰色／上＝陽色の対を揃える）
+    // 下の主房＝陰の濃い色。広く扁平に（樹冠は背より幅広く＝billowing、綿玉の真球を崩す）。
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafBaseMats[ci])
+    leaf.position.y = 2.1 + r * 0.62; leaf.scale.set(1.12, 0.84 + R() * 0.12, 1.12); leaf.castShadow = true; g.add(leaf)
+    // 上の房＝陽の当たる淡い色。上＋横へずらして陽だまりの片寄りと膨らみを出す（球の輪郭を崩す）。
+    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.74, 1), leafHiMats[ci])
+    leaf2.position.set((R() - 0.5) * r * 0.7, 2.1 + r * 1.18, (R() - 0.4) * r * 0.7); leaf2.scale.set(1.0, 0.95, 1.0); leaf2.castShadow = true; g.add(leaf2)
+    // 近景の額装木立(大)だけ、もう一房の小さな陽だまりを足して「綿玉」でなく房の重なりに（数本＝描画負荷僅か）。
+    if (scale > 1.4) {
+      const leaf3 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.5, 1), leafHiMats[ci])
+      leaf3.position.set((R() - 0.5) * r * 1.2, 2.1 + r * 0.95, (R() - 0.5) * r * 1.2); leaf3.castShadow = true; g.add(leaf3)
+    }
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
     treesArr.push(g)
