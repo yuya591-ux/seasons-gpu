@@ -116,6 +116,7 @@
 | 「実写の窓、夕暮れの町」窓の外（写真主役） | `public/bg/photo-window-dusk.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 31・Flux縦580×1015→4x超解像→幅1280 |
 | 「実写の窓、夕暮れの海辺」窓の外（写真主役） | `public/bg/photo-window-sea.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 33・Flux縦580×1015→4x超解像→幅1280 |
 | 「実写の窓、夜の町」窓の外（写真主役） | `public/bg/photo-window-night.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 32・Flux縦580×1015→4x超解像→幅1280 |
+| 「実写の窓、春の朝」窓の外（写真主役） | `public/bg/photo-window-spring.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 41・Flux縦580×1015→4x超解像→幅1280 |
 
 - 実写の窓（4枚）は当初 横1280×800 で生成していたが、縦長の窓に横画像を約3倍引き伸ばして表示しており画質が荒く見えた。
   窓の比率に合わせ「縦構図・写実（実写）寄り」で再生成（要求768×1344／無料枠の上限で縦580×1015に縮小・比率は保持）。
@@ -126,6 +127,7 @@
 - プロンプト（実写の窓・夕暮れ）: `photorealistic photograph view from a window of a quiet Japanese residential neighborhood at dusk, vivid glowing orange and pink sunset sky, low tiled-roof houses, wooden power poles and lines, a few warm window lights beginning to glow, distant hazy hills on the low horizon, nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（実写の窓・夕暮れの海辺）: `photorealistic photograph view from a window of a calm Japanese seaside town at golden dusk, distant calm sea and bright horizon line, small coastal houses with tiled roofs in the foreground, soft golden evening light reflecting on the water, gentle haze, nostalgic mood, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（実写の窓・夜の町）: `photorealistic photograph view from a window of a quiet Japanese residential street at night, many warm glowing house windows and a street lamp, deep blue night sky, silhouettes of tiled roofs and tangled power lines, distant town glow on the horizon, nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm night photo, no people, no text, no watermark`
+- プロンプト（実写の窓・春の朝）: `photorealistic photograph view from a window of a quiet Japanese residential neighborhood on a spring morning, cherry blossom trees in soft pink full bloom, low tiled-roof houses and a narrow lane, gentle warm morning sunlight with light haze, distant green hills, calm nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（立体の街の奥の実写遠景）: `photographic hazy distant view of a sprawling Japanese hillside residential town, low houses and small apartment blocks climbing green forested hills, soft summer afternoon haze, muted nostalgic tones, deep atmospheric perspective, gentle soft focus in the far distance, realistic, no text, no people, no watermark`
 - 生成サービス: Pollinations.AI（https://pollinations.ai/ ・オープンソース）。**無料の Flux モデルのみ**使用（有料モデル・課金は使わない）。生成は無料の Seed ティアのトークンで実施（鍵は `scripts/.pollinations-token`＝`.gitignore` 済でGit非公開）。
 - 扱い: AIによる生成物（オリジナルの雰囲気。既存作品の固有の絵・キャラは模さない）。個人の趣味・非公開用途。手前の雨はシェーダーのまま、奥の背景としてのみ重ねる。
