@@ -142,8 +142,8 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  /* 水彩グレード（彩度は控えめに＝原色のCG感を抑え、Fluxの柔らかい遠景にトーンを寄せる）。 */
-  filter: saturate(1.03) contrast(1.04);
+  /* ノスタルジー・グレード（彩度を少し落とし、暖かなセピアを薄く＝色褪せた郷愁の写真調・癒し）。 */
+  filter: saturate(0.95) sepia(0.12) contrast(1.02) brightness(1.02);
 }
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {
