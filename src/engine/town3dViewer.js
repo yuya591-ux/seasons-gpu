@@ -997,6 +997,183 @@ export async function mountTown3d(parent, opts = {}) {
   stage.appendChild(frame2)
   let clarityCur = -1
 
+  // ════════════════════════════════════════════════════════════════════════
+  // 「いつもと違う光景」定期イベント（ぼーっと眺めていると時々おきる小さな驚き）。
+  // 多重タイムスケール: 頻繁な小イベント〜まれな大当たり（雨上がりの虹・夜の花火）。数値で調整可。
+  // 各イベントは scene にメッシュを足し、寿命が尽きたら自分で取り除く（静的影は焼き済み＝影に不参加）。
+  // ════════════════════════════════════════════════════════════════════════
+  const fxList = []
+  const addFx = (fx) => { fx.age = 0; fxList.push(fx) }
+  const disposeObj = (o) => o.traverse((c) => {
+    if (c.geometry) c.geometry.dispose()
+    const m = c.material; if (m) { Array.isArray(m) ? m.forEach((x) => x.dispose()) : m.dispose() }
+  })
+  function updateFx(dt) {
+    for (let i = fxList.length - 1; i >= 0; i--) {
+      const fx = fxList[i]; fx.age += dt
+      let keep = true
+      try { keep = fx.update(fx.age, dt) !== false } catch (e) { keep = false }
+      if (!keep) { try { fx.cleanup() } catch (e) { /* 無視 */ } fxList.splice(i, 1) }
+    }
+  }
+  let rainActive = false // 雨は重複させない
+
+  // ── 雨が通り過ぎる（晴れでも一時的に降ってやむ）。奥が少しけむり、雨上がりに虹を呼ぶ ──
+  function evRain(dur = 30) {
+    if (rainActive) return
+    rainActive = true
+    const N = 700
+    const pos = new Float32Array(N * 3); const spd = new Float32Array(N)
+    for (let i = 0; i < N; i++) { pos[i * 3] = (R() - 0.5) * 210; pos[i * 3 + 1] = R() * 95; pos[i * 3 + 2] = -130 + R() * 190; spd[i] = 26 * (0.7 + R() * 0.6) }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const mat = new THREE.PointsMaterial({ color: 0xc0d0de, size: 0.7, transparent: true, opacity: 0, sizeAttenuation: true, fog: true, depthWrite: false })
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
+    const fogFar0 = scene.fog.far
+    let rbDone = false
+    addFx({
+      update: (age, dt) => {
+        const k = Math.min(1, age / 5) * Math.min(1, Math.max(0, (dur - age) / 8)) // 立ち上がり5s・終い8s
+        mat.opacity = 0.72 * k
+        scene.fog.far = fogFar0 * (1 - 0.16 * k) // 雨で奥がけむる
+        for (let i = 0; i < N; i++) { pos[i * 3 + 1] -= spd[i] * dt; pos[i * 3] += 3 * dt; if (pos[i * 3 + 1] < -14) { pos[i * 3 + 1] = 82 + R() * 16; pos[i * 3] = (R() - 0.5) * 210 } }
+        geo.attributes.position.needsUpdate = true
+        if (!rbDone && age >= dur - 7) { rbDone = true; evRainbow() } // 雨上がりに虹
+        if (age >= dur) { rainActive = false; scene.fog.far = fogFar0; return false }
+        return true
+      },
+      cleanup: () => { scene.remove(pts); geo.dispose(); mat.dispose(); scene.fog.far = fogFar0; rainActive = false },
+    })
+  }
+
+  // ── 雨上がりの虹（半円アーチ。赤(外)→紫(内)を計算で。淡くフェードイン/アウト） ──
+  function evRainbow() {
+    const inner = 80, outer = 102
+    const geo = new THREE.RingGeometry(inner, outer, 100, 1, 0, Math.PI) // 上半分の半円
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
+      uniforms: { uOp: { value: 0 }, uInner: { value: inner }, uOuter: { value: outer } },
+      vertexShader: 'varying float vR; void main(){ vR=length(position.xy); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
+      fragmentShader: 'varying float vR; uniform float uOp,uInner,uOuter;' +
+        'vec3 hsv(float h){ vec3 p=abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.); return clamp(p-1.,0.,1.); }' +
+        'void main(){ float rr=(vR-uInner)/(uOuter-uInner); float h=mix(0.78,0.0,rr);' +
+        'vec3 col=mix(vec3(1.0),hsv(h),0.78); float edge=smoothstep(0.0,0.12,rr)*(1.0-smoothstep(0.86,1.0,rr));' +
+        'gl_FragColor=vec4(col, edge*uOp); }',
+    })
+    const ring = new THREE.Mesh(geo, mat)
+    ring.position.set(0, -16, eye.z - 195) // 街の奥・地平から立ち上がる大アーチ（手前の建物に下部が隠れる＝奥にかかる虹。fog:false）
+    ring.frustumCulled = false
+    scene.add(ring)
+    const dur = 44
+    addFx({
+      update: (age) => { mat.uniforms.uOp.value = 0.5 * Math.min(1, age / 6) * Math.min(1, Math.max(0, (dur - age) / 16)); return age < dur },
+      cleanup: () => { scene.remove(ring); geo.dispose(); mat.dispose() },
+    })
+  }
+
+  // ── 渡り鳥の群れ（はばたきながら横切る） ──
+  function evBirdFlock() {
+    const g = new THREE.Group()
+    const mat = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3a4e : 0x39393f, fog: true })
+    const n = 14 + ((R() * 9) | 0); const sub = []
+    for (let i = 0; i < n; i++) {
+      const b = new THREE.Group()
+      for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.06, 0.42), mat); w.position.x = s * 0.62; w.userData.side = s; b.add(w) }
+      b.position.set((R() - 0.5) * 10, (R() - 0.5) * 5, (R() - 0.5) * 12); b.userData.ph = R() * 6.28; g.add(b); sub.push(b)
+    }
+    const dir = R() < 0.5 ? 1 : -1
+    // 縦長の窓は横画角が狭い（その奥行きで見える幅は ±約18）。少しだけ枠外から入れて確実に横切らせる。
+    g.position.set(dir > 0 ? -46 : 46, 46 + R() * 18, -38 - R() * 26); scene.add(g) // 空を背に飛ばす（山に紛れず映える）
+    addFx({
+      update: (age, dt) => { g.position.x += dir * 13 * dt; for (const b of sub) { const f = Math.sin(age * 9 + b.userData.ph) * 0.5; b.children.forEach((w) => { w.rotation.z = w.userData.side * f }) } return Math.abs(g.position.x) < 50 },
+      cleanup: () => { scene.remove(g); disposeObj(g) },
+    })
+  }
+
+  // ── 気球がふわりと横切る（昼） ──
+  function evBalloon() {
+    const g = new THREE.Group()
+    const hues = [0xd9694e, 0x4e84d9, 0x6ab04c, 0xe0b24a, 0xa066c0]
+    const env = new THREE.Mesh(new THREE.SphereGeometry(4.2, 16, 12), toon(hues[(R() * hues.length) | 0])); env.scale.y = 1.25; env.position.y = 5; g.add(env)
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.4), toon(0x6a4a2a)))
+    const dir = R() < 0.5 ? 1 : -1
+    // 縦長の窓は横画角が狭いので、見える幅の少し外から入れてゆっくり横断させる
+    g.position.set(dir > 0 ? -44 : 44, 26 + R() * 16, -48 - R() * 22); scene.add(g)
+    addFx({
+      update: (age, dt) => { g.position.x += dir * 6 * dt; g.position.y += 0.3 * dt; g.rotation.z = Math.sin(age * 0.5) * 0.05; return Math.abs(g.position.x) < 48 },
+      cleanup: () => { scene.remove(g); disposeObj(g) },
+    })
+  }
+
+  // ── 流れ星（夜・ひと筋の光が尾を引いて流れる） ──
+  function evShootingStar() {
+    const g = new THREE.Group()
+    const headMat = new THREE.MeshBasicMaterial({ color: 0xfffbe0, fog: false, transparent: true })
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), headMat))
+    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0, 11, 5.2, 0]), 3))
+    const trailMat = new THREE.LineBasicMaterial({ color: 0xfff0c0, transparent: true, fog: false })
+    g.add(new THREE.Line(tg, trailMat))
+    g.position.set(40 + R() * 40, 72 + R() * 18, -90 - R() * 30); scene.add(g)
+    const vx = -55 - R() * 20, vy = -26 - R() * 10, dur = 1.4
+    addFx({
+      update: (age, dt) => { g.position.x += vx * dt; g.position.y += vy * dt; const o = Math.max(0, 1 - age / dur); headMat.opacity = o; trailMat.opacity = o; return age < dur },
+      cleanup: () => { scene.remove(g); disposeObj(g) },
+    })
+  }
+
+  // ── 花火（夜・連発。色玉が開いて重力で散り、消える） ──
+  function evFireworks() {
+    const live = []; let bursts = 0, nextBurst = 0
+    const mkBurst = () => {
+      const N = 92, pos = new Float32Array(N * 3), vel = []
+      const cx = (R() - 0.5) * 60, cy = 56 + R() * 18, cz = -70 - R() * 30
+      for (let i = 0; i < N; i++) { pos[i * 3] = cx; pos[i * 3 + 1] = cy; pos[i * 3 + 2] = cz; const th = R() * 6.28, ph = Math.acos(2 * R() - 1), sp = 11 + R() * 7; vel.push([Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp]) }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+      const mat = new THREE.PointsMaterial({ color: new THREE.Color().setHSL(R(), 0.9, 0.62).getHex(), size: 1.5, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
+      const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
+      live.push({ pts, geo, mat, pos, vel, N, age: 0 })
+    }
+    const dur = 10
+    addFx({
+      update: (age, dt) => {
+        nextBurst -= dt
+        if (bursts < 4 && nextBurst <= 0) { mkBurst(); bursts++; nextBurst = 1.0 + R() * 1.3 }
+        for (let b = live.length - 1; b >= 0; b--) {
+          const B = live[b]; B.age += dt
+          for (let i = 0; i < B.N; i++) { B.vel[i][1] -= 9 * dt; B.pos[i * 3] += B.vel[i][0] * dt; B.pos[i * 3 + 1] += B.vel[i][1] * dt; B.pos[i * 3 + 2] += B.vel[i][2] * dt }
+          B.geo.attributes.position.needsUpdate = true; B.mat.opacity = Math.max(0, 1 - B.age / 2.5)
+          if (B.age > 2.5) { scene.remove(B.pts); B.geo.dispose(); B.mat.dispose(); live.splice(b, 1) }
+        }
+        return age < dur || live.length > 0
+      },
+      cleanup: () => { for (const B of live) { scene.remove(B.pts); B.geo.dispose(); B.mat.dispose() } },
+    })
+  }
+
+  // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
+  const EV = {
+    birds: { run: evBirdFlock },
+    balloon: { run: evBalloon, ok: () => !isNight },
+    star: { run: evShootingStar, ok: () => isNight },
+    rain: { run: () => evRain(30), ok: () => !rainActive },
+    fireworks: { run: evFireworks, ok: () => isNight },
+  }
+  const fxBands = [
+    { next: 9 + R() * 7, min: 16, max: 30, pool: ['birds', 'balloon', 'star'] },        // 頻繁（小さな驚き）
+    { next: 38 + R() * 28, min: 60, max: 130, pool: ['birds', 'balloon', 'star'] },      // 中
+    { next: 75 + R() * 80, min: 480, max: 1500, pool: ['rain', 'fireworks'] },           // まれ（大当たり＝雨→虹／花火）
+  ]
+  function scheduleFx(dt) {
+    for (const b of fxBands) {
+      b.next -= dt
+      if (b.next > 0) continue
+      b.next = b.min + R() * (b.max - b.min)
+      const ok = b.pool.filter((k) => { const e = EV[k]; return e && (!e.ok || e.ok()) })
+      if (ok.length) EV[ok[(R() * ok.length) | 0]].run()
+    }
+  }
+  // 検証用フック（dev）: 任意のイベントを即時に起こす
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, birds: evBirdFlock, balloon: evBalloon, star: evShootingStar, fireworks: evFireworks }[n] || (() => {}))()
+
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
@@ -1109,6 +1286,9 @@ export async function mountTown3d(parent, opts = {}) {
 
     // 雲がゆっくり流れる
     for (const c of clouds) { c.position.x += 0.01; if (c.position.x > 130) c.position.x = -130 }
+    // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
+    updateFx(dt)
+    scheduleFx(dt)
     renderer.render(scene, camera)
   }
   renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）

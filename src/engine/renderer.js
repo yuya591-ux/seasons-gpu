@@ -223,11 +223,19 @@ export function createRenderer(canvas) {
   let lastRenderTime = 0 // 約30fpsへ間引くための前回描画時刻（GPU負荷と発熱を半減）
   let adaptCooldown = 60
   // 窓を開ける（0=閉じてガラス越し, 1=開いて素通し）。トグルでなめらかに開閉。
+  // 3Dの街(town3dViewer)と「体感」を統一: 線形進行を一定速度で進め smoothstep(ease-in-out)をかける。
+  // 旧来の指数追従(*0.06)は出だしだけ急＝ease-outで戻りが不自然だった。全窓シーン共通の所要時間・ヌルヌル感に。
+  const easeInOut = (p) => p * p * (3 - 2 * p)
+  const approach = (p, target, step) => p + Math.sign(target - p) * Math.min(step, Math.abs(target - p))
+  const WIN_DUR = { open: 1.15, lean: 1.5 } // 窓あけ／乗り出しの所要時間(秒)＝town3dのCAMと同値
   let windowOpen = 0
   let windowOpenTarget = 0
+  let windowOpenP = 0 // 窓あけの線形進行(0..1)。これに ease-in-out をかけて windowOpen にする
   // 身を乗り出す（0=窓辺, 1=枠が消えて景色だけを180°見渡す）。開けた後の一段深いモード。
   let leanOut = 0
   let leanOutTarget = 0
+  let leanOutP = 0   // 乗り出しの線形進行(0..1)
+  let winPrevSec = 0 // 窓アニメ用の前フレーム時刻(秒)。経過時間でdtを取り、fpsに依らず一定速度に
   let basePanX = 2.6 // 情景ごとの基本可動域（lean-out で広げる）
 
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
@@ -384,8 +392,12 @@ export function createRenderer(canvas) {
       )
     }
     if (loc.uReduceMotion) gl.uniform1f(loc.uReduceMotion, reduceMotion ? 1 : 0)
-    windowOpen += (windowOpenTarget - windowOpen) * 0.06 // なめらかに開閉（少しゆっくり＝開閉が分かる）
-    leanOut += (leanOutTarget - leanOut) * 0.06
+    // 窓あけ／乗り出しを ease-in-out で開閉（town3dと同じ所要時間・出だしも止まり際もやわらか）
+    const dtW = Math.min(0.05, Math.max(0, seconds - winPrevSec)); winPrevSec = seconds
+    windowOpenP = approach(windowOpenP, windowOpenTarget, dtW / WIN_DUR.open)
+    leanOutP = approach(leanOutP, leanOutTarget, dtW / WIN_DUR.lean)
+    windowOpen = easeInOut(windowOpenP)
+    leanOut = easeInOut(leanOutP)
     if (loc.uWindowOpen) gl.uniform1f(loc.uWindowOpen, windowOpen)
     if (loc.uLeanOut) gl.uniform1f(loc.uLeanOut, leanOut)
     // 乗り出すと可動域を広げて景色を180°見渡せる
