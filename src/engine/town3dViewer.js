@@ -435,7 +435,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
   {
-    const vendCols = [0xcf3a3a, 0x3a6fcf, 0xe6e2d8, 0xcf8a2a]
+    const vendCols = [0xb24a44, 0x4a6692, 0xd6cebe, 0xbe9050] // くすんだ郷愁色（原色を抑える）
     for (let i = 0; i < 8; i++) {
       const side = R() < 0.5 ? -1 : 1
       const vx = side * (4.4 + R() * 1.6)
@@ -453,7 +453,7 @@ export async function mountTown3d(parent, opts = {}) {
   {
     const bushHex = season === 'spring' ? 0x7a9a4e : season === 'autumn' ? 0x977a3e : season === 'winter' ? 0x8a9488 : 0x5e7a44
     const bushMat = toon(bushHex)
-    const carCols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0x2a2a30]
+    const carCols = [0xb0564a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0x2a2a30]
     for (let i = 0; i < 14; i++) {
       const side = R() < 0.5 ? -1 : 1
       const bx = side * (5.2 + R() * 3.6)
@@ -475,7 +475,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   // ── 路沿いの小さな商店（庇＋袖看板。夕/夜は看板が灯る＝商店街の生活感） ──
-  for (const sc of [[-5.6, -16, 0xd6c4a0, 0xcf6a3a], [6, -30, 0xc8c0b0, 0x3a7a5a], [-6, -48, 0xd0c8b8, 0xc23a6a], [5.6, -60, 0xccc4b2, 0xcf9a2a]]) {
+  for (const sc of [[-5.6, -16, 0xcabfa6, 0xb0704a], [6, -30, 0xc0baa8, 0x5e7a5e], [-6, -48, 0xc6bdac, 0xa65a68], [5.6, -60, 0xc4bca8, 0xb09a58]]) { // 庇/看板はくすんだ郷愁色（原色のデバッグ感を排す）
     const sx = sc[0], sz = sc[1], gy = heightAt(sx, sz), facing = sx < 0 ? 1 : -1
     const b = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.3, 4), toon(sc[2])); b.position.set(sx, gy + 1.65, sz); b.castShadow = true; b.receiveShadow = true; town.add(b)
     const awn = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.4, 1.7), toon(sc[3])); awn.position.set(sx + facing * 1.1, gy + 2.45, sz); awn.rotation.z = facing * 0.12; awn.castShadow = true; town.add(awn)
@@ -498,7 +498,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 駐車場（店の手前の舗装）＋駐車中の車
     const lot = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 13), toon(0x63636b))
     lot.position.set(0, 0.15, 15); lot.receiveShadow = true; g.add(lot)
-    const pcols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a]
+    const pcols = [0xb0564a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a]
     for (let i = 0; i < 12; i++) {
       const car = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 3.2), toon(pcols[i % pcols.length]))
       car.position.set(-9.5 + (i % 6) * 3.8, 0.8, 12.5 + ((i / 6) | 0) * 4.5); car.castShadow = true; g.add(car)
@@ -723,7 +723,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 祝賀のアドバルーン（赤い気球＋下がる細い垂れ幕＋係留索）。小ぶりで本物らしく。街のみ。 ──
   if (kind !== 'yato') {
     const x = 13, z = -16, gy = heightAt(x, z)
-    const balloon = new THREE.Mesh(new THREE.SphereGeometry(1.7, 16, 12), toon(0xcc3a30))
+    const balloon = new THREE.Mesh(new THREE.SphereGeometry(1.7, 16, 12), toon(0xb84a3e))
     balloon.position.set(x, gy + 19, z); town.add(balloon); adBalloons.push(balloon)
     const banner = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4.5, 0.1), toon(0xf2ede2))
     banner.position.set(x, gy + 15.5, z); town.add(banner); adBalloons.push(banner)
@@ -823,7 +823,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 走る車・歩く住民（中央の通りを行き交う）。街のみ（谷戸では作らない）。 ──
   if (kind !== 'yato') {
-  const carCols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0xc8b84a]
+  const carCols = [0xb0564a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0xc8b84a]
   cars = []
   for (let i = 0; i < 6; i++) {
     const g = new THREE.Group()
