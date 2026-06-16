@@ -112,13 +112,16 @@
 | 「立体の街（花）」奥の実写遠景 | `public/bg/town3d-spring.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 7・1536×640 |
 | 「立体の街（雪）」奥の実写遠景 | `public/bg/town3d-snow.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 9・1536×640 |
 | 「谷戸（獅子ヶ谷）」奥の実写遠景 | `public/bg/town3d-yato.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 11・1536×640 |
-| 「実写の窓、夏の坂の町」窓の外（写真主役） | `public/bg/photo-window-town.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 21・縦580×1015（768×1344要求→無料枠で縮小） |
-| 「実写の窓、夕暮れの町」窓の外（写真主役） | `public/bg/photo-window-dusk.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 31・縦580×1015 |
-| 「実写の窓、夕暮れの海辺」窓の外（写真主役） | `public/bg/photo-window-sea.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 33・縦580×1015 |
-| 「実写の窓、夜の町」窓の外（写真主役） | `public/bg/photo-window-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 32・縦580×1015 |
+| 「実写の窓、夏の坂の町」窓の外（写真主役） | `public/bg/photo-window-town.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 21・Flux縦580×1015→4x超解像→幅1280 |
+| 「実写の窓、夕暮れの町」窓の外（写真主役） | `public/bg/photo-window-dusk.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 31・Flux縦580×1015→4x超解像→幅1280 |
+| 「実写の窓、夕暮れの海辺」窓の外（写真主役） | `public/bg/photo-window-sea.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 33・Flux縦580×1015→4x超解像→幅1280 |
+| 「実写の窓、夜の町」窓の外（写真主役） | `public/bg/photo-window-night.jpg` | Pollinations.AI / Flux（無料）＋Real-ESRGAN超解像（無料） | 生成日 2026-06-16・seed 32・Flux縦580×1015→4x超解像→幅1280 |
 
 - 実写の窓（4枚）は当初 横1280×800 で生成していたが、縦長の窓に横画像を約3倍引き伸ばして表示しており画質が荒く見えた。
-  窓の比率に合わせ「縦構図・写実（実写）寄り」で再生成（要求768×1344／無料枠の上限で縦580×1015に縮小・比率は保持）。縦解像度が約1.7倍になり歪みも解消。
+  窓の比率に合わせ「縦構図・写実（実写）寄り」で再生成（要求768×1344／無料枠の上限で縦580×1015に縮小・比率は保持）。
+- さらに、無料Flux枠の0.59MP上限による眠さ・JPEG荒れをスマホ全画面で許容できないため、**Real-ESRGAN（オープンソース・無料・GPU/ncnn-vulkan）で4x超解像＋ノイズ除去**し、配信用に幅1280へ整えた。これで瓦・電線・空が実写級にくっきり。処理は `scripts/upscale-photos.mjs`。超解像ツール本体は `scripts/tools/`（.gitignore済・Git非公開、本番不要）。本番は保存JPEGを表示するだけ。
+  - Real-ESRGAN: https://github.com/xinntao/Real-ESRGAN （BSD-3-Clause・モデルも公開）。実行時依存なし（開発時に一度だけ実行→画像保存）。
+  - dev用ライブラリ `sharp`／`playwright` は本番ビルド(Vite)に不要なため package.json には含めない（GitHub Pagesの自動デプロイを軽く保つ）。tooling再現時は `npm i -D sharp playwright` と上記Real-ESRGANの配置が必要。
 - プロンプト（実写の窓・夏の坂の町）: `photorealistic photograph taken from an apartment window looking down a quiet Japanese hillside residential street, nostalgic Showa-era neighborhood, low tiled-roof houses and small apartment blocks, wooden power poles and tangled lines, lush green summer trees, narrow sloping lane, distant forested hills in soft afternoon haze, warm natural light, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（実写の窓・夕暮れ）: `photorealistic photograph view from a window of a quiet Japanese residential neighborhood at dusk, vivid glowing orange and pink sunset sky, low tiled-roof houses, wooden power poles and lines, a few warm window lights beginning to glow, distant hazy hills on the low horizon, nostalgic Showa atmosphere, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
 - プロンプト（実写の窓・夕暮れの海辺）: `photorealistic photograph view from a window of a calm Japanese seaside town at golden dusk, distant calm sea and bright horizon line, small coastal houses with tiled roofs in the foreground, soft golden evening light reflecting on the water, gentle haze, nostalgic mood, vertical composition, ultra detailed, sharp focus, high resolution, 35mm photo, no people, no text, no watermark`
