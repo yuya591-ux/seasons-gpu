@@ -651,6 +651,13 @@ export async function mountTown3d(parent, opts = {}) {
       const ins = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.32, 6), insMat)
       ins.position.set(x + ex, gy + ph - 0.82, z); town.add(ins)
     }
+    // 支線（電柱を支える斜めのワイヤー＝日本の電柱の細部。一部の柱に）
+    if (R() < 0.4) {
+      const ax = x + (R() < 0.5 ? 2.3 : -2.3)
+      const topG = new THREE.Vector3(x, gy + ph - 1.4, z), anc = new THREE.Vector3(ax, gy + 0.1, z + 0.3)
+      const guy = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, topG.distanceTo(anc), 4), wireMat)
+      guy.position.copy(topG).lerp(anc, 0.5); guy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), anc.clone().sub(topG).normalize()); town.add(guy)
+    }
     // 電線を複数本に（碍子の両端＋下段の通信ケーブル＝日本の街の“電線の多さ”が本物感の決め手）
     const anchors = [
       new THREE.Vector3(x - 1.05, gy + ph - 0.7, z),
