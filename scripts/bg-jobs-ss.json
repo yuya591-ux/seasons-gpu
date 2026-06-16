@@ -1,0 +1,12 @@
+[
+  {
+    "name": "town3d-spring",
+    "prompt": "photographic hazy distant view of a sprawling Japanese hillside residential town in spring, low houses among fresh green and soft pink blooming cherry blossom hills, gentle spring haze, pastel nostalgic tones, deep atmospheric perspective, soft focus far distance, realistic, no text, no people, no watermark",
+    "seed": 7, "width": 1536, "height": 640
+  },
+  {
+    "name": "town3d-snow",
+    "prompt": "photographic hazy distant view of a quiet Japanese hillside residential town in winter snow, snow covered roofs and white forested hills, soft pale grey falling snow haze, muted cold nostalgic tones, deep atmospheric perspective, soft focus far distance, realistic, no text, no people, no watermark",
+    "seed": 9, "width": 1536, "height": 640
+  }
+]
