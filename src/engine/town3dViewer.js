@@ -529,6 +529,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
   const poleMat = toon(0x6a5c4a)
+  const transMat = toon(0x8f8f93), insMat = toon(0xcfcabf) // 柱上変圧器・碍子（共有）
   let prevTop = null
   for (let i = 0; i < 12; i++) {
     const z = 6 - i * 7
@@ -539,6 +540,16 @@ export async function mountTown3d(parent, opts = {}) {
     pole.position.set(x, gy + ph / 2, z); pole.castShadow = true; town.add(pole)
     const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.18), poleMat)
     arm.position.set(x, gy + ph - 1.0, z); town.add(arm)
+    // 柱上変圧器（半分の電柱に＝街の象徴）
+    if (R() < 0.5) {
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.95, 10), transMat)
+      tr.position.set(x + 0.55, gy + ph - 2.3, z); tr.castShadow = true; town.add(tr)
+    }
+    // 碍子（腕の両端の小さな白い碍子）
+    for (const ex of [-1.05, 1.05]) {
+      const ins = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.32, 6), insMat)
+      ins.position.set(x + ex, gy + ph - 0.82, z); town.add(ins)
+    }
     const top = new THREE.Vector3(x, gy + ph - 0.6, z)
     if (prevTop) {
       const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, prevTop.distanceTo(top), 4), new THREE.MeshBasicMaterial({ color: 0x2a2a30, fog: true }))
