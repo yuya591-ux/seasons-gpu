@@ -220,7 +220,23 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 軽いトゥーン（やわらかな水彩調のセル影）。プラスチックな拡散を脱し手描き調へ（3Dの街モード専用）。
   const grad = makeGradient(THREE)
-  const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
+  // 雪の積もり: 上を向いた面（屋根・地面・樹冠の上面）だけ白を被せる＝「雪が乗っている」表現。
+  // 壁など縦面(normal.y≈0)は白くならない。weather==='snow' の全トゥーン材に共有適用。
+  const SNOW = weather === 'snow'
+  const snowify = (m) => {
+    if (!SNOW) return m
+    m.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWNSnow;')
+        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vWNSnow = mat3(modelMatrix) * objectNormal;')
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWNSnow;')
+        .replace('#include <dithering_fragment>', '  float snowK = smoothstep(0.30, 0.72, normalize(vWNSnow).y);\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.93, 0.95, 0.985), snowK * 0.82);\n#include <dithering_fragment>')
+    }
+    m.customProgramCacheKey = () => 'snowcap'
+    return m
+  }
+  const toon = (hex) => snowify(new THREE.MeshToonMaterial({ color: hex, gradientMap: grad }))
   // 手描き調の輪郭線（反転ハル）。背面を黒で少し大きく描き、シルエットに線を出す。共有・軽量・霞で遠景は淡く。
   // OUTLINE=線の太さ（後から調整可）。fog:true で遠景の線も空気遠近で淡くなる。
   const OUTLINE = 1.022 // 線の太さ（背面ハルの拡大率。太いと箱の角で剥離して浮くため細めに。調整可）
@@ -336,7 +352,7 @@ export async function mountTown3d(parent, opts = {}) {
   const mottleMat = (baseHex, n, spread, rep) => {
     const m = new THREE.MeshToonMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
     m.map.repeat.set(rep[0], rep[1])
-    return m
+    return snowify(m)
   }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
