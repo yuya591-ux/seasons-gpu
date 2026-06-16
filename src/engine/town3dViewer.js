@@ -211,7 +211,7 @@ export async function mountTown3d(parent, opts = {}) {
     const glowTex = new THREE.CanvasTexture(gc)
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
       map: glowTex, color: isNight ? new THREE.Color(0xffb273) : sunCol.clone().lerp(new THREE.Color(0xffffff), 0.35),
-      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: isNight ? 0.4 : 0.55,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: isNight ? 0.4 : (season === 'autumn' ? 0.42 : 0.55), // 秋は逆光グローを弱め上空の白飛びを抑える
     }))
     glow.position.set(0, 16, -190) // 遠い地平。手前の街に隠れて“街の向こうのにじみ”になる
     glow.scale.set(220, 120, 1)    // 横長＝地平の光の帯
@@ -791,7 +791,7 @@ export async function mountTown3d(parent, opts = {}) {
     season === 'spring'
       ? [toon(0xe9b8cf), toon(0xf0c8d8), toon(0x8fb06a), toon(0xe6acc6), toon(0x7fa05c)]
       : season === 'autumn'
-        ? [toon(0xc97a3a), toon(0xd89a4a), toon(0xa85a36), toon(0x8a7a3e)]
+        ? [toon(0xc97a3a), toon(0xd89a4a), toon(0xa85a36), toon(0x8a7a3e), toon(0x4e6048), toon(0x586a50)] // 紅葉に常緑(杉/松)を混ぜる＝赤の中の緑で里山のリアリティ
         : weather === 'snow'
           ? [toon(0x4e6048), toon(0x586a50), toon(0x44543e)]
           : [toon(0x5c7c46), toon(0x6f9050), toon(0x4f6e3e)]
