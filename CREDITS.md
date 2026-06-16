@@ -115,6 +115,7 @@
 | 「実写の窓、夏の坂の町」窓の外（写真主役） | `public/bg/photo-window-town.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 21・1280×800 |
 | 「実写の窓、夕暮れの町」窓の外（写真主役） | `public/bg/photo-window-dusk.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 31・1280×800 |
 | 「実写の窓、夕暮れの海辺」窓の外（写真主役） | `public/bg/photo-window-sea.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 33・1280×800 |
+| 「実写の窓、夜の町」窓の外（写真主役） | `public/bg/photo-window-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 32・1280×800 |
 
 - プロンプト（夕暮れ）: `dreamy painterly dusk over a quiet Japanese small town, deep violet and rose twilight sky, faint distant rooftops and a single far hill on the low horizon, soft mist and rain haze, blurred warm street lights glowing far away, watercolor texture, muted melancholic palette, atmospheric, cinematic soft focus, no people, no text`
 - プロンプト（夜）: `dreamy painterly rainy night over a quiet Japanese town, deep indigo and navy sky, distant blurred rooftops, many small warm glowing window lights and street lamps scattered through the misty distance, soft rain haze, watercolor and gentle realism, calm melancholic healing mood, muted tones, atmospheric bokeh, no people, no text`
