@@ -382,6 +382,13 @@ export async function mountTown3d(parent, opts = {}) {
       cg.computeVertexNormals()
       const cr = new THREE.Mesh(cg, toon(0x474750)); cr.position.z = cz; cr.receiveShadow = true; town.add(cr)
     }
+    // 横断歩道（手前の交差点に白い縞＝近景の路面標示・生活感。路面のすぐ上に薄板で）
+    const cwMat = new THREE.MeshLambertMaterial({ color: 0xc8c4ba })
+    for (let i = 0; i < 5; i++) {
+      const bz = -3.4 - i * 0.62
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.03, 0.34), cwMat)
+      stripe.position.set(0, heightAt(0, bz) + 0.085, bz); town.add(stripe)
+    }
   }
 
   // ── 建物・ランドマーク（低ポリの箱＋切妻屋根）。街のみ（谷戸では作らない）。 ──
@@ -657,6 +664,14 @@ export async function mountTown3d(parent, opts = {}) {
       const topG = new THREE.Vector3(x, gy + ph - 1.4, z), anc = new THREE.Vector3(ax, gy + 0.1, z + 0.3)
       const guy = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, topG.distanceTo(anc), 4), wireMat)
       guy.position.copy(topG).lerp(anc, 0.5); guy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), anc.clone().sub(topG).normalize()); town.add(guy)
+    }
+    // 引き込み線（電柱から家の軒へ＝細い斜めの線。一部の柱に。本物の街は電柱から各戸へ線が伸びる）
+    if (R() < 0.5) {
+      const sgn = R() < 0.5 ? 1 : -1
+      const top2 = new THREE.Vector3(x + sgn * 0.9, gy + ph - 1.2, z)
+      const eave = new THREE.Vector3(x + sgn * (5.0 + R() * 2.5), gy + 3.0 + R() * 1.6, z + (R() - 0.5) * 3)
+      const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, top2.distanceTo(eave), 4), wireMat)
+      drop.position.copy(top2).lerp(eave, 0.5); drop.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), eave.clone().sub(top2).normalize()); town.add(drop)
     }
     // 電線を複数本に（碍子の両端＋下段の通信ケーブル＝日本の街の“電線の多さ”が本物感の決め手）
     const anchors = [
