@@ -5,6 +5,10 @@
 // 注入先シェーダーで uSunGlow/uHorizon/uSkyMid/uTime/h11/h21 が定義済みの前提（glass.js と同じ作法）。
 
 export const GROUND_GLSL = /* glsl */ `
+  // 見下ろしレイマーチの歩数（品質で可変。light端末は減らして軽く。注入先が定義しなければ36）。
+  #ifndef GR_STEPS
+  #define GR_STEPS 36
+  #endif
   // 世界座標 g0 から区画情報を得る。bH=建物高さ(ブロック単位, 道路や緑地は0)。
   // 道路境界は硬い step ＝ 区画が垂直の壁を持つ“箱”になる（レイマーチで壁が立つ）。
   void cityCell(vec2 g0, out vec2 gi, out vec2 gf, out float bH,
@@ -60,8 +64,8 @@ export const GROUND_GLSL = /* glsl */ `
     vec2 hGi = vec2(0.0), hGf = vec2(0.0);
     float hBH = 0.0, hTower = 0.0, hMat = 0.0, hBlk = 0.0, hTerr = 0.0, roofness = 0.0;
     vec2 prevGi = vec2(1e6);
-    float zStep = zmax / 36.0;           // 歩数を48→36に削減（画素あたりの反復を減らし発熱を抑える）
-    for (int i = 1; i <= 36; i++) {
+    float zStep = zmax / float(GR_STEPS); // 歩数は品質で可変（light端末は少なく＝軽量。二分法6回で輪郭は保つ）
+    for (int i = 1; i <= GR_STEPS; i++) {
       float z = zStep * float(i);
       float yray = Hcam - slope * z;
       vec2 g0m = vec2(horizAngle * z, z);

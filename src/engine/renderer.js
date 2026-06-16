@@ -350,8 +350,10 @@ export function createRenderer(canvas) {
     lastFrame = now
     if (adaptCooldown > 0) {
       adaptCooldown--
-    } else if (frameEMA > 42 && renderScale > 0.6) {
-      renderScale = Math.max(0.6, renderScale - 0.1) // 24fps未満が続けば解像度を落として発熱/カクつきを抑える
+    } else if (frameEMA > 42 && renderScale > 0.5) {
+      // 24fps未満が続けば解像度を落として発熱/カクつきを抑える。とても重い端末(cornerRoom等)は大きめに落とし
+      // 滑らかさを優先（下限0.5）。余裕のある端末(frameEMA<42)はこの分岐に入らず常時フル解像度＝高品質は不変。
+      renderScale = Math.max(0.5, renderScale - (frameEMA > 70 ? 0.15 : 0.1))
       adaptCooldown = 60
     } else if (frameEMA < 26 && renderScale < 1.0) {
       renderScale = Math.min(1.0, renderScale + 0.06) // 余裕があればゆっくり戻す
