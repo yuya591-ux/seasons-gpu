@@ -315,7 +315,15 @@ export async function mountTown3d(parent, opts = {}) {
       rp.setY(i, heightAt(lx, lz - 35) + 0.07)
     }
     rg.computeVertexNormals()
-    const road = new THREE.Mesh(rg, mottleMat(0x474750, 90, 0.10, [2, 10])) // 舗装に濡れ・かすれのムラ
+    // 舗装テクスチャ: アスファルトのムラ＋黄色のセンターライン（破線）＋路肩線（実写の路面標示。メッシュ増なし）
+    const rtc = document.createElement('canvas'); rtc.width = 64; rtc.height = 256
+    const rtx = rtc.getContext('2d')
+    rtx.fillStyle = '#474750'; rtx.fillRect(0, 0, 64, 256)
+    for (let i = 0; i < 70; i++) { const v = 58 + ((R() * 34) | 0); rtx.fillStyle = `rgba(${v},${v},${v + 5},0.16)`; rtx.fillRect(R() * 64, R() * 256, 2 + R() * 7, 2 + R() * 12) }
+    rtx.fillStyle = 'rgba(206,196,150,0.55)'; for (let y = 0; y < 256; y += 44) rtx.fillRect(31, y + 8, 3, 22) // 黄色のセンターライン（破線）
+    rtx.fillStyle = 'rgba(198,198,198,0.26)'; rtx.fillRect(6, 0, 2, 256); rtx.fillRect(56, 0, 2, 256) // 路肩線
+    const roadTex = new THREE.CanvasTexture(rtc); roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 8)
+    const road = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: roadTex }))
     road.position.z = -35; road.receiveShadow = true; town.add(road)
     // 横の通り（数本）
     for (const cz of [-6, -28, -50]) {
@@ -438,6 +446,31 @@ export async function mountTown3d(parent, opts = {}) {
       const box = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.9, 0.72), vm)
       box.position.set(vx, heightAt(vx, vz) + 0.95, vz); box.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2
       box.castShadow = true; town.add(box)
+    }
+  }
+
+  // ── 路傍の低木（植栽）と駐車中の車＝街路の密度・生活感 ──
+  {
+    const bushHex = season === 'spring' ? 0x7a9a4e : season === 'autumn' ? 0x977a3e : season === 'winter' ? 0x8a9488 : 0x5e7a44
+    const bushMat = toon(bushHex)
+    const carCols = [0xd24a3a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a, 0x2a2a30]
+    for (let i = 0; i < 14; i++) {
+      const side = R() < 0.5 ? -1 : 1
+      const bx = side * (5.2 + R() * 3.6)
+      const bz = -6 - R() * 70
+      const r = 0.6 + R() * 0.7
+      const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), bushMat)
+      bush.position.set(bx, heightAt(bx, bz) + r * 0.7, bz); bush.scale.y = 0.8; bush.castShadow = true; town.add(bush)
+    }
+    for (let i = 0; i < 6; i++) {
+      const side = R() < 0.5 ? -1 : 1
+      const cx = side * (3.3 + R() * 0.9)
+      const cz = -12 - R() * 54
+      const cy = heightAt(cx, cz)
+      const car = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 3.4), toon(carCols[(R() * carCols.length) | 0]))
+      car.position.set(cx, cy + 0.55, cz); car.rotation.y = side > 0 ? 0.05 : -0.05; car.castShadow = true; town.add(car)
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 1.7), toon(0x2a2e34))
+      cab.position.set(cx, cy + 1.25, cz - 0.1); town.add(cab)
     }
   }
 
