@@ -623,7 +623,8 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
   const poleMat = toon(0x6a5c4a)
   const transMat = toon(0x8f8f93), insMat = toon(0xcfcabf) // 柱上変圧器・碍子（共有）
-  let prevTop = null
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x2a2a30, fog: true }) // 電線（共有・軽量）
+  let prevAnchors = null
   for (let i = 0; i < 12; i++) {
     const z = 6 - i * 7
     const x = -3 + Math.sin(i * 0.5) * 0.6
@@ -643,14 +644,33 @@ export async function mountTown3d(parent, opts = {}) {
       const ins = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.32, 6), insMat)
       ins.position.set(x + ex, gy + ph - 0.82, z); town.add(ins)
     }
-    const top = new THREE.Vector3(x, gy + ph - 0.6, z)
-    if (prevTop) {
-      const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, prevTop.distanceTo(top), 4), new THREE.MeshBasicMaterial({ color: 0x2a2a30, fog: true }))
-      wire.position.copy(prevTop).lerp(top, 0.5)
-      wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(prevTop).normalize())
-      town.add(wire)
+    // 電線を複数本に（碍子の両端＋下段の通信ケーブル＝日本の街の“電線の多さ”が本物感の決め手）
+    const anchors = [
+      new THREE.Vector3(x - 1.05, gy + ph - 0.7, z),
+      new THREE.Vector3(x + 1.05, gy + ph - 0.7, z),
+      new THREE.Vector3(x - 0.35, gy + ph - 2.7, z), // 下段（通信ケーブル）
+      new THREE.Vector3(x + 0.35, gy + ph - 3.0, z),
+    ]
+    if (prevAnchors) {
+      for (let k = 0; k < anchors.length; k++) {
+        const a = prevAnchors[k], bn = anchors[k]
+        const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, a.distanceTo(bn), 4), wireMat)
+        wire.position.copy(a).lerp(bn, 0.5)
+        wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bn.clone().sub(a).normalize())
+        town.add(wire)
+      }
     }
-    prevTop = top
+    prevAnchors = anchors
+  }
+  // ── カーブミラー（坂の角の凸面鏡。日本の生活道路の象徴＝本物感） ──
+  for (const [mx, mz, face] of [[4.3, -20, -1], [-4.6, -50, 1]]) {
+    const gy = heightAt(mx, mz)
+    const g = new THREE.Group(); g.position.set(mx, gy, mz)
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 3.1, 6), toon(0xd9913f)); post.position.y = 1.55; post.castShadow = true; g.add(post)
+    const head = new THREE.Group(); head.position.set(face * 0.45, 3.05, 0); head.rotation.y = face * 0.5
+    const frame = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.1, 16), toon(0xd9913f)); frame.rotation.x = Math.PI / 2; head.add(frame)
+    const mirror = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 16), toon(0xaebcc8)); mirror.rotation.x = Math.PI / 2; mirror.position.z = 0.06; head.add(mirror)
+    g.add(head); town.add(g)
   }
   } // ← 建物・ランドマーク（街のみ）ここまで
 
@@ -1272,7 +1292,7 @@ export async function mountTown3d(parent, opts = {}) {
     const m = new THREE.Mesh(geo, mat); m.position.set(0, 74, eye.z - 205); m.frustumCulled = false; scene.add(m)
     const dur = 56
     addFx({
-      update: (age) => { mat.uniforms.uT.value = age; mat.uniforms.uOp.value = 0.92 * Math.min(1, age / 10) * Math.min(1, Math.max(0, (dur - age) / 16)); return age < dur },
+      update: (age) => { mat.uniforms.uT.value = age; mat.uniforms.uOp.value = 1.08 * Math.min(1, age / 10) * Math.min(1, Math.max(0, (dur - age) / 16)); return age < dur },
       cleanup: () => { scene.remove(m); geo.dispose(); mat.dispose() },
     })
   }
