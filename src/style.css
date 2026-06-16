@@ -263,6 +263,7 @@ body.idle .topbar {
 .gate {
   position: fixed;
   inset: 0;
+  z-index: 60; /* UI(topbar/音量)より前面に＝起動前にUIが透けて散らからない静かな入口 */
   pointer-events: auto;
   display: flex;
   flex-direction: column;
