@@ -333,6 +333,24 @@ export async function mountTown3d(parent, opts = {}) {
   const roofCols = [0x59636e, 0x7a5e50, 0x4e5660, 0x6a6258, 0x5e6a5c, 0x86766a] // くすんだ瓦（スレート青/テラコッタ/紺/灰/苔/茶）
   // 屋根は色ごとに質感テクスチャ（瓦の濃淡・苔・経年のムラ）を1枚ずつ共有＝見下ろしの屋根のベタ塗りを解消
   const roofMats = roofCols.map((c) => mottleMat(c, 60, 0.13, [3, 2]))
+  // 屋上・壁の雑多な設備（室外機/水タンク/塔屋/アンテナ）の共有マテリアル＝見下ろしの密度＝実写の生活感。
+  const acMat = toon(0xd8d4c6), tankMat = toon(0x6e6a64), phMat = toon(0x8a8478), antMat = toon(0x46464c)
+  // 陸屋根の屋上に雑多な設備を載せる（共有マテリアルで描画数を抑える）。
+  function addRoofClutter(g, w, d, h) {
+    const ph = new THREE.Mesh(new THREE.BoxGeometry(w * 0.3, 1.6, d * 0.3), phMat) // 塔屋（階段室）
+    ph.position.set((R() - 0.5) * w * 0.4, h + 0.8, (R() - 0.5) * d * 0.4); ph.castShadow = true; g.add(ph)
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(d * 0.15, d * 0.15, 1.3, 8), tankMat) // 水タンク
+    tank.position.set(w * 0.28, h + 0.9, -d * 0.2); tank.castShadow = true; g.add(tank)
+    const nAc = 1 + ((R() * 2) | 0) // 室外機 1〜2
+    for (let i = 0; i < nAc; i++) {
+      const ac = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.5), acMat)
+      ac.position.set((R() - 0.5) * w * 0.6, h + 0.55, (R() - 0.5) * d * 0.6); ac.castShadow = true; g.add(ac)
+    }
+    if (R() < 0.55) { // アンテナ（細い支柱）
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 4), antMat)
+      pole.position.set(-w * 0.3, h + 1.5, d * 0.25); g.add(pole)
+    }
+  }
   function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
@@ -359,9 +377,15 @@ export async function mountTown3d(parent, opts = {}) {
         const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.74, d * 0.62, 4); rg.rotateY(Math.PI / 4)
         const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
       }
+      // 壁際の室外機（どの家にもある生活感）
+      if (R() < 0.85) {
+        const ac = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 0.45), acMat)
+        ac.position.set(w * 0.5 + 0.22, 0.5, (R() - 0.5) * d * 0.5); ac.castShadow = true; g.add(ac)
+      }
     } else if (type === 'apt') {
       // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.5, d * 1.04), toon(0x8a8478)); cap.position.y = h + 0.25; cap.castShadow = true; g.add(cap)
+      addRoofClutter(g, w, d, h + 0.5) // 屋上に階段室・水タンク・室外機・アンテナ＝生活感
       const floors = Math.max(2, Math.round(h / 2.8))
       const balMat = toon(0xbcb6a8), railMat = toon(0x68686c)
       for (let f = 1; f < floors; f++) {
@@ -369,10 +393,9 @@ export async function mountTown3d(parent, opts = {}) {
         const slab = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.18, 0.85), balMat); slab.position.set(0, yy, d / 2 + 0.38); g.add(slab)
         const rail = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.5, 0.1), railMat); rail.position.set(0, yy + 0.32, d / 2 + 0.78); g.add(rail)
       }
-    } else { // mid: 陸屋根＋塔屋＋屋上の水タンク
+    } else { // mid: 陸屋根＋屋上設備（塔屋・水タンク・室外機・アンテナ）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(0x9a9488)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
-      const ph = new THREE.Mesh(new THREE.BoxGeometry(w * 0.32, 1.8, d * 0.32), toon(0x8a8478)); ph.position.set(-w * 0.2, h + 1.1, -d * 0.1); ph.castShadow = true; g.add(ph)
-      const tank = new THREE.Mesh(new THREE.CylinderGeometry(d * 0.17, d * 0.17, 1.5, 8), toon(0x6e6a64)); tank.position.set(w * 0.24, h + 1.0, d * 0.2); tank.castShadow = true; g.add(tank)
+      addRoofClutter(g, w, d, h + 0.4)
     }
     g.position.set(x, gy, z)
     g.rotation.y = (R() - 0.5) * 0.5
