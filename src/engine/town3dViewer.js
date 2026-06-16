@@ -307,8 +307,8 @@ export async function mountTown3d(parent, opts = {}) {
       // 谷戸の地形: 中央(|x|<13)が平らな谷底（棚田）、左右の里山が|x|で立ち上がり、奥で向かいの斜面が上がる。
       let base
       if (z > 6) base = (z - 6) * 0.6 + 1.5                       // 手前=自分の丘（カメラ側ほど高い）
-      else if (z > -46) base = -2.0 + Math.sin(z * 0.08) * 0.25   // 谷底（ほぼ平ら・低い）
-      else base = -2.0 + (-46 - z) * 0.42                         // 奥の向かいの斜面が立ち上がる
+      else if (z > -46) base = -1.6 - Math.floor((4 - z) / 5.6) * 0.42 + Math.sin(z * 0.08) * 0.1 // 谷底＝手前から奥へ段々に下る棚田（5.6mごとに一段）
+      else base = -4.96 + (-46 - z) * 0.42                        // 奥の向かいの斜面が立ち上がる（段々の終端から連続）
       const sx = Math.max(0, Math.abs(x) - 13)
       const hill = sx * 0.9 + Math.pow(sx * 0.12, 1.6) * 7.0       // 左右の里山（谷の縁から立ち上がる）
       const bump = Math.sin(x * 0.08 + 1.3) * 0.7 + Math.cos(z * 0.07) * 0.6 + Math.sin((x + z) * 0.12) * 0.4
@@ -832,32 +832,32 @@ export async function mountTown3d(parent, opts = {}) {
         const gy = heightAt(px + jx, pz)
         const r = R()
         const w = 4.9 + R() * 0.4
-        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w), r > 0.5 ? waterMat : (r > 0.25 ? riceMat : earthMat))
-        paddy.position.set(px + jx, gy + 0.12, pz); paddy.receiveShadow = true; town.add(paddy)
+        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w), r > 0.32 ? waterMat : (r > 0.10 ? riceMat : earthMat)) // 水を張った田を主体に＝棚田の水鏡
+        paddy.position.set(px + jx, gy + 0.13, pz); paddy.receiveShadow = true; town.add(paddy)
       }
     }
-    // 畦道（あぜ）: 棚田を仕切る細い土の畝。水田の縁取り＝棚田らしさ。区画の境界に立てる。
+    // 畦道（あぜ）: 段の境界に立つ「土手の擁壁」＝棚田の階段感の決め手。横断(段境界)は高く厚く。
     const bundMat = toon(0x8a7656)
     for (let bz = -46.8; bz <= 5.5; bz += 5.6) {
       const gy = heightAt(0, bz)
-      const b = new THREE.Mesh(new THREE.BoxGeometry(25, 0.5, 0.7), bundMat)
-      b.position.set(0, gy + 0.3, bz); b.castShadow = true; b.receiveShadow = true; town.add(b)
+      const b = new THREE.Mesh(new THREE.BoxGeometry(25, 1.15, 0.85), bundMat) // 段の擁壁（高くして段差を見せる）
+      b.position.set(0, gy + 0.5, bz); b.castShadow = true; b.receiveShadow = true; town.add(b)
     }
     for (let bx = -13.8; bx <= 13.8; bx += 5.6) {
       const gy = heightAt(bx, -21)
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 50), bundMat)
-      b.position.set(bx, gy + 0.3, -21); b.castShadow = true; b.receiveShadow = true; town.add(b)
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.55, 50), bundMat) // 縦の畦（段内の仕切り＝細い）
+      b.position.set(bx, gy + 0.32, -21); b.castShadow = true; b.receiveShadow = true; town.add(b)
     }
-    // せせらぎ（谷を縫う細い水の流れ。きらり）
-    for (let i = 0; i < 26; i++) {
-      const z = 2 - i * 1.9, x = Math.sin(z * 0.13 + 0.6) * 3.2 - 1.0, gy = heightAt(x, z)
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 2.0), toon(0xbcd2dc))
-      seg.position.set(x, gy + 0.18, z); town.add(seg)
+    // せせらぎ（谷の左の縁を縫う細い水の流れ。棚田と重ねず、連続した一筋に）
+    for (let i = 0; i < 32; i++) {
+      const z = 5 - i * 1.6, x = Math.sin(z * 0.11 + 0.4) * 1.4 - 9.0, gy = heightAt(x, z)
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.13, 1.9), toon(0xbcd2dc))
+      seg.position.set(x, gy + 0.16, z); town.add(seg)
     }
     // 横溝屋敷（谷の主役）: 茅葺の寄棟主屋＋長屋門。屋敷林に抱かれる。
     {
       const fx = 0, fz = -18, fgy = heightAt(fx, fz)
-      const g = new THREE.Group(); g.position.set(fx, fgy, fz); g.rotation.y = -0.16; g.scale.setScalar(1.25); town.add(g) // 主役なので大きめ
+      const g = new THREE.Group(); g.position.set(fx, fgy, fz); g.rotation.y = -0.16; g.scale.setScalar(1.5); town.add(g) // 谷の主役なので大きく立てる
       const body = new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 6.5), toon(0xe9e2d2)) // 主屋（白漆喰）
       body.position.y = 1.6; body.castShadow = true; body.receiveShadow = true; g.add(body)
       const skirt = new THREE.Mesh(new THREE.BoxGeometry(9.1, 1.0, 6.6), toon(0x5e4d3c)); skirt.position.y = 0.5; g.add(skirt) // 下見板（腰壁）
@@ -878,11 +878,11 @@ export async function mountTown3d(parent, opts = {}) {
       gateRoof.rotation.y = Math.PI / 4; gateRoof.position.set(0, 3.0, 5.8); gateRoof.scale.set(1.8, 1.0, 0.6); gateRoof.castShadow = true; g.add(gateRoof)
       const gateOpen = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.7, 0.3), toon(0x241f18)); gateOpen.position.set(0, 0.95, 6.95); g.add(gateOpen) // 門の通り口（陰）
     }
-    // 屋敷林（屋敷を抱く高木の木立）
-    for (const c of [[-5, -20], [6, -19], [-4, -27], [7, -26], [0, -29.5], [-7, -24]]) tree(c[0], c[1], 1.4 + R() * 0.6)
-    // 谷の斜面に点在する瓦屋根の農家（数軒）
+    // 屋敷林（屋敷を「後ろから」抱く高木の木立）。主屋(z=-18)の手前を空け、背後と側面奥にのみ立てる。
+    for (const c of [[-8, -26], [8, -25], [-6, -31], [7, -30], [0, -33], [-11, -28], [11, -27]]) tree(c[0], c[1], 1.3 + R() * 0.5)
+    // 谷の斜面に点在する瓦屋根の農家（数軒。奥にも足して空の間延びを締める）
     const farmRoof = [toon(0x6a6258), toon(0x7a5e50), toon(0x5e6a5c)]
-    for (const c of [[-19, -8, 0.9], [20, -14, 1.0], [-22, -24, 1.1], [23, -30, 1.0], [-17, -36, 0.9]]) {
+    for (const c of [[-19, -8, 0.9], [20, -14, 1.0], [-22, -24, 1.1], [23, -30, 1.0], [-17, -36, 0.9], [16, -41, 0.95], [-24, -43, 1.0], [9, -45, 0.85]]) {
       const gy = heightAt(c[0], c[1])
       const fg = new THREE.Group(); fg.position.set(c[0], gy, c[1]); fg.scale.setScalar(c[2]); fg.rotation.y = (R() - 0.5) * 0.8; town.add(fg)
       const fb = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 3.4), toon(0xd8cfbf)); fb.position.y = 1.2; fb.castShadow = true; fg.add(fb)
