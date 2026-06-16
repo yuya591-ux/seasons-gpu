@@ -10,6 +10,7 @@ export default {
   status: 'ready',
   render: 'town3d', // Three.js ビューア（src/engine/town3dViewer.js）
   town3dWeather: 'snow', // 雪を降らせる
+  bg3d: 'bg/town3d-snow.jpg', // 奥に敷く実写の雪の里山（遠景を写真級に）
 
   palette: {
     early: {
