@@ -29,8 +29,9 @@ export function applyTown3dLook(dx, dy) {
   const yawMax = 0.9 + l * 0.7   // 乗り出すと左右に大きく見渡せる
   const pitchUp = 0.5 + l * 0.28
   const pitchDn = 0.35 + l * 0.2
-  active.yaw = Math.max(-yawMax, Math.min(yawMax, active.yaw + dx * 2.4)) // 感度UP（少ない操作で見回せる）
-  active.pitch = Math.max(-pitchDn, Math.min(pitchUp, active.pitch + dy * 1.6))
+  // 目標値を動かし、frame loop でイージング追従（指を離しても余韻＝ヌルヌル）。感度UP。
+  active.yawTarget = Math.max(-yawMax, Math.min(yawMax, active.yawTarget + dx * 2.4))
+  active.pitchTarget = Math.max(-pitchDn, Math.min(pitchUp, active.pitchTarget + dy * 1.6))
 }
 
 export function resetTown3dLook() {
@@ -1007,7 +1008,10 @@ export async function mountTown3d(parent, opts = {}) {
     active.lean += (active.leanTarget - active.lean) * 0.06
     const wo = active.winOpen, lean = active.lean
 
-    // 見回しをなめらかに（息づかいの微揺れ付き）
+    // 見回しを目標へ滑らかに追従（イージング＝指を離しても余韻があるヌルヌルの見回し）
+    active.yaw += (active.yawTarget - active.yaw) * 0.16
+    active.pitch += (active.pitchTarget - active.pitch) * 0.16
+    // 見回し（息づかいの微揺れ付き）
     const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
     const pitch = active.pitch
     // 乗り出すとカメラを前へ・下へ寄せ、画角を広げる（枠を越えて街へ顔を出す立体感）
@@ -1054,7 +1058,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 検証用: 見回しを外から設定（?dev=1 のサムネ/撮影で角度を指定）
   if (/[?&]dev=1/.test(location.search)) {
-    window.__town3dSetView = (y, p) => { if (active) { active.yaw = y || 0; active.pitch = p || 0 } }
+    window.__town3dSetView = (y, p) => { if (active) { active.yaw = active.yawTarget = y || 0; active.pitch = active.pitchTarget = p || 0 } }
   }
 
   // スワイプで見回す（自前のポインタ操作）。
