@@ -405,6 +405,12 @@ export async function mountTown3d(parent, opts = {}) {
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.03, 0.34), cwMat)
       stripe.position.set(0, heightAt(0, bz) + 0.085, bz); town.add(stripe)
     }
+    // マンホール（路面の轍に沿って点々と＝近景の生活痕。鉄蓋の濃灰）
+    const mhMat = toon(0x47474c)
+    for (const [mx, mz] of [[-1.4, 3], [1.5, -9], [-1.6, -23], [1.3, -37], [-1.4, -51], [1.5, -67]]) {
+      const mh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 14), mhMat)
+      mh.position.set(mx, heightAt(mx, mz) + 0.06, mz); town.add(mh)
+    }
   }
 
   // ── 建物・ランドマーク（低ポリの箱＋切妻屋根）。街のみ（谷戸では作らない）。 ──
