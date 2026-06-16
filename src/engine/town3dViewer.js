@@ -111,6 +111,8 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 奥の実写背景（任意・Flux生成の遠景）。近景の立体の奥に、写真級の遠望を円筒状に敷いて写真的な奥行きを出す。
   // 近景の建物・木が手前を覆い、霞(fog)が中景を溶かして、遠景の実写へ自然につながる二層構成。
+  // 堅牢化: 低ポリ遠山(mtns)は常に作り、実写背景が「読めた時だけ」山を消す＝画像が無ければ山が残る安全フォールバック。
+  const mtns = []
   if (opts.bg3d) {
     const BASE = import.meta.env.BASE_URL || '/'
     new THREE.TextureLoader().load(BASE + opts.bg3d, (tex) => {
@@ -124,6 +126,7 @@ export async function mountTown3d(parent, opts = {}) {
       back.rotation.y = Math.PI // 画像の中心を初期視線(-z)へ
       back.renderOrder = -1 // 近景より先に描く（遠景の最背面）
       scene.add(back)
+      mtns.forEach((m) => scene.remove(m)) // 実写が読めたので低ポリ遠山を消す（実写が代替）
     })
   }
 
@@ -333,7 +336,7 @@ export async function mountTown3d(parent, opts = {}) {
   function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const wm = toon(wallCols[(R() * wallCols.length) | 0])
+    const wm = toon(wallCols[(R() * wallCols.length) | 0]) // 壁は軽量な拡散材（多数あるため性能優先）
     const rep = Math.max(1, Math.round(w / 2.6)), repV = Math.max(1, Math.round(h / 2.4))
     const m = winMapBase.clone(); m.repeat.set(rep, repV); m.needsUpdate = true
     wm.map = m
@@ -671,10 +674,10 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   // ── 遠景の低ポリ山（街の奥に重なる尾根。空気遠近で淡く青み＝奥行きの錨） ──
-  // 実写背景(bg3d)があるときは省く（実写の里山が遠景の役割を果たすため・低ポリ山が手前を塞がない）。
+  // 常に作り mtns に保持（実写背景が読めたら上のコールバックで消す＝画像が無ければ山が残る）。
   const mtnNear = skyHorizon.clone().lerp(new THREE.Color(0x6e7e62), 0.7)
   const mtnFar = skyHorizon.clone().lerp(new THREE.Color(0x8a98a6), 0.5)
-  if (!opts.bg3d) for (let layer = 0; layer < 2; layer++) {
+  for (let layer = 0; layer < 2; layer++) {
     const dist = layer === 0 ? 150 : 210
     const baseY = layer === 0 ? 4 : 10
     for (let i = 0; i < 9; i++) {
@@ -683,7 +686,7 @@ export async function mountTown3d(parent, opts = {}) {
       const z = -Math.cos(ang) * dist - 30
       const m = new THREE.Mesh(new THREE.ConeGeometry(42 + R() * 28, 34 + R() * 28, 7), toon((layer === 0 ? mtnNear : mtnFar).getHex()))
       m.position.set(x, baseY, z); m.rotation.y = R() * 6
-      scene.add(m)
+      scene.add(m); mtns.push(m)
     }
   }
 
