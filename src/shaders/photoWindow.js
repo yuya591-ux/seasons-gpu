@@ -51,14 +51,16 @@ const FRAGMENT_BODY = /* glsl */ `
     photo = mix(photo, photo * mood, 0.12);
     vec3 outside = photo; // 乗り出し用（枠の無い素の景色）
 
-    // 窓ガラスの薄い映り込み（斜めの光の帯）＋窓辺のごく薄いくもり＝ガラス面の実感。
-    // 窓をあける/乗り出すと、ガラスが退いて映り込み・くもりが晴れ、外気が澄む（実感のある開閉）。
+    // 窓ガラスの映り込み（斜めの光の帯＋室内側の淡い縦反射）＋窓辺のごく薄いくもり＝「ガラス越し」の手応え。
+    // 写真主役は死守しつつ、印刷写真でなく“窓”に見える最小限の反射を乗せる。あける/乗り出すと退いて澄む。
     float glass = (1.0 - uLeanOut) * (1.0 - uWindowOpen * 0.85);
     float diag = frag.x + frag.y * 0.35;
-    float refl = smoothstep(0.30, 0.46, diag) * smoothstep(0.66, 0.5, diag);
-    vec3 col = photo + vec3(0.06, 0.066, 0.078) * refl * glass * 0.55;
+    float refl = smoothstep(0.28, 0.46, diag) * smoothstep(0.68, 0.5, diag); // 斜めの面反射の帯
+    float vRefl = smoothstep(0.12, 0.96, frag.y);                            // 上ほど室内（天井）を映す淡い縦反射
+    vec3 reflCol = vec3(0.10, 0.11, 0.125);
+    vec3 col = photo + reflCol * (refl * 0.95 + vRefl * 0.20) * glass;       // 帯を見える強さに＋淡い縦反射
     float gray = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(col, mix(col, vec3(gray), 0.5), 0.035 * glass);
+    col = mix(col, mix(col, vec3(gray), 0.5), 0.05 * glass);                 // ガラス面のわずかな白け（脱彩度）
     col += photo * uWindowOpen * 0.04; // あけると外光が少し入る
 
     col = windowSash(col, frag, outside, uLeanOut); // 窓枠（乗り出すと景色だけ）
