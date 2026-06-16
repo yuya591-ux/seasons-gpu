@@ -173,8 +173,8 @@ export async function mountTown3d(parent, opts = {}) {
     gx.fillStyle = grd2; gx.fillRect(0, 0, 128, 128)
     const glowTex = new THREE.CanvasTexture(gc)
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTex, color: sunCol.clone().lerp(new THREE.Color(0xffffff), 0.35),
-      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: isNight ? 0.33 : 0.55,
+      map: glowTex, color: isNight ? new THREE.Color(0xffb273) : sunCol.clone().lerp(new THREE.Color(0xffffff), 0.35),
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: isNight ? 0.4 : 0.55,
     }))
     glow.position.set(0, 16, -190) // 遠い地平。手前の街に隠れて“街の向こうのにじみ”になる
     glow.scale.set(220, 120, 1)    // 横長＝地平の光の帯
