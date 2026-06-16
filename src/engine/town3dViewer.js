@@ -8,13 +8,14 @@ let active = null // { renderer, scene, camera, raf, dispose, stage }
 
 const lerp = (a, b, t) => a + (b - a) * t
 
-// トゥーンの段階を作る勾配テクスチャ（3段）。やわらかいセル影。
+// トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
+// 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
 function makeGradient(THREE) {
-  const data = new Uint8Array([182, 200, 216, 232, 248, 255]) // やわらかい段階。Linear補間で陰影をなめらかに（硬い面・トゥーンの帯を出さない＝丸く見える）
+  const data = new Uint8Array([96, 168, 250]) // 影0.38 / 中0.66 / 陽0.98 ＝大胆な3帯のセル（面の切り替わりを明確に）
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat)
   tex.needsUpdate = true
-  tex.magFilter = THREE.LinearFilter // Nearest→Linear: 陰影の境界を平滑化して角ばり/CG感を減らす
-  tex.minFilter = THREE.LinearFilter
+  tex.magFilter = THREE.NearestFilter // 明確なセル境界（手描きの面の切り替わり）
+  tex.minFilter = THREE.NearestFilter
   return tex
 }
 
@@ -135,10 +136,11 @@ export async function mountTown3d(parent, opts = {}) {
   const isNight = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 暗い palette = 夜
   // フィルミックなトーンマッピング（ACES）＝写真的なハイライトのころび・階調。実写風へ寄せる核。
   // Lambert 拡散シェーディングと合わせ、トゥーンの平面感を脱して実物に近い光の乗りにする。
+  // ゆるいトーンマッピング（CG的な締まりを抑え、平坦な手描き/水彩寄りに）。露出は控えめ。
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = isNight ? 1.7 : 1.5 // ACESの沈みを補正（夜はやや明るめ）
+  renderer.toneMappingExposure = isNight ? 1.5 : 1.28
   // 光（やわらかなトゥーン陰影。夜は月明かりへ）
-  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.4 : 0.92)
+  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.5 : 1.15) // 方向光を強め＝セルの明部/影部をはっきり
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048) // 影は一度だけ焼く静的影なので、高精細化しても実行時コストは増えない（精度↑）
@@ -147,8 +149,9 @@ export async function mountTown3d(parent, opts = {}) {
   sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60
   scene.add(sun)
   // 空からの回り込み光（影側を黒く沈めない＝くすみ防止）。地面側は暖色で泥にしない。
-  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.55 : 1.25))
-  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.13 : 0.45))
+  // 回り込み光を抑えて平坦フィルを脱す（影側が残る＝セルの陰影と形が出る）。地面側は暖色。
+  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.36 : 0.55))
+  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.08 : 0.18))
   // 夜は月と星
   if (isNight) {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
@@ -188,7 +191,7 @@ export async function mountTown3d(parent, opts = {}) {
   const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
   // 手描き調の輪郭線（反転ハル）。背面を黒で少し大きく描き、シルエットに線を出す。共有・軽量・霞で遠景は淡く。
   // OUTLINE=線の太さ（後から調整可）。fog:true で遠景の線も空気遠近で淡くなる。
-  const OUTLINE = 1.045 // 線の太さ（背面ハルの拡大率。後から調整可）
+  const OUTLINE = 1.022 // 線の太さ（背面ハルの拡大率。太いと箱の角で剥離して浮くため細めに。調整可）
   const outlineMat = new THREE.MeshBasicMaterial({ color: 0x16120b, side: THREE.BackSide, fog: true })
   function addOutline(mesh) {
     const o = new THREE.Mesh(mesh.geometry, outlineMat)
