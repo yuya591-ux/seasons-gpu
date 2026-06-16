@@ -115,8 +115,11 @@ export async function mountTown3d(parent, opts = {}) {
   // 奥の実写背景（任意・Flux生成の遠景）。近景の立体の奥に、写真級の遠望を円筒状に敷いて写真的な奥行きを出す。
   // 近景の建物・木が手前を覆い、霞(fog)が中景を溶かして、遠景の実写へ自然につながる二層構成。
   // 堅牢化: 低ポリ遠山(mtns)は常に作り、実写背景が「読めた時だけ」山を消す＝画像が無ければ山が残る安全フォールバック。
+  // セル/アニメ調の3D街モードでは実写の写真遠景は画風が衝突し、手前の低ポリ街と「二重像」になり
+  // 境界にz-fightingの点ノイズも出るため無効化（低ポリのセル遠山を遠景に使う）。実写の窓モード(photoWindow)とは別物。
+  const USE_PHOTO_BACKDROP = false // ←再有効化する場合は true
   const mtns = []
-  if (opts.bg3d) {
+  if (USE_PHOTO_BACKDROP && opts.bg3d) {
     const BASE = import.meta.env.BASE_URL || '/'
     new THREE.TextureLoader().load(BASE + opts.bg3d, (tex) => {
       if (my !== token) return
