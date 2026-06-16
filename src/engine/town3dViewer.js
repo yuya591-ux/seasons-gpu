@@ -1200,20 +1200,33 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 雲が陽を横切る翳り（全体がふっと翳って、また明るむ。最も静かな“整う”演出。昼のみ） ──
+  let shadeActive = false
+  function evCloudShade() {
+    if (isNight || shadeActive) return
+    shadeActive = true
+    const i0 = sun.intensity
+    addFx({
+      update: (age) => { const k = Math.min(1, age / 3) * Math.min(1, Math.max(0, (10 - age) / 4)); sun.intensity = i0 * (1 - 0.38 * k); return age < 10 },
+      cleanup: () => { sun.intensity = i0; shadeActive = false },
+    })
+  }
+
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
     birds: { run: evBirdFlock },
     balloon: { run: evBalloon, ok: () => !isNight },
     star: { run: evShootingStars, ok: () => isNight },
     contrail: { run: evContrail },
+    cloudShade: { run: evCloudShade, ok: () => !isNight && !shadeActive }, // 雲の翳り（昼の静かな整う演出）
     rainbowSolo: { run: evRainbow, ok: () => !rainActive }, // 雨無しの単独虹（中バンドに低確率）＝見せ場を観られる機会を増やす
     rain: { run: () => evRain(30), ok: () => !rainActive },
     fireworks: { run: evFireworks, ok: () => isNight },
   }
   const fxBands = [
-    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star'] },          // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
-    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'rainbowSolo'] },  // 中（少し特別）
-    { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks'] },                          // まれ（大当たり＝雨→虹／花火）
+    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade'] },         // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'rainbowSolo'] }, // 中（少し特別）
+    { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks'] },                                      // まれ（大当たり＝雨→虹／花火）
   ]
   function scheduleFx(dt) {
     for (const b of fxBands) {
@@ -1226,7 +1239,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, fireworks: evFireworks }[n] || (() => {}))()
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, fireworks: evFireworks }[n] || (() => {}))()
 
   function frame() {
     if (!active) return
