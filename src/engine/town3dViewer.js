@@ -275,9 +275,23 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // 窓の格子（3列×4段）
     for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) {
-      if (lit) { g.fillStyle = rnd() < 0.45 ? '#ffd089' : '#0a0a0a' }
-      else { g.fillStyle = rnd() < 0.5 ? '#6b6b75' : '#76767f' } // 窓ごとに僅かな濃淡
-      g.fillRect(8 + xx * 18, 7 + yy * 14, 11, 9)
+      const px = 8 + xx * 18, py = 7 + yy * 14, pw = 11, ph = 9
+      if (lit) {
+        g.fillStyle = rnd() < 0.45 ? '#ffd089' : '#0a0a0a'
+        g.fillRect(px, py, pw, ph)
+      } else {
+        // ガラス：上ほど空を映してやや明るく→下ほど室内で翳る縦グラデ＝ベタ灰の板でなく「硝子」。
+        // 窓ごとに寒暖を振る（空映りの寒色／障子・カーテンの暖色）＝のっぺり一様を脱し生活感。
+        const cool = rnd() < 0.5
+        const grad = g.createLinearGradient(0, py, 0, py + ph)
+        if (cool) { grad.addColorStop(0, '#8e9aa8'); grad.addColorStop(1, '#5c606a') }
+        else { grad.addColorStop(0, '#827e7a'); grad.addColorStop(1, '#5a5652') }
+        g.fillStyle = grad
+        g.fillRect(px, py, pw, ph)
+        // 中桟（上げ下げ窓の横さん）＝ガラスが2枚に割れて見える立体
+        g.fillStyle = 'rgba(150,150,158,0.45)'
+        g.fillRect(px, py + ph * 0.5 - 0.5, pw, 1)
+      }
     }
     const t = new THREE.CanvasTexture(c)
     t.wrapS = t.wrapT = THREE.RepeatWrapping
