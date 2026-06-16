@@ -29,8 +29,8 @@ export function applyTown3dLook(dx, dy) {
   const yawMax = 0.9 + l * 0.7   // 乗り出すと左右に大きく見渡せる
   const pitchUp = 0.5 + l * 0.28
   const pitchDn = 0.35 + l * 0.2
-  active.yaw = Math.max(-yawMax, Math.min(yawMax, active.yaw + dx * 1.4))
-  active.pitch = Math.max(-pitchDn, Math.min(pitchUp, active.pitch + dy * 1.0))
+  active.yaw = Math.max(-yawMax, Math.min(yawMax, active.yaw + dx * 2.4)) // 感度UP（少ない操作で見回せる）
+  active.pitch = Math.max(-pitchDn, Math.min(pitchUp, active.pitch + dy * 1.6))
 }
 
 export function resetTown3dLook() {
