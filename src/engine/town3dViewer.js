@@ -11,7 +11,7 @@ const lerp = (a, b, t) => a + (b - a) * t
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
 function makeGradient(THREE) {
-  const data = new Uint8Array([96, 168, 250]) // 影0.38 / 中0.66 / 陽0.98 ＝大胆な3帯のセル（面の切り替わりを明確に）
+  const data = new Uint8Array([72, 150, 250]) // 影0.28(しっかり濃い影) / 中0.59 / 陽0.98 ＝面でパキッと分かれる濃淡
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat)
   tex.needsUpdate = true
   tex.magFilter = THREE.NearestFilter // 明確なセル境界（手描きの面の切り替わり）
@@ -136,11 +136,11 @@ export async function mountTown3d(parent, opts = {}) {
   const isNight = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 暗い palette = 夜
   // フィルミックなトーンマッピング（ACES）＝写真的なハイライトのころび・階調。実写風へ寄せる核。
   // Lambert 拡散シェーディングと合わせ、トゥーンの平面感を脱して実物に近い光の乗りにする。
-  // ゆるいトーンマッピング（CG的な締まりを抑え、平坦な手描き/水彩寄りに）。露出は控えめ。
-  renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = isNight ? 1.5 : 1.28
+  // CG的な締まりを出さない線形トーン（NoToneMapping）＝フィルミックな圧縮を排し、平坦な手描き/セル調に。
+  renderer.toneMapping = THREE.NoToneMapping
+  renderer.toneMappingExposure = isNight ? 1.25 : 1.0
   // 光（やわらかなトゥーン陰影。夜は月明かりへ）
-  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.5 : 1.15) // 方向光を強め＝セルの明部/影部をはっきり
+  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.62 : 1.02) // 方向光を主役に＝セルの明部/影部をはっきり（線形トーン用に白飛び防止）
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048) // 影は一度だけ焼く静的影なので、高精細化しても実行時コストは増えない（精度↑）
@@ -150,8 +150,8 @@ export async function mountTown3d(parent, opts = {}) {
   scene.add(sun)
   // 空からの回り込み光（影側を黒く沈めない＝くすみ防止）。地面側は暖色で泥にしない。
   // 回り込み光を抑えて平坦フィルを脱す（影側が残る＝セルの陰影と形が出る）。地面側は暖色。
-  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.36 : 0.55))
-  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.08 : 0.18))
+  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.26 : 0.34))
+  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.06 : 0.10))
   // 夜は月と星
   if (isNight) {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
