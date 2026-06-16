@@ -898,6 +898,32 @@ export async function mountTown3d(parent, opts = {}) {
       const fb = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 3.4), toon(0xd8cfbf)); fb.position.y = 1.2; fb.castShadow = true; fg.add(fb)
       const fr = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.8, 4), farmRoof[(R() * 3) | 0]); fr.rotation.y = Math.PI / 4; fr.position.y = 3.1; fr.scale.set(1.0, 1.0, 0.85); fr.castShadow = true; fg.add(fr)
     }
+    // 子メッシュを位置指定して群に足す小ヘルパ（mesh.position は読み取り専用なので set を使う）
+    const addAt = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh }
+    // ── 案山子（棚田に点々と。十字の竿＋菅笠＋古着＝谷戸の農の生活） ──
+    const clothCols = [toon(0x9a7a5a), toon(0x7a8a6a), toon(0x8a6a6a), toon(0xa08858)]
+    for (const c of [[-6, -10], [5, -23], [-8, -33], [9, -39]]) {
+      const gy = heightAt(c[0], c[1])
+      const g = new THREE.Group(); g.position.set(c[0], gy + 0.2, c[1]); g.rotation.y = (R() - 0.5) * 1.2
+      addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.0, 5), toon(0x6a5a3c)), 0, 1.0, 0).castShadow = true // 竿
+      addAt(g, new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 0.08), toon(0x6a5a3c)), 0, 1.5, 0) // 腕の横木
+      addAt(g, new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.18), clothCols[(R() * clothCols.length) | 0]), 0, 1.45, 0) // 古着
+      addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), toon(0xe8dcc0)), 0, 1.98, 0) // 頭
+      addAt(g, new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.28, 10), toon(0xc8a860)), 0, 2.14, 0) // 菅笠
+      town.add(g)
+    }
+    // ── 白鷺（水を張った田に佇む。谷戸の象徴の一点） ──
+    const heronMat = toon(0xf2f2f0)
+    for (const c of [[-2, -14], [7, -29], [-9, -41]]) {
+      const gy = heightAt(c[0], c[1])
+      const g = new THREE.Group(); g.position.set(c[0], gy + 0.18, c[1]); g.rotation.y = R() * 6.28
+      addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.6, 4), toon(0x3a3a3a)), 0, 0.3, 0) // 脚
+      const body = addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), heronMat), 0, 0.72, 0); body.scale.set(1, 0.8, 1.7)
+      const neck = addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.5, 5), heronMat), 0, 1.0, 0.08); neck.rotation.x = 0.35
+      addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), heronMat), 0, 1.22, 0.18) // 頭
+      const beak = addAt(g, new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 4), toon(0xd8b048)), 0, 1.22, 0.34); beak.rotation.x = Math.PI * 0.5
+      town.add(g)
+    }
   }
 
   // ── 祝賀のアドバルーン（赤い気球＋下がる細い垂れ幕＋係留索）。小ぶりで本物らしく。街のみ。 ──
