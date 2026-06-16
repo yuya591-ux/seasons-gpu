@@ -105,13 +105,13 @@ export const GROUND_GLSL = /* glsl */ `
       base = mix(base, vec3(0.52, 0.45, 0.37), step(0.30, msel)); // モルタル暖
       base = mix(base, vec3(0.42, 0.31, 0.25), step(0.58, msel)); // タイル茶
       base = mix(base, vec3(0.35, 0.37, 0.33), step(0.82, msel)); // 防水シート灰緑
-      base = mix(base, uHorizon, 0.16) * (0.78 + 0.42 * hBlk);    // 夕暮れの大気＋棟ごとの明暗差を広げる
+      base = mix(base, uHorizon, 0.20) * (0.84 + 0.30 * hBlk);    // 夕暮れの大気に寄せ、棟ごとの明暗差は控えめに（水彩調・原色パッチ回避）
       base *= 1.0 - 0.55 * nightAmt;                              // 夜は素地が暗く沈み、灯りが映える
-      // 屋上ごとに明暗・色味を散らす（碁盤のタイル状の均質感を崩し“本物の街”に）
-      vec3 roofTop = base * (0.78 + 0.44 * h21(hGi + 88.0));
+      // 屋上ごとに明暗・色味を“ほどよく”散らす（碁盤の均質感は崩すが、原色のパッチワークにはしない）
+      vec3 roofTop = base * (0.86 + 0.26 * h21(hGi + 88.0));      // 明暗差を圧縮（旧0.78+0.44＝2.4倍幅→ほぼ1.4倍幅）
       float roofHue = h21(hGi + 34.0);
-      roofTop = mix(roofTop, roofTop * vec3(0.82, 0.92, 1.12), step(0.86, roofHue));       // たまに青いトタン屋根
-      roofTop = mix(roofTop, roofTop * vec3(1.12, 0.86, 0.74), step(0.70, roofHue) * step(roofHue, 0.86)); // 赤錆びた屋根
+      roofTop = mix(roofTop, roofTop * vec3(0.91, 0.96, 1.06), step(0.88, roofHue));        // たまに青みのトタン屋根（彩度を抑え淡く）
+      roofTop = mix(roofTop, roofTop * vec3(1.05, 0.92, 0.85), step(0.72, roofHue) * step(roofHue, 0.88)); // 赤錆びた屋根（淡く）
       float district = vnoise(hGi * 0.35 + 7.0);                  // 街区ごとの賑わい（夜の灯りの粗密）
       // ひとつの太陽（西＝画面左、低い夕日）で街全体を一貫して照らす。
       // 視線の左（西）を向く面ほど日が当たり暖かく、右（東）の面は翳る＝陰影が方向で揃う。
