@@ -181,8 +181,8 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(glow)
   }
 
-  const grad = makeGradient(THREE)
-  const toon = (hex) => new THREE.MeshLambertMaterial({ color: hex, gradientMap: grad })
+  // 拡散シェーディング（実写寄り）。MeshLambertMaterial は gradientMap を持たないため渡さない（無効な警告とテクスチャ生成の無駄を排す）。
+  const toon = (hex) => new THREE.MeshLambertMaterial({ color: hex })
 
   // 壁＋窓のテクスチャ（乗算マップ）。壁はベタ白を避け、コンクリの微細なムラ＋雨だれの経年汚れを描いて
   // 実写の建物の質感に近づける。窓は灰（通常）／暖色emissive（灯り）。64pxで滑らかに。
@@ -285,7 +285,7 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const mottleMat = (baseHex, n, spread, rep) => {
-    const m = new THREE.MeshLambertMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
+    const m = new THREE.MeshLambertMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread) })
     m.map.repeat.set(rep[0], rep[1])
     return m
   }
@@ -793,7 +793,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── ふわふわの雲（白い球の塊＝立体的な積雲） ──
   const clouds = []
-  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })
+  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xfbfaf6, fog: false })
   for (let i = 0; i < 11; i++) {
     const g = new THREE.Group()
     const n = 4 + ((R() * 4) | 0)
@@ -910,8 +910,8 @@ export async function mountTown3d(parent, opts = {}) {
         })
         winMapBase.dispose()
         for (const e of winEmis) e.dispose()
-        grad.dispose()
       } catch (e) { /* 無視 */ }
+      try { renderer.forceContextLoss() } catch (e) { /* 無視 */ } // GPUコンテキストを即解放＝連打切替でのコンテキスト蓄積/ロストを防ぐ
       renderer.dispose()
     },
   }
@@ -947,6 +947,7 @@ export async function mountTown3d(parent, opts = {}) {
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
+    if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
     const t = clock.getElapsedTime()
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
     if (t - lastDraw < 0.032) return
