@@ -437,6 +437,8 @@ export async function mountTown3d(parent, opts = {}) {
   const acMat = toon(0xd8d4c6), tankMat = toon(0x6e6a64), phMat = toon(0x8a8478), antMat = toon(0x46464c)
   // 屋上に干す布団の色（くすんだ生活色・上から見下ろす窓に映える彩り）。共有マテリアルで描画数を抑える。
   const futonMats = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xd8c8a0, 0xb0b8a8, 0xd0cabc].map(toon)
+  // 屋上のささやかな緑（プランター菜園・鉢＝俯瞰で映える生活の緑）。共有マテリアル。
+  const gardenMats = [0x6a8a4a, 0x7e9850, 0x5c7c42].map(toon)
   // 陸屋根の屋上に雑多な設備を載せる（共有マテリアルで描画数を抑える）。
   function addRoofClutter(g, w, d, h) {
     const ph = new THREE.Mesh(new THREE.BoxGeometry(w * 0.3, 1.6, d * 0.3), phMat) // 塔屋（階段室）
@@ -459,6 +461,16 @@ export async function mountTown3d(parent, opts = {}) {
         const fw = w * 0.26 + R() * w * 0.16, fd = d * 0.34 + R() * d * 0.12
         const fut = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.09, fd), futonMats[(R() * futonMats.length) | 0])
         fut.position.set((R() - 0.5) * w * 0.5, h + 0.07, (R() - 0.5) * d * 0.45); fut.castShadow = true; g.add(fut)
+      }
+    }
+    // 屋上のささやかな菜園（プランターの緑が点々＝俯瞰で映える生活の緑）。雪は除く・一部の屋上に。
+    if (!SNOW && R() < 0.24) {
+      const gm = gardenMats[(R() * gardenMats.length) | 0]
+      const ng = 2 + ((R() * 2) | 0)
+      const bx = (R() - 0.5) * w * 0.4, bz = (R() - 0.5) * d * 0.4 // 一角にまとめて並べる
+      for (let i = 0; i < ng; i++) {
+        const pl = new THREE.Mesh(new THREE.BoxGeometry(0.5 + R() * 0.28, 0.17, 0.32), gm)
+        pl.position.set(bx + (R() - 0.5) * 0.5, h + 0.1, bz + i * 0.42 - 0.2); pl.castShadow = true; g.add(pl)
       }
     }
   }
