@@ -68,8 +68,8 @@ const FRAGMENT_BODY = /* glsl */ `
     float sunDist = length(sunP * vec2(1.0, 1.3));
     float sun = exp(-sunDist * 3.0);                        // 大きなグロー
     float sunDisc = smoothstep(0.058, 0.046, sunDist);     // 太陽円盤（水平線に半分沈む）
-    sky += uSunGlow * sun * 0.7;
-    sky = mix(sky, mix(uSunGlow, vec3(1.0, 0.96, 0.86), 0.45), sunDisc * 0.92);
+    sky += uSunGlow * sun * 0.58;
+    sky = mix(sky, mix(uSunGlow, vec3(1.0, 0.96, 0.86), 0.45), sunDisc * 0.82); // 太陽の白飛びを抑え水平線を残す
     // 横に伸びる層雲（夕陽で底が染まる。見回すと流れる＝空も動く）
     float cl = fbm(vec2((ax + yaw * 0.45) * 1.2 + t * 0.006, vp.y * 3.0));
     float cloud = smoothstep(0.5, 0.75, cl) * smoothstep(horizon + 0.02, 0.96, vp.y);
@@ -114,8 +114,8 @@ const FRAGMENT_BODY = /* glsl */ `
     water = mix(water, mix(uHorizon, uSunGlow, sun * 0.5 + 0.15), skyFace * 0.12);
 
     vec3 col = (vp.y > horizon) ? sky : water;
-    // 薄明光線（god rays）: 夕陽から放射する光の筋＝空の立体的な大気
-    col = godRays(col, vec2(ax, vp.y), vec2(sunScreenX, horizon + 0.02), uSunGlow * 0.13, t, smoothstep(horizon, horizon + 0.08, vp.y));
+    // 薄明光線（god rays）: 夕陽から放射する光の筋＝空の立体的な大気。直線的な人工感を避け控えめに。
+    col = godRays(col, vec2(ax, vp.y), vec2(sunScreenX, horizon + 0.02), uSunGlow * 0.085, t, smoothstep(horizon, horizon + 0.08, vp.y));
 
     // 遠い島影（世界に固定。空気遠近で淡く霞む。低くなだらかに。）
     float islX = 0.42 - yaw * 0.45;
