@@ -689,6 +689,8 @@ export async function mountTown3d(parent, opts = {}) {
   const poleMat = toon(0x6a5c4a)
   const transMat = toon(0x8f8f93), insMat = toon(0xcfcabf) // 柱上変圧器・碍子（共有）
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x2a2a30, fog: true }) // 電線（共有・軽量）
+  // スズメ（夕暮れの電線に集まる小鳥）の共有部材＝体・尾・頭。近い数スパンに数羽だけ＝郷愁の決め手。
+  const sparrowMat = toon(0x554a3c), sparrowBody = new THREE.SphereGeometry(0.1, 6, 5), sparrowTail = new THREE.BoxGeometry(0.045, 0.03, 0.17)
   let prevAnchors = null
   for (let i = 0; i < 12; i++) {
     const z = 6 - i * 7
@@ -748,6 +750,23 @@ export async function mountTown3d(parent, opts = {}) {
         wire.position.copy(a).lerp(bn, 0.5)
         wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bn.clone().sub(a).normalize())
         town.add(wire)
+      }
+      // スズメが上段の線にとまる（夜は塒へ帰り不在）。最も近いスパンは並んで一列＝郷愁の決め手、
+      // 奥のスパンは時々まばらに。頭を上げ尾を跳ね上げた小さな影。
+      if (!isNight && (i === 1 || (i <= 3 && R() < 0.6))) {
+        const a = prevAnchors[0], bn = anchors[0] // 上段の線
+        const row = i === 1 // 最寄りは確実に一列
+        const n = row ? 4 : 1 + ((R() * 2) | 0)
+        for (let s = 0; s < n; s++) {
+          const t = row ? 0.16 + s * 0.20 + (R() - 0.5) * 0.04 : 0.2 + R() * 0.6
+          const p = a.clone().lerp(bn, t)
+          const bird = new THREE.Group()
+          const body = new THREE.Mesh(sparrowBody, sparrowMat); body.scale.set(1, 1.05, 1.35); bird.add(body)
+          const head = new THREE.Mesh(sparrowBody, sparrowMat); head.scale.setScalar(0.6); head.position.set(0, 0.08, 0.12); bird.add(head)
+          const tail = new THREE.Mesh(sparrowTail, sparrowMat); tail.position.set(0, 0.03, -0.16); tail.rotation.x = 0.55; bird.add(tail)
+          bird.position.set(p.x, p.y + 0.12, p.z); bird.rotation.y = (row ? -0.3 : 0) + (R() - 0.5) * 1.4 // ほぼ同じ向き＋少しばらす
+          town.add(bird)
+        }
       }
     }
     prevAnchors = anchors
