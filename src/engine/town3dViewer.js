@@ -713,6 +713,15 @@ export async function mountTown3d(parent, opts = {}) {
       seg.position.set(hx, hy + 0.5, z); seg.castShadow = true; seg.receiveShadow = true; town.add(seg)
     }
   }
+  // ── 玄関先の植木鉢（通り沿いにぽつぽつ＝日本の住宅街の生活感。鉢＋小さな緑） ──
+  const potMat = toon(0x9a6a4e), potGreens = [toon(0x6a8a4a), toon(0x7e9850), toon(0x8aa055), toon(0xb08a64)]
+  for (let i = 0; i < 12; i++) {
+    const px = (R() < 0.5 ? -1 : 1) * (3.85 + R() * 0.7)
+    const pz = 6 - R() * 44
+    const py = heightAt(px, pz)
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.32, 8), potMat); pot.position.set(px, py + 0.16, pz); pot.castShadow = true; town.add(pot)
+    const pl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25 + R() * 0.1, 0), potGreens[(R() * potGreens.length) | 0]); pl.position.set(px, py + 0.48, pz); pl.scale.y = 1.2; pl.castShadow = true; town.add(pl)
+  }
   } // ← 建物・ランドマーク（街のみ）ここまで
 
   // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
