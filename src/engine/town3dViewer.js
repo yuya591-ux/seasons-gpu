@@ -469,6 +469,14 @@ export async function mountTown3d(parent, opts = {}) {
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(0x9a9488)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
       addRoofClutter(g, w, d, h + 0.4)
     }
+    // 1階を店舗に（時々・中層/集合住宅）＝混在用途のにぎわい。庇＋店先のくすんだ色帯
+    if ((type === 'mid' || type === 'apt') && h > 6 && R() < 0.34) {
+      const sh = 1.9
+      const shop = new THREE.Mesh(new THREE.BoxGeometry(w * 1.012, sh, d * 1.012), toon([0xb8a890, 0xa89878, 0xc2b2a0, 0xa8a0a8][(R() * 4) | 0]))
+      shop.position.y = sh / 2 + 0.02; g.add(shop)
+      const awn = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, 0.12, 0.72), toon([0xb0604a, 0x5e7a5e, 0x4a6a8a, 0xb09a58][(R() * 4) | 0]))
+      awn.position.set(0, sh, d / 2 + 0.36); awn.castShadow = true; g.add(awn)
+    }
     g.position.set(x, gy, z)
     g.rotation.y = (R() - 0.5) * 0.5
     town.add(g)
