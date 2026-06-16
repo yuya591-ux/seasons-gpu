@@ -352,12 +352,15 @@ const FRAGMENT_BODY = /* glsl */ `
         float hub = smoothstep(0.014, 0.006, wr);
         float leg = smoothstep(0.010, 0.0, abs(abs(wd.x) - (-wd.y) * 0.5)) * step(wd.y, 0.0) * step(-0.20, wd.y); // 支柱(A字)
         col = mix(col, frame, clamp(rim + spoke * 0.55 + hub + leg, 0.0, 1.0) * 0.7);
-        // ゴンドラ（リム上・等間隔・回転。夜は色とりどりに灯る）
+        // ゴンドラ（リム上・等間隔・回転。夜は淡い暖色寄りにぽつぽつ灯る＝原色LEDの安っぽさを排しブルームでにじませる）
         float gN = 12.0;
         float gA = (ang + rot) / (2.0 * PI) * gN;
         float gondola = smoothstep(0.30, 0.0, abs(fract(gA) - 0.5) * 2.0) * smoothstep(0.020, 0.006, abs(wr - R));
-        vec3 gcol = mix(uSunGlow, 0.55 + 0.45 * cos(floor(gA) * 1.3 + vec3(0.0, 2.1, 4.2)), nightAmt);
-        col += gcol * gondola * (0.35 + 0.85 * nightAmt);
+        float gGlow = smoothstep(0.30, 0.0, abs(fract(gA) - 0.5) * 2.0) * smoothstep(0.044, 0.012, abs(wr - R)); // 淡いハロー
+        vec3 gtint = 0.80 + 0.20 * cos(floor(gA) * 1.3 + vec3(0.0, 2.1, 4.2)); // 彩度を抑えた淡い色味
+        vec3 gcol = mix(uSunGlow, mix(uSunGlow, gtint, 0.5), nightAmt);        // 夜も暖色基調に、ごく淡く色づく
+        col += gcol * gondola * (0.35 + 0.7 * nightAmt);
+        col += gcol * gGlow * 0.16 * nightAmt;                                 // にじむブルーム（淡いハロー）
       }
     }
 
