@@ -1040,7 +1040,7 @@ export async function mountTown3d(parent, opts = {}) {
         scene.fog.far = fogFar0 * (1 - 0.16 * k) // 雨で奥がけむる
         for (let i = 0; i < N; i++) { head[i * 3 + 1] -= spd[i] * dt; head[i * 3] += 4 * dt; if (head[i * 3 + 1] < -14) { head[i * 3 + 1] = 82 + R() * 16; head[i * 3] = (R() - 0.5) * 210 } }
         writeSeg(); geo.attributes.position.needsUpdate = true
-        if (!rbDone && age >= dur - 7) { rbDone = true; evRainbow() } // 雨上がりに虹
+        if (!rbDone && age >= dur - 7) { rbDone = true; evRainbow(); evWetRoad() } // 雨上がりに虹＋濡れた路面のきらめき
         if (age >= dur) { rainActive = false; scene.fog.far = fogFar0; return false }
         return true
       },
@@ -1212,6 +1212,71 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 宵の口（夜・一部の窓が時間差でぽっと明るむ。街に灯りが点っていく気配＝最も“整う”夜の演出） ──
+  function evDuskLights() {
+    if (!isNight) return
+    // 灯る窓のマテリアルを scene から拾い、一部を時間差で明るませる（配列参照を持たず scene 走査で完結）
+    const mats = []
+    scene.traverse((o) => { const m = o.material; if (m && m.emissiveMap && m.emissiveIntensity > 0.1 && R() < 0.2) mats.push(m) })
+    if (!mats.length) return
+    const items = mats.map((m) => ({ m, base: m.emissiveIntensity, t0: R() * 6 }))
+    const dur = 13
+    addFx({
+      update: (age) => {
+        for (const it of items) { const a = age - it.t0; const k = a <= 0 ? 0 : Math.min(1, a / 1.6) * Math.min(1, Math.max(0, (dur - it.t0 - a) / 3)); it.m.emissiveIntensity = it.base + 0.42 * k }
+        return age < dur
+      },
+      cleanup: () => { for (const it of items) it.m.emissiveIntensity = it.base },
+    })
+  }
+
+  // ── 雨上がりの濡れた路面のきらめき（通りに空/灯りの照り返しがちらちら。雨の“第三幕”） ──
+  function evWetRoad() {
+    const N = 90
+    const pos = new Float32Array(N * 3); const aph = new Float32Array(N)
+    for (let i = 0; i < N; i++) { pos[i * 3] = (R() - 0.5) * 9; pos[i * 3 + 1] = 0.12; pos[i * 3 + 2] = 18 - R() * 112; aph[i] = R() * 6.28 }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    geo.setAttribute('aph', new THREE.BufferAttribute(aph, 1))
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uT: { value: 0 }, uOp: { value: 0 }, uCol: { value: new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2) } },
+      vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.35+0.65*(0.5+0.5*sin(uT*2.6+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=3.2*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
+      fragmentShader: 'varying float vtw; uniform vec3 uCol; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(uCol, a*vtw*uOp); }',
+    })
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; town.add(pts) // town座標系（街と一緒に動く）
+    const dur = 17
+    addFx({
+      update: (age) => { mat.uniforms.uT.value = age; mat.uniforms.uOp.value = 0.62 * Math.min(1, age / 3) * Math.min(1, Math.max(0, (dur - age) / 6)); return age < dur },
+      cleanup: () => { town.remove(pts); geo.dispose(); mat.dispose() },
+    })
+  }
+
+  // ── オーロラ（夜の超レア大当たり。緑〜紫のカーテンが空に揺らめき流れる。計算で描画） ──
+  function evAurora() {
+    const geo = new THREE.PlaneGeometry(340, 96)
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+      uniforms: { uT: { value: 0 }, uOp: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
+      fragmentShader:
+        'varying vec2 vUv; uniform float uT,uOp;' +
+        'void main(){ float x=vUv.x, y=vUv.y; float t=uT*0.12; float curt=0.0;' +
+        'for(int i=0;i<3;i++){ float fi=float(i); float ph=x*(7.0+fi*5.0)+t*(1.0+fi*0.5)+fi*2.1; curt+=(sin(ph)*0.5+0.5)*(0.5-fi*0.12); }' +
+        'curt/=1.4; float ray=pow(curt,1.4);' +              // 縦のカーテン状の濃淡が横に流れる
+        'float vfall=smoothstep(1.0,0.12,y)*smoothstep(0.0,0.18,y);' + // 上下端へやわらかく消える
+        'vec3 green=vec3(0.30,1.0,0.55), violet=vec3(0.66,0.34,1.0);' +
+        'vec3 col=mix(green,violet,smoothstep(0.30,0.95,y));' +        // 色はフルに保ち、濃淡はアルファで（加算でも色が出る）
+        'gl_FragColor=vec4(col, ray*vfall*uOp); }',
+    })
+    const m = new THREE.Mesh(geo, mat); m.position.set(0, 74, eye.z - 205); m.frustumCulled = false; scene.add(m)
+    const dur = 56
+    addFx({
+      update: (age) => { mat.uniforms.uT.value = age; mat.uniforms.uOp.value = 0.92 * Math.min(1, age / 10) * Math.min(1, Math.max(0, (dur - age) / 16)); return age < dur },
+      cleanup: () => { scene.remove(m); geo.dispose(); mat.dispose() },
+    })
+  }
+
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
     birds: { run: evBirdFlock },
@@ -1219,14 +1284,17 @@ export async function mountTown3d(parent, opts = {}) {
     star: { run: evShootingStars, ok: () => isNight },
     contrail: { run: evContrail },
     cloudShade: { run: evCloudShade, ok: () => !isNight && !shadeActive }, // 雲の翳り（昼の静かな整う演出）
+    duskLights: { run: evDuskLights, ok: () => isNight }, // 宵の口（夜・窓がぽっと灯る）
     rainbowSolo: { run: evRainbow, ok: () => !rainActive }, // 雨無しの単独虹（中バンドに低確率）＝見せ場を観られる機会を増やす
     rain: { run: () => evRain(30), ok: () => !rainActive },
     fireworks: { run: evFireworks, ok: () => isNight },
+    aurora: { run: evAurora, ok: () => isNight },
   }
   const fxBands = [
-    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade'] },         // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
-    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'rainbowSolo'] }, // 中（少し特別）
+    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },         // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo'] }, // 中（少し特別）
     { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks'] },                                      // まれ（大当たり＝雨→虹／花火）
+    { next: 360 + R() * 360, min: 1800, max: 3600, pool: ['aurora'] },                                              // 超レア（30〜60分に一度の“特別な空”＝オーロラ。最初は6〜12分で一度）
   ]
   function scheduleFx(dt) {
     for (const b of fxBands) {
@@ -1239,7 +1307,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, fireworks: evFireworks }[n] || (() => {}))()
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, aurora: evAurora }[n] || (() => {}))()
 
   function frame() {
     if (!active) return
