@@ -425,6 +425,22 @@ export async function mountTown3d(parent, opts = {}) {
     house(c[0], c[1], 5 + R() * 1.5, 5 + R() * 1.5, 4 + R() * 2, R() < 0.7 ? 'house' : 'apt')
   }
 
+  // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
+  {
+    const vendCols = [0xcf3a3a, 0x3a6fcf, 0xe6e2d8, 0xcf8a2a]
+    for (let i = 0; i < 8; i++) {
+      const side = R() < 0.5 ? -1 : 1
+      const vx = side * (4.4 + R() * 1.6)
+      const vz = -9 - R() * 64
+      const col = vendCols[(R() * vendCols.length) | 0]
+      const vm = toon(col)
+      if (duskAmt > 0.1) { vm.emissive = new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.35); vm.emissiveIntensity = 0.3 + duskAmt * 0.7 }
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.9, 0.72), vm)
+      box.position.set(vx, heightAt(vx, vz) + 0.95, vz); box.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2
+      box.castShadow = true; town.add(box)
+    }
+  }
+
   // ── 大きなランドマーク（大型スーパー＝平らな大箱＋駐車場＋屋上看板） ──
   {
     const x = 24, z = -20, gy = heightAt(x, z)
