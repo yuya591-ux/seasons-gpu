@@ -653,9 +653,9 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
   if (kind === 'yato') {
     // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
-    const waterMat = toon(0x98bdd2) // 水を張った田（朝空を映す水色・少し濃く）
-    const riceMat = toon(0x6f8a44)  // 青田（稲の緑）
-    const earthMat = toon(0x9c8862) // 畑の土
+    const waterMat = mottleMat(0x9ec0d6, 36, 0.09, [1, 1]) // 水を張った田（朝空を映す水色・さざ波のムラ）
+    const riceMat = mottleMat(0x6f8a44, 54, 0.15, [2, 2])  // 青田（稲の濃淡）
+    const earthMat = mottleMat(0x9c8862, 40, 0.13, [1, 1]) // 畑の土（土塊のムラ）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
       for (let px = -11; px <= 11; px += 5.6) {
         const jx = (R() - 0.5) * 0.5
@@ -691,12 +691,20 @@ export async function mountTown3d(parent, opts = {}) {
       const body = new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 6.5), toon(0xe9e2d2)) // 主屋（白漆喰）
       body.position.y = 1.6; body.castShadow = true; body.receiveShadow = true; g.add(body)
       const skirt = new THREE.Mesh(new THREE.BoxGeometry(9.1, 1.0, 6.6), toon(0x5e4d3c)); skirt.position.y = 0.5; g.add(skirt) // 下見板（腰壁）
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(7.8, 5.2, 4), toon(0x6a5a3c)) // 茅葺の寄棟（大きく深い・濃い褐色で際立たせる）
+      // 茅葺の質感（縦の茅の筋）。主屋と長屋門の屋根で共有。
+      const tc = document.createElement('canvas'); tc.width = tc.height = 64
+      const tcx = tc.getContext('2d'); const tb = new THREE.Color(0x6a5a3c)
+      tcx.fillStyle = '#' + tb.getHexString(); tcx.fillRect(0, 0, 64, 64)
+      for (let i = 0; i < 80; i++) { const col = tb.clone().offsetHSL((R() - 0.5) * 0.02, (R() - 0.5) * 0.05, (R() - 0.5) * 0.2); tcx.strokeStyle = '#' + col.getHexString(); tcx.lineWidth = 0.6 + R() * 1.2; tcx.globalAlpha = 0.5; const lx = R() * 64; tcx.beginPath(); tcx.moveTo(lx, 0); tcx.lineTo(lx + (R() - 0.5) * 5, 64); tcx.stroke() }
+      tcx.globalAlpha = 1
+      const thatchTex = new THREE.CanvasTexture(tc); thatchTex.wrapS = thatchTex.wrapT = THREE.RepeatWrapping; thatchTex.repeat.set(3, 1)
+      const thatchMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: thatchTex })
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(7.8, 5.2, 4), thatchMat) // 茅葺の寄棟（縦の茅の筋）
       roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.scale.set(1.0, 1.0, 0.7); roof.castShadow = true; g.add(roof)
       const ridge = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.6, 0.8), toon(0x4e4534)); ridge.position.y = 8.2; g.add(ridge) // 棟
       const gateBody = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 2.2), toon(0xddd4c4)) // 長屋門
       gateBody.position.set(0, 1.1, 5.8); gateBody.castShadow = true; g.add(gateBody)
-      const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.4, 4), toon(0x5e5648))
+      const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.4, 4), thatchMat)
       gateRoof.rotation.y = Math.PI / 4; gateRoof.position.set(0, 3.0, 5.8); gateRoof.scale.set(1.8, 1.0, 0.6); gateRoof.castShadow = true; g.add(gateRoof)
       const gateOpen = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.7, 0.3), toon(0x241f18)); gateOpen.position.set(0, 0.95, 6.95); g.add(gateOpen) // 門の通り口（陰）
     }

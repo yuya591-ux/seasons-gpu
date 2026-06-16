@@ -11,6 +11,7 @@ export default {
   status: 'ready',
   render: 'town3d', // Three.js ビューア（src/engine/town3dViewer.js）
   town3dKind: 'yato', // 谷戸（棚田・茅葺の屋敷・里山）として組む
+  bg3d: 'bg/town3d-yato.jpg', // 奥に敷く実写の里山の谷（棚田・茅葺／遠景を写真級に）
 
   palette: {
     early: {
