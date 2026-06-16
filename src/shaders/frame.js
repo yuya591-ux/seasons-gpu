@@ -23,15 +23,17 @@ export const FRAME_GLSL = `
     float vbar = step(abs(p.x - 0.5), bar);
     float hbar = step(abs(p.y - 0.52), bar);
     float sash = max(frame, max(vbar, hbar));
-    // 木/アルミの濃い下地＋縦の木目（ごく薄い）
-    vec3 sashCol = vec3(0.125, 0.102, 0.085) * (0.94 + 0.06 * sin(p.y * 240.0));
+    // 木の濃い下地＋不規則な縦木目（二〜三周波＋わずかな赤みのムラ）＝アルミでなく塗装木枠の質感。
+    float grain = 0.90 + 0.05 * sin(p.y * 240.0) + 0.045 * sin(p.y * 61.0 + p.x * 9.0) + 0.022 * sin(p.y * 17.0 + 1.3);
+    vec3 sashCol = vec3(0.136, 0.108, 0.086) * grain;
+    sashCol += vec3(0.012, 0.004, -0.004) * sin(p.y * 31.0 + p.x * 4.0); // 木目の赤みの濃淡
     col = mix(col, sashCol, sash);
     // 立体の陰影: 光は左上。各桟/枠の左・上側を明るく、右・下側を暗く＝かまぼこ断面の手応え。
     float bevel = clamp(((0.5 - p.x) + (p.y - 0.52)) * 1.6, -0.5, 0.5);
-    col += sash * bevel * vec3(0.16, 0.145, 0.12);
-    // ガラス縁のきらり（サッシと景色の境にごく細い光＝ガラス面の実感）
-    float edge = (smoothstep(bw + 0.006, bw, dEdge + bw) - smoothstep(bw, bw - 0.006, dEdge + bw));
-    col += vec3(0.10, 0.105, 0.12) * (1.0 - smoothstep(0.0, 0.004, abs(dEdge))) * 0.5;
+    col += sash * bevel * vec3(0.17, 0.15, 0.125);
+    // 枠/桟の内端が外の光を拾う暖色のリムライト（厚みのエッジが光り、木枠が手前に立つ＝実写の窓の手応え）。
+    float rim = max(1.0 - smoothstep(0.0, 0.007, abs(dEdge)), 1.0 - smoothstep(0.0, 0.006, abs(dBar)));
+    col += vec3(0.15, 0.128, 0.10) * rim * 0.7;
     // 厚い窓台（下枠を一段厚く・上端に光＝部屋から覗く手応え）
     float sill = smoothstep(bw + 0.032, bw, p.y);
     col = mix(col, vec3(0.14, 0.112, 0.088), sill);
