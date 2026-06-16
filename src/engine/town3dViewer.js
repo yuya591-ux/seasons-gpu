@@ -784,13 +784,33 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 道沿いの生垣（低い緑の連なりが通りを縁取る＝住宅街の生活感。門口で時々途切れる） ──
   const hedgeCol = season === 'autumn' ? 0x867c46 : weather === 'snow' ? 0x6e7a64 : season === 'spring' ? 0x6f8a4a : 0x577142 // 季節で色味
   const hMat = toon(hedgeCol)
+  // 生垣の季節の彩り（春＝ツツジの紅桃白、秋＝色づき/実の紅橙、冬＝雪に映える山茶花の紅。夏は青々と無し）。
+  const bloomCols =
+    season === 'spring' ? [0xe884a4, 0xf0a8be, 0xf6ecf0]
+      : season === 'autumn' ? [0xc24a38, 0xcf7a36]
+        : weather === 'snow' ? [0xc83a44]
+          : null
+  const bloomMats = bloomCols && bloomCols.map(toon)
+  const bloomGeo = bloomMats && new THREE.IcosahedronGeometry(0.2, 0) // 花房の共有玉（低ポリ・乗算で柔らかく）
   for (const side of [-1, 1]) {
     for (let z = 8; z > -60; z -= 4.0) {
       if (R() < 0.42) continue // 門・駐車場の切れ目
       const hx = side * (4.1 + R() * 0.5)
       const hy = heightAt(hx, z)
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(3.4 + R() * 0.6, 0.9 + R() * 0.3, 0.85), hMat)
+      const hw = 3.4 + R() * 0.6
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(hw, 0.9 + R() * 0.3, 0.85), hMat)
       seg.position.set(hx, hy + 0.5, z); seg.castShadow = true; seg.receiveShadow = true; town.add(seg)
+      // 生垣の上面に季節の花房を（春のツツジは咲き満ちて密に＝面で覆う・秋冬は実がまばらに）
+      const spr = season === 'spring'
+      if (bloomMats && R() < (spr ? 0.9 : 0.4)) {
+        const nb = spr ? 3 + ((R() * 3) | 0) : 1 + ((R() * 2) | 0)
+        for (let b = 0; b < nb; b++) {
+          const fb = new THREE.Mesh(bloomGeo, bloomMats[(R() * bloomMats.length) | 0])
+          fb.position.set(hx + (R() - 0.5) * (hw - 0.3), hy + 0.96 + R() * 0.12, z + (R() - 0.4) * 0.6)
+          const s = spr ? 1.0 + R() * 0.7 : 0.6 + R() * 0.4
+          fb.scale.set(s, s * 0.65, s); town.add(fb)
+        }
+      }
     }
   }
   // ── 玄関先の植木鉢（通り沿いにぽつぽつ＝日本の住宅街の生活感。鉢＋小さな緑） ──
