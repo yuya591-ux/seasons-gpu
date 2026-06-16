@@ -167,7 +167,7 @@ const FRAGMENT_BODY = /* glsl */ `
     float mask = clamp(max(sMask, rMask), 0.0, 1.0);
 
     // 屈折オフセット（中心方向へ）。雨脚で強さが変わる。
-    vec2 refr = (sd.xy * sMask + rs.xy * rMask * 1.3) * 0.052 * mix(0.6, 1.25, rain);
+    vec2 refr = (sd.xy * sMask + rs.xy * rMask * 1.3) * 0.064 * mix(0.6, 1.25, rain); // 屈折を少し強め＝粒の中に景色が縮んで映る
 
     // 曇りガラスの下地（結露でくもる。水のある所だけ晴れて景色が見える＝雨らしさの核）
     vec3 sky = outside(frag);
@@ -194,11 +194,11 @@ const FRAGMENT_BODY = /* glsl */ `
                 * smoothstep(0.35, 1.0, sd.w) * sMask;
     vec2 rn = normalize(rs.xy + 1e-5);
     float rSpec = smoothstep(0.4, 0.96, dot(rn, normalize(LIGHT))) * rs.w;
-    // 背景画像のときは白い鏡面ハイライトを少し抑え、筋が傷のように浮かないようにする
-    col += vec3(1.0) * (sSpec + rSpec) * (0.24 - 0.06 * uHasBg);
-    // 光に面した縁の鋭いきらめき（水玉の立体感）
-    float sGlint = smoothstep(0.86, 0.99, dot(sn, normalize(LIGHT))) * smoothstep(0.55, 0.95, sd.w) * sMask;
-    col += vec3(1.0) * sGlint * 0.5;
+    // 鏡面ハイライトは控えめに（白く光る“オーブ”化を防ぎ、屈折で景色を映す“濡れたレンズ”に見せる）
+    col += vec3(1.0) * (sSpec + rSpec) * (0.13 - 0.04 * uHasBg);
+    // 光に面した縁の鋭いきらめき（水玉の立体感）。点ではなく縁の一点に絞って弱く。
+    float sGlint = smoothstep(0.88, 0.99, dot(sn, normalize(LIGHT))) * smoothstep(0.6, 0.95, sd.w) * sMask;
+    col += vec3(1.0) * sGlint * 0.24;
 
     // レンズの縁の陰り（球の輪郭を締める）
     float rimDark = smoothstep(0.68, 1.0, sd.w) * sMask;
