@@ -474,6 +474,16 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 路沿いの小さな商店（庇＋袖看板。夕/夜は看板が灯る＝商店街の生活感） ──
+  for (const sc of [[-5.6, -16, 0xd6c4a0, 0xcf6a3a], [6, -30, 0xc8c0b0, 0x3a7a5a], [-6, -48, 0xd0c8b8, 0xc23a6a], [5.6, -60, 0xccc4b2, 0xcf9a2a]]) {
+    const sx = sc[0], sz = sc[1], gy = heightAt(sx, sz), facing = sx < 0 ? 1 : -1
+    const b = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.3, 4), toon(sc[2])); b.position.set(sx, gy + 1.65, sz); b.castShadow = true; b.receiveShadow = true; town.add(b)
+    const awn = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.4, 1.7), toon(sc[3])); awn.position.set(sx + facing * 1.1, gy + 2.45, sz); awn.rotation.z = facing * 0.12; awn.castShadow = true; town.add(awn)
+    const lit = duskAmt > 0.2
+    const sg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.0, 1.0), lit ? new THREE.MeshBasicMaterial({ color: sc[3], fog: true }) : toon(sc[3]))
+    sg.position.set(sx + facing * 2.25, gy + 2.9, sz + 1.5); town.add(sg)
+  }
+
   // ── 大きなランドマーク（大型スーパー＝平らな大箱＋駐車場＋屋上看板） ──
   {
     const x = 24, z = -20, gy = heightAt(x, z)
