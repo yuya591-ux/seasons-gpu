@@ -92,11 +92,12 @@ export async function mountTown3d(parent, opts = {}) {
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
   // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）。雪は濃く冷たく。
   const fogCol = weather === 'snow'
-    ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.5).getHex()
-    : skyHorizon.clone().lerp(skyTop, 0.42).getHex() // 地平の色をより残し、暖かな空気の層に
-  // 霞を一段強め、中景の低ポリを空気遠近で溶かして奥行きと水彩感を出す（手前は鮮明に保つ）。
-  // near を手前へ・far を近くへ寄せて、遠景〜中景がやわらかな大気に溶ける絵画的な奥行きにする。
-  scene.fog = new THREE.Fog(fogCol, weather === 'snow' ? 38 : 44, weather === 'snow' ? 158 : 172)
+    ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.55).getHex()
+    : skyHorizon.clone().lerp(skyTop, 0.52).getHex() // 空色へ溶かす空気の層（俯瞰の霞）
+  // 空気遠近の霞（調整可）: near=ここから霞み始める, far=ここで空に溶ける。手前へ寄せて遠景〜中景を
+  // やわらかな大気に溶かし、「高台から街を眺める」水彩調の奥行きを出す（手前は鮮明に保つ）。
+  const FOG = { near: weather === 'snow' ? 32 : 36, far: weather === 'snow' ? 135 : 150 }
+  scene.fog = new THREE.Fog(fogCol, FOG.near, FOG.far)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
   {
@@ -182,8 +183,20 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(glow)
   }
 
-  // 拡散シェーディング（実写寄り）。MeshLambertMaterial は gradientMap を持たないため渡さない（無効な警告とテクスチャ生成の無駄を排す）。
-  const toon = (hex) => new THREE.MeshLambertMaterial({ color: hex })
+  // 軽いトゥーン（やわらかな水彩調のセル影）。プラスチックな拡散を脱し手描き調へ（3Dの街モード専用）。
+  const grad = makeGradient(THREE)
+  const toon = (hex) => new THREE.MeshToonMaterial({ color: hex, gradientMap: grad })
+  // 手描き調の輪郭線（反転ハル）。背面を黒で少し大きく描き、シルエットに線を出す。共有・軽量・霞で遠景は淡く。
+  // OUTLINE=線の太さ（後から調整可）。fog:true で遠景の線も空気遠近で淡くなる。
+  const OUTLINE = 1.045 // 線の太さ（背面ハルの拡大率。後から調整可）
+  const outlineMat = new THREE.MeshBasicMaterial({ color: 0x16120b, side: THREE.BackSide, fog: true })
+  function addOutline(mesh) {
+    const o = new THREE.Mesh(mesh.geometry, outlineMat)
+    o.position.copy(mesh.position); o.rotation.copy(mesh.rotation)
+    o.scale.copy(mesh.scale).multiplyScalar(OUTLINE) // 中心から一様にふくらませて背面を出す＝シルエットの線
+    o.castShadow = false; o.receiveShadow = false; o.renderOrder = -1
+    return o
+  }
 
   // 壁＋窓のテクスチャ（乗算マップ）。壁はベタ白を避け、コンクリの微細なムラ＋雨だれの経年汚れを描いて
   // 実写の建物の質感に近づける。窓は灰（通常）／暖色emissive（灯り）。64pxで滑らかに。
@@ -286,7 +299,7 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const mottleMat = (baseHex, n, spread, rep) => {
-    const m = new THREE.MeshLambertMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread) })
+    const m = new THREE.MeshToonMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
     m.map.repeat.set(rep[0], rep[1])
     return m
   }
@@ -375,6 +388,7 @@ export async function mountTown3d(parent, opts = {}) {
     body.position.y = h / 2
     body.castShadow = true; body.receiveShadow = true
     g.add(body)
+    if (h > 4.6 || type !== 'house') g.add(addOutline(body)) // 大きめの建物のみ輪郭（性能配慮・小さな家は省く）
     if (type === 'house') {
       // 切妻 or 寄棟の瓦屋根（色ごとの質感テクスチャを共有）
       const rMat = roofMats[(R() * roofMats.length) | 0]
@@ -794,7 +808,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── ふわふわの雲（白い球の塊＝立体的な積雲） ──
   const clouds = []
-  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xfbfaf6, fog: false })
+  const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })
   for (let i = 0; i < 11; i++) {
     const g = new THREE.Group()
     const n = 4 + ((R() * 4) | 0)
@@ -911,6 +925,7 @@ export async function mountTown3d(parent, opts = {}) {
         })
         winMapBase.dispose()
         for (const e of winEmis) e.dispose()
+        grad.dispose()
       } catch (e) { /* 無視 */ }
       try { renderer.forceContextLoss() } catch (e) { /* 無視 */ } // GPUコンテキストを即解放＝連打切替でのコンテキスト蓄積/ロストを防ぐ
       renderer.dispose()

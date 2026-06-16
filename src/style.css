@@ -142,8 +142,8 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  /* ノスタルジー・グレード（彩度を少し落とし、暖かなセピアを薄く＝色褪せた郷愁の写真調・癒し）。 */
-  filter: saturate(0.95) sepia(0.12) contrast(1.02) brightness(1.02);
+  /* アニメ調セルの発色＋ほんのり郷愁（参考: probiex007）。明るく彩度を保ち、わずかな暖色で癒しに。 */
+  filter: saturate(1.07) sepia(0.04) contrast(1.05) brightness(1.04);
 }
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {
