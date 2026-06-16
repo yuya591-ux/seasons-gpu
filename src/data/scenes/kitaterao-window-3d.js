@@ -30,9 +30,10 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 夏の昼下がりの街＝アブラゼミの蝉時雨＋ごく淡い風（既存のCC0素材を再利用）。
+  // 夏の夕暮れの街＝ヒグラシのカナカナ（夕方の蝉）＋ごく淡い風（既存のCC0素材を再利用）。
+  // 時間帯がduskなので、昼のアブラゼミ(ジリジリ)でなく夕方のヒグラシに（情景に合う蝉へ差し替え）。
   sounds: [
-    { id: 'semi', label: '蝉', src: 'audio/summer-clear-noon/aburazemi.mp3', gain: 0.32, loop: true },
+    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.4, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.07, loop: true },
   ],
 }

@@ -35,8 +35,8 @@ export default {
   // 秋の夕暮れの気配: 草むらの虫の音（鈴を振るような秋の夜長の始まり）＋名残のヒグラシ＋渡る風。
   // すべてライセンス明確な素材（CREDITS.md に全数記録）。
   sounds: [
-    { id: 'crickets', label: '虫の音', src: 'audio/autumn-dusk-corner-room/crickets.mp3', gain: 0.34, loop: true },
-    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.3, loop: true },
+    { id: 'crickets', label: '虫の音', src: 'audio/autumn-dusk-corner-room/crickets.mp3', gain: 0.4, loop: true },
+    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.18, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.12, loop: true },
   ],
 }

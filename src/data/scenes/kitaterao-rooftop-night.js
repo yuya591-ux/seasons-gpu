@@ -33,8 +33,9 @@ export default {
   driftPeriod: 320,
   phenomena: {},
 
-  // 夜の屋上: 渡る風（既存のCC0素材を再利用）。
+  // 夏の夜の屋上: 虫の音＋渡る風（既存のCC0素材を再利用）。
   sounds: [
+    { id: 'crickets', label: '虫の音', src: 'audio/autumn-dusk-corner-room/crickets.mp3', gain: 0.3, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.16, loop: true },
   ],
 }

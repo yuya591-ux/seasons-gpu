@@ -34,8 +34,9 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 屋上の風（既存のCC0素材を再利用）。
+  // 夏の夕暮れの屋上＝ヒグラシ（夕方の蝉）＋屋上の風（既存のCC0素材を再利用）。
   sounds: [
+    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.34, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.14, loop: true },
   ],
 }

@@ -1,5 +1,5 @@
 // 窓辺シリーズ「北寺尾の窓辺、花の立体の街」。本物の3D（Three.js）の坂の街に、
-// 桜の花びらが舞う春の夕暮れ。木々は桜と新緑が混じり、地面は若草色。遠くに蛙の声。
+// 桜の花びらが舞う春の夕暮れ。木々は桜と新緑が混じり、地面は若草色。遠くにうぐいすの声。
 // 観覧車は霞む茜の空に佇む。窓をあけ、身を乗り出して花の街を見渡せる。
 
 export default {
@@ -31,9 +31,9 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 春の夕の蛙＋やわらかな風（既存のCC0素材を再利用）。
+  // 春のうぐいす＋やわらかな風（既存のCC0素材を再利用）。蛙のゲコゲコは街の情景に合わず不快なため差し替え。
   sounds: [
-    { id: 'frogs', label: '蛙', src: 'audio/spring-dusk-corner-room/frogs.mp3', gain: 0.5, loop: true },
-    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.08, loop: true },
+    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.34, loop: true },
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.1, loop: true },
   ],
 }

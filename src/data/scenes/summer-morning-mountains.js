@@ -28,8 +28,10 @@ export default {
   driftPeriod: 320,
   phenomena: { mist: { amount: 0.5 } },
 
-  // 風（CC BY-SA 4.0, W.carter）。CREDITS.md に記録。
+  // 山あいの朝＝うぐいす＋谷の沢のせせらぎ＋渡る風（既存のCC0素材を再利用）。風だけでは寂しいので朝の山の音を重ねる。
   sounds: [
-    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.3, loop: true },
+    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.34, loop: true },
+    { id: 'stream', label: 'せせらぎ', src: 'audio/shishigaya-morning-yato/stream.mp3', gain: 0.26, loop: true },
+    { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.16, loop: true },
   ],
 }

@@ -31,9 +31,9 @@ export default {
   driftPeriod: 280,
   phenomena: {},
 
-  // 春の宵の気配: 田や池のカエルの合唱＋渡る風（春の夕暮れの郷愁）。CREDITS.md に全数記録。
+  // 春の宵の気配: うぐいす＋渡る風（春の郷愁）。カエルの合唱は街の窓辺に合わず不快なため差し替え。CREDITS.md に全数記録。
   sounds: [
-    { id: 'frogs', label: 'かえる', src: 'audio/spring-dusk-corner-room/frogs.mp3', gain: 0.3, loop: true },
+    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.3, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.12, loop: true },
   ],
 }
