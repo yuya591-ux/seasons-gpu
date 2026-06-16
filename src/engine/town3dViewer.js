@@ -181,21 +181,39 @@ export async function mountTown3d(parent, opts = {}) {
   const grad = makeGradient(THREE)
   const toon = (hex) => new THREE.MeshLambertMaterial({ color: hex, gradientMap: grad })
 
-  // 窓のテクスチャ（壁に窓の列。乗算マップ＝白地に灰の窓＋夕方に灯る暖色のemissive）。
+  // 壁＋窓のテクスチャ（乗算マップ）。壁はベタ白を避け、コンクリの微細なムラ＋雨だれの経年汚れを描いて
+  // 実写の建物の質感に近づける。窓は灰（通常）／暖色emissive（灯り）。64pxで滑らかに。
   function makeWinTex(lit, seed) {
-    const c = document.createElement('canvas'); c.width = 32; c.height = 32
+    const S = 64
+    const c = document.createElement('canvas'); c.width = c.height = S
     const g = c.getContext('2d')
-    g.fillStyle = lit ? '#000000' : '#ffffff'; g.fillRect(0, 0, 32, 32)
     let s = seed * 2654435761
     const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff }
+    if (lit) { g.fillStyle = '#000000'; g.fillRect(0, 0, S, S) }
+    else {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S)
+      // コンクリ/モルタルの微細なムラ（乗算なので暗いほど陰る＝のっぺり白を避ける）
+      for (let i = 0; i < 110; i++) {
+        const v = 206 + (rnd() * 49 | 0)
+        g.fillStyle = `rgba(${v},${v},${v - 8},0.22)`
+        g.fillRect(rnd() * S, rnd() * S, 1 + rnd() * 3, 1 + rnd() * 3)
+      }
+      // 縦の雨だれ筋（窓下から伸びる経年の汚れ＝建物のリアルさ）
+      for (let k = 0; k < 7; k++) {
+        const sx = rnd() * S
+        g.fillStyle = `rgba(118,120,128,${0.05 + rnd() * 0.06})`
+        g.fillRect(sx, rnd() * S * 0.4, 0.8 + rnd(), S * (0.3 + rnd() * 0.5))
+      }
+    }
+    // 窓の格子（3列×4段）
     for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) {
       if (lit) { g.fillStyle = rnd() < 0.45 ? '#ffd089' : '#0a0a0a' }
-      else { g.fillStyle = '#6f6f78' }
-      g.fillRect(4 + xx * 9, 4 + yy * 7, 5.5, 4.5)
+      else { g.fillStyle = rnd() < 0.5 ? '#6b6b75' : '#76767f' } // 窓ごとに僅かな濃淡
+      g.fillRect(8 + xx * 18, 7 + yy * 14, 11, 9)
     }
     const t = new THREE.CanvasTexture(c)
     t.wrapS = t.wrapT = THREE.RepeatWrapping
-    t.magFilter = THREE.NearestFilter
+    t.magFilter = THREE.LinearFilter // 微細な壁質感を滑らかに（Nearestのブロック感を脱す）
     return t
   }
   const winMapBase = makeWinTex(false, 1)
@@ -310,6 +328,8 @@ export async function mountTown3d(parent, opts = {}) {
   if (kind !== 'yato') {
   const wallCols = [0xd8cfbf, 0xcec0af, 0xc6c0b2, 0xc2b4a4, 0xd0c2ac, 0xbcc0b6]
   const roofCols = [0x59636e, 0x7a5e50, 0x4e5660, 0x6a6258, 0x5e6a5c, 0x86766a] // くすんだ瓦（スレート青/テラコッタ/紺/灰/苔/茶）
+  // 屋根は色ごとに質感テクスチャ（瓦の濃淡・苔・経年のムラ）を1枚ずつ共有＝見下ろしの屋根のベタ塗りを解消
+  const roofMats = roofCols.map((c) => mottleMat(c, 60, 0.13, [3, 2]))
   function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
@@ -326,15 +346,15 @@ export async function mountTown3d(parent, opts = {}) {
     body.castShadow = true; body.receiveShadow = true
     g.add(body)
     if (type === 'house') {
-      // 切妻 or 寄棟の瓦屋根
-      const rc = roofCols[(R() * roofCols.length) | 0]
+      // 切妻 or 寄棟の瓦屋根（色ごとの質感テクスチャを共有）
+      const rMat = roofMats[(R() * roofMats.length) | 0]
       if (R() < 0.6) {
         const rg = new THREE.CylinderGeometry(d * 0.62, d * 0.62, w, 3, 1)
         rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
-        const roof = new THREE.Mesh(rg, toon(rc)); roof.position.y = h + d * 0.30; roof.scale.y = 0.7; roof.castShadow = true; g.add(roof)
+        const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.y = 0.7; roof.castShadow = true; g.add(roof)
       } else {
         const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.74, d * 0.62, 4); rg.rotateY(Math.PI / 4)
-        const roof = new THREE.Mesh(rg, toon(rc)); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
+        const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
       }
     } else if (type === 'apt') {
       // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
