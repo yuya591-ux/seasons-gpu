@@ -8,6 +8,29 @@ let active = null // { renderer, scene, camera, raf, dispose, stage }
 
 const lerp = (a, b, t) => a + (b - a) * t
 
+// ease-in-out（smoothstep）。0→1の線形進行を、出だしも止まりもやわらかい曲線へ変換する。
+// 線形やexp追従(=ease-out)と違い、動き始めと止まり際の両方がそっと加減速する＝酔わない上質なカメラ運び。
+const easeInOut = (p) => p * p * (3 - 2 * p)
+
+// 線形進行 p を、目標へ毎フレーム一定速度(step)で近づける（overshoot無しでぴったり止まる）。
+// 一定速度で進めた p に easeInOut をかけることで、開く時も戻る時も両端がやわらかい往復になる。
+const approach = (p, target, step) => p + Math.sign(target - p) * Math.min(step, Math.abs(target - p))
+
+// ── 窓辺カメラ演出の微調整パラメータ（この数値だけで動きの量・速さ・角度を後から調整できる） ──
+// 一人称・カメラのみの移動。控えめな移動量/画角変化で3D酔いを避けつつ「窓から顔を出す」手応えを出す。
+const CAM = {
+  winOpenDur: 1.15, // 窓をあける所要時間(秒)。大きいほどゆっくり開く
+  leanDur: 1.5,     // 身を乗り出す／もどる所要時間(秒)
+  winFwd: 1.8,      // 窓あけでカメラが前へ進む量（控えめ＝視界がふっと開ける程度）
+  winDown: 0.4,     // 窓あけでカメラが下がる量
+  winFov: 3.5,      // 窓あけで画角が広がる量(度)
+  leanFwd: 9.0,     // 乗り出しでカメラが前へ出る量（枠を越えて街へ顔を出す）
+  leanDown: 4.5,    // 乗り出しでカメラが下がる量
+  leanFov: 7.0,     // 乗り出しで画角が広がる量(度)
+  leanLook: 4.0,    // 乗り出しで視線が下を覗き込む量
+  fov0: 62,         // 基準画角(度)
+}
+
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
 function makeGradient(THREE) {
@@ -913,8 +936,10 @@ export async function mountTown3d(parent, opts = {}) {
   active = {
     renderer, scene, camera, stage, raf: 0,
     yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0,
-    winOpen: 0, winOpenTarget: 0, // 窓をあける（ガラスが横にすべって外気が澄む）
-    lean: 0, leanTarget: 0,        // 身を乗り出す（枠を越えて前へ＝視界が広がる）
+    winOpen: 0, winOpenTarget: 0, // 窓をあける（ガラスが横にすべって外気が澄む）。winOpen=ease済みの実値
+    winOpenP: 0,                  // 窓あけの線形進行(0..1)。これに ease-in-out をかけて winOpen にする
+    lean: 0, leanTarget: 0,        // 身を乗り出す（枠を越えて前へ＝視界が広がる）。lean=ease済みの実値
+    leanP: 0,                     // 乗り出しの線形進行(0..1)
     fovCur: 62,
     dispose() {
       // シーングラフ全体の geometry/material/texture を解放（連打切替でのGPUメモリ蓄積＝コンテキストロストを防ぐ）
@@ -1024,10 +1049,14 @@ export async function mountTown3d(parent, opts = {}) {
       const flap = Math.sin(t * 9 + u.ph) * 0.5
       b.children.forEach((w) => { w.rotation.z = w.userData.side * flap })
     }
-    // 窓をあける／身を乗り出すをなめらかに追従（少しゆっくり＝動きがはっきり分かる）
-    active.winOpen += (active.winOpenTarget - active.winOpen) * 0.07
-    active.lean += (active.leanTarget - active.lean) * 0.06
-    const wo = active.winOpen, lean = active.lean
+    // 窓あけ／乗り出しの「線形進行(0..1)」を所要時間ぶんだけ目標へ一定速度で進め、ease-in-out をかける。
+    // exp追従(従来)は出だしだけ急＝ease-outで戻りが不自然だった。線形進行+smoothstepなら開く時も
+    // 戻る時も出だし・止まり際の両方がそっと加減速する＝ヌルヌルで酔わない窓の開閉・覗き込みになる。
+    active.winOpenP = approach(active.winOpenP, active.winOpenTarget, dt / CAM.winOpenDur)
+    active.leanP = approach(active.leanP, active.leanTarget, dt / CAM.leanDur)
+    const wo = easeInOut(active.winOpenP)
+    const lean = easeInOut(active.leanP)
+    active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
 
     // 見回しを目標へ滑らかに追従（イージング＝指を離しても余韻があるヌルヌルの見回し）
     active.yaw += (active.yawTarget - active.yaw) * 0.16
@@ -1035,16 +1064,16 @@ export async function mountTown3d(parent, opts = {}) {
     // 見回し（息づかいの微揺れ付き）
     const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
     const pitch = active.pitch
-    // 乗り出すとカメラを前へ・下へ寄せ、画角を広げる（枠を越えて街へ顔を出す立体感）
+    // 窓をあけると視界がふっと前へ開け(=控えめ)、乗り出すとさらに前へ・下へ寄って画角が広がる（枠を越えて街へ顔を出す）
     const ex = 0
-    const ey = eye.y - lean * 4.5
-    const ez = eye.z - lean * 9.0
+    const ey = eye.y - wo * CAM.winDown - lean * CAM.leanDown
+    const ez = eye.z - wo * CAM.winFwd - lean * CAM.leanFwd
     camera.position.set(ex, ey, ez)
-    const fov = 62 + lean * 7
+    const fov = CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     const look = new THREE.Vector3(
       ex + Math.sin(yaw) * 18,
-      ey - 12 - lean * 4 + pitch * 14 + Math.sin(t * 0.5) * 0.05, // 乗り出すほど街を見下ろす
+      ey - 12 - lean * CAM.leanLook + pitch * 14 + Math.sin(t * 0.5) * 0.05, // 乗り出すほど街を見下ろす
       ez - Math.cos(yaw) * 22,
     )
     camera.lookAt(look)
