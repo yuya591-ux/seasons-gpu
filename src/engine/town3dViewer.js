@@ -446,10 +446,17 @@ export async function mountTown3d(parent, opts = {}) {
       addRoofClutter(g, w, d, h + 0.5) // 屋上に階段室・水タンク・室外機・アンテナ＝生活感
       const floors = Math.max(2, Math.round(h / 2.8))
       const balMat = toon(0xbcb6a8), railMat = toon(0x68686c)
+      const futCols = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xb0b8a8, 0xd8c8a0] // 布団・洗濯物のくすんだ色
       for (let f = 1; f < floors; f++) {
         const yy = f * (h / floors)
         const slab = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.18, 0.85), balMat); slab.position.set(0, yy, d / 2 + 0.38); g.add(slab)
         const rail = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.5, 0.1), railMat); rail.position.set(0, yy + 0.32, d / 2 + 0.78); g.add(rail)
+        // 手すりに布団／洗濯物を干す（時々）＝平成の集合住宅の生活感・ほのかな彩り
+        if (R() < 0.4) {
+          const fw = w * 0.28 + R() * w * 0.32
+          const fut = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.66, 0.12), toon(futCols[(R() * futCols.length) | 0]))
+          fut.position.set((R() - 0.5) * (w * 0.55), yy + 0.12, d / 2 + 0.85); g.add(fut)
+        }
       }
     } else { // mid: 陸屋根＋屋上設備（塔屋・水タンク・室外機・アンテナ）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(0x9a9488)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
@@ -671,6 +678,18 @@ export async function mountTown3d(parent, opts = {}) {
     const frame = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.1, 16), toon(0xd9913f)); frame.rotation.x = Math.PI / 2; head.add(frame)
     const mirror = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 16), toon(0xaebcc8)); mirror.rotation.x = Math.PI / 2; mirror.position.z = 0.06; head.add(mirror)
     g.add(head); town.add(g)
+  }
+  // ── 道沿いの生垣（低い緑の連なりが通りを縁取る＝住宅街の生活感。門口で時々途切れる） ──
+  const hedgeCol = season === 'autumn' ? 0x867c46 : weather === 'snow' ? 0x6e7a64 : season === 'spring' ? 0x6f8a4a : 0x577142 // 季節で色味
+  const hMat = toon(hedgeCol)
+  for (const side of [-1, 1]) {
+    for (let z = 8; z > -60; z -= 4.0) {
+      if (R() < 0.42) continue // 門・駐車場の切れ目
+      const hx = side * (4.1 + R() * 0.5)
+      const hy = heightAt(hx, z)
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(3.4 + R() * 0.6, 0.9 + R() * 0.3, 0.85), hMat)
+      seg.position.set(hx, hy + 0.5, z); seg.castShadow = true; seg.receiveShadow = true; town.add(seg)
+    }
   }
   } // ← 建物・ランドマーク（街のみ）ここまで
 
