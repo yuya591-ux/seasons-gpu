@@ -280,7 +280,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds) * (1.0 - uLeanOut));
 
     // 窓枠（最前景のサッシ＋桟＋窓台・固定）。乗り出すと消える。全情景で統一。
-    col = windowSash(col, p, preFrame, uLeanOut);
+    col = windowSash(col, p, preFrame, uLeanOut, asp);
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす

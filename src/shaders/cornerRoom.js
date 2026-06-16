@@ -453,7 +453,9 @@ const FRAGMENT_BODY = /* glsl */ `
     // ── 窓のアパーチャ（室内に切られた窓の開口） ──
     // 窓枠は最も手前。見回しに少し、覗き込み(uParallax)に大きく連動して動く＝身を乗り出して窓枠の脇を覗く。
     vec2 wp = p + vec2(yaw, pitch) * 0.012 + uParallax * 2.4;
-    float winL = 0.135, winR = 0.865, winB = 0.135, winT = 0.895;
+    // 横向き(asp>1)では左右の壁が厚くなりすぎるので、左右の余白だけ詰めて窓を広げる（縦向きは不変）。
+    float xb = 0.135 / max(asp, 1.0);
+    float winL = xb, winR = 1.0 - xb, winB = 0.135, winT = 0.895;
     // 開口（角を少し丸める）
     float ax0 = smoothstep(winL, winL + 0.012, wp.x) * smoothstep(winR, winR - 0.012, wp.x);
     float ay0 = smoothstep(winB, winB + 0.012, wp.y) * smoothstep(winT, winT - 0.012, wp.y);

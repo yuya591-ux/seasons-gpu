@@ -280,7 +280,7 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 lace = mix(uSunGlow, vec3(0.96, 0.94, 0.90), 0.55) * (0.72 + 0.28 * curtFolds);
     col = mix(col, lace, gather * (0.22 + 0.16 * curtFolds) * (1.0 - uLeanOut));
 
-    col = windowSash(col, p, preFrame, uLeanOut); // 窓辺の額装（全情景で統一）
+    col = windowSash(col, p, preFrame, uLeanOut, asp); // 窓辺の額装（全情景で統一）
 
     col = applyGrade(col, frag);
     // 窓を開けたら水彩のモヤを払い、視界をくっきり晴らす

@@ -141,7 +141,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col = applyGlass(col, p, t, uGlass);
 
     vec3 preFrame = col; // 乗り出し用（枠前の景色）
-    col = windowSash(col, p, preFrame, uLeanOut); // 窓辺の額装（全情景で統一）
+    col = windowSash(col, p, preFrame, uLeanOut, asp); // 窓辺の額装（全情景で統一）
 
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;

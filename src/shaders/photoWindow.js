@@ -63,7 +63,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col = mix(col, mix(col, vec3(gray), 0.5), 0.05 * glass);                 // ガラス面のわずかな白け（脱彩度）
     col += photo * uWindowOpen * 0.04; // あけると外光が少し入る
 
-    col = windowSash(col, frag, outside, uLeanOut); // 窓枠（乗り出すと景色だけ）
+    col = windowSash(col, frag, outside, uLeanOut, uResolution.x / uResolution.y); // 窓枠（乗り出すと景色だけ）
     col = applyGrade(col, frag);                    // 全情景共通の記憶の風景グレード
     col *= uBright;
     col += (hash21(frag * uResolution.xy + t) - 0.5) * 0.006; // 微グレインでバンディング防止

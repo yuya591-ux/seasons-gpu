@@ -571,6 +571,44 @@ body.idle .topbar {
   transform: translate(-50%, 0);
 }
 
+/* ── スマホ横向き（短い高さ）: 横幅を活かしてギャラリーを多列に・パネルを収める ──
+   高さの低い landscape（=スマホ横）だけを対象に。タブレット/PC（高さに余裕）は従来のまま。 */
+@media (orientation: landscape) and (max-height: 540px) {
+  /* パネルは横幅を使って広く・高さは画面に収め、はみ出せば内部スクロール */
+  .panel {
+    width: min(94vw, 52rem);
+    max-height: 94dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.9rem 1.1rem 1rem;
+  }
+  .panel__head {
+    margin-bottom: 0.6rem;
+  }
+  /* ギャラリーは3列＝横幅を活かし、1スクロールで多くの情景が見える。高さは画面に合わせる */
+  .gallery {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    max-height: calc(94dvh - 4.6rem);
+  }
+  /* カードは小ぶりに（サムネを少し低く・説明は1行）＝1画面に多く並ぶ */
+  .scene-card__swatch {
+    aspect-ratio: 16 / 9;
+    min-height: 3rem;
+  }
+  .scene-card__body {
+    padding: 0.3rem 0.45rem 0.4rem;
+  }
+  .scene-card__desc {
+    -webkit-line-clamp: 1;
+  }
+  /* 設定パネルの行間を詰めて短い高さに収める */
+  .axis,
+  .setrow {
+    margin: 0.5rem 0;
+  }
+}
+
 /* おやすみタイマー：ゆっくり暗転して休む（触れれば戻る） */
 .sleep-overlay {
   position: fixed;
