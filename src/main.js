@@ -145,6 +145,7 @@ function start() {
           season: (next.axes && next.axes.season) || 'summer',
           weather: next.town3dWeather || null, // 'snow' | 'petals' | 'leaves'（降るもの）
           kind: next.town3dKind || 'town', // 'town'（坂の街）| 'yato'（谷戸）
+          bg3d: next.bg3d || null, // 奥に敷く実写背景（Flux生成）。遠景を写真級にする任意の格上げ層
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
       } catch (e) {

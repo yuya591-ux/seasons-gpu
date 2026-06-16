@@ -109,6 +109,24 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(new THREE.Mesh(skyGeo, skyMat))
   }
 
+  // 奥の実写背景（任意・Flux生成の遠景）。近景の立体の奥に、写真級の遠望を円筒状に敷いて写真的な奥行きを出す。
+  // 近景の建物・木が手前を覆い、霞(fog)が中景を溶かして、遠景の実写へ自然につながる二層構成。
+  if (opts.bg3d) {
+    const BASE = import.meta.env.BASE_URL || '/'
+    new THREE.TextureLoader().load(BASE + opts.bg3d, (tex) => {
+      if (my !== token) return
+      tex.colorSpace = THREE.SRGBColorSpace
+      const geo = new THREE.CylinderGeometry(232, 232, 156, 64, 1, true)
+      const back = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        map: tex, side: THREE.BackSide, fog: false, depthWrite: true,
+      }))
+      back.position.y = 36 // 実写の里山が近景の低ポリ街の上にちょうど座る高さ
+      back.rotation.y = Math.PI // 画像の中心を初期視線(-z)へ
+      back.renderOrder = -1 // 近景より先に描く（遠景の最背面）
+      scene.add(back)
+    })
+  }
+
   const isNight = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 暗い palette = 夜
   // フィルミックなトーンマッピング（ACES）＝写真的なハイライトのころび・階調。実写風へ寄せる核。
   // Lambert 拡散シェーディングと合わせ、トゥーンの平面感を脱して実物に近い光の乗りにする。
@@ -633,9 +651,10 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   // ── 遠景の低ポリ山（街の奥に重なる尾根。空気遠近で淡く青み＝奥行きの錨） ──
+  // 実写背景(bg3d)があるときは省く（実写の里山が遠景の役割を果たすため・低ポリ山が手前を塞がない）。
   const mtnNear = skyHorizon.clone().lerp(new THREE.Color(0x6e7e62), 0.7)
   const mtnFar = skyHorizon.clone().lerp(new THREE.Color(0x8a98a6), 0.5)
-  for (let layer = 0; layer < 2; layer++) {
+  if (!opts.bg3d) for (let layer = 0; layer < 2; layer++) {
     const dist = layer === 0 ? 150 : 210
     const baseY = layer === 0 ? 4 : 10
     for (let i = 0; i < 9; i++) {
