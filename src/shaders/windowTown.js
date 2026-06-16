@@ -205,20 +205,20 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
     col = hills(col, vp, ax + yaw * 0.30, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
-    col = town(col, vp, ax + yaw * 0.45 + uParallax.x * 0.3, 0.50, 0.10, 0.06,
-               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 60.0, 78.0, 1.3, 0.0, 0.40);
+    col = town(col, vp, ax + yaw * 0.45 + uParallax.x * 0.3, 0.50, 0.13, 0.06,
+               mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.25, 0.5, uIntensity), 38.0, 50.0, 1.3, 0.0, 0.40);
 
     // 空気遠近の霞: 地平のあたりで遠い街並みが空に溶ける（退色は控えめ＝奥行きを残し濁らせない）
     float haze = smoothstep(0.60, 0.44, vp.y) * smoothstep(0.34, 0.50, vp.y);
-    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.24);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.36); // 中景の潰れた街並みを大気に溶かす（ノイズ感を抑える）
 
     // 街あかりの照り返し（夜の湿った空気に滲む光害のドーム）
     float nightAmt = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0);
     float cityHalo = smoothstep(0.78, 0.46, vp.y) * smoothstep(0.34, 0.50, vp.y);
     col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
 
-    col = town(col, vp, ax + yaw * 0.85 + uParallax.x * 0.8, 0.42, 0.16, 0.13,
-               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 34.0, 40.0, 7.1, 0.22, 0.33);
+    col = town(col, vp, ax + yaw * 0.85 + uParallax.x * 0.8, 0.42, 0.22, 0.15,
+               mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.40, 0.70, uIntensity), 24.0, 28.0, 7.1, 0.22, 0.33);
     col = town(col, vp, ax + yaw * 1.28 + uParallax.x * 1.4, 0.30, 0.26, 0.18,
                uDropTint * 0.82, uSunGlow, mix(0.50, 0.85, uIntensity), 18.0, 22.0, 19.3, 0.5, 0.20);
 
