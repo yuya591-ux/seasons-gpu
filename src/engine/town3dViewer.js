@@ -799,15 +799,14 @@ export async function mountTown3d(parent, opts = {}) {
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 2.0, 8), trunkMat) // 幹を8角＝丸く
-    tr.position.y = 1.0; g.add(tr)
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.38, 2.3, 7), trunkMat) // 幹を少し高く細く＝幹が見える
+    tr.position.y = 1.15; tr.castShadow = true; g.add(tr)
     const r = 1.6 + R() * 1.4
-    // 葉は分割1の丸い塊＋もう一塊を重ね、角ばりを消して自然な樹冠に（detail0の20面の角を解消）。
-    const leafMat = leafMats[(R() * leafMats.length) | 0]
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMat)
-    leaf.position.y = 2.0 + r * 0.7; leaf.scale.set(1.05, 0.92 + R() * 0.18, 1.05); leaf.castShadow = true; g.add(leaf)
-    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.72, 1), leafMat)
-    leaf2.position.set((R() - 0.5) * r * 0.9, 2.0 + r * 1.25, (R() - 0.5) * r * 0.9); g.add(leaf2) // 上に小さな塊＝樹冠の膨らみ
+    // 葉は丸い塊を2房重ね、房ごとに葉色を選んで濃淡を出す＝角ばらず自然な樹冠（同色ベタの平面感を解消）。
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMats[(R() * leafMats.length) | 0])
+    leaf.position.y = 2.1 + r * 0.7; leaf.scale.set(1.05, 0.92 + R() * 0.18, 1.05); leaf.castShadow = true; g.add(leaf)
+    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.72, 1), leafMats[(R() * leafMats.length) | 0])
+    leaf2.position.set((R() - 0.5) * r * 0.95, 2.1 + r * 1.25, (R() - 0.5) * r * 0.9); leaf2.scale.set(1.0, 0.95, 1.0); leaf2.castShadow = true; g.add(leaf2) // 上の房（別の葉色で濃淡）
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
     treesArr.push(g)
