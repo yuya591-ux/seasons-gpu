@@ -489,13 +489,13 @@ const FRAGMENT_BODY = /* glsl */ `
     // 網戸（夏・雨雪でないとき）: 細かな格子。明るい背景でだけ薄く見え、景色をほんのり和らげる。
     float summerScreen = step(0.5, uSeason) * step(uSeason, 1.5) * step(uGlass, 0.5) * aperture * glassOn;
     if (summerScreen > 0.001) {
-      // 細い縦横の糸（網戸）。明るい背景でだけ薄く見え、景色をほんのり和らげる。
-      float wireX = smoothstep(0.16, 0.0, abs(fract(wp.x * 95.0 * asp) - 0.5));
-      float wireY = smoothstep(0.16, 0.0, abs(fract(wp.y * 95.0) - 0.5));
+      // 細い縦横の糸（網戸）。周波数を下げ強さを抑えてモアレ（格子の干渉縞）を解消し、ごく淡い網の気配だけ残す。
+      float wireX = smoothstep(0.22, 0.0, abs(fract(wp.x * 60.0 * asp) - 0.5));
+      float wireY = smoothstep(0.22, 0.0, abs(fract(wp.y * 60.0) - 0.5));
       float wire = max(wireX, wireY);
       float bright = smoothstep(0.42, 0.82, gLuma);
-      outside *= 1.0 - summerScreen * 0.045;                 // 網戸ごしの微かな減光
-      outside -= summerScreen * (0.4 + 0.6 * bright) * wire * 0.04; // 糸の影（明るい所ほど見える）
+      outside *= 1.0 - summerScreen * 0.03;                  // 網戸ごしの微かな減光
+      outside -= summerScreen * (0.4 + 0.6 * bright) * wire * 0.016; // 糸の影（控えめ＝モアレを出さない）
     }
     // 結露（冬・雪）: 縁ほど曇り、暖かい中央は晴れる。曇りを縦に晴らす水滴の筋。
     float winterCond = (step(2.5, uSeason) + step(1.5, uGlass)) * aperture * glassOn;
