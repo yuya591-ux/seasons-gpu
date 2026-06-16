@@ -182,8 +182,8 @@ export async function mountTown3d(parent, opts = {}) {
   scene.add(sun)
   // 空からの回り込み光（影側を黒く沈めない＝くすみ防止）。地面側は暖色で泥にしない。
   // 回り込み光を抑えて平坦フィルを脱す（影側が残る＝セルの陰影と形が出る）。地面側は暖色。
-  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.26 : 0.34))
-  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.06 : 0.10))
+  scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.34 : 0.34))
+  scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.10)) // 夜の近景が真っ黒に沈まない程度に底上げ
   // 夜は月と星
   if (isNight) {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
@@ -440,7 +440,7 @@ export async function mountTown3d(parent, opts = {}) {
     wm.map = m
     if (duskAmt > 0.12) { // 夕方は窓が灯る
       const e = winEmis[(R() * winEmis.length) | 0].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
-      wm.emissiveMap = e; wm.emissive = new THREE.Color(0xffcaa0); wm.emissiveIntensity = 0.45 + duskAmt * 0.9
+      wm.emissiveMap = e; wm.emissive = new THREE.Color(0xffcaa0); wm.emissiveIntensity = 0.32 + duskAmt * 0.6 // 発光を抑え主従を付ける（夜の電飾貼り絵感を解消）
     }
     const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wm)
     body.position.y = h / 2
@@ -672,6 +672,16 @@ export async function mountTown3d(parent, opts = {}) {
     pole.position.set(x, gy + ph / 2, z); pole.castShadow = true; town.add(pole)
     const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.18), poleMat)
     arm.position.set(x, gy + ph - 1.0, z); town.add(arm)
+    // 街灯（夜のみ・一部の電柱に）。暖色の灯り＋足元の淡い光だまりで、近景の坂を照らし暗黒を救う。
+    if (isNight && i % 2 === 0) {
+      const lampX = x + 0.9
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd79a, fog: true }))
+      lamp.position.set(lampX, gy + ph - 1.6, z); town.add(lamp)
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffcf8a, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
+      glow.position.copy(lamp.position); town.add(glow)
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(2.4, 16), new THREE.MeshBasicMaterial({ color: 0xffcc88, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }))
+      pool.rotation.x = -Math.PI / 2; pool.position.set(lampX, gy + 0.12, z); town.add(pool) // 路面の光だまり
+    }
     // 柱上変圧器（半分の電柱に＝街の象徴）
     if (R() < 0.5) {
       const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.95, 10), transMat)
@@ -1535,8 +1545,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (Math.abs(clarity - clarityCur) > 0.004) {
       clarityCur = clarity
       stage.style.filter =
-        `saturate(${lerp(0.78, 0.95, clarity).toFixed(3)}) sepia(${lerp(0.06, 0.02, clarity).toFixed(3)}) ` +
-        `brightness(${lerp(1.02, 1.06, clarity).toFixed(3)}) contrast(0.98)`
+        `saturate(${lerp(0.85, 0.96, clarity).toFixed(3)}) sepia(${lerp(0.045, 0.02, clarity).toFixed(3)}) ` +
+        `brightness(${lerp(1.03, 1.06, clarity).toFixed(3)}) contrast(0.99)`
     }
 
     // 雲がゆっくり流れる
