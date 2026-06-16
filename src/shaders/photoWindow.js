@@ -18,6 +18,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform vec2 uParallax;   // 覗き込み視差
   uniform float uReduceMotion;
   uniform float uLeanOut;
+  uniform float uWindowOpen; // 窓をあける（ガラスの映り込み/くもりが晴れて外気が澄む）
   uniform float uBright;
   uniform vec3 uSkyTop;
   uniform vec3 uSkyMid;
@@ -37,10 +38,10 @@ const FRAGMENT_BODY = /* glsl */ `
     // ごく弱い“息づかい”の揺れ（その場に居る気配）。モーション過敏配慮で止める。
     float sm = 1.0 - uReduceMotion;
     vec2 breathe = vec2(sin(t * 0.09) * 0.004, sin(t * 0.06 + 0.7) * 0.003) * sm;
-    // わずかな視差＝窓越しに覗く奥行き。写真をほんの少しズームし、見回し/傾きで静かに動かす。
-    vec2 par = uPan * 0.05 + uParallax * 0.6 + breathe;
-    float zoom = 0.93 - 0.04 * uLeanOut; // 乗り出すと少し寄って枠の外まで見える
-    vec2 uv = (frag - 0.5) * zoom + 0.5 - vec2(par.x * 0.5, par.y * 0.35);
+    // 視差＝窓越しに覗く奥行き。見回し(uPan.x)・見下ろし(uPan.y)・傾きで写真を動かす＝生きた窓。
+    vec2 par = uPan * vec2(0.10, 0.12) + uParallax * 0.7 + breathe;
+    float zoom = 0.92 - 0.05 * uLeanOut - 0.02 * uWindowOpen; // 乗り出す/あけると少し寄って枠の外まで
+    vec2 uv = (frag - 0.5) * zoom + 0.5 - vec2(par.x * 0.5, par.y * 0.6);
     vec3 photo = uHasBg > 0.5
       ? texture2D(uBg, vec2(clamp(uv.x, 0.0, 1.0), clamp(1.0 - uv.y, 0.0, 1.0))).rgb
       : mix(uHorizon, uSkyTop, frag.y);
@@ -50,12 +51,15 @@ const FRAGMENT_BODY = /* glsl */ `
     photo = mix(photo, photo * mood, 0.12);
     vec3 outside = photo; // 乗り出し用（枠の無い素の景色）
 
-    // 窓ガラスの薄い映り込み（斜めの光の帯）＋窓辺のごく薄いくもり＝ガラス面の実感。乗り出すと消える。
+    // 窓ガラスの薄い映り込み（斜めの光の帯）＋窓辺のごく薄いくもり＝ガラス面の実感。
+    // 窓をあける/乗り出すと、ガラスが退いて映り込み・くもりが晴れ、外気が澄む（実感のある開閉）。
+    float glass = (1.0 - uLeanOut) * (1.0 - uWindowOpen * 0.85);
     float diag = frag.x + frag.y * 0.35;
     float refl = smoothstep(0.30, 0.46, diag) * smoothstep(0.66, 0.5, diag);
-    vec3 col = photo + vec3(0.06, 0.066, 0.078) * refl * (1.0 - uLeanOut) * 0.55;
+    vec3 col = photo + vec3(0.06, 0.066, 0.078) * refl * glass * 0.55;
     float gray = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(col, mix(col, vec3(gray), 0.5), 0.035 * (1.0 - uLeanOut));
+    col = mix(col, mix(col, vec3(gray), 0.5), 0.035 * glass);
+    col += photo * uWindowOpen * 0.04; // あけると外光が少し入る
 
     col = windowSash(col, frag, outside, uLeanOut); // 窓枠（乗り出すと景色だけ）
     col = applyGrade(col, frag);                    // 全情景共通の記憶の風景グレード

@@ -127,7 +127,7 @@ export function buildUI(opts) {
   root.appendChild(topbar)
 
   // ── 窓をあける/しめる＋身を乗り出す（窓辺の情景でだけ） ──
-  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop', 'town3d']
+  const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop', 'town3d', 'photoWindow']
   const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
   const leanBtn = h('button', 'iconbtn iconbtn--lean', '乗り出す')
   topbar.insertBefore(leanBtn, sceneBtn)
