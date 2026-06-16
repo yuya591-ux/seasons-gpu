@@ -458,6 +458,13 @@ export async function mountTown3d(parent, opts = {}) {
         const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.74, d * 0.62, 4); rg.rotateY(Math.PI / 4)
         const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
       }
+      // 太陽熱温水器（昭和の屋根の象徴。一部の家に＝平たい集熱パネル＋横長の貯湯タンク。屋根に傾けて乗せる）
+      if (R() < 0.28) {
+        const sg = new THREE.Group(); sg.position.set((R() - 0.5) * w * 0.28, h + d * 0.3, (R() - 0.5) * d * 0.15); sg.rotation.x = -0.5
+        sg.add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.08, d * 0.42), toon(0x2a3848))) // 集熱パネル(濃紺)
+        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, w * 0.48, 8), toon(0xc8c4ba)); tank.rotation.z = Math.PI / 2; tank.position.set(0, 0.22, -d * 0.18); sg.add(tank) // 貯湯タンク
+        g.add(sg)
+      }
       // 壁際の室外機（どの家にもある生活感）
       if (R() < 0.85) {
         const ac = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 0.45), acMat)
