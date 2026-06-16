@@ -1008,6 +1008,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (c.geometry) c.geometry.dispose()
     const m = c.material; if (m) { Array.isArray(m) ? m.forEach((x) => x.dispose()) : m.dispose() }
   })
+  const delayFx = (sec, fn) => addFx({ update: (age) => { if (age >= sec) { fn(); return false } return true }, cleanup: () => {} }) // sec秒後に1回実行
   function updateFx(dt) {
     for (let i = fxList.length - 1; i >= 0; i--) {
       const fx = fxList[i]; fx.age += dt
@@ -1022,51 +1023,60 @@ export async function mountTown3d(parent, opts = {}) {
   function evRain(dur = 30) {
     if (rainActive) return
     rainActive = true
-    const N = 700
-    const pos = new Float32Array(N * 3); const spd = new Float32Array(N)
-    for (let i = 0; i < N; i++) { pos[i * 3] = (R() - 0.5) * 210; pos[i * 3 + 1] = R() * 95; pos[i * 3 + 2] = -130 + R() * 190; spd[i] = 26 * (0.7 + R() * 0.6) }
+    const N = 520, len = 2.6 // 雨脚の長さ。点でなく短い“筋”にして雨らしく（風で少し斜め）
+    const pos = new Float32Array(N * 2 * 3) // 各雨脚＝2頂点（上端・下端）
+    const head = new Float32Array(N * 3); const spd = new Float32Array(N)
+    for (let i = 0; i < N; i++) { head[i * 3] = (R() - 0.5) * 210; head[i * 3 + 1] = R() * 95; head[i * 3 + 2] = -130 + R() * 190; spd[i] = 32 * (0.7 + R() * 0.6) }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    const mat = new THREE.PointsMaterial({ color: 0xc0d0de, size: 0.7, transparent: true, opacity: 0, sizeAttenuation: true, fog: true, depthWrite: false })
-    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
+    const mat = new THREE.LineBasicMaterial({ color: 0xc4d4e2, transparent: true, opacity: 0, fog: true, depthWrite: false })
+    const seg = new THREE.LineSegments(geo, mat); seg.frustumCulled = false; scene.add(seg)
+    const writeSeg = () => { for (let i = 0; i < N; i++) { const h = i * 3, p = i * 6; pos[p] = head[h]; pos[p + 1] = head[h + 1]; pos[p + 2] = head[h + 2]; pos[p + 3] = head[h] + 0.6; pos[p + 4] = head[h + 1] - len; pos[p + 5] = head[h + 2] } }
     const fogFar0 = scene.fog.far
     let rbDone = false
     addFx({
       update: (age, dt) => {
         const k = Math.min(1, age / 5) * Math.min(1, Math.max(0, (dur - age) / 8)) // 立ち上がり5s・終い8s
-        mat.opacity = 0.72 * k
+        mat.opacity = 0.6 * k
         scene.fog.far = fogFar0 * (1 - 0.16 * k) // 雨で奥がけむる
-        for (let i = 0; i < N; i++) { pos[i * 3 + 1] -= spd[i] * dt; pos[i * 3] += 3 * dt; if (pos[i * 3 + 1] < -14) { pos[i * 3 + 1] = 82 + R() * 16; pos[i * 3] = (R() - 0.5) * 210 } }
-        geo.attributes.position.needsUpdate = true
+        for (let i = 0; i < N; i++) { head[i * 3 + 1] -= spd[i] * dt; head[i * 3] += 4 * dt; if (head[i * 3 + 1] < -14) { head[i * 3 + 1] = 82 + R() * 16; head[i * 3] = (R() - 0.5) * 210 } }
+        writeSeg(); geo.attributes.position.needsUpdate = true
         if (!rbDone && age >= dur - 7) { rbDone = true; evRainbow() } // 雨上がりに虹
         if (age >= dur) { rainActive = false; scene.fog.far = fogFar0; return false }
         return true
       },
-      cleanup: () => { scene.remove(pts); geo.dispose(); mat.dispose(); scene.fog.far = fogFar0; rainActive = false },
+      cleanup: () => { scene.remove(seg); geo.dispose(); mat.dispose(); scene.fog.far = fogFar0; rainActive = false },
     })
   }
 
   // ── 雨上がりの虹（半円アーチ。赤(外)→紫(内)を計算で。淡くフェードイン/アウト） ──
   function evRainbow() {
-    const inner = 80, outer = 102
-    const geo = new THREE.RingGeometry(inner, outer, 100, 1, 0, Math.PI) // 上半分の半円
-    const mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
-      uniforms: { uOp: { value: 0 }, uInner: { value: inner }, uOuter: { value: outer } },
-      vertexShader: 'varying float vR; void main(){ vR=length(position.xy); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
-      fragmentShader: 'varying float vR; uniform float uOp,uInner,uOuter;' +
-        'vec3 hsv(float h){ vec3 p=abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.); return clamp(p-1.,0.,1.); }' +
-        'void main(){ float rr=(vR-uInner)/(uOuter-uInner); float h=mix(0.78,0.0,rr);' +
-        'vec3 col=mix(vec3(1.0),hsv(h),0.78); float edge=smoothstep(0.0,0.12,rr)*(1.0-smoothstep(0.86,1.0,rr));' +
-        'gl_FragColor=vec4(col, edge*uOp); }',
-    })
-    const ring = new THREE.Mesh(geo, mat)
-    ring.position.set(0, -16, eye.z - 195) // 街の奥・地平から立ち上がる大アーチ（手前の建物に下部が隠れる＝奥にかかる虹。fog:false）
-    ring.frustumCulled = false
-    scene.add(ring)
-    const dur = 44
+    // 主虹＋淡い副虹（色反転・外側）。白を多めに混ぜ、帯の縁をやわらかくして“水彩のにじみ”に＝CG臭を消す。
+    const grp = new THREE.Group()
+    grp.position.set(0, -16, eye.z - 195) // 街の奥・地平から立ち上がる大アーチ（手前の建物に下部が隠れる＝奥にかかる虹。fog:false）
+    const mats = []
+    const makeBow = (inner, outer, reversed, opScale) => {
+      const geo = new THREE.RingGeometry(inner, outer, 120, 1, 0, Math.PI)
+      const mat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
+        uniforms: { uOp: { value: 0 }, uInner: { value: inner }, uOuter: { value: outer }, uRev: { value: reversed ? 1 : 0 }, uScale: { value: opScale } },
+        vertexShader: 'varying float vR; void main(){ vR=length(position.xy); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
+        fragmentShader: 'varying float vR; uniform float uOp,uInner,uOuter,uRev,uScale;' +
+          'vec3 hsv(float h){ vec3 p=abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.); return clamp(p-1.,0.,1.); }' +
+          'void main(){ float rr=(vR-uInner)/(uOuter-uInner);' +
+          'float h=mix(0.78,0.0,rr); if(uRev>0.5) h=mix(0.0,0.78,rr);' +          // 主虹:外赤内紫 / 副虹:反転
+          'vec3 col=mix(vec3(1.0),hsv(h),0.58);' +                                // 白を多めに＝水彩の空気感
+          'float edge=smoothstep(0.0,0.22,rr)*(1.0-smoothstep(0.78,1.0,rr));' +   // 帯の縁をやわらかく溶かす
+          'gl_FragColor=vec4(col, edge*uOp*uScale); }',
+      })
+      const ring = new THREE.Mesh(geo, mat); ring.frustumCulled = false; grp.add(ring); mats.push(mat)
+    }
+    makeBow(80, 103, false, 1.0)   // 主虹
+    makeBow(112, 131, true, 0.28)  // 副虹（外側・色反転・ごく淡い）
+    scene.add(grp)
+    const dur = 46
     addFx({
-      update: (age) => { mat.uniforms.uOp.value = 0.5 * Math.min(1, age / 6) * Math.min(1, Math.max(0, (dur - age) / 16)); return age < dur },
-      cleanup: () => { scene.remove(ring); geo.dispose(); mat.dispose() },
+      update: (age) => { const env = 0.62 * Math.min(1, age / 7) * Math.min(1, Math.max(0, (dur - age) / 17)); for (const m of mats) m.uniforms.uOp.value = env; return age < dur },
+      cleanup: () => { scene.remove(grp); disposeObj(grp) },
     })
   }
 
@@ -1074,17 +1084,19 @@ export async function mountTown3d(parent, opts = {}) {
   function evBirdFlock() {
     const g = new THREE.Group()
     const mat = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3a4e : 0x39393f, fog: true })
-    const n = 14 + ((R() * 9) | 0); const sub = []
+    const n = 13 + ((R() * 8) | 0); const sub = []
     for (let i = 0; i < n; i++) {
       const b = new THREE.Group()
       for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.06, 0.42), mat); w.position.x = s * 0.62; w.userData.side = s; b.add(w) }
-      b.position.set((R() - 0.5) * 10, (R() - 0.5) * 5, (R() - 0.5) * 12); b.userData.ph = R() * 6.28; g.add(b); sub.push(b)
+      b.userData = { ph: R() * 6.28, rk: Math.ceil(i / 2), sd: i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) }; g.add(b); sub.push(b)
     }
     const dir = R() < 0.5 ? 1 : -1
-    // 縦長の窓は横画角が狭い（その奥行きで見える幅は ±約18）。少しだけ枠外から入れて確実に横切らせる。
+    // V字編隊: 先頭1羽、後方(dirの逆)へ左右(z)に開く。縦窓は横画角が狭いので枠外から入れて確実に横切らせる。
+    for (const b of sub) b.position.set(-dir * b.userData.rk * 1.7 + (R() - 0.5) * 0.5, (R() - 0.5) * 1.2, b.userData.sd * b.userData.rk * 1.5 + (R() - 0.5) * 0.5)
     g.position.set(dir > 0 ? -46 : 46, 46 + R() * 18, -38 - R() * 26); scene.add(g) // 空を背に飛ばす（山に紛れず映える）
+    const baseY = g.position.y
     addFx({
-      update: (age, dt) => { g.position.x += dir * 13 * dt; for (const b of sub) { const f = Math.sin(age * 9 + b.userData.ph) * 0.5; b.children.forEach((w) => { w.rotation.z = w.userData.side * f }) } return Math.abs(g.position.x) < 50 },
+      update: (age, dt) => { g.position.x += dir * 10 * dt; g.position.y = baseY + Math.sin(age * 0.5) * 0.7; for (const b of sub) { const f = Math.sin(age * 9 + b.userData.ph) * 0.5; b.children.forEach((w) => { w.rotation.z = w.userData.side * f }) } return Math.abs(g.position.x) < 50 },
       cleanup: () => { scene.remove(g); disposeObj(g) },
     })
   }
@@ -1092,14 +1104,19 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 気球がふわりと横切る（昼） ──
   function evBalloon() {
     const g = new THREE.Group()
-    const hues = [0xd9694e, 0x4e84d9, 0x6ab04c, 0xe0b24a, 0xa066c0]
+    const hues = [0xc07a68, 0x6a8db5, 0x82a878, 0xcdb074, 0x9a82b0] // 街のくすみパレットに寄せた中間色
     const env = new THREE.Mesh(new THREE.SphereGeometry(4.2, 16, 12), toon(hues[(R() * hues.length) | 0])); env.scale.y = 1.25; env.position.y = 5; g.add(env)
     g.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.4), toon(0x6a4a2a)))
+    // 籠から気球へ伸びる細いゴンドラロープ（低コストで本物感）
+    g.add(new THREE.LineSegments(
+      new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.6, 0.5, -0.6, -1.5, 2.7, -1.5, 0.6, 0.5, -0.6, 1.5, 2.7, -1.5, -0.6, 0.5, 0.6, -1.5, 2.7, 1.5, 0.6, 0.5, 0.6, 1.5, 2.7, 1.5]), 3)),
+      new THREE.LineBasicMaterial({ color: 0x4a3a28, fog: true }),
+    ))
     const dir = R() < 0.5 ? 1 : -1
     // 縦長の窓は横画角が狭いので、見える幅の少し外から入れてゆっくり横断させる
     g.position.set(dir > 0 ? -44 : 44, 26 + R() * 16, -48 - R() * 22); scene.add(g)
     addFx({
-      update: (age, dt) => { g.position.x += dir * 6 * dt; g.position.y += 0.3 * dt; g.rotation.z = Math.sin(age * 0.5) * 0.05; return Math.abs(g.position.x) < 48 },
+      update: (age, dt) => { g.position.x += dir * 5 * dt; g.position.y += 0.22 * dt; g.rotation.z = Math.sin(age * 0.5) * 0.05; return Math.abs(g.position.x) < 48 },
       cleanup: () => { scene.remove(g); disposeObj(g) },
     })
   }
@@ -1109,16 +1126,18 @@ export async function mountTown3d(parent, opts = {}) {
     const g = new THREE.Group()
     const headMat = new THREE.MeshBasicMaterial({ color: 0xfffbe0, fog: false, transparent: true })
     g.add(new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), headMat))
-    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0, 11, 5.2, 0]), 3))
+    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0, 16, 8, 0]), 3)) // 速度の逆向き＝後方へ伸びる尾
     const trailMat = new THREE.LineBasicMaterial({ color: 0xfff0c0, transparent: true, fog: false })
     g.add(new THREE.Line(tg, trailMat))
     g.position.set(40 + R() * 40, 72 + R() * 18, -90 - R() * 30); scene.add(g)
-    const vx = -55 - R() * 20, vy = -26 - R() * 10, dur = 1.4
+    const vx = -33 - R() * 12, vy = -16 - R() * 7, dur = 2.4 // ゆったり長く流れて見逃さない
     addFx({
-      update: (age, dt) => { g.position.x += vx * dt; g.position.y += vy * dt; const o = Math.max(0, 1 - age / dur); headMat.opacity = o; trailMat.opacity = o; return age < dur },
+      update: (age, dt) => { g.position.x += vx * dt; g.position.y += vy * dt; const o = Math.min(1, age / 0.25) * Math.max(0, 1 - age / dur); headMat.opacity = o; trailMat.opacity = o * 0.85; return age < dur },
       cleanup: () => { scene.remove(g); disposeObj(g) },
     })
   }
+  // たまに2〜3個が時間差で流れる＝流星群の趣（夜の頻繁バンドから呼ぶ）
+  function evShootingStars() { evShootingStar(); if (R() < 0.5) delayFx(0.5 + R() * 0.7, evShootingStar); if (R() < 0.25) delayFx(1.3 + R() * 0.9, evShootingStar) }
 
   // ── 花火（夜・連発。色玉が開いて重力で散り、消える） ──
   function evFireworks() {
@@ -1128,9 +1147,14 @@ export async function mountTown3d(parent, opts = {}) {
       const cx = (R() - 0.5) * 60, cy = 56 + R() * 18, cz = -70 - R() * 30
       for (let i = 0; i < N; i++) { pos[i * 3] = cx; pos[i * 3 + 1] = cy; pos[i * 3 + 2] = cz; const th = R() * 6.28, ph = Math.acos(2 * R() - 1), sp = 11 + R() * 7; vel.push([Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp]) }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-      const mat = new THREE.PointsMaterial({ color: new THREE.Color().setHSL(R(), 0.9, 0.62).getHex(), size: 1.5, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
+      const mat = new THREE.PointsMaterial({ color: new THREE.Color().setHSL(R(), 0.78, 0.66).getHex(), size: 1.5, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
       const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
       live.push({ pts, geo, mat, pos, vel, N, age: 0 })
+      // 開花の“芯”＝中心の白い大玉を一瞬だけ強く（パッと開く手応え）
+      const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([cx, cy, cz]), 3))
+      const fm = new THREE.PointsMaterial({ color: 0xfff6e8, size: 7, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
+      const fp = new THREE.Points(fg, fm); fp.frustumCulled = false; scene.add(fp)
+      live.push({ pts: fp, geo: fg, mat: fm, N: 0, age: 0, flash: true })
     }
     const dur = 10
     addFx({
@@ -1139,6 +1163,7 @@ export async function mountTown3d(parent, opts = {}) {
         if (bursts < 4 && nextBurst <= 0) { mkBurst(); bursts++; nextBurst = 1.0 + R() * 1.3 }
         for (let b = live.length - 1; b >= 0; b--) {
           const B = live[b]; B.age += dt
+          if (B.flash) { B.mat.opacity = Math.max(0, 1 - B.age / 0.4); if (B.age > 0.4) { scene.remove(B.pts); B.geo.dispose(); B.mat.dispose(); live.splice(b, 1) } continue }
           for (let i = 0; i < B.N; i++) { B.vel[i][1] -= 9 * dt; B.pos[i * 3] += B.vel[i][0] * dt; B.pos[i * 3 + 1] += B.vel[i][1] * dt; B.pos[i * 3 + 2] += B.vel[i][2] * dt }
           B.geo.attributes.position.needsUpdate = true; B.mat.opacity = Math.max(0, 1 - B.age / 2.5)
           if (B.age > 2.5) { scene.remove(B.pts); B.geo.dispose(); B.mat.dispose(); live.splice(b, 1) }
@@ -1149,30 +1174,59 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 飛行機雲（高空をゆっくり横切り、白い帯が後ろへ伸びていく。日常の“あ、飛行機”の発見） ──
+  function evContrail() {
+    const dir = R() < 0.5 ? 1 : -1
+    const g = new THREE.Group()
+    const plane = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 0.5), new THREE.MeshBasicMaterial({ color: isNight ? 0x8a98ac : 0x4a5564, fog: true })) // 空を背に暗い点＝機体が見える
+    g.add(plane)
+    const MAXP = 130, tpos = new Float32Array(MAXP * 3)
+    const tgeo = new THREE.BufferGeometry(); tgeo.setAttribute('position', new THREE.BufferAttribute(tpos, 3))
+    const tmat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, fog: true, depthWrite: false })
+    g.add(new THREE.Line(tgeo, tmat)); scene.add(g)
+    plane.position.set(dir > 0 ? -48 : 48, 52 + R() * 12, -80 - R() * 32) // 見える高さの空に（高すぎると枠外に出る）
+    const pts2 = []; let rec = 0
+    addFx({
+      update: (age, dt) => {
+        plane.position.x += dir * 7 * dt
+        rec -= dt
+        if (rec <= 0) { rec = 0.12; pts2.push(plane.position.x, plane.position.y, plane.position.z); if (pts2.length > MAXP * 3) pts2.splice(0, 3) }
+        for (let i = 0; i < pts2.length; i++) tpos[i] = pts2[i]
+        tgeo.setDrawRange(0, pts2.length / 3); tgeo.attributes.position.needsUpdate = true
+        tmat.opacity = 0.6 * Math.min(1, age / 3) * Math.min(1, Math.max(0, (16 - age) / 4)) // 伸びて、やがて薄れて消える
+        return age < 16 && Math.abs(plane.position.x) < 54
+      },
+      cleanup: () => { scene.remove(g); disposeObj(g) },
+    })
+  }
+
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
     birds: { run: evBirdFlock },
     balloon: { run: evBalloon, ok: () => !isNight },
-    star: { run: evShootingStar, ok: () => isNight },
+    star: { run: evShootingStars, ok: () => isNight },
+    contrail: { run: evContrail },
+    rainbowSolo: { run: evRainbow, ok: () => !rainActive }, // 雨無しの単独虹（中バンドに低確率）＝見せ場を観られる機会を増やす
     rain: { run: () => evRain(30), ok: () => !rainActive },
     fireworks: { run: evFireworks, ok: () => isNight },
   }
   const fxBands = [
-    { next: 9 + R() * 7, min: 16, max: 30, pool: ['birds', 'balloon', 'star'] },        // 頻繁（小さな驚き）
-    { next: 38 + R() * 28, min: 60, max: 130, pool: ['birds', 'balloon', 'star'] },      // 中
-    { next: 75 + R() * 80, min: 480, max: 1500, pool: ['rain', 'fireworks'] },           // まれ（大当たり＝雨→虹／花火）
+    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star'] },          // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'rainbowSolo'] },  // 中（少し特別）
+    { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks'] },                          // まれ（大当たり＝雨→虹／花火）
   ]
   function scheduleFx(dt) {
     for (const b of fxBands) {
       b.next -= dt
       if (b.next > 0) continue
       b.next = b.min + R() * (b.max - b.min)
+      if (b.quiet && R() < b.quiet) continue // 何も起きない“余白”をたまに挟む（アンビエントの締まり）
       const ok = b.pool.filter((k) => { const e = EV[k]; return e && (!e.ok || e.ok()) })
       if (ok.length) EV[ok[(R() * ok.length) | 0]].run()
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, birds: evBirdFlock, balloon: evBalloon, star: evShootingStar, fireworks: evFireworks }[n] || (() => {}))()
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, fireworks: evFireworks }[n] || (() => {}))()
 
   function frame() {
     if (!active) return

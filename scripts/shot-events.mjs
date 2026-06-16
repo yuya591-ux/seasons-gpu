@@ -28,8 +28,11 @@ await fire('birds', 4200, 'birds', 0.2)
 await look(0)
 await fire('balloon', 6500, 'balloon', 0.25)
 await look(0)
+await look(0.35)
+await fire('contrail', 8000, 'contrail', 0.35)
+await look(0)
 await fire('rain', 7000, 'rain', 0)
-await fire('rainbow', 9000, 'rainbow', 0.4)
+await fire('rainbow', 10000, 'rainbow', 0.4)
 
 // 夜の坂の街
 await scene('kitaterao-window-3d-night')
