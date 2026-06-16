@@ -653,7 +653,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
   if (kind === 'yato') {
     // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
-    const waterMat = mottleMat(0x9ec0d6, 36, 0.09, [1, 1]) // 水を張った田（朝空を映す水色・さざ波のムラ）
+    const waterMat = mottleMat(0x7ba6c8, 36, 0.10, [1, 1]) // 水を張った田（朝空を映す水色・さざ波のムラ。白飛びを抑え水らしく）
     const riceMat = mottleMat(0x6f8a44, 54, 0.15, [2, 2])  // 青田（稲の濃淡）
     const earthMat = mottleMat(0x9c8862, 40, 0.13, [1, 1]) // 畑の土（土塊のムラ）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
