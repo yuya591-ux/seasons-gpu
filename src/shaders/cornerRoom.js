@@ -302,7 +302,7 @@ const FRAGMENT_BODY = /* glsl */ `
     col += mix(uHorizon, uSunGlow, 0.5) * cityHalo * nightAmt * 0.20;
 
     // 地平のスカイライン（近い街並み）。足元から下は見下ろす地面が描く。
-    col = town(col, vp, ax + yaw * 0.85 + uParallax.x * 0.8, 0.40, 0.14, 0.11,
+    col = town(col, vp, ax + yaw * 0.58 + uParallax.x * 0.8, 0.40, 0.14, 0.11,
                mix(uDropTint, uSkyMid, 0.10), uSunGlow, mix(0.32, 0.55, uIntensity) * litRamp, 7.1, 0.5);
 
     // 遠くの高い建物の赤い灯（点滅させず、静かに灯す。1〜2基）
@@ -316,7 +316,7 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 銭湯の煙突（郷愁の主役）。街にすっと立ち、夕空へ細い煙がたなびく。見回しで見つかる1本。
     {
-      float cw = ax + yaw * 0.72 + uParallax.x * 0.6;      // 中景の街と同程度に動く
+      float cw = ax + yaw * 0.45 + uParallax.x * 0.6;      // 中景の街と同じ視差で動く（0.72だと街より速く滑っていた）
       float cx = cw + 0.16;                                 // やや左寄りに立つ（既定の視界に入る）
       float baseY = 0.42, topY = 0.66;                      // 街の上へすっと抜ける高さ
       float taper = mix(0.014, 0.008, clamp((vp.y - baseY) / (topY - baseY), 0.0, 1.0)); // 上ほど細い
@@ -344,7 +344,7 @@ const FRAGMENT_BODY = /* glsl */ `
     {
       float wmo = 1.0 - uReduceMotion;
       float asp = uResolution.x / uResolution.y;
-      vec2 wd = vec2((ax + yaw * 0.7 - 0.10) / asp, vp.y - 0.56);
+      vec2 wd = vec2((ax + yaw * 0.45 - 0.10) / asp, vp.y - 0.56); // 中景の街と同じ視差で動く（帯だけ滑る違和感を解消）
       wd.y *= uResolution.y / uResolution.x;            // 画面で真円に
       float wr = length(wd);
       if (wr < 0.22) {
