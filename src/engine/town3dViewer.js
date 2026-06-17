@@ -993,7 +993,7 @@ export async function mountTown3d(parent, opts = {}) {
     {
       const fx = 0, fz = -18, fgy = heightAt(fx, fz)
       const g = new THREE.Group(); g.position.set(fx, fgy, fz); g.rotation.y = -0.16; g.scale.setScalar(1.5); town.add(g) // 谷の主役なので大きく立てる
-      const body = new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 6.5), toon(0xe9e2d2)) // 主屋（白漆喰）
+      const body = new THREE.Mesh(new RoundedBoxGeometry(9, 3.2, 6.5, 1, 0.18), toon(0xe9e2d2)) // 主屋（白漆喰・角をわずかに面取り）
       body.position.y = 1.6; body.castShadow = true; body.receiveShadow = true; g.add(body)
       const skirt = new THREE.Mesh(new THREE.BoxGeometry(9.1, 1.0, 6.6), toon(0x5e4d3c)); skirt.position.y = 0.5; g.add(skirt) // 下見板（腰壁）
       // 茅葺の質感（縦の茅の筋）。主屋と長屋門の屋根で共有。
@@ -1007,7 +1007,7 @@ export async function mountTown3d(parent, opts = {}) {
       const roof = new THREE.Mesh(new THREE.ConeGeometry(7.8, 5.2, 4), thatchMat) // 茅葺の寄棟（縦の茅の筋）
       roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.scale.set(1.0, 1.0, 0.7); roof.castShadow = true; g.add(roof)
       const ridge = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.6, 0.8), toon(0x4e4534)); ridge.position.y = 8.2; g.add(ridge) // 棟
-      const gateBody = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 2.2), toon(0xddd4c4)) // 長屋門
+      const gateBody = new THREE.Mesh(new RoundedBoxGeometry(7, 2.2, 2.2, 1, 0.16), toon(0xddd4c4)) // 長屋門（角をわずかに面取り）
       gateBody.position.set(0, 1.1, 5.8); gateBody.castShadow = true; g.add(gateBody)
       const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.4, 4), thatchMat)
       gateRoof.rotation.y = Math.PI / 4; gateRoof.position.set(0, 3.0, 5.8); gateRoof.scale.set(1.8, 1.0, 0.6); gateRoof.castShadow = true; g.add(gateRoof)
