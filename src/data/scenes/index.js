@@ -34,6 +34,7 @@ import kitateraoWindow3dAutumn from './kitaterao-window-3d-autumn.js'
 import shishigayaWindow3d from './shishigaya-window-3d.js'
 import shishigayaWindow3dAutumn from './shishigaya-window-3d-autumn.js'
 import shishigayaWindow3dSnow from './shishigaya-window-3d-snow.js'
+import shishigayaWindow3dSpring from './shishigaya-window-3d-spring.js'
 import panoDemo from './pano-demo.js'
 import splatDemo from './splat-demo.js'
 import roomDemo from './room-demo.js'
@@ -54,6 +55,7 @@ export const SCENES = [
   kitateraoWindow3dAutumn,
   kitateraoWindow3dSnow,
   shishigayaWindow3d,
+  shishigayaWindow3dSpring,
   shishigayaWindow3dAutumn,
   shishigayaWindow3dSnow,
   // 角部屋シリーズ（シェーダー）

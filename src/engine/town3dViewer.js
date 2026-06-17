@@ -1026,6 +1026,8 @@ export async function mountTown3d(parent, opts = {}) {
       const karTex = new THREE.CanvasTexture(kar); karTex.wrapS = karTex.wrapT = THREE.RepeatWrapping; karTex.repeat.set(2, 2)
       kariMat = new THREE.MeshLambertMaterial({ map: karTex }) // 刈田（金色の刈株）
     }
+    // 春＝田植えの水鏡（水を張ったばかりの棚田が一面に空を映す）。水鏡を主体に。
+    const SPR = season === 'spring'
     // 冬＝雪原の棚田（青田/刈田の代わりに雪化粧の段々田＋凍った水面）。Lambert材は雪冠(snowify)が乗らないので明示的に雪色。
     const WIN = weather === 'snow'
     const snowField = WIN ? mottleMat(0xdce6f0, 34, 0.12, [1, 1]) : null // 雪をかぶった田（淡い青の起伏の影＝段々が読める）
@@ -1042,7 +1044,9 @@ export async function mountTown3d(parent, opts = {}) {
             ? (r > 0.78 ? iceField : snowField) // 冬: 雪原が主・凍った水面が点々
             : AUT
               ? (r > 0.56 ? (R() < 0.4 ? waterSun : waterMat) : (r > 0.12 ? kariMat : earthMat))
-              : (r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat)))
+              : SPR
+                ? (r > 0.16 ? (R() < 0.42 ? waterSun : waterMat) : (r > 0.08 ? riceMat : earthMat)) // 春: 田植えの水鏡が一面に
+                : (r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat)))
         paddy.position.set(px + jx, gy + 0.13, pz); paddy.receiveShadow = true; town.add(paddy)
       }
     }
@@ -1070,12 +1074,21 @@ export async function mountTown3d(parent, opts = {}) {
     // 畦道（あぜ）: 段の境界に立つ「土手の擁壁」＝棚田の階段感の決め手。横断(段境界)は高く厚く。
     const bundMat = toon(0x8a7656)
     const azeMat = toon(0x738048) // 畦の上の草の小道（人が歩く緑の筋＝俯瞰で棚田の畦道が読める）
+    const nanoMat = SPR ? toon(0xe6d044) : null // 菜の花の黄（春の畦の彩り）
+    const nanoGeo = SPR ? new THREE.IcosahedronGeometry(0.3, 0) : null
     for (let bz = -46.8; bz <= 5.5; bz += 5.6) {
       const gy = heightAt(0, bz)
       const b = new THREE.Mesh(new THREE.BoxGeometry(25, 1.15, 0.85), bundMat) // 段の擁壁（高くして段差を見せる）
       b.position.set(0, gy + 0.5, bz); b.castShadow = true; b.receiveShadow = true; town.add(b)
       const aze = new THREE.Mesh(new THREE.BoxGeometry(25, 0.14, 0.95), azeMat) // 畦の天端の草道
       aze.position.set(0, gy + 1.11, bz); aze.receiveShadow = true; town.add(aze)
+      if (SPR) { // 畦に菜の花の連なり（黄色の彩り＝春の谷戸の風物詩。俯瞰で黄の筋に読める）
+        for (let k = 0; k < 8; k++) {
+          const nf = new THREE.Mesh(nanoGeo, nanoMat)
+          nf.position.set(-11 + k * 3.1 + (R() - 0.5) * 1.6, gy + 1.3, bz + (R() - 0.5) * 0.55)
+          nf.scale.set(0.7 + R() * 0.6, 0.9 + R() * 0.5, 0.7 + R() * 0.6); town.add(nf)
+        }
+      }
     }
     for (let bx = -13.8; bx <= 13.8; bx += 5.6) {
       const gy = heightAt(bx, -21)
