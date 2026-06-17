@@ -4,6 +4,7 @@
 
 import { GRADE_GLSL } from './grade.js'
 import { BIRDS_GLSL } from './birds.js'
+import { FRAME_GLSL } from './frame.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -20,6 +21,7 @@ const FRAGMENT_BODY = /* glsl */ `
   uniform float uIntensity;  // 陽炎・雲の強さ 0..1
   uniform float uBright;     // 明るさ
   uniform float uReduceMotion; // モーション過敏配慮 0=通常 1=止める
+  uniform float uLeanOut;    // 身を乗り出す 0..1（枠が溶けて景色だけに）
   uniform vec3 uSkyTop;      // 天頂の青
   uniform vec3 uSkyMid;      // 中空
   uniform vec3 uHorizon;     // 地平（淡い）
@@ -143,6 +145,10 @@ const FRAGMENT_BODY = /* glsl */ `
     float vig = 1.0 - 0.18 * smoothstep(0.4, 1.2, distance(frag, vec2(0.5, 0.55)));
     col *= vig;
 
+    // 窓辺の額装（全情景で統一）。乗り出すと枠が溶けて夏空だけになる。
+    vec3 preFrame = col;
+    col = windowSash(col, frag, preFrame, uLeanOut, asp);
+
     col = applyGrade(col, frag); // 全情景共通の「記憶の風景」グレード＋水彩
     col *= uBright;
 
@@ -165,6 +171,6 @@ const QUALITY_DEFINES = {
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。 */
 export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
-  const body = FRAGMENT_BODY.replace('void main()', GRADE_GLSL + '\n' + BIRDS_GLSL + '\n  void main()')
+  const body = FRAGMENT_BODY.replace('void main()', GRADE_GLSL + '\n' + BIRDS_GLSL + '\n' + FRAME_GLSL + '\n  void main()')
   return defines + body
 }
