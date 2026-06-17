@@ -98,6 +98,9 @@ export async function mountTown3d(parent, opts = {}) {
   const my = ++token
   const THREE = await import('three')
   if (my !== token) return
+  // 近景の建物の角を丸める面取り用（低ポリの箱の角を脱す）。近景の数棟だけに使い性能は据え置く。
+  const { RoundedBoxGeometry } = await import('three/examples/jsm/geometries/RoundedBoxGeometry.js')
+  if (my !== token) return
 
   const stage = document.createElement('div')
   stage.className = 'town3d-stage'
@@ -502,7 +505,11 @@ export async function mountTown3d(parent, opts = {}) {
       const e = winEmis[(R() * winEmis.length) | 0].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
       wm.emissiveMap = e; wm.emissive = new THREE.Color(0xffcaa0); wm.emissiveIntensity = 0.32 + duskAmt * 0.6 // 発光を抑え主従を付ける（夜の電飾貼り絵感を解消）
     }
-    const bodyGeo = new THREE.BoxGeometry(w, h, d)
+    // 近景の建物だけ角を面取りして「低ポリの箱」の鋭い角を脱す（奥は霞むので箱のまま＝軽量）。
+    const near = z > -12
+    const bodyGeo = near
+      ? new RoundedBoxGeometry(w, h, d, 1, Math.min(0.2, Math.min(w, d) * 0.09))
+      : new THREE.BoxGeometry(w, h, d)
     wallAO(bodyGeo, h) // 壁の足元を翳らせ上を明るく＝接地と大気の縦グラデ
     const body = new THREE.Mesh(bodyGeo, wm)
     body.position.y = h / 2
