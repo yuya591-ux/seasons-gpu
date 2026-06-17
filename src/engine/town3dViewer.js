@@ -82,6 +82,13 @@ export function setTown3dLean(lean) {
   if (lean) active.winOpenTarget = 1
 }
 
+// 設定（明るさ・描き込み品質）を3Dの街にも効かせる（従来は設定が3Dに無反応だった）。
+export function setTown3dSettings(s) {
+  if (!active || !s) return
+  if (s.brightness != null && active.setBrightness) active.setBrightness(s.brightness)
+  if (s.quality && active.setQuality) active.setQuality(s.quality)
+}
+
 export async function unmountTown3d() {
   token++
   const a = active
@@ -108,11 +115,17 @@ export async function mountTown3d(parent, opts = {}) {
 
   const W = stage.clientWidth || window.innerWidth
   const H = stage.clientHeight || window.innerHeight
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  // 描き込み品質（設定/自動品質）でtown3dも重さを調整＝低性能端末の発熱・カクつきを抑える（従来は品質設定を無視していた）。
+  const QUAL = opts.quality || 'standard'
+  const LIGHT = QUAL === 'light'
+  const PR_CAP = LIGHT ? 1.25 : QUAL === 'soft' ? 2 : 1.6
+  const SHADOW_SIZE = LIGHT ? 1024 : 2048
+  const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
+  let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
+  renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.shadowMap.type = LIGHT ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap
   // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
   renderer.shadowMap.autoUpdate = false
   stage.appendChild(renderer.domElement)
@@ -180,7 +193,7 @@ export async function mountTown3d(parent, opts = {}) {
   const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.62 : 1.02) // 方向光を主役に＝セルの明部/影部をはっきり（線形トーン用に白飛び防止）
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048) // 影は一度だけ焼く静的影なので、高精細化しても実行時コストは増えない（精度↑）
+  sun.shadow.mapSize.set(SHADOW_SIZE, SHADOW_SIZE) // 影は一度だけ焼く静的影なので高精細化してもコスト増ゼロ。light端末は1024に落として焼き負荷とメモリを抑える
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 160
   sun.shadow.camera.left = -60; sun.shadow.camera.right = 60
   sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60
@@ -1274,7 +1287,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
   let weatherPts = null
   if (weather === 'snow' || weather === 'petals' || weather === 'leaves') {
-    const N = weather === 'snow' ? 700 : weather === 'petals' ? 420 : 360
+    const N = (weather === 'snow' ? 700 : weather === 'petals' ? 420 : 360) * (LIGHT ? 0.5 : 1) | 0 // light端末は降る粒子を半減
     const baseSpd = weather === 'snow' ? 4 : weather === 'petals' ? 2.4 : 2.0
     const pos = new Float32Array(N * 3)
     const spd = new Float32Array(N) // 個別の落下速度
@@ -1363,6 +1376,22 @@ export async function mountTown3d(parent, opts = {}) {
   frame2.className = 'town3d-frame'
   stage.appendChild(frame2)
   let clarityCur = -1
+  // ── 設定（明るさ・描き込み品質）をtown3dに反映する（従来は設定が3Dに全く効かなかった＝UX評価の最重要指摘）。 ──
+  // 明るさ: stageのCSSフィルタの brightness に、窓あけclarityの明るさ×ユーザ明るさを合成。描き込み: pixelRatioを即変更。
+  let userBright = opts.brightness || 1
+  function applyStageFilter() {
+    const c = clarityCur < 0 ? 0 : clarityCur
+    const b = (lerp(1.03, 1.06, c) * userBright).toFixed(3)
+    stage.style.filter =
+      `saturate(${lerp(0.85, 0.96, c).toFixed(3)}) sepia(${lerp(0.045, 0.02, c).toFixed(3)}) brightness(${b}) contrast(0.99)`
+  }
+  applyStageFilter() // 起動時のユーザ明るさを即反映
+  active.setBrightness = (b) => { userBright = b || 1; applyStageFilter() }
+  active.setQuality = (q) => { // 描き込み変更で解像度を即反映（影/密度は次の情景読み込みでフル反映）
+    const cap = q === 'light' ? 1.25 : q === 'soft' ? 2 : 1.6
+    curPR = Math.min(window.devicePixelRatio || 1, cap)
+    renderer.setPixelRatio(curPR); renderer.setSize(stage.clientWidth, stage.clientHeight)
+  }
 
   // ════════════════════════════════════════════════════════════════════════
   // 「いつもと違う光景」定期イベント（ぼーっと眺めていると時々おきる小さな驚き）。
@@ -1781,9 +1810,7 @@ export async function mountTown3d(parent, opts = {}) {
     const clarity = Math.min(1, wo * 0.6 + lean * 0.7)
     if (Math.abs(clarity - clarityCur) > 0.004) {
       clarityCur = clarity
-      stage.style.filter =
-        `saturate(${lerp(0.85, 0.96, clarity).toFixed(3)}) sepia(${lerp(0.045, 0.02, clarity).toFixed(3)}) ` +
-        `brightness(${lerp(1.03, 1.06, clarity).toFixed(3)}) contrast(0.99)`
+      applyStageFilter() // clarity（窓あけ）とユーザ明るさを合成して反映
     }
 
     // 雲がゆっくり流れる

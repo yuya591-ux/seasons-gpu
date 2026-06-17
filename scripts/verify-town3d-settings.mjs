@@ -1,0 +1,46 @@
+// town3dで「明るさ」「描き込み」設定が実際に効くか検証（従来は無反応だった）。
+import { chromium } from 'playwright'
+const port = process.env.PORT || '4872'
+const errors = []
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+page.on('console', (m) => { if (m.type() === 'error') errors.push('[c] ' + m.text()) })
+page.on('pageerror', (e) => errors.push('[p] ' + e.message))
+await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(700)
+await page.evaluate((id) => window.__applyScene(id), 'kitaterao-window-3d')
+await page.waitForTimeout(2400)
+const readFilter = () => page.evaluate(() => { const s = document.querySelector('.town3d-stage'); return s ? s.style.filter : 'none' })
+const f0 = await readFilter()
+await page.addStyleTag({ content: '.ui{display:none !important}' })
+await page.screenshot({ path: 'scripts/_shots/set-bright-default.png' })
+// 明るさを最大(1.3)へ（設定UIのスライダーをJSで操作しinputを発火）
+await page.evaluate(() => { document.querySelectorAll('.ui').forEach(e => e.style.display = '') })
+await page.locator('.topbar .iconbtn', { hasText: '設定' }).click().catch(() => {})
+await page.waitForTimeout(400)
+const setBright = (v) => page.evaluate((val) => {
+  const sl = [...document.querySelectorAll('.panel .slider')].find((s) => s.min === '0.7')
+  if (sl) { sl.value = String(val); sl.dispatchEvent(new Event('input', { bubbles: true })) }
+  return !!sl
+}, v)
+const found = await setBright(1.3)
+await page.waitForTimeout(500)
+const f1 = await readFilter()
+await page.evaluate(() => { document.querySelectorAll('.ui').forEach(e => e.style.display = 'none') })
+await page.waitForTimeout(200)
+await page.screenshot({ path: 'scripts/_shots/set-bright-max.png' })
+// 暗く(0.7)
+await page.evaluate(() => { document.querySelectorAll('.ui').forEach(e => e.style.display = '') })
+await setBright(0.7)
+await page.waitForTimeout(500)
+const f2 = await readFilter()
+await page.evaluate(() => { document.querySelectorAll('.ui').forEach(e => e.style.display = 'none') })
+await page.waitForTimeout(200)
+await page.screenshot({ path: 'scripts/_shots/set-bright-min.png' })
+console.log('slider found =', found)
+console.log('filter default =', f0)
+console.log('filter @1.3   =', f1)
+console.log('filter @0.7   =', f2)
+console.log('errors =', errors.length); for (const e of errors) console.log('  ', e)
+await browser.close()

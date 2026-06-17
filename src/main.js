@@ -15,6 +15,7 @@ import {
   resetTown3dLook,
   setTown3dWindowOpen,
   setTown3dLean,
+  setTown3dSettings,
 } from './engine/town3dViewer.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
@@ -146,6 +147,8 @@ function start() {
           weather: next.town3dWeather || null, // 'snow' | 'petals' | 'leaves'（降るもの）
           kind: next.town3dKind || 'town', // 'town'（坂の街）| 'yato'（谷戸）
           bg3d: next.bg3d || null, // 奥に敷く実写背景（Flux生成）。遠景を写真級にする任意の格上げ層
+          quality: getState().settings.quality, // 描き込み品質＝low端末の発熱/カクつきを抑える（town3dにも効かせる）
+          brightness: getState().settings.brightness, // 明るさ設定を3Dにも反映
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
       } catch (e) {
@@ -245,6 +248,10 @@ function start() {
     onSettings(patch) {
       updateSettings(patch)
       renderer.setSettings(getState().settings)
+      // 3Dの街モードでは明るさ・描き込みをtown3dへ反映（シェーダーは一時停止中なので renderer.setSettings は効かない）
+      if (town3dMode && (patch.brightness !== undefined || patch.quality !== undefined)) {
+        setTown3dSettings({ brightness: patch.brightness, quality: patch.quality })
+      }
       if (patch.tilt !== undefined) {
         if (patch.tilt) {
           tilt.enable().then((ok) => {
