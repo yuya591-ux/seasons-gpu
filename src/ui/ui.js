@@ -108,6 +108,7 @@ export function buildUI(opts) {
   const muteBtn = h('button', 'iconbtn', settings.muted ? '♪̸' : '♪')
   muteBtn.setAttribute('aria-label', '音のオン・オフ')
   const vol = h('input', 'slider slider--vol')
+  vol.setAttribute('aria-label', '音量')
   vol.type = 'range'
   vol.min = '0'
   vol.max = '1'
@@ -273,7 +274,11 @@ export function buildUI(opts) {
     })
 
     function markCurrent() {
-      cards.forEach(({ id, card }) => card.classList.toggle('scene-card--on', id === currentScene.id))
+      cards.forEach(({ id, card }) => {
+        const on = id === currentScene.id
+        card.classList.toggle('scene-card--on', on)
+        card.setAttribute('aria-pressed', String(on)) // 選択中を支援技術へ（評価 a11y）
+      })
     }
 
     function selectScene(scene) {
@@ -427,6 +432,7 @@ export function buildUI(opts) {
     const row = h('div', 'setrow')
     row.appendChild(h('span', 'setrow__label', label))
     const input = h('input', centered ? 'slider slider--centered' : 'slider')
+    input.setAttribute('aria-label', label) // 支援技術向けのラベル（評価 a11y）
     input.type = 'range'
     input.min = String(min)
     input.max = String(max)
