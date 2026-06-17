@@ -68,10 +68,13 @@ const FRAGMENT_BODY = /* glsl */ `
       shade = clamp(0.55 - (rR - r) * 6.0, 0.25, 1.0);        // 朝陽(左)に面する斜面ほど明るい
     }
     vec3 mc = mcol * mix(1.12, 0.70, belowTop) * mix(0.82, 1.12, shade);
-    // 森のテクスチャ（近い山ほど。遠い層はfbmを省く）＋流れる雲の影が斜面を渡る
+    // 森のテクスチャ（近い山ほど）＋流れる雲の影が斜面を渡る。明暗＋緑の濃淡の二周波で、
+    // なめらかなグラデの斜面に針葉樹の塊の手触りを与える（のっぺりした緑の面を脱す）。
     if (tex > 0.01) {
-      float forest = (fbm(vec2(x * 26.0 + seed, p.y * 18.0)) - 0.5) * 0.18 * tex;
-      mc *= 1.0 + forest;
+      float f1 = fbm(vec2(x * 26.0 + seed, p.y * 18.0)) - 0.5;
+      float f2 = fbm(vec2(x * 58.0 + seed, p.y * 42.0)) - 0.5; // 細かな木立の粒
+      mc *= 1.0 + (f1 * 0.20 + f2 * 0.11) * tex;
+      mc = mix(mc, mc * vec3(0.85, 1.0, 0.80), max(0.0, -f1) * 0.45 * tex); // 谷筋の木陰は緑が深く沈む
       float cloudSh = smoothstep(0.42, 0.74, fbm(vec2(x * 0.55 + uTime * 0.02, 4.0))); // 大きな雲影
       mc *= 1.0 - cloudSh * 0.15 * tex;                                                 // 朝の斜面をゆっくり渡る
     }
