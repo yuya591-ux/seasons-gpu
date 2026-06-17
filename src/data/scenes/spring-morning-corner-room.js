@@ -14,11 +14,11 @@ export default {
 
   palette: {
     early: {
-      skyTop: '#7a92c0',
-      skyMid: '#b4c8dc',
-      horizon: '#f4d2c8', // 夜明けの桜色
-      sunGlow: '#fff0e4',
-      dropTint: '#8a98a6',
+      skyTop: '#6e88ba', // 朝空の青を少し深め＝白っぽい低コントラストを脱す（評価 美術-M1）
+      skyMid: '#a4bcd4',
+      horizon: '#eebcae', // 夜明けの桜色（白を抜き桜の彩度を上げる）
+      sunGlow: '#ffe6d2',
+      dropTint: '#6e7c8a', // 影色を深め中景のコントラストを回復
     },
     late: {
       skyTop: '#8fb0d8',

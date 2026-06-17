@@ -287,9 +287,10 @@ const FRAGMENT_BODY = /* glsl */ `
     col = town(col, vp, ax + yaw * 0.45 + uParallax.x * 0.3, 0.46, 0.085, 0.05,
                mix(uDropTint, uHorizon, 0.32), uSunGlow, mix(0.22, 0.45, uIntensity) * litRamp, 1.3, 0.0);
 
-    // 空気遠近の霞: 地平で遠い街並みが空に溶ける（退色は控えめに＝奥行きは残しつつ濁らせない）
+    // 空気遠近の霞: 地平で遠い街並みが空に溶ける（退色は控えめに＝奥行きは残しつつ濁らせない）。
+    // 評価でミルク色の靄が強すぎ低コントラストと指摘→ 0.24→0.16 に薄め中景の階調を残す（美術-M1）。
     float haze = smoothstep(0.54, 0.40, vp.y) * smoothstep(0.30, 0.46, vp.y);
-    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.24);
+    col = mix(col, mix(uHorizon, uSkyMid, 0.4), haze * 0.16);
 
     // 街あかりの照り返し（夜の湿った空気に滲む光害のドーム）。夜ほど暖かく明るむ
     float cityHalo = smoothstep(0.74, 0.42, vp.y) * smoothstep(0.30, 0.45, vp.y);

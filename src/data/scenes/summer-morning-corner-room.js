@@ -13,11 +13,11 @@ export default {
 
   palette: {
     early: {
-      skyTop: '#9fb0c4', // 明け方の淡い青
-      skyMid: '#c9c2be',
-      horizon: '#e8d2b0', // 朝焼けの暖かみ
-      sunGlow: '#fff0d8',
-      dropTint: '#6b6a72', // 朝靄にかすむ建物
+      skyTop: '#8aa0ba', // 明け方の青を深め＝ミルク色の低コントラストを脱す（評価 美術-M1）
+      skyMid: '#aeb9c2',
+      horizon: '#e6c79a', // 朝焼けの暖かみ（彩度を上げ白っぽさを抜く）
+      sunGlow: '#ffeccc',
+      dropTint: '#62616a',
     },
     late: {
       skyTop: '#a8bcd0',
