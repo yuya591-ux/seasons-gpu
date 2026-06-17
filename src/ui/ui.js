@@ -249,10 +249,30 @@ export function buildUI(opts) {
     head.appendChild(close)
     el.appendChild(head)
 
+    // 季節で絞り込むフィルタ（30以上の情景から「選ぶ」を助ける。器=scene.axes.season）。
+    const filterBar = h('div', 'gallery-filter')
+    const SEASONS = [['all', 'すべて'], ['spring', '春'], ['summer', '夏'], ['autumn', '秋'], ['winter', '冬']]
+    let activeSeason = 'all'
+    const filterChips = []
+    for (const [key, jlabel] of SEASONS) {
+      const chip = h('button', 'chip', jlabel)
+      if (key === 'all') chip.classList.add('chip--on')
+      chip.addEventListener('click', () => {
+        activeSeason = key
+        filterChips.forEach((c) => c.el.classList.toggle('chip--on', c.key === key))
+        applyFilter()
+        poke()
+      })
+      filterChips.push({ key, el: chip })
+      filterBar.appendChild(chip)
+    }
+    el.appendChild(filterBar)
+
     const gallery = h('div', 'gallery')
     el.appendChild(gallery)
 
     const cards = []
+    const headings = []
     // 公開する情景だけ（実証/開発用は public:false で隠す）
     const devMode = /[?&]dev=1/.test(location.search)
     const BASE = import.meta.env.BASE_URL || '/'
@@ -271,7 +291,7 @@ export function buildUI(opts) {
       card.appendChild(body)
       card.addEventListener('click', () => selectScene(scene))
       gallery.appendChild(card)
-      cards.push({ id: scene.id, card })
+      cards.push({ id: scene.id, card, season: (scene.axes && scene.axes.season) || '' })
     }
     // シリーズ見出しで一覧の見通しを良くする（情景が増えても探しやすい）。見出しはグリッド全幅に渡る。
     const groups = [
@@ -284,8 +304,24 @@ export function buildUI(opts) {
     for (const [name, test] of groups) {
       const inGroup = pubScenes.filter((s) => !placed.has(s.id) && test(s))
       if (!inGroup.length) continue
-      gallery.appendChild(h('h3', 'gallery__group', name))
-      for (const scene of inGroup) { placed.add(scene.id); makeCard(scene) }
+      const hEl = h('h3', 'gallery__group', name)
+      gallery.appendChild(hEl)
+      const ids = []
+      for (const scene of inGroup) { placed.add(scene.id); makeCard(scene); ids.push(scene.id) }
+      headings.push({ el: hEl, ids })
+    }
+    // 季節フィルタの適用: 一致しないカードと、表示カードが無くなった見出しを隠す。
+    function applyFilter() {
+      cards.forEach(({ card, season }) => {
+        card.style.display = activeSeason === 'all' || season === activeSeason ? '' : 'none'
+      })
+      headings.forEach(({ el: hEl, ids }) => {
+        const anyVisible = activeSeason === 'all' || ids.some((id) => {
+          const c = cards.find((cc) => cc.id === id)
+          return c && c.season === activeSeason
+        })
+        hEl.style.display = anyVisible ? '' : 'none'
+      })
     }
 
     function markCurrent() {

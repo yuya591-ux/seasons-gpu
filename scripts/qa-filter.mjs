@@ -1,0 +1,23 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+const errs = []
+page.on('pageerror', (e) => errs.push(e.message))
+await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(500)
+await page.evaluate(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent==='情景'); if(b) b.click() })
+await page.waitForTimeout(500)
+const countVisible = () => page.evaluate(() => [...document.querySelectorAll('.scene-card')].filter(c => c.style.display !== 'none').length)
+const allN = await countVisible()
+await page.screenshot({ path: 'scripts/_shots/qa-filter-all.png' })
+// 「秋」チップを押す
+await page.evaluate(() => { const b=[...document.querySelectorAll('.gallery-filter .chip')].find(x=>x.textContent==='秋'); if(b) b.click() })
+await page.waitForTimeout(400)
+const autumnN = await countVisible()
+const autumnSeasons = await page.evaluate(() => [...document.querySelectorAll('.scene-card')].filter(c => c.style.display !== 'none').length)
+await page.screenshot({ path: 'scripts/_shots/qa-filter-autumn.png' })
+const visHeadings = await page.evaluate(() => [...document.querySelectorAll('.gallery__group')].filter(h => h.style.display !== 'none').length)
+console.log('全件表示:', allN, ' / 秋で絞込後:', autumnN, ' / 見出し表示数:', visHeadings)
+console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0,4)) : 'エラー無し')
+await browser.close()

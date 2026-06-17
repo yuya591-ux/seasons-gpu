@@ -522,6 +522,13 @@ body.idle .topbar button {
 }
 
 /* 情景ギャラリー（実描画サムネの2列グリッド） */
+/* 季節フィルタ（情景パネル上部・チップで絞り込む） */
+.gallery-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+}
 .gallery {
   display: grid;
   grid-template-columns: 1fr 1fr;
