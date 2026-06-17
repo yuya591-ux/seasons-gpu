@@ -930,24 +930,31 @@ export async function mountTown3d(parent, opts = {}) {
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.38, 2.3, scale > 1.4 ? 10 : 7), trunkMat) // 幹を少し高く細く＝幹が見える（近景は丸く）
-    tr.position.y = 1.15; tr.castShadow = true; g.add(tr)
     const r = 1.6 + R() * 1.4
     const ci = (R() * leafBaseMats.length) | 0 // 木ごとの「種」（下＝陰色／上＝陽色の対を揃える）
-    const det = scale > 1.4 ? 2 : 1 // 近景の大木だけ細分を上げて樹冠の輪郭を丸く（低ポリのカクカク輪郭を脱す。奥は1=軽量）
-    // 下の主房＝陰の濃い色。広く扁平に（樹冠は背より幅広く＝billowing、綿玉の真球を崩す）。
+    const det = scale > 1.4 ? 2 : 1 // 近景の大木だけ細分を上げて輪郭を丸く（奥は1=軽量）
+    // 樹形のばらつき＝同形のロリポップ畑を脱す（評価 美術-H3）。縦長(杉檜風)/横広(落葉樹の傘)/標準を振る。
+    const form = R()
+    const tall = form > 0.68, broad = form < 0.28
+    const trunkH = tall ? 3.0 : broad ? 1.7 : 2.3
+    const ax = broad ? 1.32 : tall ? 0.72 : 1.06           // 樹冠の横倍率
+    const ay = tall ? 1.5 : broad ? 0.74 : 0.9 + R() * 0.16 // 樹冠の縦倍率
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.36, trunkH, det > 1 ? 9 : 6), trunkMat)
+    tr.position.y = trunkH / 2; tr.castShadow = true; g.add(tr)
+    // 主房（陰の濃色）を縦長/横広に変形＝輪郭を木ごとに変える。
     const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, det), leafBaseMats[ci])
-    leaf.position.y = 2.1 + r * 0.62; leaf.scale.set(1.12, 0.84 + R() * 0.12, 1.12); leaf.castShadow = true; g.add(leaf)
-    // 上の房＝陽の当たる淡い色。上＋横へずらして陽だまりの片寄りと膨らみを出す（球の輪郭を崩す）。
-    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.74, det), leafHiMats[ci])
-    leaf2.position.set((R() - 0.5) * r * 0.7, 2.1 + r * 1.18, (R() - 0.4) * r * 0.7); leaf2.scale.set(1.0, 0.95, 1.0); leaf2.castShadow = true; g.add(leaf2)
-    // 近景の額装木立(大)だけ、もう一房の小さな陽だまりを足して「綿玉」でなく房の重なりに（数本＝描画負荷僅か）。
-    if (scale > 1.4) {
-      const leaf3 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.5, 2), leafHiMats[ci])
-      leaf3.position.set((R() - 0.5) * r * 1.2, 2.1 + r * 0.95, (R() - 0.5) * r * 1.2); leaf3.castShadow = true; g.add(leaf3)
+    leaf.position.y = trunkH + r * ay * 0.5; leaf.scale.set(ax, ay, ax); leaf.castShadow = true; g.add(leaf)
+    // 房を1〜3個、上＋横へ不規則に重ねる（陽の淡色／陰の濃色を交互）＝樹冠の不整形・綿玉脱却。
+    const nC = (tall ? 2 : 1) + ((R() * 2) | 0)
+    for (let k = 0; k < nC; k++) {
+      const cr = r * (0.5 + R() * 0.34)
+      const cl = new THREE.Mesh(new THREE.IcosahedronGeometry(cr, det), (k % 2 ? leafHiMats : leafBaseMats)[ci])
+      cl.position.set((R() - 0.5) * r * ax * 1.2, trunkH + r * ay * (0.5 + (k + 1) / (nC + 1) * 0.9), (R() - 0.4) * r * ax * 0.9)
+      cl.scale.setScalar(0.9 + R() * 0.2); cl.castShadow = true; g.add(cl)
     }
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
-    g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02 }
+    g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02, tilt: (R() - 0.5) * 0.12 } // わずかな基準傾き＝不揃いの自然さ
+    g.rotation.z = g.userData.tilt
     treesArr.push(g)
   }
   if (kind === 'yato') {
@@ -1732,7 +1739,7 @@ export async function mountTown3d(parent, opts = {}) {
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
     }
     // 木がそよ風に揺れる
-    for (const tr of treesArr) tr.rotation.z = Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp
+    for (const tr of treesArr) tr.rotation.z = tr.userData.tilt + Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp // 基準の傾き＋そよ風の揺れ
     // アドバルーンがふわり揺れる
     for (const ab of adBalloons) { ab.rotation.z = Math.sin(t * 0.6) * 0.05; ab.position.x += Math.sin(t * 0.5) * 0.002 }
     // 観覧車がゆっくり回り、ゴンドラは水平を保つ
