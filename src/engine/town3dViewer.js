@@ -982,16 +982,55 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i < 60; i++) { const v = 150 + ((R() * 40) | 0); erx.fillStyle = `rgba(${v},${(v * 0.86) | 0},${(v * 0.62) | 0},0.16)`; erx.fillRect(R() * 64, R() * 64, 2, 2) } // 土塊のムラ
     const earthTex = new THREE.CanvasTexture(ear); earthTex.wrapS = earthTex.wrapT = THREE.RepeatWrapping; earthTex.repeat.set(2, 2)
     const earthMat = new THREE.MeshLambertMaterial({ map: earthTex }) // 畑の土（耕した畝）
+    // 秋＝刈田（稲刈り後の黄金の刈株が条に残る）。青田の代わりに金色の刈田を主体に（季節で中身が変わる）。
+    const AUT = season === 'autumn'
+    let kariMat = null
+    if (AUT) {
+      const kar = document.createElement('canvas'); kar.width = kar.height = 64
+      const kax = kar.getContext('2d')
+      kax.fillStyle = '#cdb46a'; kax.fillRect(0, 0, 64, 64) // 刈田の金色
+      for (let y = 3; y < 64; y += 5) { // 刈株の条
+        kax.fillStyle = 'rgba(166,138,74,0.5)'; kax.fillRect(0, y, 64, 2)        // 刈株の条の影
+        kax.fillStyle = 'rgba(228,210,154,0.4)'; kax.fillRect(0, y + 2, 64, 1)   // 刈株の明
+      }
+      for (let i = 0; i < 60; i++) { const v = 182 + ((R() * 40) | 0); kax.fillStyle = `rgba(${v},${(v * 0.85) | 0},${(v * 0.5) | 0},0.16)`; kax.fillRect(R() * 64, R() * 64, 2, 2) }
+      const karTex = new THREE.CanvasTexture(kar); karTex.wrapS = karTex.wrapT = THREE.RepeatWrapping; karTex.repeat.set(2, 2)
+      kariMat = new THREE.MeshLambertMaterial({ map: karTex }) // 刈田（金色の刈株）
+    }
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
       for (let px = -11; px <= 11; px += 5.6) {
         const jx = (R() - 0.5) * 0.5
         const gy = heightAt(px + jx, pz)
         const r = R()
         const w = 4.9 + R() * 0.4
-        // 水を張った田を主体に＝棚田の水鏡。一部は朝日を照り返して明るく（夜明けの棚田の煌めき）。
-        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w), r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat))
+        // 夏=水鏡主体＋青田、秋=刈田主体＋水鏡少なめ。一部の水は陽を照り返して明るく（棚田の煌めき）。
+        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w),
+          AUT
+            ? (r > 0.56 ? (R() < 0.4 ? waterSun : waterMat) : (r > 0.12 ? kariMat : earthMat))
+            : (r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat)))
         paddy.position.set(px + jx, gy + 0.13, pz); paddy.receiveShadow = true; town.add(paddy)
       }
+    }
+    // 稲架掛け（はざかけ）: 刈った稲を天日に干す木の架＝秋の谷戸の風物詩。横竿に金色の稲束を掛けた
+    // 水平の列＝俯瞰の窓から見下ろす視線でも「干した稲」と読める（横向きの色面＝面が立つ）。秋のみ。
+    if (AUT) {
+      const hzWood = toon(0x6a5a3c), hzRice = toon(0xd8b85a)
+      const hazakake = (x, z, ang, len) => {
+        const g = new THREE.Group(); g.position.set(x, heightAt(x, z), z); g.rotation.y = ang
+        for (const sx of [-len / 2, len / 2]) { // 2本の脚（軽く開いて自立）
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.9, 5), hzWood)
+          leg.position.set(sx, 0.9, 0); leg.rotation.z = sx < 0 ? 0.12 : -0.12; leg.castShadow = true; g.add(leg)
+        }
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, len + 0.5, 5), hzWood) // 横竿
+        pole.rotation.z = Math.PI / 2; pole.position.y = 1.55; g.add(pole)
+        const nB = Math.max(3, Math.round(len / 0.42))
+        for (let i = 0; i < nB; i++) { // 金色の稲束を掛ける
+          const b = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.78, 0.24), hzRice)
+          b.position.set(-len / 2 + 0.25 + i * (len / (nB - 0.5)), 1.2, 0); b.castShadow = true; g.add(b)
+        }
+        town.add(g)
+      }
+      for (const [hx, hz, ha, hl] of [[-5, -4, 0.15, 3.4], [4, -17, -0.25, 3.0], [-4, -31, 0.1, 3.2], [6, -39, 0.35, 2.6], [-7, -42, -0.1, 2.8]]) hazakake(hx, hz, ha, hl)
     }
     // 畦道（あぜ）: 段の境界に立つ「土手の擁壁」＝棚田の階段感の決め手。横断(段境界)は高く厚く。
     const bundMat = toon(0x8a7656)
