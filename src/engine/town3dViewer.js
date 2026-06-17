@@ -1203,16 +1203,20 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 遠景の低ポリ山（街の奥に重なる尾根。空気遠近で淡く青み＝奥行きの錨） ──
   // 常に作り mtns に保持（実写背景が読めたら上のコールバックで消す＝画像が無ければ山が残る）。
-  const mtnNear = skyHorizon.clone().lerp(new THREE.Color(0x6e7e62), 0.7)
-  const mtnFar = skyHorizon.clone().lerp(new THREE.Color(0x8a98a6), 0.5)
-  for (let layer = 0; layer < 2; layer++) {
-    const dist = layer === 0 ? 150 : 210
-    const baseY = layer === 0 ? 4 : 10
-    for (let i = 0; i < 9; i++) {
-      const ang = (i / 8 - 0.5) * Math.PI * 1.1
-      const x = Math.sin(ang) * dist + (R() - 0.5) * 30
-      const z = -Math.cos(ang) * dist - 30
-      const m = new THREE.Mesh(new THREE.ConeGeometry(42 + R() * 28, 34 + R() * 28, 7), toon((layer === 0 ? mtnNear : mtnFar).getHex()))
+  // 評価(美術-H2)で「七角錐の書き割り」と指摘→ 幅広く低い山を多数重ねて連続した不規則な尾根に、
+  // 奥の層ほど空色へ強く青ませて大気遠近の奥行きを段階化する。
+  const mtnLo = new THREE.Color(0x66765c), mtnBlue = new THREE.Color(0x94a4b2)
+  for (let layer = 0; layer < 3; layer++) {
+    const dist = 132 + layer * 52
+    const baseY = -6 + layer * 5            // 基底を地中に沈め、上部の稜線だけ見せる（重なりが尾根になる）
+    const n = 14 - layer * 2
+    const col = skyHorizon.clone().lerp(layer === 0 ? mtnLo : mtnBlue, 0.46 + layer * 0.16).getHex() // 奥ほど青く淡く
+    for (let i = 0; i < n; i++) {
+      const ang = (i / (n - 1) - 0.5) * Math.PI * 1.3
+      const x = Math.sin(ang) * dist + (R() - 0.5) * 44
+      const z = -Math.cos(ang) * dist - 22
+      const rad = 56 + R() * 46, h = (20 + R() * 30) * (1 - layer * 0.12) // 幅広く低い＝なだらかな山・高さを散らす
+      const m = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 6), toon(col))
       m.position.set(x, baseY, z); m.rotation.y = R() * 6
       scene.add(m); mtns.push(m)
     }
