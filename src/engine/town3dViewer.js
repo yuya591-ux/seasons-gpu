@@ -1167,9 +1167,9 @@ export async function mountTown3d(parent, opts = {}) {
       const thatchMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: thatchTex })
       // 茅葺の寄棟屋根＝一枚の大きな四角錐で、深い軒（基底を広く・低く）にして「厚く重い茅葺」を出す。
       // （以前は別の軒錐台を重ねて屋根が崩れて見えた＝評価 美術-H4。錐台の重なりをやめ単一の整った屋根に。）
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(8.0, 5.4, 4), thatchMat)
-      roof.rotation.y = Math.PI / 4; roof.position.y = 5.5; roof.scale.set(1.0, 1.0, 0.72); roof.castShadow = true; g.add(roof)
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.62, 0.82), toon(0x4e4534)); ridge.position.y = 8.0; g.add(ridge) // 棟（屋根頂の水平の線）
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(8.4, 4.6, 4), thatchMat) // 基底を広く・背を低く＝緩い勾配の重い茅葺。四角錐の尖りを抑え寄棟らしく
+      roof.rotation.y = Math.PI / 4; roof.position.y = 5.0; roof.scale.set(1.0, 1.0, 0.66); roof.castShadow = true; g.add(roof)
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.66, 1.0), toon(0x4e4534)); ridge.position.y = 7.1; g.add(ridge) // 棟を長く太く＝頂点の尖りを隠す水平の棟（寄棟の頂）
       const gateBody = new THREE.Mesh(new RoundedBoxGeometry(7, 2.2, 2.2, 1, 0.16), toon(0xddd4c4)) // 長屋門（角をわずかに面取り）
       gateBody.position.set(0, 1.1, 5.8); gateBody.castShadow = true; g.add(gateBody)
       const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.4, 4), thatchMat)
