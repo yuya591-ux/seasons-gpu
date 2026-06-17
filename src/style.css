@@ -205,15 +205,27 @@ body {
     linear-gradient(118deg, transparent 62%, rgba(255, 255, 255, 0.06) 71%, transparent 80%),
     linear-gradient(160deg, rgba(200, 218, 236, 0.06), transparent 45%);
 }
-/* 大気のトーン（空のほのかな光のにじみ＋周辺減光）。シネマ調の奥行きで低ポリを格上げ。 */
+/* 大気のトーン（空のほのかな光のにじみ＋周辺減光）。シネマ調の奥行きで低ポリを格上げ。
+   グロー/翳りの色は情景ごとに --t3d-glow（太陽の光）/ --t3d-shade（空色を沈めた冷色の影）で同調。 */
 .town3d-atmo {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
   background:
-    radial-gradient(115% 70% at 50% 8%, rgba(255, 246, 228, 0.14), transparent 52%),
-    radial-gradient(150% 135% at 50% 44%, transparent 54%, rgba(14, 11, 20, 0.34));
+    radial-gradient(118% 72% at 50% 6%, rgba(var(--t3d-glow, 255, 246, 228), 0.17), transparent 54%),
+    radial-gradient(146% 130% at 50% 42%, transparent 50%, rgba(var(--t3d-shade, 14, 11, 20), 0.42));
+}
+/* 情景の光で全体を一枚の空気に統一する淡いウォッシュ（ソフトライトで局所色をまとめる＝水彩の色の調和）。
+   濃さは情景ごとに --t3d-wash-a（昼は強め・夜/雪は弱め）。 */
+.town3d-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  opacity: var(--t3d-wash-a, 0.18);
+  background: rgb(var(--t3d-glow, 255, 246, 228));
 }
 /* 紙・水彩のトーン（薄い紙目を乗算で重ね、3Dを他情景と同じ手触りに） */
 .town3d-paper {

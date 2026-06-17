@@ -11,3 +11,6 @@ scripts/_sr
 .env
 .env.local
 scripts/.pollinations-token
+scripts/_eval-art
+scripts/_eval-ux
+scripts/_eval-tech

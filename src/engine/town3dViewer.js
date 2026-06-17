@@ -190,6 +190,17 @@ export async function mountTown3d(parent, opts = {}) {
   // CG的な締まりを出さない線形トーン（NoToneMapping）＝フィルミックな圧縮を排し、平坦な手描き/セル調に。
   renderer.toneMapping = THREE.NoToneMapping
   renderer.toneMappingExposure = isNight ? 1.25 : 1.0
+  // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
+  // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
+  // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
+  {
+    const rgbStr = (c) => `${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}`
+    const shadeCol = skyTop.clone().lerp(new THREE.Color(0x0e0b14), 0.62) // 隅の翳り＝空色を深く沈めた冷色の影
+    stage.style.setProperty('--t3d-glow', rgbStr(sunCol))
+    stage.style.setProperty('--t3d-shade', rgbStr(shadeCol))
+    // 統一ウォッシュの濃さ＝昼は控えめに暖色で空気を一枚に、夜/雪は弱める（白飛び・寒色の濁りを避ける）
+    stage.style.setProperty('--t3d-wash-a', isNight ? '0.10' : weather === 'snow' ? '0.12' : '0.20')
+  }
   // 光（やわらかなトゥーン陰影。夜は月明かりへ）
   const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.62 : 1.02) // 方向光を主役に＝セルの明部/影部をはっきり（線形トーン用に白飛び防止）
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
@@ -1404,6 +1415,10 @@ export async function mountTown3d(parent, opts = {}) {
   const atmo = document.createElement('div')
   atmo.className = 'town3d-atmo'
   stage.appendChild(atmo)
+  // 情景の光で全体を一枚の空気に統一する淡いウォッシュ（局所色＝緑の木/灰の道/赤い看板を一つの光へまとめる）
+  const wash = document.createElement('div')
+  wash.className = 'town3d-wash'
+  stage.appendChild(wash)
   const paper = document.createElement('div')
   paper.className = 'town3d-paper'
   stage.appendChild(paper)
