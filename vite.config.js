@@ -28,4 +28,7 @@ function precacheManifest() {
 export default defineConfig({
   base: BASE,
   plugins: [precacheManifest()],
+  // three.module は意図的に大きい（動的importで分割済み・PWAで事前キャッシュ）。
+  // 既定500KBの警告が出続けて保守ノイズになるため許容上限を上げる（評価 技術-L6）。
+  build: { chunkSizeWarningLimit: 900 },
 })
