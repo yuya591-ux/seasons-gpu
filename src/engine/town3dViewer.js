@@ -1293,7 +1293,9 @@ export async function mountTown3d(parent, opts = {}) {
   const clouds = []
   const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })       // 陽の当たる白
   const cloudBot = new THREE.MeshToonMaterial({ color: isNight ? 0x6a7286 : 0xd7cfc4, gradientMap: grad, fog: false }) // 影になる雲底（やや翳る＝厚みと立体）
-  for (let i = 0; i < 11; i++) {
+  // 数を増やし高さを少し下げて、縦窓の狭い視界でも空が間延びしないように（light端末は控えめ）。
+  const cloudN = LIGHT ? 10 : 16
+  for (let i = 0; i < cloudN; i++) {
     const g = new THREE.Group()
     const n = 6 + ((R() * 5) | 0) // 6〜10房＝もこもこの積雲
     for (let j = 0; j < n; j++) {
@@ -1304,7 +1306,7 @@ export async function mountTown3d(parent, opts = {}) {
       puff.scale.y = 0.58
       g.add(puff)
     }
-    g.position.set((R() - 0.5) * 240, 32 + R() * 22, -55 - R() * 80)
+    g.position.set((R() - 0.5) * 250, 27 + R() * 24, -52 - R() * 90)
     scene.add(g); clouds.push(g)
   }
 
