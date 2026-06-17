@@ -142,8 +142,9 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  /* アニメ調セルの発色＋ほんのり郷愁（参考: probiex007）。明るく彩度を保ち、わずかな暖色で癒しに。 */
-  filter: saturate(1.07) sepia(0.04) contrast(1.05) brightness(1.04);
+  /* 水彩の一枚へ寄せる: コントラストを少し緩めて締まり過ぎ（ゲームのレンダー感）を脱し、黒を紙色へ
+     わずかに起こす。彩度は保ちつつ暖色をひと匙足して郷愁に（参考: probiex007）。 */
+  filter: saturate(1.05) sepia(0.06) contrast(0.99) brightness(1.05);
 }
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {

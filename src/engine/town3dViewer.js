@@ -147,7 +147,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 空気遠近の霞（調整可）: near=ここから霞み始める, far=ここで空に溶ける。手前へ寄せて遠景〜中景を
   // やわらかな大気に溶かし、「高台から街を眺める」水彩調の奥行きを出す（手前は鮮明に保つ）。
   // 雪は near を手前にし過ぎると街が真っ白に潰れる→少し奥へ（中景の階調を残す）。
-  const FOG = { near: weather === 'snow' ? 44 : 36, far: weather === 'snow' ? 150 : 150 }
+  const FOG = { near: weather === 'snow' ? 40 : 30, far: weather === 'snow' ? 146 : 132 } // 大気遠近を一段深め、中景から空気に溶け始める水彩の奥行きへ（手前は鮮明に保つ）
   scene.fog = new THREE.Fog(fogCol, FOG.near, FOG.far)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
@@ -1899,7 +1899,7 @@ export async function mountTown3d(parent, opts = {}) {
     frame2.style.opacity = Math.max(0, 1 - lean * 1.2).toFixed(3)
     sill.style.transform = `translateY(${(lean * 130).toFixed(1)}%)`
     sill.style.opacity = Math.max(0, 1 - lean * 1.18).toFixed(3)
-    paper.style.opacity = (0.14 * (1 - lean * 0.6)).toFixed(3)
+    paper.style.opacity = (0.18 * (1 - lean * 0.6)).toFixed(3) // 紙目をやや強め水彩の手触りに（乗り出すと薄れる）
     // ガラス越しのくすみを、あけ／乗り出しに応じて晴らす（外気が澄む）。変化時だけ書き換え。
     const clarity = Math.min(1, wo * 0.6 + lean * 0.7)
     if (Math.abs(clarity - clarityCur) > 0.004) {
