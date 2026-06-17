@@ -101,6 +101,11 @@ const FRAGMENT_BODY = /* glsl */ `
     float glint = smoothstep(0.0, 0.55, ripple + swell * 0.25 + 0.5);
     float scint = 0.62 + 0.38 * sin(swuv.x * 13.0 + swuv.y * 8.0 - t * 4.0);
     water += uSunGlow * pathW * glint * scint * mix(0.5, 1.0, uIntensity);
+    // 低い夕陽がさざ波の無数の面に当たり横へ広がるきらめき（一筋の道でなく面で煌めく＝評価 美術-M4）。
+    float glitBand = smoothstep(0.0, 0.30, depth) * (1.0 - smoothstep(0.30, 0.66, depth)); // 水平線寄りの帯
+    float glitPts = step(0.86, h21(floor(vec2(swuv.x * 80.0, swuv.y * 46.0 - t * 1.7))));   // 点描の煌めき（明滅）
+    float glitSun = 0.34 + 0.66 * exp(-abs(ax - sunScreenX) * 1.1);                         // 太陽側ほど密に・広く
+    water += uSunGlow * glitPts * glitBand * glitSun * (0.55 + 0.45 * scint) * 0.7 * mix(0.5, 1.0, uIntensity);
     // 波頭の泡（手前の大きなうねりの頂に白く・横に寄せる筋）
     float crestLine = sin(swuv.y * 4.5 - t * 0.6) * 0.5 + 0.5;
     float foam = smoothstep(0.74, 0.96, crestLine + ripple * 0.4) * smoothstep(0.30, 0.85, depth);
