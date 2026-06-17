@@ -1024,18 +1024,28 @@ export async function mountTown3d(parent, opts = {}) {
     const earthMat = new THREE.MeshLambertMaterial({ map: earthTex }) // 畑の土（耕した畝）
     // 秋＝刈田（稲刈り後の黄金の刈株が条に残る）。青田の代わりに金色の刈田を主体に（季節で中身が変わる）。
     const AUT = season === 'autumn'
-    let kariMat = null
+    let kariMats = null
     if (AUT) {
-      const kar = document.createElement('canvas'); kar.width = kar.height = 64
-      const kax = kar.getContext('2d')
-      kax.fillStyle = '#cdb46a'; kax.fillRect(0, 0, 64, 64) // 刈田の金色
-      for (let y = 3; y < 64; y += 5) { // 刈株の条
-        kax.fillStyle = 'rgba(166,138,74,0.5)'; kax.fillRect(0, y, 64, 2)        // 刈株の条の影
-        kax.fillStyle = 'rgba(228,210,154,0.4)'; kax.fillRect(0, y + 2, 64, 1)   // 刈株の明
+      // 刈田を一枚の同じ材で敷くと俯瞰で「灰色の段々」に溶ける。実際の秋の谷戸は刈った時期で
+      // 田ごとに金色の濃淡が違う＝パッチワーク。3種の刈田材を段ごとに替え、段々の起伏を読ませる。
+      // 金はグレードで彩度が落ちて灰色化しやすいので、やや強めの金で起こす（秋の木立の暖色と調和）。
+      const makeKari = (base, rowDk, rowLt, spek) => {
+        const kar = document.createElement('canvas'); kar.width = kar.height = 64
+        const kax = kar.getContext('2d')
+        kax.fillStyle = base; kax.fillRect(0, 0, 64, 64)
+        for (let y = 3; y < 64; y += 5) { // 刈株の条
+          kax.fillStyle = rowDk; kax.fillRect(0, y, 64, 2)       // 条の影
+          kax.fillStyle = rowLt; kax.fillRect(0, y + 2, 64, 1)   // 条の明（刈株の照り）
+        }
+        for (let i = 0; i < 64; i++) { const v = spek + ((R() * 40) | 0); kax.fillStyle = `rgba(${v},${(v * 0.82) | 0},${(v * 0.46) | 0},0.18)`; kax.fillRect(R() * 64, R() * 64, 2, 2) }
+        const t = new THREE.CanvasTexture(kar); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2)
+        return new THREE.MeshLambertMaterial({ map: t }) // 刈田（金色の刈株）
       }
-      for (let i = 0; i < 60; i++) { const v = 182 + ((R() * 40) | 0); kax.fillStyle = `rgba(${v},${(v * 0.85) | 0},${(v * 0.5) | 0},0.16)`; kax.fillRect(R() * 64, R() * 64, 2, 2) }
-      const karTex = new THREE.CanvasTexture(kar); karTex.wrapS = karTex.wrapT = THREE.RepeatWrapping; karTex.repeat.set(2, 2)
-      kariMat = new THREE.MeshLambertMaterial({ map: karTex }) // 刈田（金色の刈株）
+      kariMats = [
+        makeKari('#dcc06a', 'rgba(150,120,58,0.55)', 'rgba(244,224,158,0.5)', 188),  // 刈りたての明るい金
+        makeKari('#c8a850', 'rgba(132,104,48,0.55)', 'rgba(230,206,138,0.45)', 168), // やや古い深い琥珀
+        makeKari('#b8995a', 'rgba(120,96,52,0.5)', 'rgba(210,186,130,0.4)', 156),    // 刈って間もない褐色がかった田
+      ]
     }
     // 春＝田植えの水鏡（水を張ったばかりの棚田が一面に空を映す）。水鏡を主体に。
     const SPR = season === 'spring'
@@ -1054,7 +1064,7 @@ export async function mountTown3d(parent, opts = {}) {
           WIN
             ? (r > 0.78 ? iceField : snowField) // 冬: 雪原が主・凍った水面が点々
             : AUT
-              ? (r > 0.56 ? (R() < 0.4 ? waterSun : waterMat) : (r > 0.12 ? kariMat : earthMat))
+              ? (r > 0.56 ? (R() < 0.4 ? waterSun : waterMat) : (r > 0.12 ? kariMats[(R() * 3) | 0] : earthMat))
               : SPR
                 ? (r > 0.16 ? (R() < 0.42 ? waterSun : waterMat) : (r > 0.08 ? riceMat : earthMat)) // 春: 田植えの水鏡が一面に
                 : (r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat)))
@@ -1064,7 +1074,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 稲架掛け（はざかけ）: 刈った稲を天日に干す木の架＝秋の谷戸の風物詩。横竿に金色の稲束を掛けた
     // 水平の列＝俯瞰の窓から見下ろす視線でも「干した稲」と読める（横向きの色面＝面が立つ）。秋のみ。
     if (AUT) {
-      const hzWood = toon(0x6a5a3c), hzRice = toon(0xd8b85a)
+      const hzWood = toon(0x6a5a3c), hzRice = toon(0xe2c062) // 稲束は明るい金で（俯瞰でも金の横列と読める）
       const hazakake = (x, z, ang, len) => {
         const g = new THREE.Group(); g.position.set(x, heightAt(x, z), z); g.rotation.y = ang
         for (const sx of [-len / 2, len / 2]) { // 2本の脚（軽く開いて自立）
@@ -1075,7 +1085,7 @@ export async function mountTown3d(parent, opts = {}) {
         pole.rotation.z = Math.PI / 2; pole.position.y = 1.55; g.add(pole)
         const nB = Math.max(3, Math.round(len / 0.42))
         for (let i = 0; i < nB; i++) { // 金色の稲束を掛ける
-          const b = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.78, 0.24), hzRice)
+          const b = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.8, 0.32), hzRice)
           b.position.set(-len / 2 + 0.25 + i * (len / (nB - 0.5)), 1.2, 0); b.castShadow = true; g.add(b)
         }
         town.add(g)
