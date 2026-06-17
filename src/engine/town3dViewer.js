@@ -406,13 +406,14 @@ export async function mountTown3d(parent, opts = {}) {
     const roadTex = new THREE.CanvasTexture(rtc); roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 8)
     const road = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: roadTex }))
     road.position.z = -35; road.receiveShadow = true; town.add(road)
-    // 横の通り（数本）
+    // 横の通り（数本）。アスファルトのムラ材を共有＝ベタ灰の平面を脱す（俯瞰で映える路面の質感）。
+    const crossMat = mottleMat(0x474750, 80, 0.12, [6, 2])
     for (const cz of [-6, -28, -50]) {
       const cg = new THREE.PlaneGeometry(120, 6, 48, 1); cg.rotateX(-Math.PI / 2)
       const cp = cg.attributes.position
       for (let i = 0; i < cp.count; i++) { const lx = cp.getX(i), lz = cp.getZ(i); cp.setY(i, heightAt(lx, lz + cz) + 0.06) }
       cg.computeVertexNormals()
-      const cr = new THREE.Mesh(cg, toon(0x474750)); cr.position.z = cz; cr.receiveShadow = true; town.add(cr)
+      const cr = new THREE.Mesh(cg, crossMat); cr.position.z = cz; cr.receiveShadow = true; town.add(cr)
     }
     // 横断歩道（手前の交差点に白い縞＝近景の路面標示・生活感。路面のすぐ上に薄板で）
     const cwMat = new THREE.MeshLambertMaterial({ color: 0xc8c4ba })
