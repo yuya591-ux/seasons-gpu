@@ -17,7 +17,9 @@ export const GROUND_GLSL = /* glsl */ `
   // 道路境界は硬い step ＝ 区画が垂直の壁を持つ“箱”になる（レイマーチで壁が立つ）。
   void cityCell(vec2 g0, out vec2 gi, out vec2 gf, out float bH,
                 out float tower, out float mat, out float blkR, out float dRoad) {
-    vec2 g = g0 + vec2(sin(g0.y * 1.7 + 1.0), sin(g0.x * 1.9)) * 0.05; // 碁盤目をゆるく崩す
+    // 碁盤目を崩す（上から見て規則的な格子＝反復に見えるのを解消）。ゆらぎを強め、二周波で不規則に。
+    vec2 g = g0 + vec2(sin(g0.y * 1.7 + 1.0), sin(g0.x * 1.9)) * 0.085
+                 + vec2(sin(g0.y * 4.3 + 2.0), sin(g0.x * 3.7 + 1.0)) * 0.035;
     g.x += h11(floor(g0.y) * 1.3) * 0.45;                              // 横通りごとに位置をずらす
     gi = floor(g); gf = fract(g);
     blkR = h21(gi + 2.0);
@@ -30,7 +32,8 @@ export const GROUND_GLSL = /* glsl */ `
     tower = step(0.93 - 0.20 * urban + 0.6 * uLowRise, h21(gi + 27.0)); // 低層では高層をほぼ無くす
     float isPark = step(0.92 - 0.06 * uLowRise, mat) * (1.0 - tower); // 緑地（低層では少し増える）
     // 住宅は2階建て相当まで背を持たせ、上から見ても壁と影が立つ立体感を出す（平らな貼り絵を脱する）
-    float baseH = ((0.26 + 0.30 * urban) + (0.40 + 0.50 * urban) * blkR) * (1.0 - 0.24 * uLowRise);
+    // 棟ごとの背の高さを大きく振る（1階家〜中層が隣り合う＝同寸の屋根が並ぶ平板な格子を脱す）。
+    float baseH = ((0.26 + 0.30 * urban) + (0.40 + 0.50 * urban) * blkR) * (0.72 + 0.56 * h21(gi + 41.0)) * (1.0 - 0.24 * uLowRise);
     bH = mix(baseH, 1.1 + 1.4 * urban, tower) * isBld * (1.0 - isPark);  // 建物高さ
   }
 
