@@ -1026,17 +1026,23 @@ export async function mountTown3d(parent, opts = {}) {
       const karTex = new THREE.CanvasTexture(kar); karTex.wrapS = karTex.wrapT = THREE.RepeatWrapping; karTex.repeat.set(2, 2)
       kariMat = new THREE.MeshLambertMaterial({ map: karTex }) // 刈田（金色の刈株）
     }
+    // 冬＝雪原の棚田（青田/刈田の代わりに雪化粧の段々田＋凍った水面）。Lambert材は雪冠(snowify)が乗らないので明示的に雪色。
+    const WIN = weather === 'snow'
+    const snowField = WIN ? mottleMat(0xdce6f0, 34, 0.12, [1, 1]) : null // 雪をかぶった田（淡い青の起伏の影＝段々が読める）
+    const iceField = WIN ? mottleMat(0xc4d6e2, 26, 0.14, [1, 1]) : null  // 凍った水面（薄氷の青）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
       for (let px = -11; px <= 11; px += 5.6) {
         const jx = (R() - 0.5) * 0.5
         const gy = heightAt(px + jx, pz)
         const r = R()
         const w = 4.9 + R() * 0.4
-        // 夏=水鏡主体＋青田、秋=刈田主体＋水鏡少なめ。一部の水は陽を照り返して明るく（棚田の煌めき）。
+        // 冬=雪原主体＋凍った水面、夏=水鏡主体＋青田、秋=刈田主体＋水鏡少なめ。一部の水は陽を照り返す。
         const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w),
-          AUT
-            ? (r > 0.56 ? (R() < 0.4 ? waterSun : waterMat) : (r > 0.12 ? kariMat : earthMat))
-            : (r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat)))
+          WIN
+            ? (r > 0.78 ? iceField : snowField) // 冬: 雪原が主・凍った水面が点々
+            : AUT
+              ? (r > 0.56 ? (R() < 0.4 ? waterSun : waterMat) : (r > 0.12 ? kariMat : earthMat))
+              : (r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat)))
         paddy.position.set(px + jx, gy + 0.13, pz); paddy.receiveShadow = true; town.add(paddy)
       }
     }
