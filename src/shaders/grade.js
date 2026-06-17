@@ -29,6 +29,10 @@ export const GRADE_GLSL = /* glsl */ `
     c = c / (1.0 + max(c - 0.80, 0.0) * 0.55);
     // 6) ごく僅かな周辺減光（視線を中心へ。霞ませない程度に）
     c *= 1.0 - smoothstep(0.58, 1.18, length(p - 0.5)) * 0.16;
+    // 7) 暗部の微細ディザ（夜空など滑らかなグラデの縞=バンディングを抑える。全情景共通・自己完結ハッシュ）。
+    float lz = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    float dth = fract(sin(dot(floor(p * uResolution), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+    c += dth * (0.002 + 0.008 * smoothstep(0.5, 0.0, lz)); // 暗いほど強め（縞が出やすい所だけ）
     return clamp(c, 0.0, 1.0);
   }
 `
