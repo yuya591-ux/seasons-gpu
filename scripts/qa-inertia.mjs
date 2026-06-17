@@ -1,0 +1,26 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 1 })
+const errs = []
+page.on('pageerror', (e) => errs.push(e.message))
+await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(500)
+await page.evaluate(() => window.__applyScene && window.__applyScene('summer-dusk-seaside'))
+await page.waitForTimeout(2200)
+await page.evaluate(() => window.__renderer && window.__renderer.resetView && window.__renderer.resetView())
+await page.waitForTimeout(400)
+// 素早い横フリック
+await page.mouse.move(220, 450)
+await page.mouse.down()
+for (let i = 1; i <= 6; i++) { await page.mouse.move(220 - i * 28, 450); await page.waitForTimeout(8) }
+await page.mouse.up()
+const atRelease = await page.evaluate(() => window.__renderer.getPan().x)
+await page.waitForTimeout(120)
+const after120 = await page.evaluate(() => window.__renderer.getPan().x)
+await page.waitForTimeout(500)
+const after620 = await page.evaluate(() => window.__renderer.getPan().x)
+console.log('panX 離した直後=', atRelease.toFixed(3), ' +120ms=', after120.toFixed(3), ' +620ms=', after620.toFixed(3))
+console.log('慣性で流れた量(+120ms - 離直後)=', (after120 - atRelease).toFixed(3), ' / 最終は静止:', Math.abs(after620 - after120) < 0.01)
+console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0,4)) : 'エラー無し')
+await browser.close()

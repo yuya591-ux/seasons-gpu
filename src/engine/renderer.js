@@ -550,6 +550,7 @@ export function createRenderer(canvas) {
       panTarget.x = clamp(panTarget.x + dx, PAN_LIMIT.x)
       panTarget.y = clamp(panTarget.y + dy, PAN_LIMIT.y)
     },
+    getPan() { return { x: panTarget.x, y: panTarget.y } }, // 見回し目標の読み出し（検証/連携用）
     // 端末の傾きなどから見回しの目標値を直接決める（絶対）
     setPanTarget(x, y) {
       panTarget.x = clamp(x, PAN_LIMIT.x)
