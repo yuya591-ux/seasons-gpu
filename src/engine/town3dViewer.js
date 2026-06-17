@@ -985,10 +985,13 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // 畦道（あぜ）: 段の境界に立つ「土手の擁壁」＝棚田の階段感の決め手。横断(段境界)は高く厚く。
     const bundMat = toon(0x8a7656)
+    const azeMat = toon(0x738048) // 畦の上の草の小道（人が歩く緑の筋＝俯瞰で棚田の畦道が読める）
     for (let bz = -46.8; bz <= 5.5; bz += 5.6) {
       const gy = heightAt(0, bz)
       const b = new THREE.Mesh(new THREE.BoxGeometry(25, 1.15, 0.85), bundMat) // 段の擁壁（高くして段差を見せる）
       b.position.set(0, gy + 0.5, bz); b.castShadow = true; b.receiveShadow = true; town.add(b)
+      const aze = new THREE.Mesh(new THREE.BoxGeometry(25, 0.14, 0.95), azeMat) // 畦の天端の草道
+      aze.position.set(0, gy + 1.11, bz); aze.receiveShadow = true; town.add(aze)
     }
     for (let bx = -13.8; bx <= 13.8; bx += 5.6) {
       const gy = heightAt(bx, -21)
