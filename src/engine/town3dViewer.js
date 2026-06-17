@@ -205,8 +205,15 @@ export async function mountTown3d(parent, opts = {}) {
   scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.10)) // 夜の近景が真っ黒に沈まない程度に底上げ
   // 夜は月と星
   if (isNight) {
-    const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf4f3ea, fog: false }))
+    // ベタ白の円を脱す（評価 美術-M3）: わずかに暖色のクリーム＋柔らかなハロー（加算スプライト）で月らしく。
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xf6f1e2, fog: false }))
     moon.position.set(70, 90, -120); scene.add(moon)
+    const mhc = document.createElement('canvas'); mhc.width = mhc.height = 64
+    const mhx = mhc.getContext('2d'); const mhg = mhx.createRadialGradient(32, 32, 0, 32, 32, 32)
+    mhg.addColorStop(0, 'rgba(244,242,232,0.62)'); mhg.addColorStop(0.4, 'rgba(214,224,240,0.26)'); mhg.addColorStop(1, 'rgba(214,224,240,0)')
+    mhx.fillStyle = mhg; mhx.fillRect(0, 0, 64, 64)
+    const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(mhc), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
+    moonHalo.position.copy(moon.position); moonHalo.scale.set(42, 42, 1); scene.add(moonHalo)
     const starGeo = new THREE.BufferGeometry()
     const sp = []
     for (let i = 0; i < 260; i++) {

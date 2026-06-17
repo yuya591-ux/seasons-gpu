@@ -263,10 +263,12 @@ const FRAGMENT_BODY = /* glsl */ `
     // 月（far なのでゆっくり動く。淡いハロつき）
     vec2 mn = vec2(-0.72, 0.80);
     float md = length(vec2((ax + yaw * 0.10) - mn.x, vp.y - mn.y));
-    float moonDisc = smoothstep(0.05, 0.043, md);
-    float moonTex = 0.92 + 0.08 * fbm(vec2((ax + yaw * 0.10) * 30.0, vp.y * 30.0));
-    col = mix(col, vec3(0.96, 0.95, 0.90) * moonTex, moonDisc * (0.35 + 0.5 * nightAmt));
-    col += vec3(0.9, 0.92, 1.0) * exp(-md * 13.0) * (0.05 + 0.10 * nightAmt);
+    // ベタ白の円＋単純ハローを脱す（評価 美術-M3）: 縁をやわらかく、色温度（夕=暖クリーム→夜=青白）、海のまだら。
+    float moonDisc = smoothstep(0.052, 0.036, md);
+    float moonTex = 0.88 + 0.12 * fbm(vec2((ax + yaw * 0.10) * 26.0, vp.y * 26.0)); // 月の海のまだら
+    vec3 moonCol = mix(vec3(0.99, 0.95, 0.85), vec3(0.93, 0.95, 1.0), nightAmt);   // 夕の暖クリーム→夜の青白
+    col = mix(col, moonCol * moonTex, moonDisc * (0.35 + 0.5 * nightAmt));
+    col += mix(vec3(1.0, 0.9, 0.74), vec3(0.86, 0.9, 1.0), nightAmt) * exp(-md * 10.0) * (0.06 + 0.12 * nightAmt); // 色温度のある暈
 
     // 星（夜空に静かに在る。またたかせない＝止まった時間）
     vec2 sg = vec2((ax + yaw * 0.12) * 14.0, vp.y * 14.0);
