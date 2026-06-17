@@ -258,6 +258,12 @@ body.idle .hud,
 body.idle .topbar {
   opacity: 0;
 }
+/* 起動前（ゲート表示中）はHUD/右上ボタンを隠す＝静かな入口（ゲート越しに透けない）。 */
+body.pre-start .hud,
+body.pre-start .topbar {
+  opacity: 0;
+  pointer-events: none;
+}
 /* 消えている間は当たり判定も切る（見えないボタンへの誤タップを防ぐ＝評価UX-H3）。指を動かせば poke で即復帰。 */
 body.idle .hud button,
 body.idle .hud input,

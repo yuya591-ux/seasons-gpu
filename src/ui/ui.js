@@ -26,6 +26,8 @@ export function buildUI(opts) {
 
   const root = h('div', 'ui')
   document.body.appendChild(root)
+  // 起動前は HUD/右上ボタンを隠す（半透明のゲート越しにUIが透けて散らかるのを防ぐ＝評価UX・静かな入口）。
+  document.body.classList.add('pre-start')
 
   let currentScene = initialScene
   let intensityLabelEl = null // 設定の「強さ」スライダーの名前（情景で変わる）
@@ -49,6 +51,7 @@ export function buildUI(opts) {
   async function startExperience() {
     if (gateStarted) return
     gateStarted = true
+    document.body.classList.remove('pre-start') // 開始でHUD/ボタンが静かに現れる
     gate.classList.add('gate--hide')
     setTimeout(() => gate.remove(), 800)
     try {
