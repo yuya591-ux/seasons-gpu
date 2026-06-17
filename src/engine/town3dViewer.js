@@ -913,15 +913,16 @@ export async function mountTown3d(parent, opts = {}) {
     tr.position.y = 1.15; tr.castShadow = true; g.add(tr)
     const r = 1.6 + R() * 1.4
     const ci = (R() * leafBaseMats.length) | 0 // 木ごとの「種」（下＝陰色／上＝陽色の対を揃える）
+    const det = scale > 1.4 ? 2 : 1 // 近景の大木だけ細分を上げて樹冠の輪郭を丸く（低ポリのカクカク輪郭を脱す。奥は1=軽量）
     // 下の主房＝陰の濃い色。広く扁平に（樹冠は背より幅広く＝billowing、綿玉の真球を崩す）。
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafBaseMats[ci])
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, det), leafBaseMats[ci])
     leaf.position.y = 2.1 + r * 0.62; leaf.scale.set(1.12, 0.84 + R() * 0.12, 1.12); leaf.castShadow = true; g.add(leaf)
     // 上の房＝陽の当たる淡い色。上＋横へずらして陽だまりの片寄りと膨らみを出す（球の輪郭を崩す）。
-    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.74, 1), leafHiMats[ci])
+    const leaf2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.74, det), leafHiMats[ci])
     leaf2.position.set((R() - 0.5) * r * 0.7, 2.1 + r * 1.18, (R() - 0.4) * r * 0.7); leaf2.scale.set(1.0, 0.95, 1.0); leaf2.castShadow = true; g.add(leaf2)
     // 近景の額装木立(大)だけ、もう一房の小さな陽だまりを足して「綿玉」でなく房の重なりに（数本＝描画負荷僅か）。
     if (scale > 1.4) {
-      const leaf3 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.5, 1), leafHiMats[ci])
+      const leaf3 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.5, 2), leafHiMats[ci])
       leaf3.position.set((R() - 0.5) * r * 1.2, 2.1 + r * 0.95, (R() - 0.5) * r * 1.2); leaf3.castShadow = true; g.add(leaf3)
     }
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
