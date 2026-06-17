@@ -23,6 +23,7 @@ const DEFAULTS = {
     brightness: 1.0, // 画面の明るさ 0.7..1.3
     quality: autoQuality(), // 'soft'(なめらか) | 'standard'(標準) | 'light'(軽量)
     tilt: false, // 端末の傾きで見回す
+    timeStay: false, // 時間をとどめる（時間帯の移ろいを止めて今の時刻に静止）
     muted: false,
     volume: 0.8, // 全体音量 0..1
   },

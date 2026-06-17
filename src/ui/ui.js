@@ -407,6 +407,16 @@ export function buildUI(opts) {
       document.addEventListener('fullscreenchange', syncFs)
       tiltChips.appendChild(fsBtn)
     }
+    // 時間をとどめる（既定オフ＝ゆっくり日が移ろう。オンで今の時刻に静止）
+    const stayBtn = h('button', 'chip', '時間をとどめる')
+    stayBtn.classList.toggle('chip--on', settings.timeStay)
+    stayBtn.addEventListener('click', () => {
+      settings.timeStay = !settings.timeStay
+      stayBtn.classList.toggle('chip--on', settings.timeStay)
+      onSettings({ timeStay: settings.timeStay })
+      poke()
+    })
+    tiltChips.appendChild(stayBtn)
     tiltRow.appendChild(tiltChips)
     el.appendChild(tiltRow)
 

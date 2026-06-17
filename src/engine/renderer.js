@@ -314,15 +314,29 @@ export function createRenderer(canvas) {
     gl.viewport(0, 0, canvas.width, canvas.height)
   }
 
-  // 時間帯の移ろい（early↔late）を、眺めているうちに感じられる速さで行き来する。
+  // 時間帯の移ろい（early→late）を一方向へゆっくり進める＝不可逆な「日の移ろい」。
+  // 以前は sin で early↔late を往復し、夕暮れが何度も「明→暮→明」と戻って一回性が無かった（評価指摘）。
+  // 中庸（従来の起動時の見え方）から始め、late まで単調に深まって止まり、二度と戻さない。
+  // 「とどまる」設定で今の時刻に凍結できる。情景を変えると最初から進み直す。
+  let driftStart = 0       // この情景の移ろい開始時刻（秒・renderer起動からの相対）
+  let timeStay = false     // とどまる（時を止める）
+  let stayK = 0.45         // とどまる時に固定する移ろい値
+  let lastDriftK = 0.45    // 直近の移ろい値（とどまる切替時に凍結）
   function driftFactor(seconds) {
-    // 情景の driftPeriod を半分に詰め、振幅をフルスイングに（色の変化を体感できるように）
-    const period = ((scene && scene.driftPeriod) || 300) * 0.5
-    const w = (2 * Math.PI) / period
-    // 2つの周期を混ぜて単調なループを避けつつ、early↔late をしっかり往復する
-    const v = 0.5 + 0.42 * Math.sin(w * seconds) + 0.08 * Math.sin(w * 2.3 * seconds + 1.0)
-    return Math.min(1, Math.max(0, v))
+    if (timeStay) return stayK
+    const period = (scene && scene.driftPeriod) || 360 // early→late に進む時間（既定6分・ゆるやか）
+    const x = (seconds - driftStart) / period
+    const s = x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3.0 - 2.0 * x) // 0→1 を一度だけ（戻らない）
+    const k = 0.45 + 0.55 * s                          // 中庸→late へ単調に深まる（夕暮れの一回性）
+    lastDriftK = k
+    return k
   }
+  function setTimeStay(on) {
+    on = !!on
+    if (on && !timeStay) stayK = lastDriftK // 今の時刻で凍結
+    timeStay = on
+  }
+  if (/[?&]dev=1/.test(location.search)) window.__driftTo = (k) => { stayK = Math.max(0, Math.min(1, k)); timeStay = true } // 検証用: 移ろいを任意値で凍結
 
   function currentColors(seconds) {
     const pal = scene.palette
@@ -583,6 +597,8 @@ export function createRenderer(canvas) {
     },
     setScene(s) {
       scene = s
+      driftStart = (performance.now() - startTime) / 1000 // 情景ごとに時の移ろいを最初から進め直す
+      if (timeStay) stayK = 0.45                           // 「とどまる」中の新情景はその情景の基準時刻で静止
       glassMode = glassOf(s)
       foliageMode = foliageOf(s)
       seasonMode = seasonOf(s)
@@ -602,11 +618,14 @@ export function createRenderer(canvas) {
       // 品質が変わったらシェーダーを組み直す
       if (s.quality !== quality) buildProgram(s.quality, shaderType)
       settings = s
+      setTimeStay(s.timeStay) // 「時間をとどめる」設定を反映（onに切替えた瞬間の時刻で凍結）
       resize()
     },
     start(initialScene, initialSettings) {
       scene = initialScene
       settings = initialSettings
+      driftStart = (performance.now() - startTime) / 1000
+      setTimeStay(initialSettings && initialSettings.timeStay)
       glassMode = glassOf(initialScene)
       foliageMode = foliageOf(initialScene)
       seasonMode = seasonOf(initialScene)
