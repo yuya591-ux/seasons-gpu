@@ -134,17 +134,18 @@ const FRAGMENT_BODY = /* glsl */ `
     float colId = floor(uv.x * cells.x);
     float cr = hash21(vec2(colId, 5.0));
     float active = step(0.30, cr);                 // 多めの列が流れる
+    float hero = step(0.84, hash21(vec2(colId, 21.0))); // 一部の列だけ「一気に走る大滴」＝見本の主役（SPEC）
     float lx = fract(uv.x * cells.x) - 0.5;
     lx += sin(uv.y * 6.5 + cr * 6.2831) * 0.11;    // 蛇行
     lx += sin(uv.y * 17.0 + cr * 12.0) * 0.025;    // 細かな揺らぎ
-    float speed = mix(0.07, 0.18, hash21(vec2(colId, 9.0)));
+    float speed = mix(0.07, 0.18, hash21(vec2(colId, 9.0))) * mix(1.0, 1.85, hero); // 主役は速く一気に走る
     float headY = fract(cr * 10.0 + t * speed);    // 0(上)→1(下)
     float yy = 1.0 - uv.y;                          // 上を0に
     float dy = yy - headY;
     vec2 hd = vec2(lx * 1.3, dy);
-    float head = smoothstep(0.11, 0.0, length(hd)); // ふくらんだ頭（しずく）
-    // 頭より上に伸びる濡れた筋（はっきり）
-    float line = smoothstep(0.030, 0.0, abs(lx)) * step(dy, 0.0) * smoothstep(-0.62, 0.0, dy);
+    float head = smoothstep(mix(0.11, 0.165, hero), 0.0, length(hd)); // ふくらんだ頭（主役は大きい大滴）
+    // 頭より上に伸びる濡れた筋（はっきり。主役は太い走り跡）
+    float line = smoothstep(mix(0.030, 0.046, hero), 0.0, abs(lx)) * step(dy, 0.0) * smoothstep(-0.62, 0.0, dy);
     // 筋上に残る小さな滴（伝ったあとの名残）
     float beads = smoothstep(0.028, 0.0, abs(lx)) * step(dy, 0.0)
                 * smoothstep(0.4, 1.0, sin(yy * 48.0 + cr * 20.0) * 0.5 + 0.5);
