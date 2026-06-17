@@ -140,11 +140,12 @@ export async function mountTown3d(parent, opts = {}) {
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
   // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）。雪は濃く冷たく。
   const fogCol = weather === 'snow'
-    ? skyHorizon.clone().lerp(new THREE.Color(0xeef2f6), 0.55).getHex()
+    ? skyHorizon.clone().lerp(new THREE.Color(0xc8d2de), 0.5).getHex() // 雪霞は純白でなく淡い青灰に＝白飛びを止める（評価 美術-M5）
     : skyHorizon.clone().lerp(skyTop, 0.52).getHex() // 空色へ溶かす空気の層（俯瞰の霞）
   // 空気遠近の霞（調整可）: near=ここから霞み始める, far=ここで空に溶ける。手前へ寄せて遠景〜中景を
   // やわらかな大気に溶かし、「高台から街を眺める」水彩調の奥行きを出す（手前は鮮明に保つ）。
-  const FOG = { near: weather === 'snow' ? 32 : 36, far: weather === 'snow' ? 135 : 150 }
+  // 雪は near を手前にし過ぎると街が真っ白に潰れる→少し奥へ（中景の階調を残す）。
+  const FOG = { near: weather === 'snow' ? 44 : 36, far: weather === 'snow' ? 150 : 150 }
   scene.fog = new THREE.Fog(fogCol, FOG.near, FOG.far)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
@@ -249,7 +250,7 @@ export async function mountTown3d(parent, opts = {}) {
         .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vWNSnow = mat3(modelMatrix) * objectNormal;')
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWNSnow;')
-        .replace('#include <dithering_fragment>', '  float snowK = smoothstep(0.30, 0.72, normalize(vWNSnow).y);\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.93, 0.95, 0.985), snowK * 0.82);\n#include <dithering_fragment>')
+        .replace('#include <dithering_fragment>', '  float snowK = smoothstep(0.34, 0.74, normalize(vWNSnow).y);\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.88, 0.90, 0.95), snowK * 0.7);\n#include <dithering_fragment>')
     }
     m.customProgramCacheKey = () => 'snowcap'
     return m

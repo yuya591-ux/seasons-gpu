@@ -14,9 +14,9 @@ export default {
 
   palette: {
     early: {
-      skyTop: '#9fb2c8', // 雪雲の鈍色（やや明るい夕方前）
-      skyMid: '#c3cdd8',
-      horizon: '#e6e2dc', // 雪明かりの淡い地平
+      skyTop: '#8ba1bb', // 雪雲の鈍色（上端は青灰を残し白飛びを防ぐ）
+      skyMid: '#b4c1cf',
+      horizon: '#dcdcd9', // 雪明かりの淡い地平（純白でなく僅かに灰を残す）
       sunGlow: '#f2ead8',
       dropTint: '#5a6470', // 冷たい影色
     },
