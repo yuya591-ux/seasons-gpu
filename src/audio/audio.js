@@ -292,6 +292,74 @@ export function createAudio(opts) {
     master.gain.linearRampToValueAtTime(targetVol(), now() + (crossfade ? 0.8 : 2.5))
   }
 
+  // ── 生成的な風レイヤー（常時・素材ゼロ）。ピンクノイズ近似をゆっくり揺れるバンドパスに通し、
+  // ループ素材の上にうっすら重ねて「同じ所が繰り返る」ループ感を消す（CC0原則と完全整合）。
+  // master 経由なので音量/ミュート/おやすみに自動追従。値は控えめ（うっすら空気が動く程度）。
+  let windNode = null
+  function startWind() {
+    if (!ctx || windNode || !ctx.createBiquadFilter) return
+    const len = Math.floor(2 * ctx.sampleRate)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    let b0 = 0, b1 = 0, b2 = 0 // ピンクノイズ近似（Paul Kellet 風の簡易版）
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = 0.99 * b0 + w * 0.05; b1 = 0.96 * b1 + w * 0.08; b2 = 0.90 * b2 + w * 0.09; d[i] = (b0 + b1 + b2) * 0.45 }
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 0.7
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.022, now() + 8)
+    src.connect(bp).connect(g).connect(master)
+    windNode = { src }
+    try {
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05
+      const lfoG = ctx.createGain(); lfoG.gain.value = 180; lfo.connect(lfoG).connect(bp.frequency); lfo.start()
+      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.073
+      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.012; lfo2.connect(lfo2G).connect(g.gain); lfo2.start()
+    } catch { /* LFO非対応でも常時うっすらの風は鳴る */ }
+    try { src.start() } catch { /* 無視 */ }
+  }
+
+  // ── イベント連動の合成音（素材ゼロ）。現実に音のある現象だけ鳴らす（花火・流れ星）。
+  // 気球/飛行機雲/雲影/宵の灯り/オーロラ/虹は現実に無音なので鳴らさない。
+  function boom(at, amp) {
+    // 遠い花火の破裂: ノイズの胴鳴り(ローパス)＋腹に響くサブのサイン(ピッチ落ち)。光→音のずれは呼び元で付ける。
+    const len = Math.floor(0.5 * ctx.sampleRate)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1
+    const src = ctx.createBufferSource(); src.buffer = buf
+    const lp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null
+    if (lp) { lp.type = 'lowpass'; lp.frequency.value = 380 } // 遠い＝低域中心
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(amp * 0.5, at + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.6)
+    const sub = ctx.createOscillator(); sub.type = 'sine'
+    sub.frequency.setValueAtTime(92, at); sub.frequency.exponentialRampToValueAtTime(44, at + 0.5)
+    const sg = ctx.createGain(); sg.gain.setValueAtTime(0.0001, at); sg.gain.linearRampToValueAtTime(amp * 0.5, at + 0.02); sg.gain.exponentialRampToValueAtTime(0.0001, at + 0.55)
+    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+    const out = pan || master
+    if (pan) { pan.pan.value = (Math.random() - 0.5) * 0.8; pan.connect(master) }
+    if (lp) { src.connect(lp); lp.connect(g) } else { src.connect(g) }
+    g.connect(out); sub.connect(sg); sg.connect(out)
+    try { src.start(at); src.stop(at + 0.66); sub.start(at); sub.stop(at + 0.6) } catch { /* 無視 */ }
+  }
+  function shimmer(at) {
+    // 流れ星: ごく淡い高音のきらめき（短い下降のサイン）。
+    const o = ctx.createOscillator(); o.type = 'sine'
+    o.frequency.setValueAtTime(2300, at); o.frequency.exponentialRampToValueAtTime(1250, at + 0.7)
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.03, at + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.8)
+    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+    if (pan) { pan.pan.value = (Math.random() - 0.5); o.connect(g).connect(pan).connect(master) } else { o.connect(g).connect(master) }
+    try { o.start(at); o.stop(at + 0.85) } catch { /* 無視 */ }
+  }
+  function playEvent(kind) {
+    if (!started || !ctx || muted) return
+    const T = now() + 0.02
+    if (kind === 'fireworks') {
+      const shots = 2 + ((Math.random() * 3) | 0)
+      for (let i = 0; i < shots; i++) boom(T + 0.35 + i * (0.22 + Math.random() * 0.5), 0.5 + Math.random() * 0.34) // 光→一拍おいて遠い破裂＋連発
+    } else if (kind === 'star') {
+      shimmer(T)
+    }
+  }
+
   return {
     /** 最初のユーザー操作で呼ぶ。音脈を起こし、現在の情景の音を静かに立ち上げる。 */
     async start() {
@@ -300,8 +368,11 @@ export function createAudio(opts) {
       unlockMediaSession() // ジェスチャ起点で無音タグを再生＝iOSの消音スイッチを回避
       if (ctx.state === 'suspended') await ctx.resume()
       started = true
+      startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
       if (currentScene) await playScene(currentScene, false)
     },
+    /** 画面の現象に音を結ぶ（花火の遠い破裂・流れ星のきらめき）。無音の現象は鳴らさない。 */
+    playEvent,
     /** 情景を切り替える（音もクロスフェードで差し替える）。 */
     async setScene(scene) {
       currentScene = scene

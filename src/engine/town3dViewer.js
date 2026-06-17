@@ -135,6 +135,7 @@ export async function mountTown3d(parent, opts = {}) {
   const season = opts.season || 'summer' // 季節で地面・木の色を替える
   const weather = opts.weather || null    // 'snow' | 'petals' | 'leaves' | null（降るもの）
   const kind = opts.kind || 'town'        // 'town'（坂の街）| 'yato'（谷戸＝棚田と茅葺の屋敷）
+  const onEvent = typeof opts.onEvent === 'function' ? opts.onEvent : () => {} // 定期イベント発火を外へ伝える（音の結線）
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
@@ -1783,11 +1784,11 @@ export async function mountTown3d(parent, opts = {}) {
       b.next = b.min + R() * (b.max - b.min)
       if (b.quiet && R() < b.quiet) continue // 何も起きない“余白”をたまに挟む（アンビエントの締まり）
       const ok = b.pool.filter((k) => { const e = EV[k]; return e && (!e.ok || e.ok()) })
-      if (ok.length) EV[ok[(R() * ok.length) | 0]].run()
+      if (ok.length) { const k = ok[(R() * ok.length) | 0]; EV[k].run(); onEvent(k) } // 画面の現象と音を同時に
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, aurora: evAurora }[n] || (() => {}))()
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, aurora: evAurora }[n] || (() => {}))() }
 
   function frame() {
     if (!active) return
