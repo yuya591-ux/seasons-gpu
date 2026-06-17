@@ -1,7 +1,7 @@
 // 全体の結線。器（情景データ）＋レンダラ＋音＋UI をつなぐ。
 
 import { SCENES, DEFAULT_SCENE, pickNowScene } from './data/scenes/index.js'
-import { getState, setScene, updateSettings } from './state.js'
+import { getState, setScene, updateSettings, recordVisit, addViewSeconds, recordEvent } from './state.js'
 import { createRenderer } from './engine/renderer.js'
 import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
@@ -107,6 +107,7 @@ function start() {
       if (gen !== sceneGen) return // 連打されたら新しい切替に任せる
     }
     setScene(next.id)
+    recordVisit(next.id) // 通い帳: この窓辺に座った記録
     audio.setScene(next)
     // 情景を替えたら窓は閉じた状態から始める（ボタンと描画のズレを防ぐ）
     renderer.setWindowOpen(false)
@@ -150,7 +151,11 @@ function start() {
           bg3d: next.bg3d || null, // 奥に敷く実写背景（Flux生成）。遠景を写真級にする任意の格上げ層
           quality: getState().settings.quality, // 描き込み品質＝low端末の発熱/カクつきを抑える（town3dにも効かせる）
           brightness: getState().settings.brightness, // 明るさ設定を3Dにも反映
-          onEvent: (kind) => { if (!sleepFading) audio.playEvent(kind) }, // 画面の現象に音を結ぶ（おやすみ中は鳴らさない）
+          onEvent: (kind) => {
+            if (!sleepFading) audio.playEvent(kind) // 画面の現象に音を結ぶ（おやすみ中は鳴らさない）
+            const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', aurora: 'aurora', star: 'star' }[kind]
+            if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録
+          },
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
       } catch (e) {
@@ -263,6 +268,11 @@ function start() {
     setTimeout(step, 1000)
   }
 
+  // 通い帳: 眺めている時間を静かに積む（タブ非表示/おやすみ中は数えない）
+  setInterval(() => {
+    if (!document.hidden && !sleepFading && audio.isStarted()) addViewSeconds(20)
+  }, 20000)
+
   const ui = buildUI({
     initialScene: scene,
     settings,
@@ -270,6 +280,7 @@ function start() {
       applyScene(next)
     },
     onSleepTimer,
+    getJournal: () => getState().journal, // 通い帳の記録（訪れた窓辺・累計時間・まれな現象）
     onSettings(patch) {
       updateSettings(patch)
       renderer.setSettings(getState().settings)

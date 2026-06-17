@@ -27,6 +27,13 @@ const DEFAULTS = {
     muted: false,
     volume: 0.8, // 全体音量 0..1
   },
+  // 通い帳: 訪れた窓辺・過ごした時間・立ち会ったまれな現象を静かに記録（達成やバッジではなく、気づいたら溜まっている記録）。
+  journal: {
+    visits: {}, // { sceneId: 訪れた回数 }
+    seconds: 0, // 累計の眺めた秒数
+    events: {}, // { rainbow|fireworks|star|aurora: 立ち会った回数 }
+    firstAt: null, // 初めて窓辺に座った日時
+  },
 }
 
 function read() {
@@ -38,6 +45,12 @@ function read() {
       ...structuredClone(DEFAULTS),
       ...parsed,
       settings: { ...DEFAULTS.settings, ...(parsed.settings || {}) },
+      journal: {
+        ...DEFAULTS.journal,
+        ...(parsed.journal || {}),
+        visits: { ...(parsed.journal && parsed.journal.visits) },
+        events: { ...(parsed.journal && parsed.journal.events) },
+      },
     }
   } catch {
     return structuredClone(DEFAULTS)
@@ -65,5 +78,23 @@ export function setScene(id) {
 
 export function updateSettings(patch) {
   Object.assign(state.settings, patch)
+  persist()
+}
+
+// ── 通い帳の記録（静かに溜める） ──
+export function recordVisit(sceneId) {
+  if (!sceneId) return
+  const j = state.journal
+  j.visits[sceneId] = (j.visits[sceneId] || 0) + 1
+  if (!j.firstAt) j.firstAt = Date.now()
+  persist()
+}
+export function addViewSeconds(s) {
+  state.journal.seconds = (state.journal.seconds || 0) + s
+  persist()
+}
+export function recordEvent(kind) {
+  if (!kind) return
+  state.journal.events[kind] = (state.journal.events[kind] || 0) + 1
   persist()
 }

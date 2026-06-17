@@ -22,6 +22,7 @@ export function buildUI(opts) {
     onToggleWindow, // (open) => void  窓をあける/しめる
     onToggleLean, // (lean) => void  身を乗り出す/もどる
     onSleepTimer, // (minutes) => void  おやすみタイマー（0=なし）
+    getJournal, // () => journal  通い帳の記録（訪れた窓辺・累計時間・まれな現象）
   } = opts
 
   const root = h('div', 'ui')
@@ -193,6 +194,10 @@ export function buildUI(opts) {
     poke()
   })
 
+  // ── 通い帳パネル（訪れた窓辺・過ごした時間・立ち会ったまれな現象） ──
+  const panelJournal = buildJournalPanel()
+  root.appendChild(panelJournal.el)
+
   // ── 設定パネル ──
   const panelSet = buildSettingsPanel()
   root.appendChild(panelSet.el)
@@ -235,6 +240,63 @@ export function buildUI(opts) {
     window.addEventListener(ev, poke, { passive: true }),
   )
   poke()
+
+  // ── 通い帳パネル：訪れた窓辺・過ごした時間・立ち会ったまれな現象を静かに振り返る（達成でなく記録） ──
+  function buildJournalPanel() {
+    const el = h('div', 'panel panel--journal')
+    const head = h('div', 'panel__head')
+    head.appendChild(h('h2', 'panel__title', '通い帳'))
+    const close = h('button', 'iconbtn', '×')
+    close.setAttribute('aria-label', '閉じる')
+    head.appendChild(close)
+    el.appendChild(head)
+    const bodyEl = h('div', 'journal')
+    el.appendChild(bodyEl)
+    close.addEventListener('click', () => { el.classList.remove('panel--open'); poke() })
+    const BASE = import.meta.env.BASE_URL || '/'
+    const fmtDur = (sec) => {
+      const m = Math.floor((sec || 0) / 60)
+      if (m < 60) return `${m}分`
+      const hh = Math.floor(m / 60); const mm = m % 60
+      return mm ? `${hh}時間${mm}分` : `${hh}時間`
+    }
+    function render() {
+      bodyEl.replaceChildren()
+      const j = (getJournal && getJournal()) || { visits: {}, seconds: 0, events: {}, firstAt: null }
+      const visitIds = Object.keys(j.visits || {}).filter((id) => SCENES.some((s) => s.id === id))
+      const lead = h('p', 'journal__lead')
+      if (!j.firstAt || !visitIds.length) {
+        lead.textContent = 'まだ記録がありません。窓辺に座ると、静かに溜まっていきます。'
+      } else {
+        const days = Math.max(1, Math.round((Date.now() - j.firstAt) / 86400000))
+        lead.textContent = `はじめての窓辺から ${days}日。これまでに ${fmtDur(j.seconds)}、眺めました。`
+      }
+      bodyEl.appendChild(lead)
+      if (visitIds.length) {
+        visitIds.sort((a, b) => j.visits[b] - j.visits[a]) // 多く座った窓辺から
+        const grid = h('div', 'journal__grid')
+        for (const id of visitIds) {
+          const sc = SCENES.find((s) => s.id === id)
+          const cell = h('div', 'journal__cell')
+          const sw = h('span', 'journal__thumb')
+          const pal = sc.palette.early
+          sw.style.backgroundImage = `url("${BASE}thumbs/${id}.jpg"), linear-gradient(165deg, ${pal.skyTop}, ${pal.horizon})`
+          cell.appendChild(sw)
+          cell.appendChild(h('span', 'journal__name', sc.label))
+          grid.appendChild(cell)
+        }
+        bodyEl.appendChild(grid)
+      }
+      const ev = j.events || {}
+      const seen = [['rainbow', '虹'], ['star', '流れ星'], ['fireworks', '花火'], ['aurora', 'オーロラ']]
+        .filter(([k]) => ev[k] > 0).map(([k, n]) => `${n}に${ev[k]}度`)
+      if (seen.length) bodyEl.appendChild(h('p', 'journal__events', '立ち会った景色　' + seen.join('、')))
+    }
+    return {
+      el,
+      open() { render(); el.classList.add('panel--open'); requestAnimationFrame(() => close.focus()) },
+    }
+  }
 
   // ── 情景パネル：実装済みの情景をカード一覧で直接選ぶ ──
   function buildScenePanel() {
@@ -481,6 +543,20 @@ export function buildUI(opts) {
     })
     sleepRow.appendChild(sleepChips)
     el.appendChild(sleepRow)
+
+    // 通い帳：訪れた窓辺・過ごした時間・立ち会ったまれな現象を静かに振り返る
+    const journalRow = h('div', 'setrow')
+    journalRow.appendChild(h('span', 'setrow__label', '記録'))
+    const journalChips = h('div', 'axis__chips')
+    const journalBtn = h('button', 'chip', '通い帳をひらく')
+    journalBtn.addEventListener('click', () => {
+      el.classList.remove('panel--open') // 設定を閉じて通い帳へ
+      panelJournal.open()
+      poke()
+    })
+    journalChips.appendChild(journalBtn)
+    journalRow.appendChild(journalChips)
+    el.appendChild(journalRow)
 
     close.addEventListener('click', () => {
       el.classList.remove('panel--open')

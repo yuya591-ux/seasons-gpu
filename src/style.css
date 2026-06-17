@@ -550,6 +550,49 @@ body.idle .topbar button {
 .gallery__group:first-child {
   margin-top: 0;
 }
+/* 通い帳（訪れた窓辺の静かな記録。達成でなく、気づいたら溜まっている記録） */
+.journal {
+  overflow-y: auto;
+  max-height: min(64vh, 32rem);
+  -webkit-overflow-scrolling: touch;
+  padding-right: 0.2rem;
+}
+.journal__lead {
+  font-size: 0.84rem;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.78);
+  margin: 0 0 0.9rem;
+}
+.journal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+}
+.journal__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.journal__thumb {
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: 0.4rem;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.82;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.journal__name {
+  font-size: 0.62rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.55);
+}
+.journal__events {
+  margin: 1rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 235, 200, 0.7);
+}
 .scene-card {
   appearance: none;
   display: flex;
