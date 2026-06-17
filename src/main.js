@@ -151,6 +151,7 @@ function start() {
           bg3d: next.bg3d || null, // 奥に敷く実写背景（Flux生成）。遠景を写真級にする任意の格上げ層
           quality: getState().settings.quality, // 描き込み品質＝low端末の発熱/カクつきを抑える（town3dにも効かせる）
           brightness: getState().settings.brightness, // 明るさ設定を3Dにも反映
+          reduceMotion: !!(mqReduce && mqReduce.matches), // 視差軽減: 定期イベントを止める
           onEvent: (kind) => {
             if (!sleepFading) audio.playEvent(kind) // 画面の現象に音を結ぶ（おやすみ中は鳴らさない）
             const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', aurora: 'aurora', star: 'star' }[kind]

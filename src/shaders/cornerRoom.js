@@ -282,7 +282,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // 帰る鳥影（はばたきながら弧を描いて空を渡る）。
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), uTime, 1.0 - uReduceMotion);
     // 夜空をごくたまに流れる流れ星（既存の瞬く星に重ねる、まれな"小さな驚き"）
-    col = shootingStar(col, vec2(ax + yaw * 0.5, vp.y), uTime, nightAmt * smoothstep(0.58, 0.78, vp.y));
+    col = shootingStar(col, vec2(ax + yaw * 0.5, vp.y), uTime, nightAmt * smoothstep(0.58, 0.78, vp.y) * (1.0 - uReduceMotion)); // 視差軽減では流れ星を出さない
 
     // 時間とともに窓に灯がともる（夕暮れが深まる郷愁）
     float litRamp = 0.7 + 0.3 * smoothstep(0.0, 90.0, uTime);

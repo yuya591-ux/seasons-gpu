@@ -204,7 +204,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // 帰る鳥影（はばたきながら弧を描いて夕空を渡る）。街並みより奥＝空に描く
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, 1.0 - uReduceMotion);
     // 夜の下町をごくたまに流れる流れ星（夜空ほど見える・上空のみ。街並みより奥＝後の街レイヤーが手前を隠す）
-    float ssNight = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0) * smoothstep(0.55, 0.75, vp.y);
+    float ssNight = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0) * smoothstep(0.55, 0.75, vp.y) * (1.0 - uReduceMotion); // 視差軽減では流れ星を出さない
     col = shootingStar(col, vec2(ax + yaw * 0.5, vp.y), t, ssNight);
 
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
