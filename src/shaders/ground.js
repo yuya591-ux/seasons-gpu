@@ -198,7 +198,13 @@ export const GROUND_GLSL = /* glsl */ `
         float across = mix(hGf.y, hGf.x, ridgeAxis);            // 棟に直交する座標(0..1)
         float toEave = abs(across - 0.5) * 2.0;                  // 0=棟 1=軒
         float sunnySide = step(0.5, across);
-        vec3 tile = mix(vec3(0.30, 0.33, 0.40), vec3(0.42, 0.27, 0.21), step(0.5, h21(hGi + 19.0))); // いぶし瓦/赤瓦
+        // 瓦の色を4種＋棟ごとの明暗ムラに（評価 美術-M2: 2色コピペの格子感を解消）。
+        float roofPick = h21(hGi + 19.0);
+        vec3 tile = roofPick < 0.34 ? vec3(0.30, 0.33, 0.40)   // いぶし瓦（青灰）
+                  : roofPick < 0.60 ? vec3(0.42, 0.27, 0.21)   // 赤瓦
+                  : roofPick < 0.82 ? vec3(0.35, 0.31, 0.26)   // 茶瓦
+                  :                   vec3(0.27, 0.31, 0.30);  // 苔・緑青
+        tile *= 0.86 + 0.26 * h21(hGi + 31.0);                 // 棟ごとの明暗ムラ＝同じ色でも一棟ずつ違う
         float face = mix(mix(1.12, 0.84, sunFacing), mix(0.84, 1.12, sunFacing), sunnySide);          // 二面の陰影
         tile *= face * (1.0 - 0.12 * toEave);
         tile = mix(tile, tile * 1.18, smoothstep(0.05, 0.0, abs(across - 0.5)));                       // 棟の稜線
