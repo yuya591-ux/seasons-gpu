@@ -27,7 +27,7 @@ const CAM = {
   leanFwd: 9.0,     // 乗り出しでカメラが前へ出る量（枠を越えて街へ顔を出す）
   leanDown: 4.5,    // 乗り出しでカメラが下がる量
   leanFov: 7.0,     // 乗り出しで画角が広がる量(度)
-  leanLook: 4.0,    // 乗り出しで視線が下を覗き込む量（既定の見下ろし）
+  leanLook: 3.2,    // 乗り出しで視線が下を覗き込む量（手前の木立へ落ち込み過ぎない程度に抑制＝評価UX-H2）
   leanPitchUp: 1.10, // 乗り出し時に上を見上げられる範囲（空・ビル上層まで仰げる）。大きいほど上が見える
   leanPitchDn: 0.20, // 乗り出し時に下を見下ろせる範囲の拡張
   lookPitch: 18,    // 見上げ/見下ろしの効き（pitch→視線の縦移動量）。大きいほど少しのスワイプで大きく振れる
@@ -36,7 +36,7 @@ const CAM = {
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
 // applyTown3dLook(スワイプ時)とframeループ(戻り時の追従)の両方で使い、範囲を一元管理する。
-const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.35 + lean * CAM.leanPitchDn })
+const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.30 + lean * CAM.leanPitchDn })
 
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
@@ -63,7 +63,7 @@ export function applyTown3dLook(dx, dy) {
   const lim = pitchLimits(l)     // 乗り出すと上（空・ビル上層）も下も大きく見られる
   // 目標値を動かし、frame loop でイージング追従（指を離しても余韻＝ヌルヌル）。感度UP。
   active.yawTarget = Math.max(-yawMax, Math.min(yawMax, active.yawTarget + dx * 2.4))
-  active.pitchTarget = Math.max(-lim.dn, Math.min(lim.up, active.pitchTarget + dy * 1.6))
+  active.pitchTarget = Math.max(-lim.dn, Math.min(lim.up, active.pitchTarget + dy * 1.2)) // 縦の感度を下げ、手前の木立へ視線が落ち込み過ぎないように（評価UX-H2）
 }
 
 export function resetTown3dLook() {
@@ -1789,7 +1789,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     const look = new THREE.Vector3(
       ex + Math.sin(yaw) * 18,
-      ey - 12 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.05, // 既定は見下ろし／上スワイプで空・ビル上層も仰げる
+      ey - 10.5 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.05, // 既定は見下ろし（手前の木に落ち込み過ぎない程度に）／上スワイプで空・ビル上層も仰げる
       ez - Math.cos(yaw) * 22,
     )
     camera.lookAt(look)
