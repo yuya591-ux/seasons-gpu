@@ -4,7 +4,8 @@ import { chromium } from 'playwright'
 const port = process.env.PORT || '4855'
 const ids = [
   'kitaterao-window-3d', 'kitaterao-window-3d-spring', 'kitaterao-window-3d-autumn',
-  'kitaterao-window-3d-snow', 'kitaterao-window-3d-night', 'shishigaya-window-3d', 'shishigaya-window-3d-autumn',
+  'kitaterao-window-3d-snow', 'kitaterao-window-3d-night', 'shishigaya-window-3d',
+  'shishigaya-window-3d-spring', 'shishigaya-window-3d-autumn', 'shishigaya-window-3d-snow',
 ]
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
