@@ -129,11 +129,12 @@ const FRAGMENT_BODY = /* glsl */ `
       vec2 cwarp = vec2(fbm(cq + 2.0), fbm(cq + 5.0)) - 0.5;
       float cl = fbm(cq + cwarp * 0.8);
       float clu = fbm(cq + vec2(0.0, 0.14) + cwarp * 0.8);
-      float cb = smoothstep(0.50, 0.68, cl) * smoothstep(0.50, 1.0, vp.y);
+      // 雲を中空（水平線寄り）まで広げて間延びした空ベタを埋める。上端は空けて空を残す。
+      float cb = smoothstep(0.49, 0.67, cl) * smoothstep(0.44, 0.74, vp.y) * (1.0 - smoothstep(0.92, 1.0, vp.y));
       float underlit = smoothstep(-0.06, 0.10, clu - cl);
       vec3 cloudWarm = mix(uHorizon, uSunGlow, 0.5 + 0.35 * sunSide);
       vec3 cloudCool = mix(uSkyMid, uSkyTop, 0.4);
-      col = mix(col, mix(cloudCool, cloudWarm, underlit), cb * (0.55 - fl * 0.16));
+      col = mix(col, mix(cloudCool, cloudWarm, underlit), cb * (0.58 - fl * 0.16));
       float rim = smoothstep(0.48, 0.60, cl) * smoothstep(0.68, 0.56, cl);
       col += mix(uSunGlow, vec3(1.0), 0.3) * rim * (0.16 + 0.5 * sunSide) * smoothstep(0.50, 1.0, vp.y) * (0.6 - fl * 0.2);
     }
