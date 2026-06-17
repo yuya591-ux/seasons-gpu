@@ -81,25 +81,34 @@ const FRAGMENT_BODY = /* glsl */ `
     // 以前は密度しきい値が発火せず雲がほぼ出ていなかった（評価 美術-H1）。外形(底細く中広く頂窄む)＋
     // もくもくのfbmで、画面中央にそびえる積乱雲をはっきり主役として立てる。
     vec2 cc = vec2((uv.x - 0.5) * asp, uv.y);
-    float cx = cc.x + 0.14 - sin(t * 0.015) * 0.05;            // 雲の中心はやや左・ゆっくり流れる
-    float baseY = 0.27, topY = 0.90;
+    float cx = cc.x + 0.03 - sin(t * 0.015) * 0.035;          // 雲の中心はほぼ中央・ゆっくり流れる
+    float baseY = 0.30, topY = 0.82;
     float vf = clamp((uv.y - baseY) / (topY - baseY), 0.0, 1.0); // 0=底 1=頂
-    vec2 q = vec2(cx * 1.5, (uv.y - baseY) * 1.7) + vec2(t * 0.012, -t * 0.010);
-    vec2 warp = vec2(fbm(q + 3.1), fbm(q + 7.7)) - 0.5;        // ドメインワープでもくもく感
-    float puff = fbm(q + warp * 0.9) * 0.6 + fbm(q * 2.6 + 9.0 + warp) * 0.4; // もくもく密度 0..1
-    float halfW = (0.13 + 0.30 * sin(vf * 3.14159)) * (0.78 + puff * 0.66);   // 縁がもくもく膨らむ外形
-    float body = (1.0 - smoothstep(halfW * 0.62, halfW, abs(cx)))
-               * smoothstep(baseY - 0.015, baseY + 0.07, uv.y)
-               * (1.0 - smoothstep(topY - 0.07, topY + 0.02, uv.y));
-    float cloudMask = clamp(body * smoothstep(0.30, 0.5, puff + 0.20) * mix(1.0, 1.18, uIntensity), 0.0, 1.0);
-    // 立体陰影: 上＋中心＋盛り上がった面が陽を受け白く、底＋外周は青く翳る
-    float lit = clamp(smoothstep(0.12, 0.72, vf) * 0.5
-                    + (1.0 - smoothstep(0.30, 1.0, abs(cx) / max(halfW, 0.02))) * 0.3
-                    + smoothstep(0.42, 0.74, puff) * 0.45, 0.0, 1.0);
-    vec3 cloudLit = vec3(1.0, 0.995, 0.97);                    // 陽の当たる白
-    vec3 cloudSha = uDropTint * 0.44 + uSkyMid * 0.5;          // 青みの翳り（底・外周）
+    // もくもく密度（ドメインワープ＋三周波でカリフラワーの粒を細かく）
+    vec2 q = vec2(cx * 2.3, (uv.y - baseY) * 2.3) + vec2(t * 0.012, -t * 0.010);
+    vec2 warp = vec2(fbm(q + 3.1), fbm(q + 7.7)) - 0.5;
+    float puff = fbm(q + warp * 0.9) * 0.5 + fbm(q * 2.7 + 9.0 + warp) * 0.32 + fbm(q * 5.6 + warp * 1.4) * 0.18;
+    // 外形: 平らな底→中〜上で膨らみ→頂はカリフラワー状に丸く窄む（綿玉でなく“そびえる塔”）。縦窓に収め
+    // 左右と頂に青空を残して塔の全形を見せる（旧版は頂が窄み綿玉化＋画面いっぱいに溶けていた）。
+    float prof = smoothstep(0.0, 0.24, vf) * (1.0 - smoothstep(0.62, 1.0, vf) * 0.62);
+    float halfW = (0.05 + 0.14 * prof) * (0.84 + puff * 0.5);
+    float edge = abs(cx) / max(halfW, 0.02);
+    float body = (1.0 - smoothstep(0.70, 1.0, edge))          // 縁を締めてカリフラワーの粒を立てる
+               * smoothstep(baseY - 0.01, baseY + 0.04, uv.y)
+               * (1.0 - smoothstep(topY - 0.05, topY + 0.02, uv.y));
+    float cloudMask = clamp(body * smoothstep(0.38, 0.52, puff + 0.16) * mix(1.0, 1.14, uIntensity), 0.0, 1.0);
+    // 立体陰影: 上面・陽側(右)が白く輝き、底は平らに深く翳る＝塔の量感。コントラストを強めて霧でなく雲塊に。
+    float ud = smoothstep(0.0, 0.45, vf);                      // 底→上
+    float sunSide = smoothstep(-0.5, 0.6, cx / max(halfW, 0.02)); // 右(陽側)ほど明るい
+    float lobe = smoothstep(0.40, 0.60, puff);                // 盛り上がった粒（カリフラワー）
+    float lit = ud * 0.34 + sunSide * 0.30 + lobe * 0.7;      // 明部: 上・陽側・盛り上がった粒
+    lit -= (1.0 - ud) * 0.34;                                 // 底ほど平らに翳る（積乱雲の暗い雲底）
+    lit -= smoothstep(0.55, 0.30, puff) * 0.25;               // 粒の谷（くぼみ）は翳る＝カリフラワーの陰
+    lit = clamp(lit, 0.0, 1.0);
+    vec3 cloudLit = vec3(1.0, 0.99, 0.96);                     // 陽の当たる白
+    vec3 cloudSha = uSkyMid * 0.74 + uDropTint * 0.12;         // 底・くぼみの青い翳り（より深く）
     vec3 cloudCol = mix(cloudSha, cloudLit, lit);
-    cloudCol += uSunGlow * smoothstep(0.40, 0.5, puff) * (1.0 - smoothstep(0.5, 0.64, puff)) * 0.16; // 縁の陽の透け
+    cloudCol += uSunGlow * smoothstep(0.44, 0.54, puff) * (1.0 - smoothstep(0.54, 0.68, puff)) * 0.18; // 縁の陽の透け
     col = mix(col, cloudCol, cloudMask);
 
     // 高層のちぎれ雲（小さな積雲が上空に点々）
