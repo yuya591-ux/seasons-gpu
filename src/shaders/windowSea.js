@@ -103,7 +103,14 @@ const FRAGMENT_BODY = /* glsl */ `
     water += uSunGlow * pathW * glint * scint * mix(0.5, 1.0, uIntensity);
     // 低い夕陽がさざ波の無数の面に当たり横へ広がるきらめき（一筋の道でなく面で煌めく＝評価 美術-M4）。
     float glitBand = smoothstep(0.0, 0.30, depth) * (1.0 - smoothstep(0.30, 0.66, depth)); // 水平線寄りの帯
-    float glitPts = step(0.86, h21(floor(vec2(swuv.x * 80.0, swuv.y * 46.0 - t * 1.7))));   // 点描の煌めき（明滅）
+    // 四角いセル(step+floor)＝ブロック状のきらめきを脱す。各セルに丸い輝点を散らし、点ごとに明滅。
+    vec2 gcell = vec2(swuv.x * 78.0, swuv.y * 44.0 - t * 1.7);
+    vec2 gid = floor(gcell);
+    vec2 goff = (vec2(h21(gid), h21(gid + 3.1)) - 0.5) * 0.7;          // セル内の輝点位置をばらす
+    float gd = length(fract(gcell) - 0.5 - goff);
+    float gh = h21(gid + 1.7);
+    float gtw = 0.45 + 0.55 * sin(t * 5.5 + gh * 40.0);               // 点ごとの明滅
+    float glitPts = smoothstep(0.32, 0.0, gd) * step(0.72, gh) * max(gtw, 0.0); // 約3割のセルに丸い輝点
     float glitSun = 0.34 + 0.66 * exp(-abs(ax - sunScreenX) * 1.1);                         // 太陽側ほど密に・広く
     water += uSunGlow * glitPts * glitBand * glitSun * (0.55 + 0.45 * scint) * 0.7 * mix(0.5, 1.0, uIntensity);
     // 波頭の泡（手前の大きなうねりの頂に白く・横に寄せる筋）
