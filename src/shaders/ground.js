@@ -9,6 +9,10 @@ export const GROUND_GLSL = /* glsl */ `
   #ifndef GR_STEPS
   #define GR_STEPS 36
   #endif
+  // 影サンプル数（light端末は2に減らす＝最重コスト削減。注入先が定義しなければ4＝従来通り）。評価 技術-H3。
+  #ifndef GR_SHADOW
+  #define GR_SHADOW 4
+  #endif
   // 世界座標 g0 から区画情報を得る。bH=建物高さ(ブロック単位, 道路や緑地は0)。
   // 道路境界は硬い step ＝ 区画が垂直の壁を持つ“箱”になる（レイマーチで壁が立つ）。
   void cityCell(vec2 g0, out vec2 gi, out vec2 gf, out float bH,
@@ -215,6 +219,7 @@ export const GROUND_GLSL = /* glsl */ `
       float bShadow = 0.0;
       vec2 g0hit = vec2(horizAngle * hitZ, hitZ);
       for (int s = 1; s <= 3; s++) {
+        if (s > GR_SHADOW) break; // light端末は影サンプルを減らす
         float dd = float(s) * 0.5;
         vec2 nb = g0hit + vec2(-0.96 + sunAz * 0.6, 0.28) * dd;
         vec2 _gi, _gf; float _bH, _t, _m, _b, _d;
@@ -305,6 +310,7 @@ export const GROUND_GLSL = /* glsl */ `
       float shadow = 0.0;
       vec2 sdir = vec2(-0.96 + sunAz * 0.6, 0.28);   // 太陽（西やや奥）へ向かう方向（移ろう）
       for (int s = 1; s <= 4; s++) {
+        if (s > GR_SHADOW) break; // light端末は影サンプルを減らす（最重コストの削減）
         float dd = float(s) * 0.45;
         vec2 nb = g0 + sdir * dd;
         vec2 _gi, _gf; float _bH, _t, _m, _b, _d;

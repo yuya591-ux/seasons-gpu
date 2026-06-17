@@ -669,7 +669,7 @@ const FRAGMENT_BODY = /* glsl */ `
 const QUALITY_DEFINES = {
   soft: '#define OCTAVES 5\n#define GR_STEPS 40\n',
   standard: '#define OCTAVES 4\n#define GR_STEPS 36\n',
-  light: '#define OCTAVES 3\n#define GR_STEPS 28\n', // 重い端末は見下ろしレイマーチも歩数減（軽量・低解像と併用で滑らかに）
+  light: '#define OCTAVES 3\n#define GR_STEPS 28\n#define GR_SHADOW 2\n', // 重い端末は歩数も影サンプルも減らす（軽量・低解像と併用で滑らかに）
 }
 
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。ガラス現象とグレードを main 直前に挿入。 */
