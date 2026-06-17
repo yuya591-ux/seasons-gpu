@@ -952,8 +952,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 主房（陰の濃色）を縦長/横広に変形＝輪郭を木ごとに変える。
     const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, det), leafBaseMats[ci])
     leaf.position.y = trunkH + r * ay * 0.5; leaf.scale.set(ax, ay, ax); leaf.castShadow = true; g.add(leaf)
-    // 房を1〜3個、上＋横へ不規則に重ねる（陽の淡色／陰の濃色を交互）＝樹冠の不整形・綿玉脱却。
-    const nC = (tall ? 2 : 1) + ((R() * 2) | 0)
+    // 房を上＋横へ不規則に重ねる（陽の淡色／陰の濃色を交互）＝樹冠の不整形・綿玉脱却。
+    // 近景の額装木立は房を多く（豊か）、奥の木は1〜2に抑える（霞むので軽量＝ドローコール削減）。
+    const nC = scale > 1.4 ? (tall ? 2 : 1) + ((R() * 2) | 0) : 1 + (R() < 0.45 ? 1 : 0)
     for (let k = 0; k < nC; k++) {
       const cr = r * (0.5 + R() * 0.34)
       const cl = new THREE.Mesh(new THREE.IcosahedronGeometry(cr, det), (k % 2 ? leafHiMats : leafBaseMats)[ci])
