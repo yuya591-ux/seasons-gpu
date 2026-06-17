@@ -426,10 +426,16 @@ export async function mountTown3d(parent, opts = {}) {
   if (kind !== 'yato') {
     const rg = new THREE.PlaneGeometry(7.5, 130, 1, 56); rg.rotateX(-Math.PI / 2)
     const rp = rg.attributes.position
+    const rcol = []
     for (let i = 0; i < rp.count; i++) {
       const lx = rp.getX(i), lz = rp.getZ(i)
       rp.setY(i, heightAt(lx, lz - 35) + 0.07)
+      // 低周波の路面の濃淡（補修跡・日焼け・轍の汚れ）。テクスチャの反復に乗らない地形ベースの長い
+      // うねりで、のっぺり灰の平面を脱して「使い込まれた路面」に（俯瞰で効く）。
+      const m = 0.9 + 0.15 * Math.sin(lz * 0.16 + 1.3) + 0.08 * Math.sin(lz * 0.43 + lx)
+      rcol.push(m, m, m)
     }
+    rg.setAttribute('color', new THREE.Float32BufferAttribute(rcol, 3))
     rg.computeVertexNormals()
     // 舗装テクスチャ: アスファルトのムラ＋黄色のセンターライン（破線）＋路肩線（実写の路面標示。メッシュ増なし）
     const rtc = document.createElement('canvas'); rtc.width = 64; rtc.height = 256
@@ -439,7 +445,7 @@ export async function mountTown3d(parent, opts = {}) {
     rtx.fillStyle = 'rgba(206,196,150,0.55)'; for (let y = 0; y < 256; y += 44) rtx.fillRect(31, y + 8, 3, 22) // 黄色のセンターライン（破線）
     rtx.fillStyle = 'rgba(198,198,198,0.26)'; rtx.fillRect(6, 0, 2, 256); rtx.fillRect(56, 0, 2, 256) // 路肩線
     const roadTex = new THREE.CanvasTexture(rtc); roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 8)
-    const road = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: roadTex }))
+    const road = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: roadTex, vertexColors: true }))
     road.position.z = -35; road.receiveShadow = true; town.add(road)
     // 横の通り（数本）。アスファルトのムラ材を共有＝ベタ灰の平面を脱す（俯瞰で映える路面の質感）。
     const crossMat = mottleMat(0x474750, 80, 0.12, [6, 2])
