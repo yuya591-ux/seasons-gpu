@@ -258,6 +258,12 @@ body.idle .hud,
 body.idle .topbar {
   opacity: 0;
 }
+/* 消えている間は当たり判定も切る（見えないボタンへの誤タップを防ぐ＝評価UX-H3）。指を動かせば poke で即復帰。 */
+body.idle .hud button,
+body.idle .hud input,
+body.idle .topbar button {
+  pointer-events: none;
+}
 
 /* 起動ゲート */
 .gate {
@@ -373,6 +379,14 @@ body.idle .topbar {
   background: rgba(20, 16, 26, 0.45);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
   outline: none;
+}
+/* 中央=標準のティック（明るさ等の向きの目安。トラックの中央に淡い縦線） */
+.slider--centered {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55));
+  background-size: 2px 11px;
+  background-position: center center;
+  background-repeat: no-repeat;
 }
 .slider::-webkit-slider-thumb {
   appearance: none;

@@ -29,6 +29,12 @@ export function buildUI(opts) {
 
   let currentScene = initialScene
   let intensityLabelEl = null // 設定の「強さ」スライダーの名前（情景で変わる）
+  let intensityRowEl = null // 「強さ」行（town3d等では効かないので隠す＝評価UX-H4）
+  // 「強さ」が効くのはシェーダー情景（雨脚・陽炎・雲など uIntensity を使う）。3Dの街/谷戸では無効→隠す。
+  const intensityApplies = (s) => s && s.render !== 'town3d'
+  function syncIntensityRow() {
+    if (intensityRowEl) intensityRowEl.style.display = intensityApplies(currentScene) ? '' : 'none'
+  }
 
   // ── 起動ゲート（iOS自動再生対策） ──
   const gate = h('div', 'gate')
@@ -73,13 +79,16 @@ export function buildUI(opts) {
     } catch {
       /* localStorage不可でも続行 */
     }
-    const hint = h('div', 'lookhint', '指でなぞって、見回す')
+    const hint = h('div', 'lookhint', '指でなぞって見渡す　／　窓をあける')
     root.appendChild(hint)
     requestAnimationFrame(() => hint.classList.add('lookhint--show'))
-    setTimeout(() => {
+    const dismiss = () => {
       hint.classList.remove('lookhint--show')
       setTimeout(() => hint.remove(), 1400)
-    }, 4200)
+    }
+    const timer = setTimeout(dismiss, 4600)
+    // パネルを開く等で触れたら、ヒントはそっと消す（ギャラリーに被らない＝評価UX）。
+    window.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss() }, { once: true, passive: true })
     try {
       localStorage.setItem('seasons_look_hint', '1')
     } catch {
@@ -272,6 +281,7 @@ export function buildUI(opts) {
         onApplyScene(scene)
         markCurrent()
         updateWindowBtn()
+        syncIntensityRow() // 情景に応じて「強さ」行を出し分け
       }
       el.classList.remove('panel--open')
       poke()
@@ -315,13 +325,15 @@ export function buildUI(opts) {
       },
     )
     intensityLabelEl = intensityRow.querySelector('.setrow__label')
+    intensityRowEl = intensityRow
     el.appendChild(intensityRow)
     el.appendChild(
       makeSlider('明るさ', 0.7, 1.3, 0.01, settings.brightness, (v) => {
         settings.brightness = v
         onSettings({ brightness: v })
-      }),
+      }, true), // 中央=標準のティックを出す（向きの目安＝評価UX-H4）
     )
+    syncIntensityRow() // 起動情景に応じて「強さ」行の出し分け
 
     const qRow = h('div', 'setrow')
     qRow.appendChild(h('span', 'setrow__label', '描き込み'))
@@ -408,10 +420,10 @@ export function buildUI(opts) {
     return { el }
   }
 
-  function makeSlider(label, min, max, step, value, onInput) {
+  function makeSlider(label, min, max, step, value, onInput, centered) {
     const row = h('div', 'setrow')
     row.appendChild(h('span', 'setrow__label', label))
-    const input = h('input', 'slider')
+    const input = h('input', centered ? 'slider slider--centered' : 'slider')
     input.type = 'range'
     input.min = String(min)
     input.max = String(max)
