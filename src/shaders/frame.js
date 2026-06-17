@@ -46,6 +46,6 @@ export const FRAME_GLSL = `
     float sill = smoothstep(bw + 0.032, bw, bottomU);
     col = mix(col, vec3(0.14, 0.112, 0.088), sill);
     col += vec3(0.16) * smoothstep(bw + 0.036, bw + 0.026, bottomU) * step(bw, bottomU);
-    return mix(col, preFrame, lean); // 乗り出すと枠が消えて景色だけ
+    return mix(col, preFrame, min(1.0, lean * 1.15)); // 乗り出すと枠が消えて景色だけ（leanが1に漸近しても0.87で完全に消し残像を防ぐ）
   }
 `
