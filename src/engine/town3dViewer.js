@@ -125,7 +125,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = LIGHT ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap
+  renderer.shadowMap.type = THREE.PCFShadowMap // PCFSoftShadowMapは非推奨で実際は自動でPCFに落ちる→明示してThree.jsの警告を消す（静的影なので見た目は同一）
   // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
   renderer.shadowMap.autoUpdate = false
   stage.appendChild(renderer.domElement)
@@ -1344,7 +1344,8 @@ export async function mountTown3d(parent, opts = {}) {
         for (const e of winEmis) e.dispose()
         grad.dispose()
       } catch (e) { /* 無視 */ }
-      try { renderer.forceContextLoss() } catch (e) { /* 無視 */ } // GPUコンテキストを即解放＝連打切替でのコンテキスト蓄積/ロストを防ぐ
+      // forceContextLoss() は呼ばない: 上で geometry/material/texture を解放済みなので不要で、
+      // 情景往復のたびにコンテキストを強制喪失・再生成するとモバイルでコンテキスト枯渇→3D表示不能の温床になる（評価 技術-H5）。
       renderer.dispose()
     },
   }
@@ -1356,7 +1357,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   window.addEventListener('resize', resize)
 
-  const clock = new THREE.Clock()
+  const startT = performance.now() // THREE.Clock は非推奨→performance.now 差分で経過秒を出す（警告解消・依存削減）
   let lastT = 0
   let lastDraw = -1
 
@@ -1709,7 +1710,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
     if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
-    const t = clock.getElapsedTime()
+    const t = (performance.now() - startT) / 1000
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
     if (t - lastDraw < 0.032) return
     lastDraw = t
