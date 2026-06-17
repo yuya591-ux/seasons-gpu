@@ -624,20 +624,24 @@ export async function mountTown3d(parent, opts = {}) {
       awn.position.set(0, sh, d / 2 + 0.36); awn.castShadow = true; g.add(awn)
     }
     g.position.set(x, gy, z)
-    g.rotation.y = (R() - 0.5) * 0.5
+    // 屋根の向きを散らす（碁盤の同一方向を崩す）。多くは街路にゆるく沿い、時々大きく振れて棟の向きが変わる。
+    g.rotation.y = R() < 0.26 ? (R() - 0.5) * 1.5 : (R() - 0.5) * 0.5
     town.add(g)
   }
 
-  // 街区を碁盤にばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）
+  // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
+  // 格子からの揺らぎを大きめに取り、区画の大きさも独立に振って、見下ろしの「市松の屋根」を崩す。
   for (let zi = -11; zi <= 2; zi++) {
     for (let xi = -8; xi <= 8; xi++) {
       if (Math.abs(xi) < 1.6 && zi > -3) continue // 手前中央は道（街を見通す抜け）
-      if (R() < 0.08) continue // 密な街（抜けは僅か）
-      const x = xi * 9 + (R() - 0.5) * 3
-      const z = zi * 9 + (R() - 0.5) * 3
+      if (R() < 0.12) continue // 空地・駐車場・庭で時々抜く（碁盤の規則性を崩す）
+      const x = xi * 9 + (R() - 0.5) * 5.4 // 格子からの揺らぎを大きく（隣と不揃いに寄る＝密集の自然さ）
+      const z = zi * 9 + (R() - 0.5) * 5.4
       const far = (zi + 11) / 13 // 0=奥 1=手前
-      const w = lerp(3.2, 5.5, far) + R() * 1.4
-      const d = lerp(3.2, 5.5, far) + R() * 1.4
+      // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
+      const big = R() < 0.12 ? 1.7 : 1.0
+      const w = (lerp(3.0, 5.2, far) + R() * 2.4) * big
+      const d = (lerp(3.0, 5.2, far) + R() * 2.4) * (big > 1.0 ? 0.7 + R() * 0.6 : 1.0)
       // 高さの分布を広げ、均質な高層の壁を避ける（低い家が主役・たまに中層/団地）
       const tall = R() < 0.12
       const h = tall ? lerp(8, 18, R() * R()) : lerp(2.6, 5.5, far) + R() * 2.2
