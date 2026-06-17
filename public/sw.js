@@ -4,8 +4,25 @@
 const VERSION = 'seasons-v2'
 const ASSET_CACHE = `${VERSION}-assets`
 
-self.addEventListener('install', () => {
-  self.skipWaiting() // 新版は即時有効化（静かな自動更新）
+// install: シェル（index.html/JS/CSS/manifest/icon）を事前キャッシュ＝一度も情景を開かずオフラインでも起動。
+// precache-manifest.json はビルド時にVite pluginが生成（ハッシュ付き資産名を含む）。失敗しても起動は妨げない。
+self.addEventListener('install', (e) => {
+  e.waitUntil(
+    (async () => {
+      try {
+        const res = await fetch(new URL('precache-manifest.json', self.registration.scope).href, { cache: 'no-cache' })
+        if (res.ok) {
+          const urls = await res.json()
+          const cache = await caches.open(ASSET_CACHE)
+          // 一つの失敗で全体を諦めない（allSettled）。
+          await Promise.allSettled(urls.map((u) => cache.add(u)))
+        }
+      } catch {
+        /* オフライン初回等は無視＝stale-while-revalidateで追って埋まる */
+      }
+      self.skipWaiting() // 新版は即時有効化（静かな自動更新）
+    })(),
+  )
 })
 
 self.addEventListener('activate', (e) => {
