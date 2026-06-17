@@ -77,26 +77,29 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 col = sky;
     vec2 cuv = vec2((uv.x - 0.5) * asp + 0.5, uv.y);
 
-    // ── 入道雲（積乱雲）: もくもく立ち上がる大きな塊。上面は陽に白く輝き、底は青く翳る ──
-    vec2 q = cuv * vec2(1.15, 1.5) + vec2(t * 0.009, 0.0);
-    vec2 warp = vec2(fbm(q + 3.1), fbm(q + 7.7)) - 0.5;       // ドメインワープでもくもく感
-    float d1 = fbm(q + warp * 0.9);
-    float d2 = fbm(q * 2.4 + 11.0 + warp);
-    float dens = d1 * 0.66 + d2 * 0.34;
-    float d1u = fbm(q + vec2(0.0, 0.07) + warp * 0.9);        // 少し上の密度
-    // 入道雲らしく低い所から高くそびえる帯
-    float tower = smoothstep(0.10, 0.26, uv.y) * (1.0 - smoothstep(0.74, 0.99, uv.y));
-    float cloudMask = smoothstep(0.42, 0.52, dens) * tower;   // 厚く・はっきり
-    cloudMask = clamp(cloudMask * mix(1.0, 1.3, uIntensity), 0.0, 1.0);
-    // 密度の縦勾配を「光の当たる面」に: 上面が陽を受け、底は影る（はっきりした立体感）
-    float topLight = smoothstep(-0.07, 0.09, d1 - d1u);
-    float core = smoothstep(0.5, 0.9, dens);
-    vec3 cloudLit = mix(uDropTint, vec3(1.0, 0.99, 0.96), 0.4); // 陽の当たる白（やや暖色）
-    vec3 cloudSha = uDropTint * 0.32 + uSkyMid * 0.42;          // 青みの濃い翳り（底）
-    vec3 cloudCol = mix(cloudSha, cloudLit, topLight);
-    cloudCol = mix(cloudCol, cloudCol * 0.82, core * 0.35);     // 芯を締めて厚みを出す
-    float rim = smoothstep(0.42, 0.5, dens) * (1.0 - smoothstep(0.5, 0.64, dens));
-    cloudCol += uSunGlow * rim * 0.18;                          // 縁の陽の透け
+    // ── 入道雲（積乱雲）: 真夏の昼の主役。低い底から高くそびえる大きな白い塊。上面は陽に輝き底は翳る。 ──
+    // 以前は密度しきい値が発火せず雲がほぼ出ていなかった（評価 美術-H1）。外形(底細く中広く頂窄む)＋
+    // もくもくのfbmで、画面中央にそびえる積乱雲をはっきり主役として立てる。
+    vec2 cc = vec2((uv.x - 0.5) * asp, uv.y);
+    float cx = cc.x + 0.14 - sin(t * 0.015) * 0.05;            // 雲の中心はやや左・ゆっくり流れる
+    float baseY = 0.27, topY = 0.90;
+    float vf = clamp((uv.y - baseY) / (topY - baseY), 0.0, 1.0); // 0=底 1=頂
+    vec2 q = vec2(cx * 1.5, (uv.y - baseY) * 1.7) + vec2(t * 0.012, -t * 0.010);
+    vec2 warp = vec2(fbm(q + 3.1), fbm(q + 7.7)) - 0.5;        // ドメインワープでもくもく感
+    float puff = fbm(q + warp * 0.9) * 0.6 + fbm(q * 2.6 + 9.0 + warp) * 0.4; // もくもく密度 0..1
+    float halfW = (0.13 + 0.30 * sin(vf * 3.14159)) * (0.78 + puff * 0.66);   // 縁がもくもく膨らむ外形
+    float body = (1.0 - smoothstep(halfW * 0.62, halfW, abs(cx)))
+               * smoothstep(baseY - 0.015, baseY + 0.07, uv.y)
+               * (1.0 - smoothstep(topY - 0.07, topY + 0.02, uv.y));
+    float cloudMask = clamp(body * smoothstep(0.30, 0.5, puff + 0.20) * mix(1.0, 1.18, uIntensity), 0.0, 1.0);
+    // 立体陰影: 上＋中心＋盛り上がった面が陽を受け白く、底＋外周は青く翳る
+    float lit = clamp(smoothstep(0.12, 0.72, vf) * 0.5
+                    + (1.0 - smoothstep(0.30, 1.0, abs(cx) / max(halfW, 0.02))) * 0.3
+                    + smoothstep(0.42, 0.74, puff) * 0.45, 0.0, 1.0);
+    vec3 cloudLit = vec3(1.0, 0.995, 0.97);                    // 陽の当たる白
+    vec3 cloudSha = uDropTint * 0.44 + uSkyMid * 0.5;          // 青みの翳り（底・外周）
+    vec3 cloudCol = mix(cloudSha, cloudLit, lit);
+    cloudCol += uSunGlow * smoothstep(0.40, 0.5, puff) * (1.0 - smoothstep(0.5, 0.64, puff)) * 0.16; // 縁の陽の透け
     col = mix(col, cloudCol, cloudMask);
 
     // 高層のちぎれ雲（小さな積雲が上空に点々）
