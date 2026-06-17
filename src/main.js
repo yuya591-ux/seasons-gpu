@@ -273,6 +273,12 @@ function start() {
     if (!document.hidden && !sleepFading && audio.isStarted()) addViewSeconds(20)
   }, 20000)
 
+  // 見回しに連動して音場が左右に動く（聴覚の没入）。シェーダー情景のみ（3Dの街/スプラットは別系統＝中央）。
+  setInterval(() => {
+    if (!audio.isStarted()) return
+    audio.setLookPan(town3dMode || splatMode ? 0 : renderer.getPan().x)
+  }, 130)
+
   const ui = buildUI({
     initialScene: scene,
     settings,
@@ -325,6 +331,7 @@ function start() {
   // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュ・サムネ生成など）
   if (/[?&]dev=1/.test(location.search)) {
     window.__renderer = renderer
+    window.__audio = audio // 検証用: 見回し連動の音場(getLookPan)など
     window.__applyScene = (id) => applyScene(resolveScene(id), false)
     window.__sceneIds = SCENES.filter((s) => s.public !== false && s.status === 'ready').map((s) => s.id)
     window.__town3dWindow = (b) => setTown3dWindowOpen(b) // 検証用: 3Dの街の窓をあける/しめる

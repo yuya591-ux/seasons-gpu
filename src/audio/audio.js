@@ -13,7 +13,8 @@ export function createAudio(opts) {
   let master = null
   let openFilter = null // 窓のあけ具合で外音を澄ませる/こもらせるローパス（閉=ガラス越し／開=外気が澄む）
   let windowOpenAmt = 0
-  let layers = [] // ループ中のレイヤー {layerGain, stopped}
+  let layers = [] // ループ中のレイヤー {layerGain, stopped, panner, basePan}
+  let lookPan = 0 // 見回しに連動する音場の左右オフセット（右を向くと音は左へ＝視覚と一致）
   let timers = [] // ループ継ぎ足し・ランダム再生のタイマー
   let currentScene = null
   let muted = false
@@ -130,14 +131,15 @@ export function createAudio(opts) {
     const layerGain = ctx.createGain()
     layerGain.gain.setValueAtTime(0.0001, now())
     layerGain.gain.linearRampToValueAtTime(Math.max(0.0001, gainVal), now() + 1.4) // レイヤーのフェードイン
+    let panner = null
     if (ctx.createStereoPanner) {
-      const panner = ctx.createStereoPanner()
-      panner.pan.value = pan
+      panner = ctx.createStereoPanner()
+      panner.pan.value = Math.max(-1, Math.min(1, pan + lookPan)) // 生成時点の見回しを反映
       layerGain.connect(panner).connect(master)
     } else {
       layerGain.connect(master)
     }
-    const layer = { layerGain, stopped: false }
+    const layer = { layerGain, stopped: false, panner, basePan: pan }
     layers.push(layer)
 
     let nextStart = now() + 0.05
@@ -407,6 +409,18 @@ export function createAudio(opts) {
         openFilter.frequency.value = f
       }
     },
+    /** 見回しの角度(yaw)で音場を左右に動かす（右を向くと音は左へ＝視覚と一致）。聴覚にも窓の外の広がりを。 */
+    setLookPan(yaw) {
+      lookPan = Math.max(-0.45, Math.min(0.45, -(yaw || 0) * 0.16))
+      if (!ctx) return
+      const t = now()
+      for (const l of layers) {
+        if (!l.panner || l.stopped) continue
+        const target = Math.max(-1, Math.min(1, l.basePan + lookPan))
+        try { l.panner.pan.setTargetAtTime(target, t, 0.12) } catch { l.panner.pan.value = target } // なめらかに移す（クリック音を避ける）
+      }
+    },
+    getLookPan() { return lookPan }, // 検証/連携用
     isStarted() {
       return started
     },
