@@ -958,7 +958,8 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
   if (kind === 'yato') {
     // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
-    const waterMat = mottleMat(0x7ba6c8, 36, 0.10, [1, 1]) // 水を張った田（朝空を映す水色・さざ波のムラ。白飛びを抑え水らしく）
+    const waterMat = mottleMat(0x8fbcd8, 42, 0.18, [1, 1]) // 水を張った田（朝空を映す水鏡・さざ波のムラを強め煌めきを）
+    const waterSun = mottleMat(0xcadce0, 30, 0.24, [1, 1]) // 朝日を照り返す明るい水面（一部の田＝棚田の夜明けの輝き）
     const riceMat = mottleMat(0x6f8a44, 54, 0.15, [2, 2])  // 青田（稲の濃淡）
     const earthMat = mottleMat(0x9c8862, 40, 0.13, [1, 1]) // 畑の土（土塊のムラ）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
@@ -967,7 +968,8 @@ export async function mountTown3d(parent, opts = {}) {
         const gy = heightAt(px + jx, pz)
         const r = R()
         const w = 4.9 + R() * 0.4
-        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w), r > 0.32 ? waterMat : (r > 0.10 ? riceMat : earthMat)) // 水を張った田を主体に＝棚田の水鏡
+        // 水を張った田を主体に＝棚田の水鏡。一部は朝日を照り返して明るく（夜明けの棚田の煌めき）。
+        const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w), r > 0.32 ? (R() < 0.32 ? waterSun : waterMat) : (r > 0.10 ? riceMat : earthMat))
         paddy.position.set(px + jx, gy + 0.13, pz); paddy.receiveShadow = true; town.add(paddy)
       }
     }
