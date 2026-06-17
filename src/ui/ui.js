@@ -256,7 +256,8 @@ export function buildUI(opts) {
     // 公開する情景だけ（実証/開発用は public:false で隠す）
     const devMode = /[?&]dev=1/.test(location.search)
     const BASE = import.meta.env.BASE_URL || '/'
-    SCENES.filter((s) => s.status === 'ready' && (s.public !== false || devMode)).forEach((scene) => {
+    const pubScenes = SCENES.filter((s) => s.status === 'ready' && (s.public !== false || devMode))
+    function makeCard(scene) {
       const card = h('button', 'scene-card')
       // 実描画のサムネ（読み込めない時はパレットのグラデへフォールバック）
       const sw = h('span', 'scene-card__swatch')
@@ -271,7 +272,21 @@ export function buildUI(opts) {
       card.addEventListener('click', () => selectScene(scene))
       gallery.appendChild(card)
       cards.push({ id: scene.id, card })
-    })
+    }
+    // シリーズ見出しで一覧の見通しを良くする（情景が増えても探しやすい）。見出しはグリッド全幅に渡る。
+    const groups = [
+      ['実写の窓', (s) => s.render === 'photoWindow'],
+      ['立体の街と谷戸', (s) => s.render === 'town3d'],
+      ['角部屋から', (s) => s.render === 'cornerRoom'],
+      ['街と自然', () => true], // 残り全部（下町・雨・海・山・屋上・デモ）
+    ]
+    const placed = new Set()
+    for (const [name, test] of groups) {
+      const inGroup = pubScenes.filter((s) => !placed.has(s.id) && test(s))
+      if (!inGroup.length) continue
+      gallery.appendChild(h('h3', 'gallery__group', name))
+      for (const scene of inGroup) { placed.add(scene.id); makeCard(scene) }
+    }
 
     function markCurrent() {
       cards.forEach(({ id, card }) => {
