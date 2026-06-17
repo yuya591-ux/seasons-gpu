@@ -971,7 +971,17 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i < 70; i++) { const v = 96 + ((R() * 44) | 0); rix.fillStyle = `rgba(${v},${v + 26},${(v * 0.58) | 0},0.16)`; rix.fillRect(R() * 64, R() * 64, 2, 2) } // 株のムラ
     const riceTex = new THREE.CanvasTexture(ric); riceTex.wrapS = riceTex.wrapT = THREE.RepeatWrapping; riceTex.repeat.set(2, 2)
     const riceMat = new THREE.MeshLambertMaterial({ map: riceTex }) // 青田（稲の条）
-    const earthMat = mottleMat(0x9c8862, 40, 0.13, [1, 1]) // 畑の土（土塊のムラ）
+    // 畑の土（耕した畝＝土の条が並ぶ。ベタ土を脱し「耕した畑」と読ませる。稲の条と揃える）。
+    const ear = document.createElement('canvas'); ear.width = ear.height = 64
+    const erx = ear.getContext('2d')
+    erx.fillStyle = '#9c8862'; erx.fillRect(0, 0, 64, 64)
+    for (let y = 3; y < 64; y += 6) { // 畝（耕した土の条）
+      erx.fillStyle = 'rgba(122,104,72,0.55)'; erx.fillRect(0, y, 64, 2)       // 畝の谷（影）
+      erx.fillStyle = 'rgba(186,164,124,0.4)'; erx.fillRect(0, y + 3, 64, 1)   // 畝の頂（明）
+    }
+    for (let i = 0; i < 60; i++) { const v = 150 + ((R() * 40) | 0); erx.fillStyle = `rgba(${v},${(v * 0.86) | 0},${(v * 0.62) | 0},0.16)`; erx.fillRect(R() * 64, R() * 64, 2, 2) } // 土塊のムラ
+    const earthTex = new THREE.CanvasTexture(ear); earthTex.wrapS = earthTex.wrapT = THREE.RepeatWrapping; earthTex.repeat.set(2, 2)
+    const earthMat = new THREE.MeshLambertMaterial({ map: earthTex }) // 畑の土（耕した畝）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
       for (let px = -11; px <= 11; px += 5.6) {
         const jx = (R() - 0.5) * 0.5
