@@ -631,9 +631,9 @@ export async function mountTown3d(parent, opts = {}) {
       const cx = side * (3.3 + R() * 0.9)
       const cz = -12 - R() * 54
       const cy = heightAt(cx, cz)
-      const car = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 3.4), toon(carCols[(R() * carCols.length) | 0]))
+      const car = new THREE.Mesh(new RoundedBoxGeometry(1.7, 1.0, 3.4, 2, 0.26), toon(carCols[(R() * carCols.length) | 0])) // 面取りで丸みのある車体
       car.position.set(cx, cy + 0.55, cz); car.rotation.y = side > 0 ? 0.05 : -0.05; car.castShadow = true; town.add(car)
-      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 1.7), toon(0x2a2e34))
+      const cab = new THREE.Mesh(new RoundedBoxGeometry(1.5, 0.7, 1.7, 2, 0.2), toon(0x2a2e34))
       cab.position.set(cx, cy + 1.25, cz - 0.1); town.add(cab)
     }
   }
@@ -1160,12 +1160,13 @@ export async function mountTown3d(parent, opts = {}) {
   for (let i = 0; i < 6; i++) {
     const g = new THREE.Group()
     const col = carCols[i % carCols.length]
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 3.4), toon(col))
+    // 車体・客室は面取りした箱（RoundedBox）＝丸みのある車に（低ポリの角張った箱を脱す）。
+    const body = new THREE.Mesh(new RoundedBoxGeometry(1.7, 0.6, 3.4, 2, 0.24), toon(col))
     body.position.y = 0.66; body.castShadow = true; g.add(body)
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.54, 0.52, 1.8), glassMat); cabin.position.set(0, 1.12, -0.1); g.add(cabin) // 窓(水色ガラス)
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.12, 1.55), toon(col)); roof.position.set(0, 1.42, -0.1); roof.castShadow = true; g.add(roof) // 屋根(車体色)
+    const cabin = new THREE.Mesh(new RoundedBoxGeometry(1.54, 0.52, 1.8, 2, 0.2), glassMat); cabin.position.set(0, 1.12, -0.1); g.add(cabin) // 窓(水色ガラス)
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(1.58, 0.12, 1.55, 1, 0.06), toon(col)); roof.position.set(0, 1.42, -0.1); roof.castShadow = true; g.add(roof) // 屋根(車体色)
     for (const wx of [-0.82, 0.82]) for (const wz of [-1.05, 1.1]) { // 4輪
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 8), wheelMat)
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 12), wheelMat)
       wheel.rotation.z = Math.PI / 2; wheel.position.set(wx, 0.32, wz); g.add(wheel)
     }
     const dir = (i % 2 === 0) ? 1 : -1
