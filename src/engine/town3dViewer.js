@@ -29,14 +29,14 @@ const CAM = {
   leanFov: 7.0,     // 乗り出しで画角が広がる量(度)
   leanLook: 3.2,    // 乗り出しで視線が下を覗き込む量（手前の木立へ落ち込み過ぎない程度に抑制＝評価UX-H2）
   leanPitchUp: 1.10, // 乗り出し時に上を見上げられる範囲（空・ビル上層まで仰げる）。大きいほど上が見える
-  leanPitchDn: 0.20, // 乗り出し時に下を見下ろせる範囲の拡張
+  leanPitchDn: 0.55, // 乗り出し時に下を見下ろせる範囲の拡張（ユーザー要望でさらに下＝足下の街まで覗ける）
   lookPitch: 18,    // 見上げ/見下ろしの効き（pitch→視線の縦移動量）。大きいほど少しのスワイプで大きく振れる
   fov0: 62,         // 基準画角(度)
 }
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
 // applyTown3dLook(スワイプ時)とframeループ(戻り時の追従)の両方で使い、範囲を一元管理する。
-const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.30 + lean * CAM.leanPitchDn })
+const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.45 + lean * CAM.leanPitchDn })
 
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
@@ -1838,11 +1838,12 @@ export async function mountTown3d(parent, opts = {}) {
     glass.style.opacity = ((1 - wo * 0.92) * (1 - lean)).toFixed(3)
     cross.style.transform = `translateX(${(wo * 96).toFixed(1)}%)`
     cross.style.opacity = ((1 - wo) * (1 - lean)).toFixed(3)
-    // サッシ・窓台は乗り出すと拡大しながら退いて外気だけに（枠を通り抜ける手応え）
+    // サッシ・窓台は乗り出すと拡大しながら退いて外気だけに（枠を通り抜ける手応え）。
+    // 乗り出しきったら完全に消す（×0.96/×0.9だと中央の縦桟や枠が4〜10%残って黒い線になる＝指摘の不具合）。
     frame2.style.transform = `scale(${(1 + lean * 0.55).toFixed(3)})`
-    frame2.style.opacity = (1 - lean * 0.96).toFixed(3)
+    frame2.style.opacity = Math.max(0, 1 - lean * 1.2).toFixed(3)
     sill.style.transform = `translateY(${(lean * 130).toFixed(1)}%)`
-    sill.style.opacity = (1 - lean * 0.9).toFixed(3)
+    sill.style.opacity = Math.max(0, 1 - lean * 1.18).toFixed(3)
     paper.style.opacity = (0.14 * (1 - lean * 0.6)).toFixed(3)
     // ガラス越しのくすみを、あけ／乗り出しに応じて晴らす（外気が澄む）。変化時だけ書き換え。
     const clarity = Math.min(1, wo * 0.6 + lean * 0.7)
