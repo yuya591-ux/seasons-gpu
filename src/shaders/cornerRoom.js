@@ -9,6 +9,7 @@ import { GRADE_GLSL } from './grade.js'
 import { GROUND_GLSL } from './ground.js'
 import { BIRDS_GLSL } from './birds.js'
 import { GODRAYS_GLSL } from './godrays.js'
+import { SKYEVENTS_GLSL } from './skyEvents.js'
 
 export const vertexSource = /* glsl */ `
   attribute vec2 aPosition;
@@ -280,6 +281,8 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 帰る鳥影（はばたきながら弧を描いて空を渡る）。
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), uTime, 1.0 - uReduceMotion);
+    // 夜空をごくたまに流れる流れ星（既存の瞬く星に重ねる、まれな"小さな驚き"）
+    col = shootingStar(col, vec2(ax + yaw * 0.5, vp.y), uTime, nightAmt * smoothstep(0.58, 0.78, vp.y));
 
     // 時間とともに窓に灯がともる（夕暮れが深まる郷愁）
     float litRamp = 0.7 + 0.3 * smoothstep(0.0, 90.0, uTime);
@@ -677,7 +680,7 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     // 地面・鳥の関数は outsideView より前に定義する必要がある（outsideView から呼ぶため）
-    .replace('//__GROUND__', GROUND_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL)
+    .replace('//__GROUND__', GROUND_GLSL + '\n' + BIRDS_GLSL + '\n' + GODRAYS_GLSL + '\n' + SKYEVENTS_GLSL)
     .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n  void main()')
   return defines + body
 }

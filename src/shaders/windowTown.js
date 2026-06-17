@@ -8,6 +8,7 @@ import { GRADE_GLSL } from './grade.js'
 import { GROUND_GLSL } from './ground.js'
 import { GODRAYS_GLSL } from './godrays.js'
 import { BIRDS_GLSL } from './birds.js'
+import { SKYEVENTS_GLSL } from './skyEvents.js'
 import { FRAME_GLSL } from './frame.js'
 
 export const vertexSource = /* glsl */ `
@@ -202,6 +203,9 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 帰る鳥影（はばたきながら弧を描いて夕空を渡る）。街並みより奥＝空に描く
     col = flyingBirds(col, vec2(ax + yaw * 0.5, vp.y), t, 1.0 - uReduceMotion);
+    // 夜の下町をごくたまに流れる流れ星（夜空ほど見える・上空のみ。街並みより奥＝後の街レイヤーが手前を隠す）
+    float ssNight = clamp(1.0 - dot(uSkyTop, vec3(1.2)), 0.0, 1.0) * smoothstep(0.55, 0.75, vp.y);
+    col = shootingStar(col, vec2(ax + yaw * 0.5, vp.y), t, ssNight);
 
     // 奥→手前。回転はほぼ一律（手前ほどごくわずかに大きく＝自然な奥行き）
     col = hills(col, vp, ax + yaw * 0.30, 0.55, mix(vec3(0.15, 0.21, 0.18), uHorizon, 0.45));
@@ -305,6 +309,6 @@ export function buildFragment(quality) {
   const defines = QUALITY_DEFINES[quality] || QUALITY_DEFINES.standard
   const body = FRAGMENT_BODY
     .replace('//__GROUND__', GROUND_GLSL) // 地面関数は town/main より前に定義する必要がある
-    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + GODRAYS_GLSL + '\n' + BIRDS_GLSL + '\n' + FRAME_GLSL + '\n  void main()')
+    .replace('void main()', GLASS_GLSL + '\n' + GRADE_GLSL + '\n' + GODRAYS_GLSL + '\n' + BIRDS_GLSL + '\n' + SKYEVENTS_GLSL + '\n' + FRAME_GLSL + '\n  void main()')
   return defines + body
 }
