@@ -41,11 +41,13 @@ const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.35 + le
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
 function makeGradient(THREE) {
-  const data = new Uint8Array([72, 150, 250]) // 影0.28(しっかり濃い影) / 中0.59 / 陽0.98 ＝面でパキッと分かれる濃淡
+  // やわらかな水彩調の階調（低ポリ脱却＝曲面が丸く読める）。陰→陽を5段で、Linear補間でセルの
+  // 硬い境界をほぐし、曲面（樹冠・地形・人・車）を丸く見せる。輪郭線＋紙目グレードが手描きの趣は保つ。
+  const data = new Uint8Array([80, 122, 164, 204, 242]) // 影0.31 / 0.48 / 0.64 / 0.80 / 陽0.95
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat)
   tex.needsUpdate = true
-  tex.magFilter = THREE.NearestFilter // 明確なセル境界（手描きの面の切り替わり）
-  tex.minFilter = THREE.NearestFilter
+  tex.magFilter = THREE.LinearFilter // 面の切り替わりをやわらげ曲面を丸く（プラスチックにしない範囲で）
+  tex.minFilter = THREE.LinearFilter
   return tex
 }
 
