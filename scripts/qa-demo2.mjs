@@ -1,0 +1,20 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 1 })
+const errs = []
+page.on('pageerror', (e) => errs.push(e.message))
+await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(400)
+// シェーダー情景に切替（town3dでない）→ flag消去 → デモ起動
+await page.evaluate(() => window.__applyScene && window.__applyScene('summer-dusk-seaside'))
+await page.waitForTimeout(2200)
+await page.evaluate(() => { localStorage.removeItem('seasons_look_demo'); window.__lookDemo && window.__lookDemo() })
+const px = async () => (await page.evaluate(() => window.__renderer.getPan().x))
+await page.waitForTimeout(1600); const a = await px()
+await page.waitForTimeout(1900); const b = await px()
+await page.waitForTimeout(2100); const d = await px()
+console.log('panX: +1.6s=', a.toFixed(2), ' +3.5s=', b.toFixed(2), ' +5.6s=', d.toFixed(2))
+console.log('右を覗いた(a>0.3):', a > 0.3, ' 左へ振れた(b<a-0.3):', b < a - 0.3, ' 正面へ戻る(|d|<0.25):', Math.abs(d) < 0.25)
+console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0,4)) : 'エラー無し')
+await browser.close()

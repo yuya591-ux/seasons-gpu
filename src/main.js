@@ -240,6 +240,29 @@ function start() {
     window.addEventListener(ev, () => { if (sleepFading) cancelSleep() }, { passive: true }),
   )
 
+  // 初回のみ: 起動直後に景色がゆっくり一度だけ見回して正面へ戻る＝「指で動かせる／ただの静止画ではない」を
+  // 体で伝える最小の所作。「視差効果を減らす」設定・見回し系でない情景・触れた瞬間は行わない/中止する。
+  function maybeLookDemo() {
+    try {
+      if (localStorage.getItem('seasons_look_demo')) return
+      localStorage.setItem('seasons_look_demo', '1')
+    } catch { return }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (town3dMode || splatMode) return // 3Dの街/スプラットは別系統の見回し＝対象外
+    let cancelled = false
+    const cancel = () => { cancelled = true }
+    window.addEventListener('pointerdown', cancel, { once: true })
+    const seq = [[1.2, 0], [-1.2, 0], [0, 0]] // 右を覗く→左を覗く→正面へ（rendererの追従で滑らかに）
+    let i = 0
+    const step = () => {
+      if (cancelled || town3dMode) { window.removeEventListener('pointerdown', cancel); return }
+      renderer.setPanTarget(seq[i][0], seq[i][1])
+      if (++i < seq.length) setTimeout(step, 1900)
+      else window.removeEventListener('pointerdown', cancel)
+    }
+    setTimeout(step, 1000)
+  }
+
   const ui = buildUI({
     initialScene: scene,
     settings,
@@ -265,6 +288,7 @@ function start() {
       }
     },
     onAudioStart() {
+      maybeLookDemo() // 初回だけ、そっと一度見回して「動かせる」ことを伝える
       return audio.start()
     },
     onToggleMute(muted) {
@@ -295,6 +319,7 @@ function start() {
     window.__town3dWindow = (b) => setTown3dWindowOpen(b) // 検証用: 3Dの街の窓をあける/しめる
     window.__town3dLean = (b) => setTown3dLean(b) // 検証用: 3Dの街で身を乗り出す/もどる
     window.__sleepNow = () => startSleepFade() // 検証用: おやすみの暗転を即時に起こす
+    window.__lookDemo = () => maybeLookDemo() // 検証用: 初回の見回しデモを起こす（flagは呼び元で消す）
     window.__sleepState = () => ({ fading: sleepFading, on: sleepOverlay.classList.contains('sleep-overlay--on') })
   }
 
