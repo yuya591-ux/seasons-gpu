@@ -1,0 +1,13 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.evaluate(() => document.fonts.ready)
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(600)
+await page.addStyleTag({ content: '.ui{display:none !important}' })
+await page.evaluate(() => window.__applyScene && window.__applyScene('summer-morning-mountains'))
+await page.waitForTimeout(3000)
+await page.screenshot({ path: 'scripts/_shots/qa-mtn-after.png' })
+console.log('done')
+await browser.close()

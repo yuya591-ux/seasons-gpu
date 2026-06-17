@@ -102,9 +102,14 @@ const FRAGMENT_BODY = /* glsl */ `
     // 朝の空
     vec3 col = mix(uHorizon, uSkyMid, smoothstep(0.3, 0.66, vp.y));
     col = mix(col, uSkyTop, smoothstep(0.62, 1.0, vp.y));
-    // 高層の雲（見回すと流れる＝空も動く）。featurelessな空の不感帯を解消。
-    float mcl = fbm(vec2((ax + yaw * 0.55) * 1.1 + uTime * 0.005, vp.y * 2.2));
-    col = mix(col, mix(uSkyMid, vec3(1.0), 0.5), smoothstep(0.5, 0.72, mcl) * smoothstep(0.6, 1.0, vp.y) * 0.35);
+    // 高層の朝雲（見回すと流れる＝空も動く）。明るい霞んだ空には白い雲は溶けて見えないので、
+    // 朝陽側は暖色に輝き／影側はごく淡い青灰で「浮く雲の立体」を出し、平らな上空に朝の情感を足す。
+    float mcl = fbm(vec2((ax + yaw * 0.55) * 1.05 + uTime * 0.005, vp.y * 2.0));
+    float cloudM = smoothstep(0.43, 0.64, mcl) * smoothstep(0.40, 0.74, vp.y);
+    float warmSide = smoothstep(0.5, -0.45, ax);                                // 左(朝陽側)ほど暖色
+    vec3 cloudC = mix(mix(uSkyMid, vec3(0.74, 0.79, 0.86), 0.5), vec3(1.0, 0.95, 0.86), warmSide); // 影側=淡青灰, 陽側=暖クリーム
+    cloudC = mix(cloudC, uSunGlow, warmSide * 0.4);
+    col = mix(col, cloudC, cloudM * 0.5);
     // 朝陽（世界に固定。首を振ると視界の中を移動する）。円盤＋薄明光線
     vec2 sunC = vec2(-0.25 - yaw * 0.6, 0.72);
     float sunDist = distance(vec2(ax, vp.y), sunC);
