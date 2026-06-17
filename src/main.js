@@ -110,6 +110,7 @@ function start() {
     audio.setScene(next)
     // 情景を替えたら窓は閉じた状態から始める（ボタンと描画のズレを防ぐ）
     renderer.setWindowOpen(false)
+    audio.setWindowOpen(false) // 音も閉じた（こもった）状態へ戻す
     if (ui && ui.resetWindow) ui.resetWindow()
     if (next.render === 'splat') {
       splatMode = true
@@ -276,10 +277,12 @@ function start() {
     onToggleWindow(open) {
       if (town3dMode) setTown3dWindowOpen(open) // 3Dの街は窓ガラスがすべって開く
       else renderer.setWindowOpen(open)
+      audio.setWindowOpen(open) // 窓をあけると外音が澄む（ガラス越しのこもり→外気＝視覚＋聴覚で「あいた」を伝える）
     },
     onToggleLean(lean) {
       if (town3dMode) setTown3dLean(lean) // 3Dの街はカメラが枠を越えて前へ
       else renderer.setLeanOut(lean)
+      if (lean) audio.setWindowOpen(true) // 乗り出すと窓は開く＝外音もさらに澄む
     },
   })
 

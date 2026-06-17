@@ -11,6 +11,8 @@ export function createAudio(opts) {
   const onCue = (opts && opts.onCue) || null // 音の発火を画面に伝える（遠雷フラッシュ等）
   let ctx = null
   let master = null
+  let openFilter = null // 窓のあけ具合で外音を澄ませる/こもらせるローパス（閉=ガラス越し／開=外気が澄む）
+  let windowOpenAmt = 0
   let layers = [] // ループ中のレイヤー {layerGain, stopped}
   let timers = [] // ループ継ぎ足し・ランダム再生のタイマー
   let currentScene = null
@@ -93,7 +95,16 @@ export function createAudio(opts) {
     ctx = new AC()
     master = ctx.createGain()
     master.gain.value = 0.0001 // 無音から始めてフェードイン
-    master.connect(ctx.destination)
+    // 窓のあけ具合で外音のこもり/澄みを切り替えるローパス（master→openFilter→destination）。
+    if (ctx.createBiquadFilter) {
+      openFilter = ctx.createBiquadFilter()
+      openFilter.type = 'lowpass'
+      openFilter.frequency.value = windowOpenAmt > 0.5 ? 20000 : 5200 // 閉=ガラス越しのこもり／開=澄む
+      openFilter.Q.value = 0.6
+      master.connect(openFilter).connect(ctx.destination)
+    } else {
+      master.connect(ctx.destination)
+    }
     // 割り込みで running から外れたら、復帰操作時に起こし直せるよう監視
     ctx.onstatechange = () => {
       if (started && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
@@ -310,6 +321,19 @@ export function createAudio(opts) {
         master.gain.cancelScheduledValues(now())
         master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now())
         master.gain.linearRampToValueAtTime(Math.max(0.0001, v), now() + 0.1)
+      }
+    },
+    /** 窓のあけ具合(0..1)で外音のこもり/澄みをクロスフェード（閉=ガラス越し→開=外気が澄む）。 */
+    setWindowOpen(open) {
+      windowOpenAmt = open ? 1 : 0
+      if (!openFilter || !ctx) return
+      const f = open ? 20000 : 5200
+      try {
+        openFilter.frequency.cancelScheduledValues(now())
+        openFilter.frequency.setValueAtTime(openFilter.frequency.value, now())
+        openFilter.frequency.exponentialRampToValueAtTime(f, now() + 0.9) // 窓のease(約1.15s)に寄り添う
+      } catch {
+        openFilter.frequency.value = f
       }
     },
     isStarted() {
