@@ -59,8 +59,11 @@ const FRAGMENT_BODY = /* glsl */ `
     float ridge = baseY + (fbm(vec2(wx * 1.3, 1.7)) - 0.5) * amp;
     float inside = step(vp.y, ridge);
     if (inside < 0.5) return col;
-    float canopy = (fbm(vec2(wx * 18.0, vp.y * 14.0)) - 0.5) * 0.18;
-    vec3 mc = fcol * (mix(1.08, 0.70, smoothstep(ridge, ridge - 0.18, vp.y)) + canopy);
+    // 樹冠の質感を二周波に＋木陰で緑を深く沈める＝のっぺりした緑の帯を脱し森の塊の手触りに。
+    float canopy = fbm(vec2(wx * 18.0, vp.y * 14.0)) - 0.5;
+    float canopy2 = fbm(vec2(wx * 40.0, vp.y * 30.0)) - 0.5; // 細かな樹冠の粒
+    vec3 mc = fcol * (mix(1.08, 0.70, smoothstep(ridge, ridge - 0.18, vp.y)) + canopy * 0.20 + canopy2 * 0.11);
+    mc = mix(mc, mc * vec3(0.85, 1.0, 0.80), max(0.0, -canopy) * 0.4); // 木陰は緑が深く沈む
     mc += uSunGlow * smoothstep(ridge - 0.02, ridge, vp.y) * 0.18;
     return mix(col, mc, inside);
   }
