@@ -476,10 +476,24 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
   }
+  // 壁面の縦グラデを頂点色で（足元=接地のAOで翳り→上=空の光で明るい）。平らな箱面の一様さを破り、
+  // 接地感と大気の奥行きを足して「低ポリの箱」感を脱す。頂点色なので描画コストは増えない。
+  function wallAO(geo, hh) {
+    const pos = geo.attributes.position
+    const col = new Float32Array(pos.count * 3)
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.min(1, Math.max(0, (pos.getY(i) + hh / 2) / Math.max(0.001, hh))) // 0=底 1=上
+      const ao = Math.min(1, t / 0.26)                 // 下26%で接地の翳り
+      const v = 0.72 + 0.28 * ao + 0.06 * t            // 底0.72→中1.0→上1.06(空の光)
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  }
   function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
     const wm = toon(wallCols[(R() * wallCols.length) | 0]) // 壁は軽量な拡散材（多数あるため性能優先）
+    wm.vertexColors = true // 壁面の縦グラデ（接地AO＋空の光）を頂点色で乗せる
     const rep = Math.max(1, Math.round(w / 2.6)), repV = Math.max(1, Math.round(h / 2.4))
     const m = winMapBase.clone(); m.repeat.set(rep, repV); m.needsUpdate = true
     wm.map = m
@@ -487,7 +501,9 @@ export async function mountTown3d(parent, opts = {}) {
       const e = winEmis[(R() * winEmis.length) | 0].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
       wm.emissiveMap = e; wm.emissive = new THREE.Color(0xffcaa0); wm.emissiveIntensity = 0.32 + duskAmt * 0.6 // 発光を抑え主従を付ける（夜の電飾貼り絵感を解消）
     }
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wm)
+    const bodyGeo = new THREE.BoxGeometry(w, h, d)
+    wallAO(bodyGeo, h) // 壁の足元を翳らせ上を明るく＝接地と大気の縦グラデ
+    const body = new THREE.Mesh(bodyGeo, wm)
     body.position.y = h / 2
     body.castShadow = true; body.receiveShadow = true
     g.add(body)
