@@ -960,7 +960,17 @@ export async function mountTown3d(parent, opts = {}) {
     // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
     const waterMat = mottleMat(0x8fbcd8, 42, 0.18, [1, 1]) // 水を張った田（朝空を映す水鏡・さざ波のムラを強め煌めきを）
     const waterSun = mottleMat(0xcadce0, 30, 0.24, [1, 1]) // 朝日を照り返す明るい水面（一部の田＝棚田の夜明けの輝き）
-    const riceMat = mottleMat(0x6f8a44, 54, 0.15, [2, 2])  // 青田（稲の濃淡）
+    // 青田（田植え後の稲の条が整然と並ぶ緑＝俯瞰で「田んぼ」と読ませる。ベタ緑を脱す）。
+    const ric = document.createElement('canvas'); ric.width = ric.height = 64
+    const rix = ric.getContext('2d')
+    rix.fillStyle = '#6f8a44'; rix.fillRect(0, 0, 64, 64)
+    for (let y = 3; y < 64; y += 5) { // 稲の条（列）
+      rix.fillStyle = 'rgba(86,108,54,0.55)'; rix.fillRect(0, y, 64, 2)       // 条の影
+      rix.fillStyle = 'rgba(146,168,90,0.42)'; rix.fillRect(0, y + 2, 64, 1)  // 株の明部
+    }
+    for (let i = 0; i < 70; i++) { const v = 96 + ((R() * 44) | 0); rix.fillStyle = `rgba(${v},${v + 26},${(v * 0.58) | 0},0.16)`; rix.fillRect(R() * 64, R() * 64, 2, 2) } // 株のムラ
+    const riceTex = new THREE.CanvasTexture(ric); riceTex.wrapS = riceTex.wrapT = THREE.RepeatWrapping; riceTex.repeat.set(2, 2)
+    const riceMat = new THREE.MeshLambertMaterial({ map: riceTex }) // 青田（稲の条）
     const earthMat = mottleMat(0x9c8862, 40, 0.13, [1, 1]) // 畑の土（土塊のムラ）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
       for (let px = -11; px <= 11; px += 5.6) {
@@ -985,10 +995,12 @@ export async function mountTown3d(parent, opts = {}) {
       const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.55, 50), bundMat) // 縦の畦（段内の仕切り＝細い）
       b.position.set(bx, gy + 0.32, -21); b.castShadow = true; b.receiveShadow = true; town.add(b)
     }
-    // せせらぎ（谷の左の縁を縫う細い水の流れ。棚田と重ねず、連続した一筋に）
+    // せせらぎ（谷の左の縁を縫う細い水の流れ。棚田と重ねず、連続した一筋に）。朝の光を映してきらめく
+    // 明るい水＝棚田の水鏡と同じ質感に。共有マテリアル1枚（従来は32枚生成していた無駄を解消）。
+    const brookMat = mottleMat(0xc8dce4, 28, 0.20, [1, 2]) // 流れの水（さざ波のムラで煌めき）
     for (let i = 0; i < 32; i++) {
       const z = 5 - i * 1.6, x = Math.sin(z * 0.11 + 0.4) * 1.4 - 9.0, gy = heightAt(x, z)
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.13, 1.9), toon(0xbcd2dc))
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.13, 1.95), brookMat)
       seg.position.set(x, gy + 0.16, z); town.add(seg)
     }
     // 横溝屋敷（谷の主役）: 茅葺の寄棟主屋＋長屋門。屋敷林に抱かれる。
