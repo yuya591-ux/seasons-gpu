@@ -739,7 +739,7 @@ export async function mountTown3d(parent, opts = {}) {
     const x = -3 + Math.sin(i * 0.5) * 0.6
     const gy = heightAt(x, z)
     const ph = 9
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, ph, 6), poleMat)
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, ph, 12), poleMat) // 近景の縦線＝丸く（低ポリの六角柱を脱す）
     pole.position.set(x, gy + ph / 2, z); pole.castShadow = true; town.add(pole)
     const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.18), poleMat)
     arm.position.set(x, gy + ph - 1.0, z); town.add(arm)
@@ -910,7 +910,7 @@ export async function mountTown3d(parent, opts = {}) {
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.38, 2.3, 7), trunkMat) // 幹を少し高く細く＝幹が見える
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.38, 2.3, scale > 1.4 ? 10 : 7), trunkMat) // 幹を少し高く細く＝幹が見える（近景は丸く）
     tr.position.y = 1.15; tr.castShadow = true; g.add(tr)
     const r = 1.6 + R() * 1.4
     const ci = (R() * leafBaseMats.length) | 0 // 木ごとの「種」（下＝陰色／上＝陽色の対を揃える）
