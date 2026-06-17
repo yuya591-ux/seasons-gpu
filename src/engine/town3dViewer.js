@@ -1128,20 +1128,22 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
-  // ── ふわふわの雲（白い球の塊＝立体的な積雲） ──
+  // ── ふわふわの雲（白い球の塊＝立体的な積雲。底は平ら・上は盛り上がり、雲底は翳って立体に） ──
   const clouds = []
-  const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })
+  const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })       // 陽の当たる白
+  const cloudBot = new THREE.MeshToonMaterial({ color: isNight ? 0x6a7286 : 0xd7cfc4, gradientMap: grad, fog: false }) // 影になる雲底（やや翳る＝厚みと立体）
   for (let i = 0; i < 11; i++) {
     const g = new THREE.Group()
-    const n = 4 + ((R() * 4) | 0)
+    const n = 6 + ((R() * 5) | 0) // 6〜10房＝もこもこの積雲
     for (let j = 0; j < n; j++) {
-      const s = 5 + R() * 6
-      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), cloudMat)
-      puff.position.set((R() - 0.5) * 18, (R() - 0.5) * 3, (R() - 0.5) * 9)
-      puff.scale.y = 0.66
+      const s = 4 + R() * 7
+      const up = Math.pow(R(), 0.6) // 上ほど房が多い＝盛り上がる頂・底は平ら
+      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), up < 0.25 ? cloudBot : cloudMat)
+      puff.position.set((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11)
+      puff.scale.y = 0.58
       g.add(puff)
     }
-    g.position.set((R() - 0.5) * 240, 34 + R() * 20, -55 - R() * 80)
+    g.position.set((R() - 0.5) * 240, 32 + R() * 22, -55 - R() * 80)
     scene.add(g); clouds.push(g)
   }
 
