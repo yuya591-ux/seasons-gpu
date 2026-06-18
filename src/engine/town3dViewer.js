@@ -1151,6 +1151,21 @@ export async function mountTown3d(parent, opts = {}) {
       const seg = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.13, 1.95), brookMat)
       seg.position.set(x, gy + 0.16, z); town.add(seg)
     }
+    // 寄棟(よせむね)屋根のジオメトリ: 水平の大棟＋四方の勾配＋深い軒＝四角錐の「段ボール箱」を脱す（評価指摘の核心）。
+    // baseW/baseD=軒の外寸(壁より広く＝深い軒), ridgeLen=大棟の長さ(<baseW), h=棟の高さ。ridge は X 軸に通る。
+    const makeHipRoof = (baseW, baseD, ridgeLen, h) => {
+      const hw = baseW / 2, hd = baseD / 2, hr = ridgeLen / 2
+      const bFL = [-hw, 0, hd], bFR = [hw, 0, hd], bBR = [hw, 0, -hd], bBL = [-hw, 0, -hd]
+      const rL = [-hr, h, 0], rR = [hr, h, 0]
+      const tri = [bFL, bFR, rR, bFL, rR, rL, bBR, bBL, rL, bBR, rL, rR, bBL, bFL, rL, bFR, bBR, rR] // 前/後の勾配＋左右の寄せ
+      const pos = [], uv = []
+      for (const v of tri) { pos.push(v[0], v[1], v[2]); uv.push((v[0] / baseW + 0.5) * 2.0, 0.85 - v[1] / h * 0.8) } // 茅の縦筋が勾配を下る
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+      geo.computeVertexNormals()
+      return geo
+    }
     // 横溝屋敷（谷の主役）: 茅葺の寄棟主屋＋長屋門。屋敷林に抱かれる。
     {
       const fx = 0, fz = -18, fgy = heightAt(fx, fz)
@@ -1166,15 +1181,14 @@ export async function mountTown3d(parent, opts = {}) {
       tcx.globalAlpha = 1
       const thatchTex = new THREE.CanvasTexture(tc); thatchTex.wrapS = thatchTex.wrapT = THREE.RepeatWrapping; thatchTex.repeat.set(3, 1)
       const thatchMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: thatchTex })
-      // 茅葺の寄棟屋根＝一枚の大きな四角錐で、深い軒（基底を広く・低く）にして「厚く重い茅葺」を出す。
-      // （以前は別の軒錐台を重ねて屋根が崩れて見えた＝評価 美術-H4。錐台の重なりをやめ単一の整った屋根に。）
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(8.4, 4.6, 4), thatchMat) // 基底を広く・背を低く＝緩い勾配の重い茅葺。四角錐の尖りを抑え寄棟らしく
-      roof.rotation.y = Math.PI / 4; roof.position.y = 5.0; roof.scale.set(1.0, 1.0, 0.66); roof.castShadow = true; g.add(roof)
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.66, 1.0), toon(0x4e4534)); ridge.position.y = 7.1; g.add(ridge) // 棟を長く太く＝頂点の尖りを隠す水平の棟（寄棟の頂）
+      // 茅葺の寄棟屋根: 水平の大棟＋四方の勾配＋深い軒。四角錐の「段ボール箱」を本物の寄棟へ作り直す（評価指摘）。
+      const roof = new THREE.Mesh(makeHipRoof(10.8, 8.2, 5.6, 3.5), thatchMat)
+      roof.position.y = 2.7; roof.castShadow = true; roof.receiveShadow = true; g.add(roof) // 軒を壁の上端(3.2)より下げ＝深い軒の量感
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.62, 1.25), toon(0x423a2c)); ridge.position.y = 6.2; g.add(ridge) // 大棟の押さえ（水平に長く通る）
       const gateBody = new THREE.Mesh(new RoundedBoxGeometry(7, 2.2, 2.2, 1, 0.16), toon(0xddd4c4)) // 長屋門（角をわずかに面取り）
       gateBody.position.set(0, 1.1, 5.8); gateBody.castShadow = true; g.add(gateBody)
-      const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.4, 4), thatchMat)
-      gateRoof.rotation.y = Math.PI / 4; gateRoof.position.set(0, 3.0, 5.8); gateRoof.scale.set(1.8, 1.0, 0.6); gateRoof.castShadow = true; g.add(gateRoof)
+      const gateRoof = new THREE.Mesh(makeHipRoof(8.2, 3.4, 5.0, 1.5), thatchMat)
+      gateRoof.position.set(0, 2.0, 5.8); gateRoof.castShadow = true; g.add(gateRoof)
       const gateOpen = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.7, 0.3), toon(0x241f18)); gateOpen.position.set(0, 0.95, 6.95); g.add(gateOpen) // 門の通り口（陰）
     }
     // 屋敷林（屋敷を「後ろから」抱く高木の木立）。主屋(z=-18)の手前を空け、背後と側面奥にのみ立てる。
@@ -1185,7 +1199,7 @@ export async function mountTown3d(parent, opts = {}) {
       const gy = heightAt(c[0], c[1])
       const fg = new THREE.Group(); fg.position.set(c[0], gy, c[1]); fg.scale.setScalar(c[2]); fg.rotation.y = (R() - 0.5) * 0.8; town.add(fg)
       const fb = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 3.4), toon(0xd8cfbf)); fb.position.y = 1.2; fb.castShadow = true; fg.add(fb)
-      const fr = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.8, 4), farmRoof[(R() * 3) | 0]); fr.rotation.y = Math.PI / 4; fr.position.y = 3.1; fr.scale.set(1.0, 1.0, 0.85); fr.castShadow = true; fg.add(fr)
+      const fr = new THREE.Mesh(makeHipRoof(5.0, 4.2, 2.2, 1.7), farmRoof[(R() * 3) | 0]); fr.position.y = 2.2; fr.castShadow = true; fg.add(fr) // 瓦の寄棟（深い軒）
     }
     // 子メッシュを位置指定して群に足す小ヘルパ（mesh.position は読み取り専用なので set を使う）
     const addAt = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh }
