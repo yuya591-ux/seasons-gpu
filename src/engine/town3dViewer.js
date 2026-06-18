@@ -1445,13 +1445,15 @@ export async function mountTown3d(parent, opts = {}) {
       const pondGround = heightAt(px0, pz0) + PARK.pondDepth // 掘る前の中心地面
       const waterY = pondGround - 0.7
       const stoneMat = toon(0x9a958c), woodMat = toon(0x8a6a48)
-      // 水面（空を映す水鏡。MeshToonの空グラデで白飛びを防ぐ）。池なので淡くおだやかに。
+      // 水面（空を映す水鏡。MeshToonの空グラデで白飛びを防ぐ）。冬は氷の張った淡い面に。
+      const iced = season === 'winter'
       const pc = document.createElement('canvas'); pc.width = pc.height = 64; const pcx = pc.getContext('2d')
       const pg = pcx.createLinearGradient(0, 0, 0, 64)
-      pg.addColorStop(0, '#' + new THREE.Color(0x7aa6c4).lerp(skyTop, 0.4).getHexString())
-      pg.addColorStop(1, '#' + new THREE.Color(0x4f748e).lerp(skyHorizon, 0.22).getHexString())
+      pg.addColorStop(0, iced ? '#dce8ee' : '#' + new THREE.Color(0x7aa6c4).lerp(skyTop, 0.4).getHexString())
+      pg.addColorStop(1, iced ? '#c4d6de' : '#' + new THREE.Color(0x4f748e).lerp(skyHorizon, 0.22).getHexString())
       pcx.fillStyle = pg; pcx.fillRect(0, 0, 64, 64)
-      for (let i = 0; i < 30; i++) { pcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.05})`; pcx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
+      if (iced) { for (let i = 0; i < 7; i++) { pcx.strokeStyle = `rgba(255,255,255,${0.3 + R() * 0.3})`; pcx.lineWidth = 0.6; pcx.beginPath(); pcx.moveTo(R() * 64, R() * 64); pcx.lineTo(R() * 64, R() * 64); pcx.lineTo(R() * 64, R() * 64); pcx.stroke() } } // 氷のひび
+      else for (let i = 0; i < 30; i++) { pcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.05})`; pcx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
       const ptex = new THREE.CanvasTexture(pc)
       const pondGeo = new THREE.CircleGeometry(pondR + 0.1, 36); pondGeo.rotateX(-Math.PI / 2)
       const pond = new THREE.Mesh(pondGeo, new THREE.MeshToonMaterial({ color: 0xffffff, map: ptex, gradientMap: grad, fog: true }))
@@ -1493,12 +1495,14 @@ export async function mountTown3d(parent, opts = {}) {
           rail.position.set(lx, ly, rs * (width / 2 - 0.12)); rail.rotation.z = -ang; grp.add(rail)
         }
       }
-      // 桜（淡紅の花房。緑の木立に色を差す）。橋の線（x軸）を避けて配置。
+      // 桜（季節で姿が変わる）。春=淡紅の満開・夏=新緑・秋=紅葉・冬=雪をかぶった裸枝。
+      const blossomHex = season === 'spring' ? 0xf0bcce : season === 'autumn' ? 0xd6743a : season === 'winter' ? 0xe4eaf0 : 0x6f9a52
       for (const c of [[px0 - 6.5, pz0 + 5.5], [px0 + 6, pz0 - 6], [px0 - 5, pz0 - 6.5], [px0 + 5.5, pz0 + 6]]) {
         const gy = heightAt(c[0], c[1]); const sg = new THREE.Group(); sg.position.set(c[0], gy, c[1]); town.add(sg)
         const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 2.4, 7), woodMat); tr.position.y = 1.2; tr.castShadow = true; sg.add(tr)
-        const sakuraMat = toon(0xf0bcce)
-        for (const bl of [[0, 2.9, 0, 1.5], [-0.9, 2.5, 0.4, 1.0], [0.8, 2.6, -0.5, 1.05], [0.2, 3.4, 0.3, 0.9]]) {
+        const sakuraMat = toon(blossomHex)
+        const blobs = season === 'winter' ? [[0, 2.7, 0, 0.7], [-0.8, 2.4, 0.4, 0.5], [0.7, 2.5, -0.4, 0.52], [0.2, 3.2, 0.3, 0.46]] : [[0, 2.9, 0, 1.5], [-0.9, 2.5, 0.4, 1.0], [0.8, 2.6, -0.5, 1.05], [0.2, 3.4, 0.3, 0.9]]
+        for (const bl of blobs) {
           const bs = new THREE.Mesh(new THREE.SphereGeometry(bl[3], 8, 7), sakuraMat); bs.position.set(bl[0], bl[1], bl[2]); bs.castShadow = true; sg.add(bs)
         }
         colliders.push({ x: c[0], z: c[1], r: 0.6 }); spawnAvoid.push({ x: c[0], z: c[1], r: 2.0 })
@@ -1654,12 +1658,14 @@ export async function mountTown3d(parent, opts = {}) {
           const rim = new THREE.Mesh(new THREE.BoxGeometry(e[2], 0.5, e[3]), toon(0xd8d2c4)); rim.position.set(plx + e[0], pgy + 0.22, plz + e[1]); grp.add(rim)
         }
       }
-      // 桜並木（校門から校舎へ）
+      // 桜並木（校門から校舎へ）。季節で姿が変わる（春=桜・夏=緑・秋=紅葉・冬=雪枝）。
+      const schBlossom = season === 'spring' ? 0xf0bcce : season === 'autumn' ? 0xd6743a : season === 'winter' ? 0xe4eaf0 : 0x6f9a52
       for (const c of [[-6, 9], [6, 9], [-6, 4.5], [6, 4.5]]) {
         const gy = heightAt(cx + c[0], cz + c[1]); const sg = new THREE.Group(); sg.position.set(cx + c[0], gy, cz + c[1]); town.add(sg)
         const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 7), toon(0x8a6a48)); tr.position.y = 1.1; tr.castShadow = true; sg.add(tr)
-        const sakuraMat = toon(0xf0bcce)
-        for (const bl of [[0, 2.7, 0, 1.3], [-0.8, 2.4, 0.4, 0.9], [0.7, 2.5, -0.4, 0.95]]) { const bs = new THREE.Mesh(new THREE.SphereGeometry(bl[3], 8, 7), sakuraMat); bs.position.set(bl[0], bl[1], bl[2]); bs.castShadow = true; sg.add(bs) }
+        const sakuraMat = toon(schBlossom)
+        const sblobs = season === 'winter' ? [[0, 2.6, 0, 0.62], [-0.7, 2.4, 0.4, 0.46], [0.6, 2.5, -0.4, 0.48]] : [[0, 2.7, 0, 1.3], [-0.8, 2.4, 0.4, 0.9], [0.7, 2.5, -0.4, 0.95]]
+        for (const bl of sblobs) { const bs = new THREE.Mesh(new THREE.SphereGeometry(bl[3], 8, 7), sakuraMat); bs.position.set(bl[0], bl[1], bl[2]); bs.castShadow = true; sg.add(bs) }
         colliders.push({ x: cx + c[0], z: cz + c[1], r: 0.5 })
       }
       // 国旗ポール
