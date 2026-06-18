@@ -355,12 +355,15 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
+  // 棚田の段境界のうねり（x方向）。heightAt と畦の擁壁で共用＝段が等高線に沿って湾曲して整合する。
+  const undX = (x) => Math.sin(x * 0.16) * 2.0 + Math.sin(x * 0.075 - 1.0) * 1.3
   const heightAt = (x, z) => {
     if (kind === 'yato') {
       // 谷戸の地形: 中央(|x|<13)が平らな谷底（棚田）、左右の里山が|x|で立ち上がり、奥で向かいの斜面が上がる。
       let base
       if (z > 6) base = (z - 6) * 0.6 + 1.5                       // 手前=自分の丘（カメラ側ほど高い）
-      else if (z > -46) base = -1.6 - Math.floor((4 - z) / 5.6) * 0.42 + Math.sin(z * 0.08) * 0.1 // 谷底＝手前から奥へ段々に下る棚田（5.6mごとに一段）
+      // 谷底＝手前から奥へ段々に下る棚田。段の境界を x でうねらせ「等高線に沿う有機的な段」へ（剛体の横縞を脱す＝評価指摘）。
+      else if (z > -46) base = -1.6 - Math.floor(((4 - z) + undX(x)) / 5.6) * 0.42 + Math.sin(z * 0.08) * 0.1
       else base = -4.96 + (-46 - z) * 0.42                        // 奥の向かいの斜面が立ち上がる（段々の終端から連続）
       const sx = Math.max(0, Math.abs(x) - 13)
       const hill = sx * 0.9 + Math.pow(sx * 0.12, 1.6) * 7.0       // 左右の里山（谷の縁から立ち上がる）
@@ -1124,16 +1127,19 @@ export async function mountTown3d(parent, opts = {}) {
     const azeMat = toon(0x738048) // 畦の上の草の小道（人が歩く緑の筋＝俯瞰で棚田の畦道が読める）
     const nanoMat = SPR ? toon(0xe6d044) : null // 菜の花の黄（春の畦の彩り）
     const nanoGeo = SPR ? new THREE.IcosahedronGeometry(0.3, 0) : null
-    for (let bz = -46.8; bz <= 5.5; bz += 5.6) {
-      const gy = heightAt(0, bz)
-      const b = new THREE.Mesh(new THREE.BoxGeometry(25, 1.15, 0.85), bundMat) // 段の擁壁（高くして段差を見せる）
-      b.position.set(0, gy + 0.5, bz); b.castShadow = true; b.receiveShadow = true; town.add(b)
-      const aze = new THREE.Mesh(new THREE.BoxGeometry(25, 0.14, 0.95), azeMat) // 畦の天端の草道
-      aze.position.set(0, gy + 1.11, bz); aze.receiveShadow = true; town.add(aze)
-      if (SPR) { // 畦に菜の花の連なり（黄色の彩り＝春の谷戸の風物詩。俯瞰で黄の筋に読める）
-        for (let k = 0; k < 8; k++) {
+    // 段の擁壁を「うねる段境界」に沿って短いセグメントで並べる＝棚田が等高線に沿って湾曲する（剛体の横縞を脱す）。
+    for (let n = 1; n <= 9; n++) {
+      for (let bx = -12.5; bx <= 12.5; bx += 2.5) {
+        const bz = 4 + undX(bx) - 5.6 * n               // この x での段境界 z（heightAt と同じ undX で整合）
+        if (bz < -46.5 || bz > 5.5) continue
+        const gy = heightAt(bx, bz)
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.15, 0.85), bundMat) // 短い擁壁（隣と重ねて連続に）
+        seg.position.set(bx, gy + 0.5, bz); seg.castShadow = true; seg.receiveShadow = true; town.add(seg)
+        const aze = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.14, 0.95), azeMat)  // 畦の天端の草道
+        aze.position.set(bx, gy + 1.11, bz); aze.receiveShadow = true; town.add(aze)
+        if (SPR) { // 春の菜の花（黄の彩り）
           const nf = new THREE.Mesh(nanoGeo, nanoMat)
-          nf.position.set(-11 + k * 3.1 + (R() - 0.5) * 1.6, gy + 1.3, bz + (R() - 0.5) * 0.55)
+          nf.position.set(bx + (R() - 0.5) * 1.6, gy + 1.3, bz + (R() - 0.5) * 0.5)
           nf.scale.set(0.7 + R() * 0.6, 0.9 + R() * 0.5, 0.7 + R() * 0.6); town.add(nf)
         }
       }
