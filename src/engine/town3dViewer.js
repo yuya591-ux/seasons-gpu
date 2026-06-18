@@ -69,8 +69,8 @@ const FLY = {
   turnRate: 1.7,    // 白猫式: 横へ倒すほど速く向き直る旋回速度(rad/s)
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
-  // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上のxMaxまで）。
-  bound: { x: 86, xMax: 104, zMin: -118, zMax: 42, yMax: 122, yFloor: 4.5 },
+  // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上の島・大橋を越えるxMaxまで）。
+  bound: { x: 86, xMax: 112, zMin: -118, zMax: 42, yMax: 122, yFloor: 4.5 },
   // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
   yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
@@ -523,6 +523,8 @@ export async function mountTown3d(parent, opts = {}) {
   const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5 }
   // 臨海の港（埋立地の平らな工業の岸）。倉庫・煙突・クレーン・ガスタンク＝鶴見の臨海らしさ。
   const HARBOR = { x: 74, z: -64, r: 11, padY: SEA.level + 2 }
+  // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
+  const ISLAND = { x: 98, z: -40, r: 8 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -563,6 +565,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 臨海の港の埋立地＝平らな岸（海面より少し上の盤）。縁はなだらかに均す。
     const hd = Math.hypot(x - HARBOR.x, z - HARBOR.z)
     if (hd < HARBOR.r) h += (HARBOR.padY - h) * Math.min(1, (HARBOR.r - hd) / 4)
+    // 湾の小島＝海面から盛り上がるドーム（橋の対岸）。海より高い所だけ採用（島が海から覗く）。
+    const isd = Math.hypot(x - ISLAND.x, z - ISLAND.z)
+    if (isd < ISLAND.r) h = Math.max(h, 2.2 - Math.pow(isd / ISLAND.r, 2) * 14)
     return h
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
@@ -1896,6 +1901,54 @@ export async function mountTown3d(parent, opts = {}) {
         boats.push(g)
       }
       spawnAvoid.push({ x: hx, z: hz, r: HARBOR.r })
+    }
+
+    // ── 港の大橋（湾を渡る斜張橋）と小島。海上の目印・飛んでくぐれる。──
+    {
+      const BZ = ISLAND.z, A = 72, B = ISLAND.x - 2 // 橋の両端x（A=岸、B=島の手前）
+      const Ay = heightAt(A, BZ) + 0.6, By = heightAt(B, BZ) + 0.6, span = B - A
+      const deckY = (x) => { const t = Math.max(0, Math.min(1, (x - A) / span)); return Ay + (By - Ay) * t + Math.sin(Math.PI * t) * 7 }
+      const deckMat = toon(0xc4c0b6), towerMat = toon(0xd6d0c4), cableMat = toon(0x70747a)
+      const lit2 = duskAmt > 0.2, warm2 = new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true })
+      // 橋桁（弧を描く床版）＋欄干（1メッシュへ）
+      const deckGeos = [], railGeos = []
+      for (let x = A; x <= B; x += 1.4) {
+        const y = deckY(x), slope = deckY(x + 0.7) - deckY(x - 0.7)
+        const seg = new THREE.BoxGeometry(1.5, 0.45, 4.4); seg.rotateZ(-Math.atan2(slope, 1.4)); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, BZ)); deckGeos.push(seg)
+        for (const rz of [-2.1, 2.1]) { const r = new THREE.BoxGeometry(1.5, 0.5, 0.12); r.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y + 0.5, BZ + rz)); railGeos.push(r) }
+      }
+      if (BufferGeometryUtils.mergeGeometries) {
+        const dm = BufferGeometryUtils.mergeGeometries(deckGeos, false); if (dm) { const deck = new THREE.Mesh(dm, deckMat); deck.castShadow = true; deck.receiveShadow = true; town.add(deck) }
+        const rmg = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rmg) town.add(new THREE.Mesh(rmg, deckMat))
+      }
+      deckGeos.concat(railGeos).forEach((g) => g.dispose())
+      // 主塔×2（H型・海面から立つ）＋扇状のケーブル
+      for (const tx of [A + span * 0.32, A + span * 0.68]) {
+        const dY = deckY(tx), topY = dY + 17, legBot = SEA.level - 1, legH = topY - legBot
+        const g = new THREE.Group(); g.position.set(tx, 0, BZ); town.add(g)
+        for (const lz of [-2.4, 2.4]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, legH, 8), towerMat); leg.position.set(0, legBot + legH / 2, lz); leg.castShadow = true; g.add(leg) }
+        const cross1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 5.4), towerMat); cross1.position.set(0, dY + 0.2, 0); g.add(cross1)
+        const cross2 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 5.4), towerMat); cross2.position.set(0, topY - 3, 0); g.add(cross2)
+        for (const lz of [-2.4, 2.4]) for (const dxp of [-9, -5.5, 5.5, 9]) {
+          const dx2 = tx + dxp, dy2 = deckY(dx2) + 0.4, cdy = dy2 - topY, clen = Math.hypot(dxp, cdy)
+          const cable = new THREE.Mesh(new THREE.BoxGeometry(clen, 0.07, 0.07), cableMat); cable.position.set(dxp / 2, (topY + dy2) / 2, lz); cable.rotation.z = Math.atan2(cdy, dxp); g.add(cable)
+        }
+        if (lit2) { const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff5a4a, fog: true })); beacon.position.set(0, topY + 0.4, 0); g.add(beacon) }
+        colliders.push({ x: tx, z: BZ, r: 2.8 })
+      }
+      // 橋の灯り（夕夜、橋桁に沿って暖色の点）
+      if (lit2) for (let x = A + 2; x < B; x += 4) { const lp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 6), warm2); lp.position.set(x, deckY(x) + 0.7, BZ + 2.1); town.add(lp) }
+      // 小島の造形（盛り上がった地面＋一本松＋岩＋灯標）
+      {
+        const ix = ISLAND.x, iz = ISLAND.z, iy = heightAt(ix, iz)
+        tree(ix, iz + 1, 1.3 + R() * 0.4) // 島の一本松
+        for (const rp of [[-3, -2, 1.0], [2.5, 2, 0.8], [3.2, -3, 0.7]]) { const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(rp[2], 0), toon(0x8a857c)); rk.position.set(ix + rp[0], heightAt(ix + rp[0], iz + rp[1]) + rp[2] * 0.4, iz + rp[1]); rk.castShadow = true; town.add(rk) }
+        const beaconG = new THREE.Group(); beaconG.position.set(ix - 4, iy, iz - 2); town.add(beaconG)
+        const bp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 3.4, 8), toon(0xeae6dc)); bp.position.y = 1.7; beaconG.add(bp)
+        const bband = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.8, 8), toon(0xc24a33)); bband.position.y = 2.4; beaconG.add(bband)
+        const blamp = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true })); blamp.position.y = 3.6; beaconG.add(blamp)
+        colliders.push({ x: ix, z: iz, r: 4 }); spawnAvoid.push({ x: ix, z: iz, r: 6 })
+      }
     }
 
     // ── 川辺の遊歩道（東岸の護岸の上を歩ける帯）。路面＋手すり＋街灯＋ベンチ＋並木。──
