@@ -411,7 +411,9 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 壁＋窓のテクスチャ（乗算マップ）。壁はベタ白を避け、コンクリの微細なムラ＋雨だれの経年汚れを描いて
   // 実写の建物の質感に近づける。窓は灰（通常）／暖色emissive（灯り）。64pxで滑らかに。
-  function makeWinTex(lit, seed) {
+  function makeWinTex(lit, seed, opt = {}) {
+    const litRatio = opt.litRatio ?? 0.45 // 灯る窓の割合（夜は増やして街を瞬かせる）
+    const litCol = opt.litCol ?? '#ffd089' // 灯りの色
     // 128pxへ拡張＝歩行・低空で近づいても窓が崩れない。サッシ枠・十字桟・窓台を描き、ベタ硝子の板を脱す。
     const S = 128
     const c = document.createElement('canvas'); c.width = c.height = S
@@ -438,8 +440,8 @@ export async function mountTown3d(parent, opts = {}) {
     for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) {
       const px = 16 + xx * 36, py = 14 + yy * 28, pw = 24, ph = 19
       if (lit) {
-        const on = rnd() < 0.45
-        g.fillStyle = on ? '#ffd089' : '#0a0a0a'
+        const on = rnd() < litRatio
+        g.fillStyle = on ? litCol : '#0a0a0a'
         g.fillRect(px, py, pw, ph)
         if (on) { // 灯った窓は十字桟が影で抜ける＝障子/サッシのシルエット
           g.fillStyle = 'rgba(40,28,12,0.55)'
@@ -473,7 +475,8 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const winMapBase = makeWinTex(false, 1)
-  const winEmis = [makeWinTex(true, 3), makeWinTex(true, 11), makeWinTex(true, 29), makeWinTex(true, 53)]
+  // 夜は灯る窓を増やし（街が瞬く）、色をわずかに濃い暖色へ。夕は控えめ。
+  const winEmis = [3, 11, 29, 53].map((s) => makeWinTex(true, s, { litRatio: isNight ? 0.7 : 0.46, litCol: isNight ? '#ffdca0' : '#ffd089' }))
   // 灯り度（空の明るさで決める。明るい昼=窓は灯らない／夕暮れ=ほのか／夜=煌々と）
   const skyBright = (skyTop.r + skyTop.g + skyTop.b) / 3
   const duskAmt = Math.min(1, Math.max(0, (0.56 - skyBright) * 2.4))
@@ -786,7 +789,7 @@ export async function mountTown3d(parent, opts = {}) {
     wm.map = m
     if (duskAmt > 0.12) { // 夕方は窓が灯る
       const e = winEmis[(R() * winEmis.length) | 0].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
-      wm.emissiveMap = e; wm.emissive = new THREE.Color(0xffcaa0); wm.emissiveIntensity = 0.32 + duskAmt * 0.6 // 発光を抑え主従を付ける（夜の電飾貼り絵感を解消）
+      wm.emissiveMap = e; wm.emissive = new THREE.Color(isNight ? 0xffbe82 : 0xffcaa0); wm.emissiveIntensity = 0.3 + duskAmt * (isNight ? 0.95 : 0.62) // 夜は窓灯りを強めて瞬かせる（夕は控えめで貼り絵感を防ぐ）
     }
     // 近景の建物だけ角を面取りして「低ポリの箱」の鋭い角を脱す（奥は霞むので箱のまま＝軽量）。
     const near = z > -12
