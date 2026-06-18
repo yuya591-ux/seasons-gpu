@@ -2074,6 +2074,22 @@ export async function mountTown3d(parent, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: true }))
     m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m); return m
   })()
+  // 高空を速く飛ぶと自分が飛行機雲を引く（後ろへ伸びる白い蒸気）。一粒ずつ薄れる加算スプライトの点群。
+  const trailN = LIGHT ? 40 : 72
+  const trailTex = (() => {
+    const s = 48, c = document.createElement('canvas'); c.width = c.height = s
+    const g = c.getContext('2d'); const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+    gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.5, 'rgba(245,248,255,0.5)'); gr.addColorStop(1, 'rgba(240,245,255,0)')
+    g.fillStyle = gr; g.fillRect(0, 0, s, s); return new THREE.CanvasTexture(c)
+  })()
+  const trailGeo = new THREE.BufferGeometry()
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(trailN * 3), 3))
+  trailGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(trailN * 3), 3)) // 各粒の濃さ(白×alpha)
+  const trailMat = new THREE.PointsMaterial({ map: trailTex, size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true })
+  const trail = new THREE.Points(trailGeo, trailMat); trail.frustumCulled = false; trail.visible = false; scene.add(trail)
+  const trailAlpha = new Float32Array(trailN) // 各粒の寿命(0..1)
+  let trailIdx = 0, trailAccum = 0
+
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
   const speedVig = document.createElement('div'); speedVig.className = 'town3d-speedvig'; stage.appendChild(speedVig)
@@ -2109,8 +2125,22 @@ export async function mountTown3d(parent, opts = {}) {
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * 5 + u.ph)) * 0.06, u.z)
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
     }
-    // 木がそよ風に揺れる
-    for (const tr of treesArr) tr.rotation.z = tr.userData.tilt + Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp // 基準の傾き＋そよ風の揺れ
+    // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
+    const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
+    const wakeSpd = wakeOn ? Math.min(1, Math.hypot(active.vel.x, active.vel.z) / FLY.speed) : 0
+    for (const tr of treesArr) {
+      let wake = tr.userData.wake || 0
+      if (wakeOn && wakeSpd > 0.1) {
+        const dx = tr.position.x - active.flyPos.x, dz = tr.position.z - active.flyPos.z
+        const dh = Math.hypot(dx, dz), dy = active.flyPos.y - (tr.position.y + 5)
+        if (dh < 9 && dy < 12 && dy > -4) {
+          const target = (1 - dh / 9) * wakeSpd * 0.4 * (dx >= 0 ? 1 : -1) // 自機の外側へ倒れる
+          if (Math.abs(target) > Math.abs(wake)) wake = target
+        }
+      }
+      wake *= 0.92; tr.userData.wake = wake // 余波はゆっくり戻る
+      tr.rotation.z = tr.userData.tilt + Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp + wake
+    }
     // アドバルーンがふわり揺れる
     for (const ab of adBalloons) { ab.rotation.z = Math.sin(t * 0.6) * 0.05; ab.position.x += Math.sin(t * 0.5) * 0.002 }
     // 観覧車がゆっくり回り、ゴンドラは水平を保つ
@@ -2292,6 +2322,21 @@ export async function mountTown3d(parent, opts = {}) {
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
       const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 15) * flyAmt
       if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.82).toFixed(2) }
+      // 高空を速く飛ぶと飛行機雲を引く（後ろへ。一定距離ごとに一粒を撒く）
+      if (!isWalk && active.flyPos.y > 38 && speedMag > FLY.speed * 0.45) {
+        trailAccum += speedMag * dt
+        const inv = 1 / Math.max(speedMag, 0.001)
+        const tarr = trailGeo.attributes.position.array
+        while (trailAccum > 2.5) {
+          trailAccum -= 2.5
+          const k = trailIdx * 3
+          tarr[k] = active.flyPos.x - active.vel.x * inv * 2.2 + (Math.random() - 0.5) * 1.2
+          tarr[k + 1] = active.flyPos.y + (Math.random() - 0.5) * 0.8
+          tarr[k + 2] = active.flyPos.z - active.vel.z * inv * 2.2 + (Math.random() - 0.5) * 1.2
+          trailAlpha[trailIdx] = 1
+          trailIdx = (trailIdx + 1) % trailN
+        }
+      }
     }
     // 着地の砂ぼこりが広がって薄れる
     if (active.landDustT > 0) {
@@ -2302,6 +2347,16 @@ export async function mountTown3d(parent, opts = {}) {
       landDust.material.opacity = Math.max(0, 1 - p) * 0.5
       if (active.landDustT <= 0) landDust.visible = false
     }
+    // 飛行機雲が後ろでゆっくり薄れていく（撒いた粒の寿命を減らし、白×濃さで描く）
+    let trailAlive = false
+    const carr = trailGeo.attributes.color.array
+    for (let i = 0; i < trailN; i++) {
+      if (trailAlpha[i] > 0) { trailAlpha[i] = Math.max(0, trailAlpha[i] - dt / 4.5); trailAlive = trailAlive || trailAlpha[i] > 0 }
+      const a = trailAlpha[i] * 0.13
+      carr[i * 3] = a; carr[i * 3 + 1] = a; carr[i * 3 + 2] = a
+    }
+    if (trail.visible || trailAlive) { trailGeo.attributes.position.needsUpdate = true; trailGeo.attributes.color.needsUpdate = true }
+    trail.visible = trailAlive
     camera.up.set(upX, upY, upZ)
     camera.position.set(camX, camY, camZ)
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
