@@ -486,6 +486,7 @@ export async function mountTown3d(parent, opts = {}) {
   let cars = []
   let peeps = []
   let ferris = null
+  let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -1661,6 +1662,57 @@ export async function mountTown3d(parent, opts = {}) {
       colliders.push({ x: cx, z: cz - 7, r: 8 }) // 校舎の塊
       spawnAvoid.push({ x: cx, z: cz - 7, r: 9 })
     }
+
+    // ── 遊園地（観覧車のまわり）。ゲート・回転木馬・旗・柵・ベンチ＝明るい賑わいの目的地。──
+    {
+      const fx = FUN.x, fz = FUN.z
+      // 入口ゲート（アーチ＋「ゆうえんち」看板＋三角旗）。観覧車の手前(+z=街側)に。
+      {
+        const gz = fz + 11, gy = heightAt(fx, gz)
+        const grp = new THREE.Group(); grp.position.set(fx, gy, gz); town.add(grp)
+        const postMat = toon(0xe06f8a)
+        for (const px of [-4.4, 4.4]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 5.6, 10), postMat); p.position.set(px, 2.8, 0); p.castShadow = true; grp.add(p) }
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(4.4, 0.42, 8, 20, Math.PI), toon(0xf2c14e)); arch.position.set(0, 5.4, 0); grp.add(arch)
+        const bc = document.createElement('canvas'); bc.width = 256; bc.height = 64; const bx2 = bc.getContext('2d')
+        bx2.fillStyle = '#e8567f'; bx2.fillRect(0, 0, 256, 64); bx2.strokeStyle = '#fff3d0'; bx2.lineWidth = 4; bx2.strokeRect(3, 3, 250, 58)
+        bx2.fillStyle = '#fff8e8'; bx2.font = 'bold 33px sans-serif'; bx2.textAlign = 'center'; bx2.textBaseline = 'middle'; bx2.fillText('ゆうえんち', 128, 36)
+        const banner = new THREE.Mesh(new THREE.BoxGeometry(8, 1.3, 0.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc) })); banner.position.set(0, 5.7, 0.12); grp.add(banner)
+        const flagCols = [0xe8567f, 0xf2c14e, 0x5aa6d0, 0x6fae8f]
+        for (let i = -4; i <= 4; i++) { const fl = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.55, 3), toon(flagCols[(i + 4) % 4])); fl.rotation.z = Math.PI / 2; fl.position.set(i * 0.95, 5.0 + Math.abs(i) * 0.04, 0); grp.add(fl) }
+      }
+      // メリーゴーラウンド（回転木馬）。台＋馬は回り、屋根と心柱は止まる。
+      {
+        const mx = fx + 9, mz = fz + 2, gy = heightAt(mx, mz)
+        const outer = new THREE.Group(); outer.position.set(mx, gy, mz); town.add(outer)
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 5, 10), toon(0xd9b44a)); pole.position.y = 2.6; outer.add(pole)
+        const rc = document.createElement('canvas'); rc.width = 64; rc.height = 16; const rcx = rc.getContext('2d')
+        for (let i = 0; i < 8; i++) { rcx.fillStyle = i % 2 ? '#e8567f' : '#fff3e0'; rcx.fillRect(i * 8, 0, 8, 16) }
+        const rtex = new THREE.CanvasTexture(rc); rtex.wrapS = THREE.RepeatWrapping; rtex.repeat.set(6, 1)
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(4.7, 1.9, 20), new THREE.MeshToonMaterial({ map: rtex, gradientMap: grad, fog: true })); roof.position.y = 4.9; roof.castShadow = true; outer.add(roof)
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), toon(0xf2c14e)); ball.position.y = 5.95; outer.add(ball)
+        const spin = new THREE.Group(); outer.add(spin); carousel = spin
+        const plat = new THREE.Mesh(new THREE.CylinderGeometry(4.1, 4.3, 0.5, 20), toon(0xf0e6d2)); plat.position.y = 0.25; plat.receiveShadow = true; spin.add(plat)
+        for (let i = 0; i < 6; i++) {
+          const a = i / 6 * 6.283, rr = 3.2
+          const h = new THREE.Group(); h.position.set(Math.cos(a) * rr, 0.5, Math.sin(a) * rr); spin.add(h)
+          const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 6), toon(0xd9b44a)); bar.position.y = 1.5; h.add(bar)
+          const hMat = i % 2 ? toon(0xf6f1e8) : toon(0xd98f5a)
+          const bodyH = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.7, 3, 6), hMat); bodyH.rotation.z = Math.PI / 2; bodyH.position.y = 1.0; h.add(bodyH)
+          const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.45, 3, 6), hMat); neck.position.set(0.45, 1.35, 0); neck.rotation.z = 0.7; h.add(neck)
+        }
+        colliders.push({ x: mx, z: mz, r: 4.4 })
+      }
+      // 低い柵（遊園地の縁。街側のゲート寄りは空ける）
+      const fenceMat = toon(0xd6dde0)
+      for (let i = 0; i < 22; i++) { const a = i / 22 * 6.283; if (Math.sin(a) > 0.45) continue; const px = fx + Math.cos(a) * (FUN.r - 1), pz = fz + Math.sin(a) * (FUN.r - 1); const gy = heightAt(px, pz); const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), fenceMat); post.position.set(px, gy + 0.5, pz); town.add(post) }
+      // ベンチ×2
+      for (const bp of [[fx - 6, fz + 4, 1.2], [fx + 3, fz + 8, -0.6]]) {
+        const gy = heightAt(bp[0], bp[1]); const bg = new THREE.Group(); bg.position.set(bp[0], gy, bp[1]); bg.rotation.y = bp[2]; town.add(bg)
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.46), toon(0x8a6a48)); seat.position.y = 0.46; bg.add(seat)
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.36, 0.1), toon(0x8a6a48)); back.position.set(0, 0.72, -0.2); bg.add(back)
+      }
+      spawnAvoid.push({ x: fx, z: fz, r: 12 })
+    }
   }
 
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
@@ -2725,6 +2777,7 @@ export async function mountTown3d(parent, opts = {}) {
       const wr = ferris.wheel.rotation.z
       for (const g of ferris.gondolas) g.rotation.z = -wr
     }
+    if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
     // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
     if (weatherPts) {
       const { pos, spd, phs, N, swirl } = weatherPts
