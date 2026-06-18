@@ -492,6 +492,8 @@ export async function mountTown3d(parent, opts = {}) {
   let ferris = null
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
+  let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
+  let lightBeam = null // 灯台の光芒（夜に回る）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -1746,7 +1748,7 @@ export async function mountTown3d(parent, opts = {}) {
       wg.addColorStop(1, '#' + new THREE.Color(0x1f4d6c).lerp(skyHorizon, 0.06).getHexString())
       wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
       for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
-      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(5, 14)
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(5, 14); seaTex = wtex
       const seaGeo = new THREE.PlaneGeometry(84, 210); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       const seaMesh = new THREE.Mesh(seaGeo, new THREE.MeshBasicMaterial({ map: wtex, fog: true }))
@@ -1764,6 +1766,11 @@ export async function mountTown3d(parent, opts = {}) {
         const room = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 1.6, 12), toon(0x6a747c)); room.position.y = 8.6; lan.add(room) // 灯室
         const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 10), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true })); lamp.position.y = 8.6; lan.add(lamp) // 灯り（昼も明るく夜は際立つ）
         const cap = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.0, 12), toon(0x3a4248)); cap.position.y = 9.95; lan.add(cap)
+        // 光芒（夜に回る扇状の光。加算で淡く。灯室の高さで回る）
+        const beam = new THREE.Group(); beam.position.y = 8.6; lan.add(beam); lightBeam = beam
+        const beamOp = 0.04 + duskAmt * 0.16
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff0c0, transparent: true, opacity: beamOp, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide })
+        for (const ang of [0, Math.PI]) { const bg = new THREE.ConeGeometry(2.2, 20, 4, 1, true); bg.rotateZ(Math.PI / 2); bg.translate(10, 0, 0); const bm = new THREE.Mesh(bg, beamMat); bm.rotation.y = ang; bm.scale.set(1, 0.25, 1); beam.add(bm) } // 横に倒した細い扇＝水面を撫でる光
         colliders.push({ x: lx, z: lz, r: 1.6 })
       }
       // 小舟（岸近くに数艘。ゆるく浮かんで揺れる）
@@ -1774,6 +1781,13 @@ export async function mountTown3d(parent, opts = {}) {
         const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.9), toon(0xe6e0d4)); cabin.position.set(0, 0.5, -0.5); bg.add(cabin)
         boats.push(bg)
       }
+      // 砂浜（汀の帯。海岸線に沿って砂色の敷きを置く＝丘と海の境をやわらげる。冬は雪の渚）
+      const shoreXat = (z) => { let lo = SEA.coast, hi = SEA.shore + 12; for (let i = 0; i < 16; i++) { const m = (lo + hi) / 2; if (heightAt(m, z) > SEA.level) lo = m; else hi = m } return (lo + hi) / 2 }
+      const beachMat = toon(season === 'winter' ? 0xe6ebf0 : 0xd9c79c)
+      const beachGeos = []
+      for (let z = 26; z > -98; z -= 2.3) { const sx = shoreXat(z); const cxb = sx - 2.0; const gy = heightAt(cxb, z); const seg = new THREE.BoxGeometry(6.0, 0.16, 2.5); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(cxb, gy + 0.05, z)); beachGeos.push(seg) }
+      if (BufferGeometryUtils.mergeGeometries) { const bm2 = BufferGeometryUtils.mergeGeometries(beachGeos, false); if (bm2) { const beach = new THREE.Mesh(bm2, beachMat); beach.receiveShadow = true; town.add(beach) } }
+      beachGeos.forEach((g) => g.dispose())
     }
 
     // ── 川辺の遊歩道（東岸の護岸の上を歩ける帯）。路面＋手すり＋街灯＋ベンチ＋並木。──
@@ -2868,6 +2882,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
+    if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
+    if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
     // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
     if (weatherPts) {
       const { pos, spd, phs, N, swirl } = weatherPts
