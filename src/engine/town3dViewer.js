@@ -500,6 +500,12 @@ export async function mountTown3d(parent, opts = {}) {
   const PARK = { x: 16, z: -27, r: 12, pondR: 5.4, pondDepth: 2.4 }
   // 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。谷の中ほどに立てる。
   const TOWER = { x: -7, z: -48, r: 6 }
+  // 寺（五重塔のある仏閣）。谷の右奥の中腹に。観覧車と対をなす高い目印・飛んでいく目的地。
+  const TEMPLE = { x: 40, z: -74, r: 14 }
+  // 学校（校舎と校庭）。街の右手の一角。時計塔・トラック・桜並木＝町の馴染みの場所。
+  const SCHOOL = { x: 54, z: -18, r: 13 }
+  // 遊園地（既存の観覧車を中心に）。メリーゴーラウンド・遊具・ゲート＝明るい賑わいの目的地。
+  const FUN = { x: -26, z: -66, r: 13 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -875,6 +881,9 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r) continue // 駅前は空ける
       if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r) continue // 公園の広場は空ける
       if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
+      if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r) continue // 寺の境内は空ける
+      if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
+      if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
       const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1383,6 +1392,9 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r - 2) continue // 駅前は空ける
       if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r - 1) continue // 公園は専用の木立で囲む
       if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
+      if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r - 2) continue // 寺は専用の木立で囲む
+      if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
+      if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
@@ -1530,6 +1542,66 @@ export async function mountTown3d(parent, opts = {}) {
       const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff5a4a })); beacon.position.y = roofY + 2.4 + 3.2; grp.add(beacon) // 航空障害灯（夜も街に灯る赤）
       colliders.push({ x: tx, z: tz, r: 4.4 }) // 歩行: 塔身には入らない
       spawnAvoid.push({ x: tx, z: tz, r: 5.5 }) // 着地: 塔の真下には降りない
+    }
+
+    // ── 寺（五重塔のある仏閣）。谷の右奥の中腹に。観覧車と対をなす高い目印・飛んでいく目的地。──
+    {
+      const tx = TEMPLE.x, tz = TEMPLE.z, baseY = heightAt(tx, tz)
+      const wood = toon(0x8a5a3c), beam = toon(0xb5503f), roofMat = toon(0x4a4e52), stoneMat = toon(0x9a958c), gold = toon(0xc9a84a)
+      const grp = new THREE.Group(); grp.position.set(tx, baseY, tz); town.add(grp) // 参道(+z)を街の中心へ向ける（回転なし）
+      const plat = new THREE.Mesh(new THREE.CylinderGeometry(12, 12.6, 0.9, 10), stoneMat); plat.position.y = 0.15; plat.receiveShadow = true; grp.add(plat) // 寺地の石の基壇
+      // 五重塔（積み上がる五つの屋根＋相輪）。塔のかたわらに立てる。
+      {
+        const pag = new THREE.Group(); pag.position.set(-5.5, 0.5, -2); pag.scale.setScalar(1.12); grp.add(pag)
+        let y = 0
+        for (let i = 0; i < 5; i++) {
+          const s = 1 - i * 0.12, bw = 3.4 * s, bh = 2.1
+          const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bw), wood); body.position.y = y + bh / 2; body.castShadow = true; pag.add(body)
+          const band = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.05, 0.2, bw + 0.05), beam); band.position.y = y + bh - 0.12; pag.add(band) // 各層の朱の見切り
+          const roofR = bw * 0.96 + 0.75
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(roofR, 1.2, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.position.y = y + bh + 0.5; roof.castShadow = true; pag.add(roof); pag.add(addOutline(roof)) // 四注の深い軒
+          y += bh + 1.0
+        }
+        const sorin = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.4, 6), gold); sorin.position.y = y + 1.6; pag.add(sorin) // 相輪の心柱
+        for (let r = 0; r < 6; r++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3 - r * 0.025, 0.05, 5, 12), gold); ring.rotation.x = Math.PI / 2; ring.position.y = y + 0.5 + r * 0.36; pag.add(ring) } // 九輪
+        const houju = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), gold); houju.position.y = y + 3.5; pag.add(houju) // 宝珠
+        colliders.push({ x: tx - 5.5, z: tz - 2, r: 2.8 })
+      }
+      // 本堂（大きな入母屋の御堂）
+      {
+        const hall = new THREE.Group(); hall.position.set(4.5, 0.5, -1); grp.add(hall)
+        const body = new THREE.Mesh(new THREE.BoxGeometry(8.5, 3.4, 6), wood); body.position.y = 1.7; body.castShadow = true; hall.add(body)
+        for (const px of [-4, -1.3, 1.3, 4]) { const pil = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.2, 0.35), beam); pil.position.set(px, 1.6, 3.1); hall.add(pil) } // 縁の朱柱
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 3.0, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.scale.set(1.0, 1, 0.8); roof.position.y = 4.4; roof.castShadow = true; hall.add(roof); hall.add(addOutline(roof))
+        const ridge = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.5, 0.7), roofMat); ridge.position.y = 5.55; hall.add(ridge)
+        colliders.push({ x: tx + 4.5, z: tz - 1, r: 4.0 })
+      }
+      // 山門（参道の入口の二本柱の門）
+      {
+        const mon = new THREE.Group(); mon.position.set(0, 0.5, 8); grp.add(mon)
+        for (const px of [-2.2, 2.2]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 4.2, 8), beam); pil.position.set(px, 2.1, 0); pil.castShadow = true; mon.add(pil) }
+        const lintel = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.5, 0.6), beam); lintel.position.y = 3.8; mon.add(lintel)
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.8, 1.4, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 0.55); roof.position.y = 4.5; roof.castShadow = true; mon.add(roof)
+      }
+      // 鐘楼（梵鐘を吊る小さな袴腰）
+      {
+        const bell = new THREE.Group(); bell.position.set(-1, 0.5, 4.5); grp.add(bell)
+        for (const px of [-1, 1]) for (const pz of [-1, 1]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.0, 6), wood); pil.position.set(px, 1.5, pz); bell.add(pil) }
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.2, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.position.y = 3.5; roof.castShadow = true; bell.add(roof)
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 1.2, 10), toon(0x6a6256)); b.position.y = 1.9; bell.add(b)
+        colliders.push({ x: tx - 1, z: tz + 4.5, r: 1.4 })
+      }
+      // 石灯籠×2（参道の左右。夕夜は灯る）
+      for (const lp of [[-2.6, 6], [2.6, 6]]) {
+        const gy = heightAt(tx + lp[0], tz + lp[1]); const lan = new THREE.Group(); lan.position.set(tx + lp[0], gy, tz + lp[1]); town.add(lan)
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 1.3, 8), stoneMat); post.position.y = 0.95
+        const fire = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffce86 }) : toon(0xb0a890)); fire.position.y = 1.8
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.4, 4), stoneMat); cap.rotation.y = Math.PI / 4; cap.position.y = 2.2
+        for (const m of [post, fire, cap]) { m.castShadow = true; lan.add(m) }
+      }
+      // 寺を背後と側面から抱く木立（街向き＝参道の前(+z)は開けて、塔と御堂を見せる）
+      for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; if (Math.sin(a) > 0.2) continue; const rr = 11.5 + R() * 3; tree(tx + Math.cos(a) * rr, tz + Math.sin(a) * rr, 1.0 + R() * 0.6) }
+      spawnAvoid.push({ x: tx, z: tz, r: 8 }) // 寺の境内に降りない
     }
   }
 
