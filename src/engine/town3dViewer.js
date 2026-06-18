@@ -495,6 +495,7 @@ export async function mountTown3d(parent, opts = {}) {
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
+  let crossing = null // 踏切（電車が近づくと遮断機が下り警報灯が点滅）
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
@@ -1067,6 +1068,35 @@ export async function mountTown3d(parent, opts = {}) {
       for (const bx of [-carLen * 0.3, carLen * 0.3]) { const bogie = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.7), toon(0x2a2a2e)); bogie.position.set(bx, 0.32, 0); car.add(bogie) } // 台車
     }
     train.userData = { x: RAIL.x0, speed: 9, len: NCAR * (carLen + gap) }
+
+    // ── 踏切（道が線路と交わる所。電車が近づくと遮断機が下り、警報灯が点滅する）。──
+    const crossX = 6
+    crossing = { gates: [], lamps: [], cx: crossX }
+    // 紅白の遮断桿テクスチャ
+    const sc = document.createElement('canvas'); sc.width = 64; sc.height = 8; const scx = sc.getContext('2d')
+    for (let i = 0; i < 8; i++) { scx.fillStyle = i % 2 ? '#c0392b' : '#f0ece0'; scx.fillRect(i * 8, 0, 8, 8) }
+    const barTex = new THREE.CanvasTexture(sc); barTex.wrapS = THREE.RepeatWrapping; barTex.repeat.set(4, 1)
+    const barMat = new THREE.MeshToonMaterial({ map: barTex, gradientMap: grad })
+    // 道の舗装（踏切を渡る短い道。z方向に通す）
+    const roadGeos = []
+    for (let z = RAIL.z - 6; z <= RAIL.z + 6; z += 1.2) { const seg = new THREE.BoxGeometry(4.6, 0.1, 1.3); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(crossX, heightAt(crossX, z) + 0.07, z)); roadGeos.push(seg) }
+    if (BufferGeometryUtils.mergeGeometries) { const rmesh = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (rmesh) { const road = new THREE.Mesh(rmesh, toon(0x6e6a64)); road.receiveShadow = true; town.add(road) } }
+    roadGeos.forEach((g) => g.dispose())
+    // 警報機×2（対角の隅）＋遮断桿
+    for (const gp of [[crossX - 2.6, RAIL.z - 3, 1], [crossX + 2.6, RAIL.z + 3, -1]]) {
+      const px = gp[0], pz = gp[1], barDir = gp[2]
+      const g = new THREE.Group(); g.position.set(px, heightAt(px, pz), pz); town.add(g)
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3.3, 6), toon(0x2a2a2e)); post.position.y = 1.65; post.castShadow = true; g.add(post)
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.34, 0.18), toon(0x2a2a2e)); head.position.y = 3.05; head.rotation.y = barDir > 0 ? -0.5 : 0.5 + Math.PI; g.add(head) // 警報灯の箱（道へ向ける）
+      const lampLocal = []
+      for (const lx of [-0.22, 0.22]) { const lm = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshBasicMaterial({ color: 0x4a1410, fog: true })); lm.position.set(lx, 0, 0.12); head.add(lm); lampLocal.push(lm) }
+      const xsign = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.07, 4, 4), toon(0xf0d030)); xsign.position.set(0, 3.05, -0.12); xsign.rotation.z = Math.PI / 4; g.add(xsign) // 警標（黄の×印を菱形で近似）
+      const pivot = new THREE.Group(); pivot.position.set(0, 2.5, 0.16); pivot.rotation.z = barDir * 1.45; g.add(pivot) // 起立時=上向き
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.16, 0.16), barMat); bar.position.x = barDir * 1.8; pivot.add(bar)
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.2), toon(0xf0ece0)); tip.position.x = barDir * 3.5; pivot.add(tip)
+      pivot.userData = { barDir }
+      crossing.gates.push(pivot); crossing.lamps.push(lampLocal)
+    }
   }
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
@@ -3066,6 +3096,12 @@ export async function mountTown3d(parent, opts = {}) {
       if (u.x > RAIL.x1 + 2) u.x = RAIL.x0 - u.len
       train.position.set(u.x, 0, RAIL.z)
       for (const car of train.children) car.position.y = heightAt(u.x + car.userData.ox, RAIL.z) + 0.05
+    }
+    if (crossing && train) { // 踏切: 電車が近づくと遮断機が下り、警報灯が交互に点滅
+      const active = Math.abs(train.userData.x - crossing.cx) < 13
+      for (const pv of crossing.gates) { const target = active ? 0 : pv.userData.barDir * 1.45; pv.rotation.z += (target - pv.rotation.z) * Math.min(1, dt * 3) }
+      const blink = Math.sin(t * 7) > 0
+      for (const pair of crossing.lamps) { pair[0].material.color.setHex(active && blink ? 0xff3020 : 0x4a1410); pair[1].material.color.setHex(active && !blink ? 0xff3020 : 0x4a1410) }
     }
     // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
     if (weatherPts) {
