@@ -1,0 +1,35 @@
+// 実ポインタ操作でスティックが現れ、移動が起きるかを確認（左半分ドラッグ＝移動／右半分＝見回し）。
+import { chromium } from 'playwright'
+const port = process.env.PORT || '4801'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+page.on('pageerror', (e) => console.log('PAGE EXCEPTION:', e.message))
+await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(700)
+await page.evaluate(() => window.__applyScene && window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(1800)
+// 乗り出し→空へ
+await page.evaluate(() => window.__town3dWindow(true)); await page.waitForTimeout(1300)
+await page.evaluate(() => window.__town3dLean(true)); await page.waitForTimeout(1800)
+await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(500)
+const dbg = () => page.evaluate(() => window.__town3dDbg())
+
+// 左半分を上方向へドラッグ＝前進スティック
+await page.mouse.move(110, 640)
+await page.mouse.down()
+await page.mouse.move(120, 590, { steps: 4 })
+await page.mouse.move(120, 560, { steps: 4 })
+await page.waitForTimeout(120)
+const stickOn = await page.locator('.town3d-stick').evaluate((el) => el.classList.contains('stick--on'))
+const mid = await dbg()
+await page.waitForTimeout(1200)
+const moved = await dbg()
+await page.mouse.up()
+await page.waitForTimeout(100)
+const afterUp = await dbg()
+console.log('スティック表示 =', stickOn)
+console.log('ドラッグ中 mvX/mvY/vel =', mid.mvX, mid.mvY, mid.vel)
+console.log('1.2s移動後 z/vel =', moved.z, moved.vel)
+console.log('離した後 mvX/mvY =', afterUp.mvX, afterUp.mvY, '（0なら停止入力）')
+await browser.close()

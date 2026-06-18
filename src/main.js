@@ -160,6 +160,8 @@ function start() {
             const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', aurora: 'aurora', star: 'star' }[kind]
             if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録
           },
+          onSpeed: (v) => { if (!sleepFading) audio.setFlyWind(v) }, // 飛行速度で風音を膨らませる
+
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
       } catch (e) {

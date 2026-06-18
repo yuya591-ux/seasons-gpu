@@ -298,6 +298,7 @@ export function createAudio(opts) {
   // ループ素材の上にうっすら重ねて「同じ所が繰り返る」ループ感を消す（CC0原則と完全整合）。
   // master 経由なので音量/ミュート/おやすみに自動追従。値は控えめ（うっすら空気が動く程度）。
   let windNode = null
+  let flyWindV = 0 // 飛行速度に応じた風の強さ（setFlyWind）。細かな変化を無視する基準
   function startWind() {
     if (!ctx || windNode || !ctx.createBiquadFilter) return
     const len = Math.floor(2 * ctx.sampleRate)
@@ -309,7 +310,7 @@ export function createAudio(opts) {
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 0.7
     const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.022, now() + 8)
     src.connect(bp).connect(g).connect(master)
-    windNode = { src }
+    windNode = { src, g, bp } // g/bp は飛行速度で風を膨らませる（setFlyWind）ために保持
     try {
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05
       const lfoG = ctx.createGain(); lfoG.gain.value = 180; lfo.connect(lfoG).connect(bp.frequency); lfo.start()
@@ -408,6 +409,18 @@ export function createAudio(opts) {
       } catch {
         openFilter.frequency.value = f
       }
+    },
+    /** 飛行速度(0..1)で風を膨らませる（速いほど風切りが強まり高くなる＝飛んでいる手応え）。 */
+    setFlyWind(v) {
+      if (!windNode || !ctx) return
+      v = Math.max(0, Math.min(1, v || 0))
+      if (Math.abs(v - flyWindV) < 0.04) return // 細かな変化は無視（無駄なスケジューリングを抑える）
+      flyWindV = v
+      const t = now()
+      try {
+        windNode.g.gain.setTargetAtTime(0.022 + v * 0.05, t, 0.35)       // 風量を速度で増す
+        windNode.bp.frequency.setTargetAtTime(420 + v * 300, t, 0.35)    // 速いほど高い風切り
+      } catch { /* 無視 */ }
     },
     /** 見回しの角度(yaw)で音場を左右に動かす（右を向くと音は左へ＝視覚と一致）。聴覚にも窓の外の広がりを。 */
     setLookPan(yaw) {

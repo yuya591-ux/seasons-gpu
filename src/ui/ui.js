@@ -188,8 +188,8 @@ export function buildUI(opts) {
     flyBtn.textContent = aloft === 'fly' ? 'おりる' : '空へ'
     flyBtn.classList.toggle('is-open', isAloft)
   }
-  // 着地直後に一度だけ、そっと歩き方を伝える（タップで歩く）。静かな文言・数秒で消える。
-  const walkHint = h('div', 'walk-hint', 'そっと画面をタップして、歩く')
+  // 空/地上へ出た時に一度だけ、そっと操作を伝える。静かな文言・数秒で消える。
+  const walkHint = h('div', 'walk-hint', '左で動く　右で見まわす　離すと止まる')
   root.appendChild(walkHint)
   let walkHintShown = false
   let walkHintTimer = null
@@ -198,7 +198,7 @@ export function buildUI(opts) {
     walkHintShown = true
     walkHint.classList.add('walk-hint--on')
     clearTimeout(walkHintTimer)
-    walkHintTimer = setTimeout(() => walkHint.classList.remove('walk-hint--on'), 4200)
+    walkHintTimer = setTimeout(() => walkHint.classList.remove('walk-hint--on'), 5000)
   }
   function stopAloft() {
     if (aloft) { aloft = null; onToggleFly && onToggleFly(false) } // 空/地上から窓辺へ戻す
@@ -221,9 +221,9 @@ export function buildUI(opts) {
   })
   flyBtn.addEventListener('click', () => {
     // 窓辺→空へ / 飛行→おりて歩く / 歩行→また空へ（上下の移動を1つのボタンで段階的に）
-    if (aloft === 'fly') { aloft = 'walk'; onToggleLand && onToggleLand(true); showWalkHint() }
+    if (aloft === 'fly') { aloft = 'walk'; onToggleLand && onToggleLand(true) }
     else if (aloft === 'walk') { aloft = 'fly'; onToggleLand && onToggleLand(false) }
-    else { aloft = 'fly'; windowIsOpen = true; leanIsOut = true; onToggleFly && onToggleFly(true) } // 飛ぶには窓をあけ乗り出した状態から
+    else { aloft = 'fly'; windowIsOpen = true; leanIsOut = true; onToggleFly && onToggleFly(true); showWalkHint() } // 飛ぶには窓をあけ乗り出した状態から。初回だけ操作を案内
     updateWindowBtn()
     poke()
   })

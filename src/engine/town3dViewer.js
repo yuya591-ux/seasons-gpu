@@ -34,25 +34,34 @@ const CAM = {
   fov0: 62,         // 基準画角(度)
 }
 
-// ── 浮遊（空を飛ぶ）モードの調整パラメータ ──
-// 乗り出した先から空へ飛び立ち、鳥のようにゆるやかに滑空しながら街を見渡す。
-// 操舵はドラッグのみ（上を向く＝上昇／下を向く＝下降）。常時前進＝「飛んでいる」手応え。
-// 速度は控えめ・操舵は鈍く追従＝3D酔いを避ける瞑想的な飛翔。境界で街の縁（未生成域）を見せない。
+// ── 浮遊（空を飛ぶ）／散策（歩く）モードの調整パラメータ ──
+// 白猫の“ぷにコン”式スティック（左=移動／右=見回し）で操る。離すと慣性で減速しホバリング。
+// 視点の少し後ろ上から街を広く望む“浮遊カメラ”（アバター無し）。旋回でバンク・慣性・風で飛翔感を出す。
 const FLY = {
-  speed: 9.0,       // 滑空速度(u/s)。街の奥行(約120)を10数秒で渡る＝ゆったり
-  fov: 70,          // 浮遊時の画角(度)。窓より少し広く＝空の開放感
-  enterDur: 1.7,    // 飛び立つ／窓へ戻るの所要(秒)。両端やわらかく
-  pitchMax: 1.15,   // 上下に向ける限界(rad≈±66°)。真下/真上で破綻させない
-  yawEase: 0.09,    // 旋回（操舵）の追従の鈍さ。小さいほどゆっくり大きく回り込む
-  pitchEase: 0.10,  // 上下（操舵）の追従の鈍さ
+  // 速度・慣性（鳥/グライダーの“重さ”）
+  speed: 15,        // 飛行の最大速度(u/s)。スティック全倒しで到達（控えめに倒せばゆっくり）
+  walkSpeed: 5.5,   // 歩行の最大速度(u/s)
+  moveEase: 2.6,    // 速度の追従(1/s)。小さいほど重い加速／離すと惰性で滑空して停止
+  // 画角
+  fov: 72, walkFov: 68,
+  fovSpeedGain: 7,  // 高速時に画角が広がる量(度)＝速度の高揚
+  // 出入り・見回し
+  enterDur: 1.7, pitchMax: 1.2, landDur: 1.4,
+  lookEase: 0.18,   // 見回し（右ドラッグ）の追従
+  // 引いた三人称“浮遊カメラ”（後方上から望む）
+  camBack: 9.5, camUp: 3.2, camAhead: 9,    // 飛行: 後方/上/注視先
+  walkBack: 5.2, walkUp: 2.5, walkAhead: 7, // 歩行: 引き控えめ
+  camLag: 0.12,     // カメラ位置の遅れ追従（わずかな揺らぎ＝空気の流れ）
+  // 旋回バンク（飛行の没入の要）
+  bankMax: 0.5,     // 最大ロール(rad≈29°)
+  bankGain: 2.2,    // 旋回・横移動入力→バンク量
+  bankEase: 0.07,   // バンクの追従（ゆっくり傾く）
+  // 目線・スティック
+  eye: 1.62,        // 立ったときの目線の高さ（地形+この高さ）
+  stickRadius: 62,  // スティックの最大振れ(px)。これで全速
+  stickDead: 0.14,  // 不感帯（微小な震えを無視）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。
   bound: { x: 64, zMin: -86, zMax: 34, yMax: 80, yFloor: 4.5 },
-  // ── 着地して歩く（一人称散策） ──
-  eye: 1.62,        // 立ったときの目線の高さ（地形+この高さ）
-  walkSpeed: 4.0,   // 歩く速さ(u/s)。ゆっくりした散歩のペース
-  stepLen: 5.0,     // タップ1回で進む距離(u)。連打で歩き続けられる
-  landDur: 1.4,     // 飛び降りて着地する所要(秒)＝なめらかに下りる
-  walkFov: 66,      // 歩行時の画角(度)。立った目線に自然な広さ（飛行70より控えめ）
 }
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
@@ -122,16 +131,18 @@ export function setTown3dFly(on) {
       const len = Math.hypot(dx, dy, dz) || 1
       dx /= len; dy /= len; dz /= len
       active.flyYaw = active.flyYawTarget = Math.atan2(dx, -dz)      // 0=奥(-z)を向く
-      active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy)))     // いまの見下ろしから地続きに
-      active.flyPitchTarget = Math.max(-0.1, active.flyPitch)        // 飛び立つと視線がそっと上がり街へ舞い上がる
+      active.flyPitch = active.flyPitchTarget = Math.asin(Math.max(-1, Math.min(1, dy))) // いまの見下ろしから地続きに
+      active.camReady = false // 引いたカメラ位置を次フレームでスナップ初期化
     } else if (active.mode === 'walk') {
-      active.flyPitchTarget = 0.22 // 歩きから飛び立つ＝視線を上げてふわりと舞い上がる
+      active.flyPitchTarget = 0.18 // 歩きから飛び立つ＝視線を少し上げてふわりと
     }
+    active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0
     active.mode = 'fly'
     active.flyTarget = 1
   } else {
     active.mode = 'window'
     active.flyTarget = 0
+    active.moveX = 0; active.moveY = 0
   }
 }
 
@@ -145,7 +156,7 @@ export function setTown3dLand(land) {
     active.flyPos.x = sx; active.flyPos.z = sz
     active.flyYaw = active.flyYawTarget = active.openYaw(sx, sz) // 壁や木を正面にせず、抜けのある方へ向き直る
     active.flyPitchTarget = -0.05 // 立って街路をそっと見渡す
-    active.stepRemain = 0
+    active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.camReady = false
     active.mode = 'walk'
     active.flyTarget = 1
   } else {
@@ -212,6 +223,7 @@ export async function mountTown3d(parent, opts = {}) {
   const weather = opts.weather || null    // 'snow' | 'petals' | 'leaves' | null（降るもの）
   const kind = opts.kind || 'town'        // 'town'（坂の街）| 'yato'（谷戸＝棚田と茅葺の屋敷）
   const onEvent = typeof opts.onEvent === 'function' ? opts.onEvent : () => {} // 定期イベント発火を外へ伝える（音の結線）
+  const onSpeed = typeof opts.onSpeed === 'function' ? opts.onSpeed : () => {} // 飛行速度(0..1)を外へ伝える（風音の膨らみ）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -1568,9 +1580,13 @@ export async function mountTown3d(parent, opts = {}) {
     mode: 'window',               // 'window'（窓辺）| 'fly'（空を飛ぶ）| 'walk'（地上を歩く）
     flyTarget: 0,                 // 窓の外にいたい(1)/窓へ戻りたい(0)。fly/walk のどちらでも 1
     flyP: 0,                      // 窓⇄外の混ざり具合 0=窓 / 1=外（これをイージングして滑らかに出入り）
-    flyPos: new THREE.Vector3(),  // 外（空/地上）での自機の位置
-    flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // 機首/視線の向き（操舵で動かす）
-    stepRemain: 0,                // 歩行: 残りの前進距離（タップで増える。フレームごとに消費）
+    flyPos: new THREE.Vector3(),  // 移動の中心点（“自分”）。引いたカメラはこの後ろ上から望む
+    flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // 見回し（カメラの向き）。右ドラッグで動かす
+    vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
+    moveX: 0, moveY: 0,           // スティック入力(-1..1)。左ドラッグで動かし、離すと0
+    bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
+    camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
+    camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
     winLook: new THREE.Vector3(), // 窓ビューの注視点（飛び立つ瞬間の視線引き継ぎ用に毎フレーム保持）
     dispose() {
       // シーングラフ全体の geometry/material/texture を解放（連打切替でのGPUメモリ蓄積＝コンテキストロストを防ぐ）
@@ -1648,6 +1664,7 @@ export async function mountTown3d(parent, opts = {}) {
   const startT = performance.now() // THREE.Clock は非推奨→performance.now 差分で経過秒を出す（警告解消・依存削減）
   let lastT = 0
   let lastDraw = -1
+  const TMP_DIR = new THREE.Vector3(), TMP_UP2 = new THREE.Vector3() // 引いたカメラのバンク計算用（毎フレーム確保しない）
 
   // ── 窓枠のHTMLオーバーレイ（最前景のサッシ＋横桟＋窓台＋ガラスの映り込み＋紙目）──
   // frame() から参照するので先に生成する。あける／乗り出すで毎フレーム動かす。
@@ -2122,53 +2139,88 @@ export async function mountTown3d(parent, opts = {}) {
     )
     active.winLook.copy(look) // 飛び立つ瞬間の視線引き継ぎ用に、窓ビューの注視点を毎フレーム保持
 
-    // 既定は窓ビュー。浮遊中(flyP>0)は空での自機の位置・視線・画角を混ぜる（出入りが地続きに滑らか）。
+    // 既定は窓ビュー。浮遊/散策中(flyP>0)は、引いた三人称“浮遊カメラ”＋慣性移動＋旋回バンクを混ぜる。
     let camX = ex, camY = ey, camZ = ez, fov = winFov
+    let upX = 0, upY = 1, upZ = 0
+    let lookX = look.x, lookY = look.y, lookZ = look.z
+    let windSpeed01 = 0 // 飛行速度の正規化(0..1)。風音の膨らみへ渡す
     if (flyAmt > 0.0005 || active.flyTarget) {
-      // 機首の向きを操舵目標へゆっくり追従（指を離しても余韻＝ぬるりと回り込む）
-      active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.yawEase
-      active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.pitchEase
-      const cp = Math.cos(active.flyPitch)
-      const dirX = Math.sin(active.flyYaw) * cp
-      const dirY = Math.sin(active.flyPitch)
-      const dirZ = -Math.cos(active.flyYaw) * cp
-      if (active.mode === 'walk') {
-        // 地上を歩く: 目線の高さを地形に沿わせ（飛び降りはやわらかく着地）、タップで前進、建物は貫通しない。
+      // 見回し（右ドラッグ）を目標へ追従＝指を離しても余韻。旋回角速度はバンクの素。
+      const prevYaw = active.flyYaw
+      active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.lookEase
+      active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.lookEase
+      const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001)
+      const cpit = Math.cos(active.flyPitch), spit = Math.sin(active.flyPitch)
+      const syaw = Math.sin(active.flyYaw), cyaw = Math.cos(active.flyYaw)
+      const fwdX = syaw * cpit, fwdY = spit, fwdZ = -cyaw * cpit // 視線方向(3D)
+      const hfX = syaw, hfZ = -cyaw           // 水平の前後
+      const hrX = cyaw, hrZ = syaw            // 水平の右
+      const isWalk = active.mode === 'walk'
+
+      // スティック→目標速度。飛行は視線方向へ前後（見上げ＝上昇）、歩行は地面を進む。離すと目標0で惰性停止。
+      const spd = isWalk ? FLY.walkSpeed : FLY.speed
+      let dvX, dvY, dvZ
+      if (isWalk) { dvX = (hfX * active.moveY + hrX * active.moveX) * spd; dvY = 0; dvZ = (hfZ * active.moveY + hrZ * active.moveX) * spd }
+      else { dvX = (fwdX * active.moveY + hrX * active.moveX) * spd; dvY = fwdY * active.moveY * spd; dvZ = (fwdZ * active.moveY + hrZ * active.moveX) * spd }
+      const k = 1 - Math.exp(-FLY.moveEase * dt) // 慣性：目標速度へ寄せる（離すと0へ＝滑空して停止）
+      active.vel.x += (dvX - active.vel.x) * k
+      active.vel.y += (dvY - active.vel.y) * k
+      active.vel.z += (dvZ - active.vel.z) * k
+
+      const b = FLY.bound
+      if (isWalk) {
+        tryWalk(active.flyPos, active.vel.x * dt, active.vel.z * dt) // 当たり判定つきで水平移動
         const eyeY = heightAt(active.flyPos.x, active.flyPos.z) + FLY.eye
-        const k = 1 - Math.pow(0.02, dt / FLY.landDur) // フレーム率に依らず landDur 秒で着地・地形追従
-        active.flyPos.y += (eyeY - active.flyPos.y) * k
-        if (active.stepRemain > 0.0001) {
-          const adv = Math.min(active.stepRemain, FLY.walkSpeed * dt)
-          active.stepRemain -= adv
-          const hx = Math.sin(active.flyYaw), hz = -Math.cos(active.flyYaw) // 水平の歩行方向（見上げ/見下ろしで進路は変えない）
-          tryWalk(active.flyPos, hx * adv, hz * adv)
-        }
-      } else if (active.flyTarget) {
-        // 機首の向きへゆるやかに前進（=飛んでいる）。戻り中(flyTarget=0)は前進を止め位置を保つ。
-        const step = FLY.speed * dt
-        active.flyPos.x += dirX * step
-        active.flyPos.y += dirY * step
-        active.flyPos.z += dirZ * step
-        // 飛べる箱に収める＝手描きの街の縁・未生成の余白を見せない。床は地形+一定で街すれすれまで降りられる。
-        const b = FLY.bound
+        const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
+        active.flyPos.y += (eyeY - active.flyPos.y) * ky // 着地はやわらかく・以降は地形に沿う
+      } else {
+        active.flyPos.x += active.vel.x * dt; active.flyPos.y += active.vel.y * dt; active.flyPos.z += active.vel.z * dt
         active.flyPos.x = Math.max(-b.x, Math.min(b.x, active.flyPos.x))
         active.flyPos.z = Math.max(b.zMin, Math.min(b.zMax, active.flyPos.z))
         const floor = heightAt(active.flyPos.x, active.flyPos.z) + b.yFloor
         active.flyPos.y = Math.max(floor, Math.min(b.yMax, active.flyPos.y))
       }
+
+      // 旋回バンク（飛行のみ）：旋回角速度＋横移動入力に応じて世界が傾く＝飛翔の手応え。
+      // ただし“動いている時だけ”傾ける（ホバリングして見回すだけでは傾かない）。
+      const spMag = Math.hypot(active.vel.x, active.vel.y, active.vel.z)
+      const moveFactor = Math.min(1, spMag / (FLY.speed * 0.35))
+      const bankTgt = isWalk ? 0 : Math.max(-FLY.bankMax, Math.min(FLY.bankMax, -(yawV * 0.5 + active.moveX) * FLY.bankGain * 0.18)) * moveFactor
+      active.bankCur += (bankTgt - active.bankCur) * FLY.bankEase
+
+      // 引いた三人称カメラ：focus の後ろ上から望む。後ろが建物/地面なら寄せてのめり込みを防ぐ。
       const fp = active.flyPos
-      const flyLookX = fp.x + dirX * 20
-      const flyLookY = fp.y + dirY * 20 + Math.sin(t * 0.5) * 0.05 // ほのかな息づかい
-      const flyLookZ = fp.z + dirZ * 20
-      camX = lerp(ex, fp.x, flyAmt)
-      camY = lerp(ey, fp.y, flyAmt)
-      camZ = lerp(ez, fp.z, flyAmt)
-      look.set(lerp(look.x, flyLookX, flyAmt), lerp(look.y, flyLookY, flyAmt), lerp(look.z, flyLookZ, flyAmt))
-      fov = lerp(winFov, active.mode === 'walk' ? FLY.walkFov : FLY.fov, flyAmt) // 歩行は自然な画角・飛行は少し広く
+      const back0 = isWalk ? FLY.walkBack : FLY.camBack
+      const upOff = isWalk ? FLY.walkUp : FLY.camUp
+      const ahead = isWalk ? FLY.walkAhead : FLY.camAhead
+      let back = back0, dcx = fp.x, dcz = fp.z
+      for (let tries = 0; tries < 5; tries++) {
+        dcx = fp.x - fwdX * back; dcz = fp.z - fwdZ * back
+        if (!blockedAt(dcx, dcz)) break
+        back *= 0.62
+      }
+      let dcy = fp.y - fwdY * back + upOff
+      const camFloor = heightAt(dcx, dcz) + 1.6
+      if (dcy < camFloor) dcy = camFloor
+      if (!active.camReady) { active.camPos.set(dcx, dcy, dcz); active.camReady = true } // 飛び立ち/着地直後はスナップ
+      else { active.camPos.x += (dcx - active.camPos.x) * FLY.camLag; active.camPos.y += (dcy - active.camPos.y) * FLY.camLag; active.camPos.z += (dcz - active.camPos.z) * FLY.camLag }
+
+      const aLookX = fp.x + fwdX * ahead, aLookY = fp.y + fwdY * ahead + Math.sin(t * 0.5) * 0.04, aLookZ = fp.z + fwdZ * ahead
+      TMP_DIR.set(fwdX, fwdY, fwdZ); TMP_UP2.set(0, 1, 0).applyAxisAngle(TMP_DIR, active.bankCur) // バンクした上ベクトル
+
+      camX = lerp(ex, active.camPos.x, flyAmt); camY = lerp(ey, active.camPos.y, flyAmt); camZ = lerp(ez, active.camPos.z, flyAmt)
+      lookX = lerp(look.x, aLookX, flyAmt); lookY = lerp(look.y, aLookY, flyAmt); lookZ = lerp(look.z, aLookZ, flyAmt)
+      upX = lerp(0, TMP_UP2.x, flyAmt); upY = lerp(1, TMP_UP2.y, flyAmt); upZ = lerp(0, TMP_UP2.z, flyAmt)
+      const speedMag = Math.hypot(active.vel.x, active.vel.y, active.vel.z)
+      const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain)
+      fov = lerp(winFov, aloftFov, flyAmt)
+      windSpeed01 = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt // 飛行の速さ＝風の膨らみ
     }
+    camera.up.set(upX, upY, upZ)
     camera.position.set(camX, camY, camZ)
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
-    camera.lookAt(look)
+    camera.lookAt(lookX, lookY, lookZ)
+    onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
 
     // 窓ガラスと横桟は、あけると横へすべって消える（引き違い窓）。乗り出すと枠ごと外へ退く。
     glass.style.transform = `translateX(${(wo * 96).toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
@@ -2205,10 +2257,11 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dSetView = (y, p) => { if (active) { active.yaw = active.yawTarget = y || 0; active.pitch = active.pitchTarget = p || 0 } }
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
-    window.__town3dStep = () => { if (active && active.mode === 'walk') active.stepRemain = Math.min(FLY.stepLen * 3, active.stepRemain + FLY.stepLen) } // 検証用: 数歩すすむ
-    window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・境界・着地の数値確認）
+    window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
+    window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
-      yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2), step: +active.stepRemain.toFixed(1),
+      yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2),
+      vel: +Math.hypot(active.vel.x, active.vel.y, active.vel.z).toFixed(2), mvX: +active.moveX.toFixed(2), mvY: +active.moveY.toFixed(2), bank: +active.bankCur.toFixed(2),
     })
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
@@ -2216,37 +2269,74 @@ export async function mountTown3d(parent, opts = {}) {
       active.flyPos.set(x, y, z)
       active.flyYaw = active.flyYawTarget = yaw || 0
       active.flyPitch = active.flyPitchTarget = pitch || 0
+      active.vel.set(0, 0, 0); active.bankCur = 0; active.camReady = false // 引いたカメラを新しい位置へスナップ
+      if (active.mode === 'window') active.mode = 'fly'
       active.flyP = 1; active.flyTarget = 1
     }
   }
 
-  // スワイプで見回す（自前のポインタ操作）。歩行中は「軽いタップ＝数歩すすむ」も拾う。
-  let dragging = false, lx = 0, ly = 0, moved = 0
+  // 移動スティック（ぷにコン）の見た目＝触れた場所に出る円とつまみ。空/地上でだけ現れる。
+  const stickWrap = document.createElement('div'); stickWrap.className = 'town3d-stick'
+  const stickBase = document.createElement('div'); stickBase.className = 'town3d-stick__base'
+  const stickKnob = document.createElement('div'); stickKnob.className = 'town3d-stick__knob'
+  stickBase.appendChild(stickKnob); stickWrap.appendChild(stickBase); stage.appendChild(stickWrap)
+
+  // ── 操作: 窓辺はドラッグで見回し。空/地上は左半分=移動スティック・右半分=見回し（両手で同時可）。──
   const dom = renderer.domElement
-  const onDown = (e) => { dragging = true; lx = e.clientX; ly = e.clientY; moved = 0 }
-  const onMove = (e) => {
-    if (!dragging || !active) return
-    const w = stage.clientWidth || 1, h = stage.clientHeight || 1
-    moved += Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly)
-    applyTown3dLook((e.clientX - lx) / w * -1.0, (e.clientY - ly) / h * 1.0)
-    lx = e.clientX; ly = e.clientY
+  dom.style.touchAction = 'none' // スクロール/ピンチに操作を奪われない
+  let lookId = null, lookLX = 0, lookLY = 0          // 見回し中のポインタ
+  let stickId = null, stickOX = 0, stickOY = 0       // 移動スティック中のポインタ＋発生原点
+  const aloftNow = () => active && (active.mode === 'fly' || active.mode === 'walk')
+  const setStick = (dx, dy) => {
+    let nx = dx / FLY.stickRadius, ny = -dy / FLY.stickRadius // 上方向(画面上)を前進(+)に
+    const m = Math.hypot(nx, ny); if (m > 1) { nx /= m; ny /= m }
+    const dead = FLY.stickDead
+    active.moveX = Math.abs(nx) < dead ? 0 : nx
+    active.moveY = Math.abs(ny) < dead ? 0 : ny
+    const kx = Math.max(-1, Math.min(1, dx / FLY.stickRadius)) * FLY.stickRadius
+    const ky = Math.max(-1, Math.min(1, dy / FLY.stickRadius)) * FLY.stickRadius
+    stickKnob.style.transform = `translate(${kx.toFixed(0)}px, ${ky.toFixed(0)}px)`
   }
-  const onUp = () => {
-    // 歩行中の「ほぼ動かさないタップ」＝前へ数歩。連打で歩き続け、ためれば長く進む。
-    if (dragging && active && active.mode === 'walk' && moved < 8) {
-      active.stepRemain = Math.min(FLY.stepLen * 3, active.stepRemain + FLY.stepLen)
+  const showStick = (x, y) => {
+    stickBase.style.left = x + 'px'; stickBase.style.top = y + 'px'
+    stickWrap.classList.add('stick--on'); stickKnob.style.transform = 'translate(0,0)'
+  }
+  const hideStick = () => { stickWrap.classList.remove('stick--on'); if (active) { active.moveX = 0; active.moveY = 0 } }
+  const onDown = (e) => {
+    if (!active) return
+    const rect = stage.getBoundingClientRect()
+    const lx = e.clientX - rect.left
+    if (aloftNow() && stickId === null && lx < rect.width * 0.5) {
+      stickId = e.pointerId; stickOX = e.clientX; stickOY = e.clientY // 左半分＝触れた場所を原点にスティック発生
+      showStick(lx, e.clientY - rect.top); setStick(0, 0)
+    } else if (lookId === null) {
+      lookId = e.pointerId; lookLX = e.clientX; lookLY = e.clientY // それ以外＝見回し
     }
-    dragging = false
+  }
+  const onMove = (e) => {
+    if (!active) return
+    if (e.pointerId === stickId) setStick(e.clientX - stickOX, e.clientY - stickOY)
+    else if (e.pointerId === lookId) {
+      const w = stage.clientWidth || 1, h = stage.clientHeight || 1
+      applyTown3dLook((e.clientX - lookLX) / w * -1.0, (e.clientY - lookLY) / h * 1.0)
+      lookLX = e.clientX; lookLY = e.clientY
+    }
+  }
+  const onUp = (e) => {
+    if (e.pointerId === stickId) { stickId = null; hideStick() }
+    if (e.pointerId === lookId) lookId = null
   }
   dom.addEventListener('pointerdown', onDown)
   window.addEventListener('pointermove', onMove)
   window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onUp)
   // dispose に後始末を足す
   const baseDispose = active.dispose
   active.dispose = () => {
     dom.removeEventListener('pointerdown', onDown)
     window.removeEventListener('pointermove', onMove)
     window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointercancel', onUp)
     window.removeEventListener('resize', resize)
     baseDispose()
   }

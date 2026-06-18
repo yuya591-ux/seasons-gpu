@@ -146,6 +146,39 @@ body {
      わずかに起こす。彩度は保ちつつ暖色をひと匙足して郷愁に（参考: probiex007）。 */
   filter: saturate(1.05) sepia(0.06) contrast(0.99) brightness(1.05);
 }
+/* 移動スティック（ぷにコン）。空/地上で画面左に触れると、触れた場所に静かに現れる */
+.town3d-stick {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.town3d-stick.stick--on {
+  opacity: 1;
+}
+.town3d-stick__base {
+  position: absolute;
+  width: 124px; /* 直径 = 2×stickRadius(62) */
+  height: 124px;
+  margin: -62px 0 0 -62px; /* 中心を触れた点へ */
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.22);
+}
+.town3d-stick__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1.5px solid rgba(255, 255, 255, 0.68);
+}
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {
   position: absolute;
