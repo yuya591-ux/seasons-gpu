@@ -198,6 +198,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 近景の建物の角を丸める面取り用（低ポリの箱の角を脱す）。近景の数棟だけに使い性能は据え置く。
   const { RoundedBoxGeometry } = await import('three/examples/jsm/geometries/RoundedBoxGeometry.js')
   if (my !== token) return
+  // 全建物の基礎（接地のコンクリ土台）を1メッシュに統合するためのジオメトリ結合ユーティリティ。
+  const BufferGeometryUtils = await import('three/examples/jsm/utils/BufferGeometryUtils.js')
+  if (my !== token) return
 
   const stage = document.createElement('div')
   stage.className = 'town3d-stage'
@@ -464,6 +467,8 @@ export async function mountTown3d(parent, opts = {}) {
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
   const spawnAvoid = []
+  // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
+  const plinthGeos = []
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -564,6 +569,23 @@ export async function mountTown3d(parent, opts = {}) {
     const roadTex = new THREE.CanvasTexture(rtc); roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 8)
     const road = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: roadTex, vertexColors: true }))
     road.position.z = -35; road.receiveShadow = true; town.add(road)
+    // 縁石（道の両肩）。短い箱を地形に沿って並べ1メッシュへ統合＝歩くと路肩が立ち、街路が地に着く。
+    {
+      const curbGeos = []
+      for (const sideC of [-1, 1]) {
+        for (let z = 28; z > -98; z -= 2.4) {
+          const cx = sideC * 3.95, cy = heightAt(cx, z) + 0.11
+          const seg = new THREE.BoxGeometry(0.34, 0.22, 2.5)
+          seg.applyMatrix4(new THREE.Matrix4().makeTranslation(cx, cy, z))
+          curbGeos.push(seg)
+        }
+      }
+      if (BufferGeometryUtils.mergeGeometries) {
+        const cm = BufferGeometryUtils.mergeGeometries(curbGeos, false)
+        if (cm) { const curb = new THREE.Mesh(cm, toon(season === 'winter' ? 0xc4c0b6 : 0xb6b0a4)); curb.receiveShadow = true; town.add(curb) }
+      }
+      curbGeos.forEach((g) => g.dispose())
+    }
     // 横の通り（数本）。アスファルトのムラ材を共有＝ベタ灰の平面を脱す（俯瞰で映える路面の質感）。
     const crossMat = mottleMat(0x474750, 80, 0.12, [6, 2])
     for (const cz of [-6, -28, -50]) {
@@ -746,6 +768,13 @@ export async function mountTown3d(parent, opts = {}) {
     const foot = (w + d) * 0.25 + 0.5
     colliders.push({ x, z, r: foot })        // 歩行の当たり判定（敷地を円で近似＋人の半径）
     spawnAvoid.push({ x, z, r: foot + 1.0 }) // 着地は壁ぎわを避けて少し離れて降りる
+    // 基礎（接地のコンクリ土台）。壁より一回り広く低い帯を建物の足元に。回転・位置を焼き込んで後で統合。
+    const plH = 0.45
+    const pg = new THREE.BoxGeometry(w * 1.06, plH, d * 1.06)
+    pg.applyMatrix4(new THREE.Matrix4().makeTranslation(0, plH / 2, 0))
+    pg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
+    pg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
+    plinthGeos.push(pg)
   }
 
   // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
@@ -772,6 +801,16 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 自分の丘の近所（手前の両脇の家。緑だけの近景を埋め、自分も坂の街に居る感じに） ──
   for (const c of [[-13, 24], [13, 25], [-19, 19], [20, 20], [-10, 28], [11, 29]]) {
     house(c[0], c[1], 5 + R() * 1.5, 5 + R() * 1.5, 4 + R() * 2, R() < 0.7 ? 'house' : 'apt')
+  }
+
+  // ── 全建物の基礎（接地のコンクリ土台）を1メッシュに統合＝足元が地に着く（俯瞰では薄く・歩行で効く）。──
+  if (plinthGeos.length && BufferGeometryUtils.mergeGeometries) {
+    const merged = BufferGeometryUtils.mergeGeometries(plinthGeos, false)
+    if (merged) {
+      const plinth = new THREE.Mesh(merged, toon(season === 'winter' ? 0x9a978f : 0x8a8278)) // くすんだコンクリ色
+      plinth.receiveShadow = true; plinth.castShadow = false; town.add(plinth)
+    }
+    plinthGeos.forEach((g) => g.dispose()) // 統合済みの素片は解放
   }
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
