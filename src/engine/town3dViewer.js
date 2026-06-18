@@ -1488,6 +1488,12 @@ export async function mountTown3d(parent, opts = {}) {
     b.userData = { cx: (R() - 0.5) * 40, cz: -40 - R() * 40, rad: 18 + R() * 16, yy: 30 + R() * 14, sp: 0.12 + R() * 0.08, ph: R() * 6.28 }
     scene.add(b); birds.push(b)
   }
+  // 飛行中、ふと一羽が並んで飛ぶ（つかの間の道連れ）。たまに現れ、少し伴走して離れていく。
+  const comp = new THREE.Group()
+  for (const s of [-1, 1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.44), birdMat); wing.position.x = s * 0.64; comp.add(wing); wing.userData.side = s }
+  comp.visible = false; scene.add(comp)
+  let compActive = false, compT = 0, compCool = 6, compSide = 1
+  const compPhase = R() * 6.28
 
   // ── 走る車・歩く住民（中央の通りを行き交う）。街のみ（谷戸では作らない）。 ──
   if (kind !== 'yato') {
@@ -2200,6 +2206,29 @@ export async function mountTown3d(parent, opts = {}) {
       b.rotation.y = -a + Math.PI / 2
       const flap = Math.sin(t * 9 + u.ph) * (0.5 + st * 0.5)
       b.children.forEach((w) => { w.rotation.z = w.userData.side * flap })
+    }
+    // つかの間の道連れ: 飛行中にたまに一羽が現れ、横に並んで伴走し、終盤は離れていく。
+    compCool = Math.max(0, compCool - dt)
+    const flyingFast = active && active.mode === 'fly' && active.flyP > 0.6 && Math.hypot(active.vel.x, active.vel.z) > FLY.speed * 0.3
+    if (!compActive && flyingFast && compCool <= 0 && Math.random() < dt * 0.05) {
+      compActive = true; compT = 9 + Math.random() * 8; compSide = Math.random() < 0.5 ? -1 : 1
+      comp.position.set(active.flyPos.x - active.vel.x * 0.3, active.flyPos.y - 1, active.flyPos.z - active.vel.z * 0.3); comp.visible = true
+    }
+    if (compActive) {
+      compT -= dt
+      const sp = Math.hypot(active.vel.x, active.vel.z) || 1
+      const fx = active.vel.x / sp, fz = active.vel.z / sp, rx = -fz, rz = fx // 進む向きと右（水平）
+      const peel = compT < 1.6 ? (1.6 - compT) * 5 : 0 // 終盤は外へ離れる
+      const tx = active.flyPos.x + (compSide * 5 + peel * compSide) * rx + fx * 3
+      const ty = active.flyPos.y + 0.5 + Math.sin(t * 0.7) * 0.6 + peel * 1.0
+      const tz = active.flyPos.z + (compSide * 5 + peel * compSide) * rz + fz * 3
+      comp.position.x += (tx - comp.position.x) * 0.06
+      comp.position.y += (ty - comp.position.y) * 0.06
+      comp.position.z += (tz - comp.position.z) * 0.06
+      comp.rotation.y = Math.atan2(fx, fz)
+      const cflap = Math.sin(t * 10 + compPhase) * 0.6
+      comp.children.forEach((w) => { w.rotation.z = w.userData.side * cflap })
+      if (compT <= 0 || !active || active.mode !== 'fly') { compActive = false; comp.visible = false; compCool = 22 + Math.random() * 26 }
     }
     // 窓あけ／乗り出しの「線形進行(0..1)」を所要時間ぶんだけ目標へ一定速度で進め、ease-in-out をかける。
     // exp追従(従来)は出だしだけ急＝ease-outで戻りが不自然だった。線形進行+smoothstepなら開く時も
