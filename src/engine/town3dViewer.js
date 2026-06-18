@@ -621,6 +621,29 @@ export async function mountTown3d(parent, opts = {}) {
       const mh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 14), mhMat)
       mh.position.set(mx, heightAt(mx, mz) + 0.06, mz); town.add(mh)
     }
+    // 停止線（横断歩道の手前の白い太線＝交差点の標示）
+    const stopMat = new THREE.MeshLambertMaterial({ color: 0xd2cec4 })
+    for (const sz of [-7.4, -29.4, -51.4]) {
+      const sl = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.03, 0.42), stopMat)
+      sl.position.set(0, heightAt(0, sz) + 0.085, sz); town.add(sl)
+    }
+    // 側溝（縁石の内側の暗いコンクリ溝＝路肩の締まり）。地形に沿わせ1メッシュへ統合。
+    {
+      const gutGeos = []
+      for (const sideU of [-1, 1]) {
+        for (let z = 28; z > -98; z -= 2.4) {
+          const gx = sideU * 3.55, gy3 = heightAt(gx, z)
+          const seg = new THREE.BoxGeometry(0.42, 0.05, 2.5)
+          seg.applyMatrix4(new THREE.Matrix4().makeTranslation(gx, gy3 + 0.065, z))
+          gutGeos.push(seg)
+        }
+      }
+      if (BufferGeometryUtils.mergeGeometries) {
+        const gum = BufferGeometryUtils.mergeGeometries(gutGeos, false)
+        if (gum) { const gutter = new THREE.Mesh(gum, toon(0x6e6c68)); gutter.receiveShadow = true; town.add(gutter) }
+      }
+      gutGeos.forEach((g) => g.dispose())
+    }
   }
 
   // ── 建物・ランドマーク（低ポリの箱＋切妻屋根）。街のみ（谷戸では作らない）。 ──
