@@ -7,9 +7,11 @@ export default {
   label: '冬の雪の夕暮れ、高台の角部屋',
   desc: '舞う雪と、窓の桟に積もる白。眼下に冷たい街あかり。指や傾きで見回す。',
   status: 'ready',
-  render: 'cornerRoom',
+  render: 'town3d',          // 立体の街エンジンへ載せ替え（見回しの正しさ・立体感）
+  town3dKind: 'corner',
+  town3dWeather: 'snow',     // 雪が舞う
   lowRise: true,
-  glass: 'snow', // 窓に舞い、桟に積もる雪
+  glass: 'snow',
   intensityLabel: '街あかり',
 
   palette: {

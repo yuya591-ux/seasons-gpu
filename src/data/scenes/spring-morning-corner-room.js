@@ -7,9 +7,11 @@ export default {
   label: '春の朝、高台の角部屋',
   desc: '夜明けの桜色の空と、窓の外を舞う花びら。澄んだ朝の街を見下ろす。',
   status: 'ready',
-  render: 'cornerRoom',
+  render: 'town3d',          // 立体の街エンジンへ載せ替え（見回しの正しさ・立体感）
+  town3dKind: 'corner',
+  town3dWeather: 'petals',   // 花びらが窓の外を舞う
   lowRise: true,
-  foliage: 'petals', // 花びらが窓の外を舞う
+  foliage: 'petals',
   intensityLabel: '街あかり',
 
   palette: {

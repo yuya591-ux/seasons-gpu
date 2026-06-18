@@ -7,7 +7,8 @@ export default {
   label: '夏の朝、高台の角部屋',
   desc: '朝靄にかすむ街を、部屋の窓から見下ろす。指や傾きで見回す。',
   status: 'ready',
-  render: 'cornerRoom',
+  render: 'town3d',          // 立体の街エンジンへ載せ替え（見回しの正しさ・立体感）
+  town3dKind: 'corner',
   lowRise: true,
   intensityLabel: '街あかり',
 
