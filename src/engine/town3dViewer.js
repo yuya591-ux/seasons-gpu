@@ -487,6 +487,8 @@ export async function mountTown3d(parent, opts = {}) {
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
   const spawnAvoid = []
+  // 鎮守の森の神社（飛んでいく目的地のランドマーク）。街の左手の一角を空けて建てる。建物/木の生成で共用するので関数本体スコープに。
+  const SHRINE = { x: -32, z: -18, r: 11 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -850,6 +852,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (R() < 0.12) continue // 空地・駐車場・庭で時々抜く（碁盤の規則性を崩す）
       const x = xi * 9 + (R() - 0.5) * 5.4 // 格子からの揺らぎを大きく（隣と不揃いに寄る＝密集の自然さ）
       const z = zi * 9 + (R() - 0.5) * 5.4
+      if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は空ける
       const far = (zi + 11) / 13 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1258,10 +1261,38 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i < 140; i++) {
       const x = (R() - 0.5) * 150, z = -100 + R() * 130
       if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
+      if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
     for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
+
+    // ── 鎮守の森の神社（飛んでいく目的地のランドマーク）。鳥居・社・石段・灯籠＋囲む木立。──
+    {
+      const sx = SHRINE.x, sz = SHRINE.z, baseY = heightAt(sx, sz)
+      const woodMat = toon(0x8a6a48), vermilion = toon(0xc1442e), stoneMat = toon(0x9a958c), roofMat = toon(0x55585e)
+      const grp = new THREE.Group(); grp.position.set(sx, baseY, sz); grp.rotation.y = Math.atan2(-sx, -sz) // 参道(+z)を街の中心へ向ける
+      const plat = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 9, 1.4, 24), stoneMat); plat.position.y = 0.2; plat.receiveShadow = true; grp.add(plat) // 石の基壇
+      const body = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 3.8), woodMat); body.position.set(0, 2.2, -3.5); body.castShadow = true; grp.add(body) // 拝殿
+      const rg = new THREE.CylinderGeometry(2.5, 2.5, 6, 3, 1); rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
+      const roof = new THREE.Mesh(rg, roofMat); roof.position.set(0, 3.9, -3.5); roof.scale.set(1, 0.78, 1.15); roof.castShadow = true; grp.add(roof); grp.add(addOutline(roof)) // 切妻屋根
+      for (const px of [-2.3, 2.3]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 5.2, 10), vermilion); pil.position.set(px, 3.5, 5.2); pil.castShadow = true; grp.add(pil) } // 鳥居の柱
+      const kasagi = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.55, 0.8), vermilion); kasagi.position.set(0, 6.0, 5.2); kasagi.castShadow = true; grp.add(kasagi)
+      const nuki = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.34, 0.42), vermilion); nuki.position.set(0, 5.0, 5.2); grp.add(nuki)
+      for (let s = 0; s < 4; s++) { const st = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 0.7), stoneMat); st.position.set(0, 0.78 - s * 0.16, 6.6 + s * 0.7); st.receiveShadow = true; grp.add(st) } // 石段
+      for (const lx of [-2.7, 2.7]) { // 灯籠×2
+        const lan = new THREE.Group(); lan.position.set(lx, 0.9, 2.2)
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.5, 8), stoneMat)
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.2, 8), stoneMat); post.position.y = 0.85
+        const fire = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.62), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffce86 }) : toon(0xb0a890)); fire.position.y = 1.7 // 火袋（夕夜はほのかに灯る）
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.42, 4), stoneMat); cap.rotation.y = Math.PI / 4; cap.position.y = 2.12
+        for (const m of [foot, post, fire, cap]) { m.castShadow = true; lan.add(m) }
+        grp.add(lan)
+      }
+      town.add(grp)
+      for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283, rr = 7.5 + R() * 3.5; tree(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr, 1.5 + R() * 0.8) } // 鎮守の森
+      colliders.push({ x: sx, z: sz - 3.5, r: 3.2 }) // 歩行: 社殿には入らない
+    }
   }
 
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
