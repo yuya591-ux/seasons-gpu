@@ -491,6 +491,8 @@ export async function mountTown3d(parent, opts = {}) {
   const SHRINE = { x: -32, z: -18, r: 11 }
   // 川（街の左手の谷筋をz方向に流れる）。地形を掘って河床を作る＝飛んで川沿いを渡れる水辺のランドマーク。
   const RIVER = { x: -52, halfW: 2.6, bankW: 5.5, depth: 4 }
+  // 駅（街の右手の一角）。商店街は中央の道沿い。人の集まる目的地。
+  const STATION = { x: 34, z: -44, r: 10 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -859,6 +861,7 @@ export async function mountTown3d(parent, opts = {}) {
       const z = zi * 9 + (R() - 0.5) * 5.4
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は空ける
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 2) continue // 川筋は空ける
+      if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r) continue // 駅前は空ける
       const far = (zi + 11) / 13 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -930,6 +933,59 @@ export async function mountTown3d(parent, opts = {}) {
     const deck = new THREE.Mesh(new THREE.BoxGeometry(RIVER.halfW * 2 + 4.4, 0.4, 4), toon(0x9a958c)); deck.position.set(rx, bTop, bz); deck.castShadow = true; deck.receiveShadow = true; town.add(deck)
     for (const rs of [-1.8, 1.8]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(RIVER.halfW * 2 + 4.4, 0.5, 0.16), toon(0xb0a48a)); rail.position.set(rx, bTop + 0.45, bz + rs); town.add(rail) }
     for (const ps of [-RIVER.halfW, RIVER.halfW]) { const pier = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), toon(0x7a766e)); pier.position.set(rx + ps, bTop - 2, bz); pier.castShadow = true; town.add(pier) }
+  }
+
+  // ── 商店街ゲート（中央の道の入口に架かるアーチ看板）＋提灯。人の集まる通りの象徴。──
+  {
+    const gz = -12, gy = heightAt(0, gz)
+    const gateMat = toon(0x4a7a5e), lightMat = new THREE.MeshBasicMaterial({ color: 0xffce86 })
+    const grp = new THREE.Group(); grp.position.set(0, gy, gz); town.add(grp)
+    for (const gx of [-4.3, 4.3]) { const pil = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5.2, 0.5), gateMat); pil.position.set(gx, 2.6, 0); pil.castShadow = true; grp.add(pil) }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.6, 0.7), gateMat); beam.position.set(0, 5.3, 0); beam.castShadow = true; grp.add(beam)
+    // 看板（商店街名のバナー）
+    const bc = document.createElement('canvas'); bc.width = 256; bc.height = 64
+    const bx2 = bc.getContext('2d'); bx2.fillStyle = '#3c6650'; bx2.fillRect(0, 0, 256, 64); bx2.strokeStyle = '#e8e0c8'; bx2.lineWidth = 4; bx2.strokeRect(3, 3, 250, 58)
+    bx2.fillStyle = '#f4efe0'; bx2.font = 'bold 34px sans-serif'; bx2.textAlign = 'center'; bx2.textBaseline = 'middle'; bx2.fillText('しょうてんがい', 128, 36)
+    const banner = new THREE.Mesh(new THREE.BoxGeometry(8.4, 1.1, 0.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc) })); banner.position.set(0, 4.35, 0.22); grp.add(banner)
+    for (let i = -3; i <= 3; i++) { const lt = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), lightMat); lt.position.set(i * 1.3, 5.75, 0); grp.add(lt) } // アーチ上の灯り
+    // 提灯（赤い提灯を通り沿いに連ねる）
+    const lantMat = toon(0xc23a2e), capMat = toon(0x2a2622)
+    for (const lx of [-2.9, 2.9]) for (let z = -15; z > -40; z -= 3.0) {
+      const lan = new THREE.Group(); lan.position.set(lx, heightAt(lx, z) + 3.8, z)
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 10), lantMat); body.scale.y = 1.15; lan.add(body)
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.21, 0.1, 8), capMat); cap.position.y = 0.33; lan.add(cap)
+      town.add(lan)
+    }
+  }
+
+  // ── 駅（街の右手。人の集まる目的地。駅舎＋ホーム＋駅名標＋短い線路）。──
+  {
+    const stx = STATION.x, stz = STATION.z, sy = heightAt(stx, stz)
+    const grp = new THREE.Group(); grp.position.set(stx, sy, stz); town.add(grp)
+    const wallMat = toon(0xd8d0be), roofMat = toon(0x6a4e44), platMat = toon(0xb8b2a6), railMat = toon(0x55555c)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(7, 3.4, 5), wallMat); body.position.set(0, 1.7, 0); body.castShadow = true; body.receiveShadow = true; grp.add(body); grp.add(addOutline(body))
+    const rg = new THREE.CylinderGeometry(2.9, 2.9, 7.4, 3, 1); rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
+    const roof = new THREE.Mesh(rg, roofMat); roof.position.set(0, 3.7, 0); roof.scale.set(1, 0.7, 1.15); roof.castShadow = true; grp.add(roof)
+    const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 16), new THREE.MeshBasicMaterial({ color: 0xf0ead8 })); clock.rotation.x = Math.PI / 2; clock.position.set(0, 2.9, 2.55); grp.add(clock) // 駅の時計
+    const plat = new THREE.Mesh(new THREE.BoxGeometry(13, 0.6, 3), platMat); plat.position.set(0, 0.3, -5.2); plat.receiveShadow = true; grp.add(plat) // ホーム
+    for (const px of [-5, 0, 5]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 6), toon(0x8a8680)); post.position.set(px, 1.9, -5.2); grp.add(post) } // ホーム上屋の柱
+    const proof = new THREE.Mesh(new THREE.BoxGeometry(13, 0.16, 3.2), toon(0x9a9690)); proof.position.set(0, 3.2, -5.2); proof.castShadow = true; grp.add(proof)
+    // 駅名標（ホームの看板）
+    const nc = document.createElement('canvas'); nc.width = 128; nc.height = 48
+    const ncx = nc.getContext('2d'); ncx.fillStyle = '#f4efe4'; ncx.fillRect(0, 0, 128, 48); ncx.fillStyle = '#3a6a4a'; ncx.fillRect(0, 38, 128, 10)
+    ncx.fillStyle = '#2a3a4a'; ncx.font = 'bold 26px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText('みなみ', 64, 20)
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 0.1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); sign.position.set(-2, 2.1, -3.9); grp.add(sign)
+    for (const sp of [-3, -1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6), toon(0x8a8680)); post.position.set(sp, 0.85, -3.9); grp.add(post) }
+    // 線路（枕木＋2本のレール。ホームの外側に短く）
+    const sleepGeos = [], railGeos = []
+    for (let t = -6.5; t <= 6.5; t += 0.9) { const sl = new THREE.BoxGeometry(2.6, 0.12, 0.4); sl.applyMatrix4(new THREE.Matrix4().makeTranslation(t, 0.06, -7.4)); sleepGeos.push(sl) }
+    for (const rr of [-0.8, 0.8]) { const ra = new THREE.BoxGeometry(13, 0.1, 0.12); ra.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0.16, -7.4 + rr)); railGeos.push(ra) }
+    if (BufferGeometryUtils.mergeGeometries) {
+      const sm = BufferGeometryUtils.mergeGeometries(sleepGeos, false); if (sm) grp.add(new THREE.Mesh(sm, toon(0x5e554a)))
+      const rm = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rm) grp.add(new THREE.Mesh(rm, railMat))
+    }
+    sleepGeos.concat(railGeos).forEach((g) => g.dispose())
+    colliders.push({ x: stx, z: stz, r: 4 }) // 歩行: 駅舎には入らない
   }
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
@@ -1311,6 +1367,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
+      if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r - 2) continue // 駅前は空ける
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
