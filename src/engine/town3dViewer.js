@@ -1766,6 +1766,30 @@ export async function mountTown3d(parent, opts = {}) {
         boats.push(bg)
       }
     }
+
+    // ── 川辺の遊歩道（東岸の護岸の上を歩ける帯）。路面＋手すり＋街灯＋ベンチ＋並木。──
+    {
+      const px = RIVER.x + 4.0          // 東岸の遊歩道の中心（護岸の上）
+      const railX = RIVER.x + 2.5       // 川側の手すり（路面の水際）
+      const zTop = 18, zEnd = -86, dz = 2.2
+      // 路面（地面に沿わせた敷石。1メッシュへ）
+      const pathGeos = []
+      for (let z = zTop; z > zEnd; z -= dz) { const gy = heightAt(px, z); const seg = new THREE.BoxGeometry(3.6, 0.12, dz + 0.1); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(px, gy + 0.06, z)); pathGeos.push(seg) }
+      if (BufferGeometryUtils.mergeGeometries) { const pm = BufferGeometryUtils.mergeGeometries(pathGeos, false); if (pm) { const path = new THREE.Mesh(pm, toon(0xbab2a4)); path.receiveShadow = true; town.add(path) } }
+      pathGeos.forEach((g) => g.dispose())
+      // 手すり（川側。親柱＋上桟を1メッシュへ）
+      const railGeos = []
+      for (let z = zTop; z > zEnd; z -= 2.0) { const gy = heightAt(px, z); const post = new THREE.BoxGeometry(0.1, 0.9, 0.1); post.applyMatrix4(new THREE.Matrix4().makeTranslation(railX, gy + 0.45, z)); railGeos.push(post); const top = new THREE.BoxGeometry(0.09, 0.09, 2.0); top.applyMatrix4(new THREE.Matrix4().makeTranslation(railX, gy + 0.85, z - 1.0)); railGeos.push(top) }
+      if (BufferGeometryUtils.mergeGeometries) { const rm = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rm) { const rail = new THREE.Mesh(rm, toon(0x8a8478)); rail.castShadow = true; town.add(rail) } }
+      railGeos.forEach((g) => g.dispose())
+      // 街灯（夕夜は灯る）
+      const litHead = duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffce86, fog: true }) : toon(0xb8b4a0)
+      for (let z = 12; z > zEnd + 4; z -= 16) { const gy = heightAt(px + 1.3, z); const lp = new THREE.Group(); lp.position.set(px + 1.3, gy, z); town.add(lp); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.4, 6), toon(0x4a4a4e)); pole.position.y = 1.7; pole.castShadow = true; lp.add(pole); const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), litHead); head.position.y = 3.5; lp.add(head) }
+      // ベンチ（川を向く＝-x側を向く）
+      for (let z = 4; z > zEnd + 6; z -= 22) { const gy = heightAt(px + 0.6, z); const bg = new THREE.Group(); bg.position.set(px + 0.6, gy, z); bg.rotation.y = -Math.PI / 2; town.add(bg); const seat = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, 0.46), toon(0x8a6a48)); seat.position.y = 0.46; seat.castShadow = true; bg.add(seat); const back = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.36, 0.1), toon(0x8a6a48)); back.position.set(0, 0.72, -0.2); bg.add(back) }
+      // 並木（町側の縁。川沿いの立ち木）
+      for (let z = 9; z > zEnd; z -= 9) tree(px + 2.7, z, 0.8 + R() * 0.5)
+    }
   }
 
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
