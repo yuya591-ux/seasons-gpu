@@ -146,6 +146,26 @@ body {
      わずかに起こす。彩度は保ちつつ暖色をひと匙足して郷愁に（参考: probiex007）。 */
   filter: saturate(1.05) sepia(0.06) contrast(0.99) brightness(1.05);
 }
+/* 速度のヴィネット。飛行が速いほど画面の縁がそっと締まり、前へ吸い込まれる速度感を出す */
+.town3d-speedvig {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(ellipse 78% 66% at 50% 46%, rgba(0, 0, 0, 0) 54%, rgba(10, 12, 20, 0.62) 100%);
+}
+/* 雲を抜けるときの白いかすみ（雲の中＝高度の手応え） */
+.town3d-cloudhaze {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(ellipse 120% 120% at 50% 45%, rgba(248, 250, 253, 0.96) 0%, rgba(242, 246, 250, 0.82) 60%, rgba(236, 240, 246, 0.7) 100%);
+}
 /* 移動スティック（ぷにコン）。空/地上で画面左に触れると、触れた場所に静かに現れる */
 .town3d-stick {
   position: absolute;

@@ -2049,6 +2049,25 @@ export async function mountTown3d(parent, opts = {}) {
   // 検証用フック（dev）: 任意のイベントを即時に起こす
   if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, aurora: evAurora }[n] || (() => {}))() }
 
+  // ── 飛行/歩行の没入オブジェクト ──
+  // 自分の影が真下の地面を走る（高度＝飛んでいる手応え）。柔らかい円を地面に伏せる。
+  const flyerShadow = (() => {
+    const s = 64, c = document.createElement('canvas'); c.width = c.height = s
+    const g = c.getContext('2d')
+    const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+    grd.addColorStop(0, 'rgba(0,0,0,0.5)'); grd.addColorStop(0.55, 'rgba(0,0,0,0.22)'); grd.addColorStop(1, 'rgba(0,0,0,0)')
+    g.fillStyle = grd; g.fillRect(0, 0, s, s)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: true }))
+    m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m); return m
+  })()
+  // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
+  // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
+  const speedVig = document.createElement('div'); speedVig.className = 'town3d-speedvig'; stage.appendChild(speedVig)
+  let speedVigCur = -1
+  // 雲を抜けるとき視界が白くかすむ（雲の中に入った手応え＝高度の実感）。
+  const cloudHaze = document.createElement('div'); cloudHaze.className = 'town3d-cloudhaze'; stage.appendChild(cloudHaze)
+  let cloudHazeCur = -1
+
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
@@ -2215,6 +2234,32 @@ export async function mountTown3d(parent, opts = {}) {
       const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain)
       fov = lerp(winFov, aloftFov, flyAmt)
       windSpeed01 = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt // 飛行の速さ＝風の膨らみ
+
+      // 浮遊感: ホバリングはゆっくり上下に漂い、速いとかすかに揺れる。歩行は頭が弾む。
+      const sp01 = Math.min(1, speedMag / (isWalk ? FLY.walkSpeed : FLY.speed))
+      if (isWalk) {
+        camY += Math.sin(t * 8.0) * 0.06 * sp01 * flyAmt
+        camX += Math.sin(t * 4.0) * 0.03 * sp01 * flyAmt
+      } else {
+        camY += (Math.sin(t * 0.8) * 0.16 * (1 - sp01) + Math.sin(t * 7.3) * 0.12 * sp01) * flyAmt
+        camX += Math.sin(t * 5.1) * 0.12 * sp01 * flyAmt
+      }
+      // 自分の影が真下の地面を走る（高度で大きさ・濃さが変わる＝飛んでいる手応え）
+      const gY = heightAt(active.flyPos.x, active.flyPos.z)
+      const alt = Math.max(0, active.flyPos.y - gY)
+      flyerShadow.visible = flyAmt > 0.5
+      flyerShadow.position.set(active.flyPos.x, gY + 0.06, active.flyPos.z)
+      const ssc = isWalk ? 2.1 : (2.3 + alt * 0.1)
+      flyerShadow.scale.set(ssc, ssc, ssc)
+      flyerShadow.material.opacity = Math.max(0, (isWalk ? 0.34 : 0.44 - alt * 0.004)) * flyAmt
+      // 高速時の速度感＝画面の縁がそっと締まるヴィネット（飛行のみ・変化時だけ書き換え）
+      const vig = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt
+      if (Math.abs(vig - speedVigCur) > 0.02) { speedVigCur = vig; speedVig.style.opacity = (vig * 0.5).toFixed(2) }
+      // 雲を抜けると白くかすむ＝いちばん近い雲の中心までの距離で白みを出す（飛行のみ）
+      let nearC = 1e9
+      if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
+      const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 15) * flyAmt
+      if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.82).toFixed(2) }
     }
     camera.up.set(upX, upY, upZ)
     camera.position.set(camX, camY, camZ)
@@ -2258,6 +2303,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
+    window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
       yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2),
