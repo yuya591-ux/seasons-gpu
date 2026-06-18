@@ -39,9 +39,9 @@ const CAM = {
 // 視点の少し後ろ上から街を広く望む“浮遊カメラ”（アバター無し）。旋回でバンク・慣性・風で飛翔感を出す。
 const FLY = {
   // 速度・慣性（鳥/グライダーの“重さ”）
-  speed: 15,        // 飛行の最大速度(u/s)。スティック全倒しで到達（控えめに倒せばゆっくり）
+  speed: 12.5,      // 飛行の最大速度(u/s)。御しやすさ優先で少し控えめに（全倒しで到達）
   walkSpeed: 5.5,   // 歩行の最大速度(u/s)
-  moveEase: 2.6,    // 速度の追従(1/s)。小さいほど重い加速／離すと惰性で滑空して停止
+  moveEase: 2.8,    // 速度の追従(1/s)。小さいほど重い加速／離すと惰性で滑空して停止
   // 画角
   fov: 72, walkFov: 68,
   fovSpeedGain: 7,  // 高速時に画角が広がる量(度)＝速度の高揚
@@ -60,7 +60,8 @@ const FLY = {
   eye: 1.62,        // 立ったときの目線の高さ（地形+この高さ）
   stickRadius: 62,  // スティックの最大振れ(px)。これで全速
   stickDead: 0.14,  // 不感帯（微小な震えを無視）
-  turnRate: 1.8,    // 白猫式: 左スティックを横へ倒すほど速く向き直る旋回速度(rad/s)
+  turnRate: 1.7,    // 白猫式: 横へ倒すほど速く向き直る旋回速度(rad/s)
+  turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。
   bound: { x: 64, zMin: -86, zMax: 34, yMax: 80, yFloor: 4.5 },
 }
@@ -138,7 +139,7 @@ export function setTown3dFly(on) {
     } else if (active.mode === 'walk') {
       active.flyPitchTarget = 0.18 // 歩きから飛び立つ＝視線を少し上げてふわりと
     }
-    active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0
+    active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0
     active.mode = 'fly'
     active.flyTarget = 1
   } else {
@@ -158,7 +159,7 @@ export function setTown3dLand(land) {
     active.flyPos.x = sx; active.flyPos.z = sz
     active.flyYaw = active.flyYawTarget = active.openYaw(sx, sz) // 壁や木を正面にせず、抜けのある方へ向き直る
     active.flyPitchTarget = -0.05 // 立って街路をそっと見渡す
-    active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.camReady = false
+    active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
     active.landedFired = false // 接地した瞬間に砂ぼこり＋沈み込みを起こす
     active.mode = 'walk'
     active.flyTarget = 1
@@ -1683,6 +1684,7 @@ export async function mountTown3d(parent, opts = {}) {
     flyPos: new THREE.Vector3(),  // 移動の中心点（“自分”）。引いたカメラはこの後ろ上から望む
     flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // flyYaw=進路の向き（左スティックで旋回）／flyPitch=高さ角（右ドラッグ上下）
     lookYawOff: 0, lookYawOffTarget: 0, lookDragging: false, // 見回しの横オフセット（右ドラッグ。進路は変えず、離すと0へ戻る）
+    turnSmooth: 0,                // 旋回入力のスムージング値（手ブレを均し、急旋回を抑える＝快適な曲がり）
     vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
@@ -2365,7 +2367,10 @@ export async function mountTown3d(parent, opts = {}) {
       const prevYaw = active.flyYaw
       const mvMag = Math.min(1, Math.hypot(active.moveX, active.moveY))
       const turnAmt = mvMag > 0.001 ? Math.atan2(active.moveX, active.moveY) : 0 // 上=0 / 右=+π/2 / 手前=±π
-      if (mvMag > 0.05) active.flyYaw += Math.max(-1.2, Math.min(1.2, turnAmt)) * FLY.turnRate * dt // 倒した向きへ旋回
+      // 旋回入力＝押した角度を-1..1へ正規化×押し量。スムージングで手ブレを均し、斜め押しは穏やかに曲がる（快適）。
+      const turnTarget = mvMag > 0.05 ? Math.max(-1, Math.min(1, turnAmt / 1.3)) * mvMag : 0
+      active.turnSmooth += (turnTarget - active.turnSmooth) * FLY.turnEase
+      active.flyYaw += active.turnSmooth * FLY.turnRate * dt // 倒した向きへ滑らかに向き直る
       // 高さ（右ドラッグ上下）は追従して保持。見回しオフセット（右ドラッグ左右）は離すと後ろへ戻る。
       if (!active.lookDragging) active.lookYawOffTarget *= 0.86
       active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.lookEase
@@ -2382,7 +2387,7 @@ export async function mountTown3d(parent, opts = {}) {
 
       // スティック量→目標速度（横/後ろへ倒すほど遅く＝旋回が落ち着く）。離すと目標0＝惰性で停止。
       const spd = isWalk ? FLY.walkSpeed : FLY.speed
-      const throttle = mvMag * (0.35 + 0.65 * Math.max(0, Math.cos(turnAmt)))
+      const throttle = mvMag * (0.55 + 0.45 * Math.max(0, Math.cos(turnAmt))) // 曲がっても失速し過ぎない（御しやすさ）
       const dvX = mFwdX * throttle * spd, dvY = mFwdY * throttle * spd, dvZ = mFwdZ * throttle * spd
       const k = 1 - Math.exp(-FLY.moveEase * dt) // 慣性：目標速度へ寄せる（離すと0へ＝滑空して停止）
       active.vel.x += (dvX - active.vel.x) * k
