@@ -494,6 +494,7 @@ export async function mountTown3d(parent, opts = {}) {
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
+  let train = null // 線路を走る電車
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -504,6 +505,8 @@ export async function mountTown3d(parent, opts = {}) {
   const RIVER = { x: -52, halfW: 2.6, bankW: 5.5, depth: 4 }
   // 駅（街の右手の一角）。商店街は中央の道沿い。人の集まる目的地。
   const STATION = { x: 34, z: -44, r: 10 }
+  // 線路（駅のホーム外側を通り、街を横切る一直線）。電車が走る。z は駅の線路に合わせる。
+  const RAIL = { z: STATION.z - 7.4, x0: -6, x1: 60 }
   // 公園（街の中ほどの広場）。浅い池に空を映し、太鼓橋・桜・石灯籠・ベンチで憩う。飛んで降りる目的地。
   const PARK = { x: 16, z: -27, r: 12, pondR: 5.4, pondDepth: 2.4 }
   // 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。谷の中ほどに立てる。
@@ -906,6 +909,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) continue // 海・汀のセルは建てない（水没を防ぐ）
       if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 臨海の港（工業地帯）は専用に建てる
+      if (Math.abs(z - RAIL.z) < 2.7 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1) continue // 線路の通り道は空ける
       const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1030,6 +1034,33 @@ export async function mountTown3d(parent, opts = {}) {
     }
     sleepGeos.concat(railGeos).forEach((g) => g.dispose())
     colliders.push({ x: stx, z: stz, r: 4 }) // 歩行: 駅舎には入らない
+  }
+
+  // ── 線路と走る電車（駅のホーム外側を通り、街を横切る一直線）。 ──
+  {
+    const railTopY = (x) => heightAt(x, RAIL.z) + 0.18
+    const ballGeos = [], sleepGeos = [], railGeos = []
+    for (let x = RAIL.x0; x <= RAIL.x1; x += 0.95) { const gy = heightAt(x, RAIL.z); const sl = new THREE.BoxGeometry(2.7, 0.12, 0.42); sl.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy + 0.12, RAIL.z)); sleepGeos.push(sl); const bl = new THREE.BoxGeometry(0.95, 0.18, 3.4); bl.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy + 0.04, RAIL.z)); ballGeos.push(bl) } // 砂利の路盤＋枕木
+    for (const rr of [-0.78, 0.78]) for (let x = RAIL.x0; x < RAIL.x1; x += 2.6) { const ra = new THREE.BoxGeometry(2.7, 0.1, 0.12); ra.applyMatrix4(new THREE.Matrix4().makeTranslation(x + 1.3, heightAt(x + 1.3, RAIL.z) + 0.2, RAIL.z + rr)); railGeos.push(ra) }
+    if (BufferGeometryUtils.mergeGeometries) {
+      const bm = BufferGeometryUtils.mergeGeometries(ballGeos, false); if (bm) { const ball = new THREE.Mesh(bm, toon(0x7c766c)); ball.receiveShadow = true; town.add(ball) }
+      const sm = BufferGeometryUtils.mergeGeometries(sleepGeos, false); if (sm) town.add(new THREE.Mesh(sm, toon(0x5e554a)))
+      const rm = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rm) { const rmesh = new THREE.Mesh(rm, toon(0x55555c)); town.add(rmesh) }
+    }
+    ballGeos.concat(sleepGeos, railGeos).forEach((g) => g.dispose())
+    // 電車（3両編成。車体・窓帯・床下・台車。夜は窓が灯る）
+    train = new THREE.Group(); town.add(train)
+    const NCAR = 3, carLen = 5.4, gap = 0.7, bodyCol = 0xd98a3c // 郷愁の朱橙（旧型通勤電車）
+    const glassMat = duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffe6b0, fog: true }) : toon(0x36404a)
+    for (let i = 0; i < NCAR; i++) {
+      const car = new THREE.Group(); car.position.x = i * (carLen + gap); car.userData = { ox: i * (carLen + gap) }; train.add(car)
+      const body = new THREE.Mesh(new RoundedBoxGeometry(carLen, 2.3, 1.95, 2, 0.32), toon(bodyCol)); body.position.y = 1.55; body.castShadow = true; car.add(body)
+      const belt = new THREE.Mesh(new THREE.BoxGeometry(carLen + 0.02, 0.2, 1.97), toon(0xeae2d2)); belt.position.y = 2.05; car.add(belt) // 窓上のクリーム帯
+      const win = new THREE.Mesh(new THREE.BoxGeometry(carLen * 0.82, 0.72, 1.99), glassMat); win.position.y = 1.95; car.add(win) // 窓帯（夜は灯り）
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(carLen, 0.6, 1.8), toon(0x4a4640)); skirt.position.y = 0.55; car.add(skirt) // 床下
+      for (const bx of [-carLen * 0.3, carLen * 0.3]) { const bogie = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.7), toon(0x2a2a2e)); bogie.position.set(bx, 0.32, 0); car.add(bogie) } // 台車
+    }
+    train.userData = { x: RAIL.x0, speed: 9, len: NCAR * (carLen + gap) }
   }
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
@@ -1419,6 +1450,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.5) continue // 海・汀には木を生やさない
       if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 工業地帯には木を生やさない
+      if (Math.abs(z - RAIL.z) < 2.7 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1) continue // 線路の通り道は空ける
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
@@ -2947,6 +2979,13 @@ export async function mountTown3d(parent, opts = {}) {
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
+    if (train) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
+      const u = train.userData
+      u.x += u.speed * dt
+      if (u.x > RAIL.x1 + 2) u.x = RAIL.x0 - u.len
+      train.position.set(u.x, 0, RAIL.z)
+      for (const car of train.children) car.position.y = heightAt(u.x + car.userData.ox, RAIL.z) + 0.05
+    }
     // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
     if (weatherPts) {
       const { pos, spd, phs, N, swirl } = weatherPts
