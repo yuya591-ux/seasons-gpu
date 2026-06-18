@@ -69,7 +69,8 @@ const FLY = {
   turnRate: 1.7,    // 白猫式: 横へ倒すほど速く向き直る旋回速度(rad/s)
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
-  bound: { x: 86, zMin: -118, zMax: 42, yMax: 122, yFloor: 4.5 },
+  // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上のxMaxまで）。
+  bound: { x: 86, xMax: 104, zMin: -118, zMax: 42, yMax: 122, yFloor: 4.5 },
   // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
   yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
@@ -487,6 +488,7 @@ export async function mountTown3d(parent, opts = {}) {
   let peeps = []
   let ferris = null
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
+  let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -507,6 +509,9 @@ export async function mountTown3d(parent, opts = {}) {
   const SCHOOL = { x: 54, z: -18, r: 13 }
   // 遊園地（既存の観覧車を中心に）。メリーゴーラウンド・遊具・ゲート＝明るい賑わいの目的地。
   const FUN = { x: -26, z: -66, r: 13 }
+  // 海（街の東の縁が湾へ下る）。x>coast で地形を海底へ下げ、shore より沖は水面。飛んで海まで行ける。
+  // 海面は谷底より低く取る＝谷を水没させず、東の縁だけが汀へ落ちる（丘が海へ落ちる入江状の海岸線）。
+  const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -540,7 +545,11 @@ export async function mountTown3d(parent, opts = {}) {
     // 公園の池を掘る（PARK中心の浅い円い窪み）。石組みの縁で水際の段を作る。
     const pd = Math.max(0, 1 - Math.hypot(x - PARK.x, z - PARK.z) / PARK.pondR)
     const pondDip = Math.pow(pd, 1.6) * PARK.pondDepth
-    return vy + bump - dip - pondDip
+    let h = vy + bump - dip - pondDip
+    // 海への傾斜（東の縁 x>coast で海底へ向けて下げる＝丘が汀へ落ちる）。
+    const sb = Math.min(1, Math.max(0, (x - SEA.coast) / (SEA.shore - SEA.coast)))
+    if (sb > 0) h += (SEA.floor - h) * (sb * sb)
+    return h
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
   // 2層構成: 低周波の大きな色斑（草地・土・陰りの“面”の多様さ＝絵画的な地面）＋高周波の細かなムラ（手触り）。
@@ -885,6 +894,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r) continue // 寺の境内は空ける
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
+      if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) continue // 海・汀のセルは建てない（水没を防ぐ）
       const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1396,6 +1406,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r - 2) continue // 寺は専用の木立で囲む
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
+      if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.5) continue // 海・汀には木を生やさない
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
@@ -1714,6 +1725,46 @@ export async function mountTown3d(parent, opts = {}) {
         const back = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.36, 0.1), toon(0x8a6a48)); back.position.set(0, 0.72, -0.2); bg.add(back)
       }
       spawnAvoid.push({ x: fx, z: fz, r: 12 })
+    }
+
+    // ── 海・港（街の東の縁が湾へ下る）。空を映す広い水面＋防波堤＋灯台＋小舟＝飛んで海まで行ける。──
+    {
+      // 海面（空を映す大きな水鏡。MeshToonの空グラデ＋さざ波。沖まで広く敷く）。
+      const wc = document.createElement('canvas'); wc.width = wc.height = 128; const wcx = wc.getContext('2d')
+      const wg = wcx.createLinearGradient(0, 0, 0, 128)
+      // 海は空をうっすら映しつつ、青を芯に強く残す（夕の暖色フォグに溶けて砂色にならないよう、濃いめの青で）。
+      wg.addColorStop(0, '#' + new THREE.Color(0x2f6f9c).lerp(skyTop, 0.1).getHexString())
+      wg.addColorStop(1, '#' + new THREE.Color(0x1f4d6c).lerp(skyHorizon, 0.06).getHexString())
+      wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
+      for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(5, 14)
+      const seaGeo = new THREE.PlaneGeometry(84, 210); seaGeo.rotateX(-Math.PI / 2)
+      // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
+      const seaMesh = new THREE.Mesh(seaGeo, new THREE.MeshBasicMaterial({ map: wtex, fog: true }))
+      seaMesh.position.set(SEA.shore + 22, SEA.level, -38); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈62..146 を覆う（汀の手前は地面が水面上に出て水を隠す＝自然な海岸線）
+      // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
+      const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
+      for (let x = jStartX; x <= jEndX; x += 2) { const seg = new THREE.BoxGeometry(2.4, 2.0, 5.2); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, SEA.level + 0.4, jz)); jetGeos.push(seg) }
+      if (BufferGeometryUtils.mergeGeometries) { const jm = BufferGeometryUtils.mergeGeometries(jetGeos, false); if (jm) { const jetty = new THREE.Mesh(jm, toon(0x9a958c)); jetty.castShadow = true; jetty.receiveShadow = true; town.add(jetty) } }
+      jetGeos.forEach((g) => g.dispose())
+      // 灯台（防波堤の先端。白に紅帯・上に灯り）
+      {
+        const lx = jEndX, lz = jz, lan = new THREE.Group(); lan.position.set(lx, SEA.level + 1.4, lz); town.add(lan)
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.5, 8, 14), toon(0xeae6dc)); tower.position.y = 4; tower.castShadow = true; lan.add(tower); lan.add(addOutline(tower))
+        for (const by of [2.6, 5.4]) { const band = new THREE.Mesh(new THREE.CylinderGeometry(1.28 - by * 0.06, 1.34 - by * 0.06, 1.1, 14), toon(0xc24a33)); band.position.y = by; lan.add(band) } // 紅帯
+        const room = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 1.6, 12), toon(0x6a747c)); room.position.y = 8.6; lan.add(room) // 灯室
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 10), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true })); lamp.position.y = 8.6; lan.add(lamp) // 灯り（昼も明るく夜は際立つ）
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.0, 12), toon(0x3a4248)); cap.position.y = 9.95; lan.add(cap)
+        colliders.push({ x: lx, z: lz, r: 1.6 })
+      }
+      // 小舟（岸近くに数艘。ゆるく浮かんで揺れる）
+      const boatCols = [0xc7b48a, 0xb0563f, 0x6f8aa6]
+      for (const bp of [[86, -12], [91, -42], [84, -54], [95, -22]]) {
+        const bg = new THREE.Group(); bg.position.set(bp[0], SEA.level + 0.15, bp[1]); bg.rotation.y = R() * 6.28; bg.userData = { ph: R() * 6.28 }; town.add(bg)
+        const hull = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 2.4, 4, 8), toon(boatCols[(R() * boatCols.length) | 0])); hull.rotation.x = Math.PI / 2; hull.scale.set(1, 0.5, 1); hull.position.y = 0.2; bg.add(hull)
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.9), toon(0xe6e0d4)); cabin.position.set(0, 0.5, -0.5); bg.add(cabin)
+        boats.push(bg)
+      }
     }
   }
 
@@ -2227,7 +2278,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   const tryWalk = (pos, dx, dz) => {
     const b = bound
-    const nx = Math.max(-b.x, Math.min(b.x, pos.x + dx))
+    const nx = Math.max(-b.x, Math.min(b.xMax || b.x, pos.x + dx))
     const nz = Math.max(b.zMin, Math.min(b.zMax, pos.z + dz))
     if (!blockedAt(nx, pos.z)) pos.x = nx // x方向だけ先に試す（壁に沿って横へ滑る）
     if (!blockedAt(pos.x, nz)) pos.z = nz // z方向だけ試す
@@ -2235,7 +2286,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 着地地点が建物/樹冠の中なら、空いた近くの地点へそっと退避する（建物や木に埋もれて立たない）。
   const spawnBad = (x, z) => {
     const b = bound
-    if (x < -b.x || x > b.x || z < b.zMin || z > b.zMax) return true // 箱の外には降りない
+    if (x < -b.x || x > (b.xMax || b.x) || z < b.zMin || z > b.zMax) return true // 箱の外には降りない
     for (const c of spawnAvoid) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
     return false
   }
@@ -2783,6 +2834,7 @@ export async function mountTown3d(parent, opts = {}) {
       for (const g of ferris.gondolas) g.rotation.z = -wr
     }
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
+    for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
     if (weatherPts) {
       const { pos, spd, phs, N, swirl } = weatherPts
@@ -2932,7 +2984,7 @@ export async function mountTown3d(parent, opts = {}) {
         if (active.walkDist > 2.1) { active.walkDist = 0; onFoot() }
       } else {
         active.flyPos.x += active.vel.x * dt; active.flyPos.y += active.vel.y * dt; active.flyPos.z += active.vel.z * dt
-        active.flyPos.x = Math.max(-b.x, Math.min(b.x, active.flyPos.x))
+        active.flyPos.x = Math.max(-b.x, Math.min(b.xMax || b.x, active.flyPos.x))
         active.flyPos.z = Math.max(b.zMin, Math.min(b.zMax, active.flyPos.z))
         const floor = heightAt(active.flyPos.x, active.flyPos.z) + b.yFloor
         active.flyPos.y = Math.max(floor, Math.min(b.yMax, active.flyPos.y))
