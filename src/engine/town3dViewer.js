@@ -469,6 +469,8 @@ export async function mountTown3d(parent, opts = {}) {
   const spawnAvoid = []
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
+  // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
+  const doorGeos = []
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -585,6 +587,17 @@ export async function mountTown3d(parent, opts = {}) {
         if (cm) { const curb = new THREE.Mesh(cm, toon(season === 'winter' ? 0xc4c0b6 : 0xb6b0a4)); curb.receiveShadow = true; town.add(curb) }
       }
       curbGeos.forEach((g) => g.dispose())
+    }
+    // カーブミラー（曲がり角の凸面鏡）＝日本の生活道路の象徴。ポール＋橙の枠＋淡い鏡面。
+    {
+      const mPole = toon(0x8f8f8f), mRing = toon(0xcf7a2e), mGlass = toon(0xc2ccd2)
+      for (const [mx, mz] of [[4.8, 7], [-4.8, -13], [5.3, -31], [-5.1, -49], [4.9, -67], [-5.0, 19]]) {
+        const gym = heightAt(mx, mz), grp = new THREE.Group()
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 2.7, 6), mPole); pole.position.y = 1.35; grp.add(pole)
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.06, 6, 16), mRing); ring.position.y = 2.55; grp.add(ring)
+        const disc = new THREE.Mesh(new THREE.CircleGeometry(0.37, 16), mGlass); disc.position.set(0, 2.55, 0.03); grp.add(disc)
+        grp.position.set(mx, gym, mz); grp.rotation.y = mx > 0 ? -0.6 : 0.6; town.add(grp)
+      }
     }
     // 横の通り（数本）。アスファルトのムラ材を共有＝ベタ灰の平面を脱す（俯瞰で映える路面の質感）。
     const crossMat = mottleMat(0x474750, 80, 0.12, [6, 2])
@@ -775,6 +788,15 @@ export async function mountTown3d(parent, opts = {}) {
     pg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
     pg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
     plinthGeos.push(pg)
+    // 接地階の戸口（前面 +z 面に暗いパネル）。回転・位置を焼き込んで後で統合。
+    if (h > 2.6) {
+      const dw = type === 'house' ? 0.92 : 1.3, dh = type === 'house' ? 1.9 : 2.15
+      const dg = new THREE.BoxGeometry(dw, dh, 0.07)
+      dg.applyMatrix4(new THREE.Matrix4().makeTranslation((R() - 0.5) * w * 0.42, dh / 2 + 0.02, d / 2 + 0.04))
+      dg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
+      dg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
+      doorGeos.push(dg)
+    }
   }
 
   // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
@@ -811,6 +833,9 @@ export async function mountTown3d(parent, opts = {}) {
       plinth.receiveShadow = true; plinth.castShadow = false; town.add(plinth)
     }
     plinthGeos.forEach((g) => g.dispose()) // 統合済みの素片は解放
+    const dmerged = doorGeos.length && BufferGeometryUtils.mergeGeometries(doorGeos, false)
+    if (dmerged) { const doors = new THREE.Mesh(dmerged, toon(0x40382f)); doors.receiveShadow = true; town.add(doors) } // 暗い戸口（玄関/店先）
+    doorGeos.forEach((g) => g.dispose())
   }
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
