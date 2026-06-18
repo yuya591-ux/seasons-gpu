@@ -134,6 +134,10 @@ body {
   transition: opacity 0.9s ease;
   /* 参考画像の手描き水彩調へ：彩度を落として暖かみと軽いコントラストを足す（プラスチック感を排除） */
   filter: saturate(0.78) sepia(0.06) brightness(1.02) contrast(0.98);
+  /* 長押しでテキスト選択/コンテキストメニューが出るのを抑止（ブラウザの既定挙動）＝操作の邪魔をしない */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .town3d-stage--in {
   opacity: 1;
@@ -209,40 +213,34 @@ body {
   background: rgba(255, 255, 255, 0.3);
   border: 1.5px solid rgba(255, 255, 255, 0.68);
 }
-/* 上昇/下降ボタン（右端中央・飛行のときだけ）。押している間だけ高さが変わる */
-.town3d-climb {
+/* とまる／すすむ トグル（下中央・飛行のときだけ）。タップでホバリング⇄巡航 */
+.town3d-cruise {
   position: absolute;
-  right: max(0.8rem, env(safe-area-inset-right));
-  top: 50%;
-  transform: translateY(-50%);
+  left: 50%;
+  bottom: max(1.6rem, calc(env(safe-area-inset-bottom) + 1.2rem));
+  transform: translateX(-50%);
   z-index: 4;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  appearance: none;
+  min-width: 96px;
+  padding: 0.55rem 1.4rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(20, 16, 26, 0.46);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 1rem;
+  letter-spacing: 0.14em;
+  cursor: pointer;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
-.town3d-climb.climb--on {
+.town3d-cruise.cruise--on {
   opacity: 1;
   pointer-events: auto;
 }
-.town3d-climb__btn {
-  appearance: none;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  background: rgba(20, 16, 26, 0.4);
-  backdrop-filter: blur(6px);
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  touch-action: none;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-.town3d-climb__btn:active {
+.town3d-cruise:active {
   background: rgba(72, 116, 158, 0.6);
 }
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */

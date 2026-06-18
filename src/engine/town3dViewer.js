@@ -41,8 +41,13 @@ const FLY = {
   // 速度・慣性（鳥/グライダーの“重さ”）
   speed: 12.5,      // 飛行の最大速度(u/s)。御しやすさ優先で少し控えめに（全倒しで到達）
   walkSpeed: 5.5,   // 歩行の最大速度(u/s)
-  climbSpeed: 6.5,  // 上昇/下降の速さ(u/s)。前進速度から独立（止まったままでも高さを変えられる＝ホバリング式）
+  climbSpeed: 6.5,  // （旧）上昇/下降の速さ。スキームAでは未使用
   moveEase: 2.8,    // 速度の追従(1/s)。小さいほど重い加速／離すと惰性で滑空して停止
+  // ── スキームA: オート巡航＋ドラッグ操舵（一本指） ──
+  cruiseSpeed: 7.5, // 自動巡航の速さ(u/s)。ゆっくり前進
+  steerEase: 0.13,  // ドラッグで操った進路(向き)へ機首が向く滑らかさ
+  steerYaw: 2.4,    // 横ドラッグ→旋回の効き（画面幅いっぱいのドラッグでこのrad）
+  steerPitch: 2.2,  // 縦ドラッグ→上昇下降(機首上下)の効き
   // 画角
   fov: 72, walkFov: 68,
   fovSpeedGain: 7,  // 高速時に画角が広がる量(度)＝速度の高揚
@@ -91,8 +96,7 @@ export function isTown3dActive() {
 // 見回し（スワイプ）。nx,ny は累積の相対量。乗り出すと見回せる幅が広がる。
 export function applyTown3dLook(dx, dy) {
   if (!active) return
-  // 空/地上は右ドラッグ＝上下で高さ（機首の上下＝飛行は上昇下降）／左右で見回し（進路は変えず、離すと後ろへ戻る）。
-  // 進路の旋回は左スティック（白猫式）に移したので、右は「眺める・高さ」専用。
+  // 歩行（白猫式）のときの右ドラッグ＝見回し（上下で機首・左右でオフセット、離すと戻る）。飛行はapplyTown3dSteerを使う。
   if (active.flyTarget) {
     active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget + dy * 0.9))
     active.lookYawOffTarget = Math.max(-1.3, Math.min(1.3, active.lookYawOffTarget + dx * 1.6))
@@ -104,6 +108,19 @@ export function applyTown3dLook(dx, dy) {
   // 目標値を動かし、frame loop でイージング追従（指を離しても余韻＝ヌルヌル）。感度UP。
   active.yawTarget = Math.max(-yawMax, Math.min(yawMax, active.yawTarget + dx * 2.4))
   active.pitchTarget = Math.max(-lim.dn, Math.min(lim.up, active.pitchTarget + dy * 1.2)) // 縦の感度を下げ、手前の木立へ視線が落ち込み過ぎないように（評価UX-H2）
+}
+
+// 飛行（スキームA）のドラッグ操舵: 進む向き(flyYaw)と機首の上下(flyPitch)を動かす。dx/dy は画面比の移動量
+// （右ドラッグ=dx+ / 下ドラッグ=dy+）。横で旋回、上で上昇・下で下降。離しても巡航は続く。
+export function applyTown3dSteer(dx, dy) {
+  if (!active) return
+  active.flyYawTarget += dx * FLY.steerYaw // 右ドラッグ＝右へ旋回
+  active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget - dy * FLY.steerPitch)) // 上ドラッグ＝機首上げ＝上昇
+}
+
+// とまる／すすむ（スキームA）。とまる中はその場でホバリング、すすむで自動巡航を再開。
+export function setTown3dCruise(on) {
+  if (active) active.cruise = !!on
 }
 
 export function resetTown3dLook() {
@@ -141,6 +158,7 @@ export function setTown3dFly(on) {
       active.flyPitchTarget = 0.18 // 歩きから飛び立つ＝視線を少し上げてふわりと
     }
     active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0
+    active.cruise = true // スキームA: 飛び立ったら自動巡航から
     active.mode = 'fly'
     active.flyTarget = 1
   } else {
@@ -1688,7 +1706,8 @@ export async function mountTown3d(parent, opts = {}) {
     turnSmooth: 0,                // 旋回入力のスムージング値（手ブレを均し、急旋回を抑える＝快適な曲がり）
     vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
-    climb: 0,                     // 上昇/下降入力(-1..1)。右端の↑↓ボタン。前進速度から独立（ホバリング式）
+    climb: 0,                     // （旧）上昇/下降入力。スキームAでは未使用
+    cruise: true,                 // スキームA: 自動巡航中か（とまる/すすむトグル）。とまる=その場でホバリング
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
@@ -2218,18 +2237,17 @@ export async function mountTown3d(parent, opts = {}) {
   // 高く昇るほど空気が冷たく淡くなる（高度の実感）。淡い寒色をうっすら被せる。
   const altTint = document.createElement('div'); altTint.className = 'town3d-alt'; stage.appendChild(altTint)
   let altTintCur = -1
-  // 上昇/下降ボタン（右端・飛行のときだけ）。押している間だけ高さを変える＝前進と独立（ホバリング式）。非反転：上＝上。
-  const climbWrap = document.createElement('div'); climbWrap.className = 'town3d-climb'
-  const climbUp = document.createElement('button'); climbUp.className = 'town3d-climb__btn'; climbUp.textContent = '↑'; climbUp.setAttribute('aria-label', '上昇')
-  const climbDn = document.createElement('button'); climbDn.className = 'town3d-climb__btn'; climbDn.textContent = '↓'; climbDn.setAttribute('aria-label', '下降')
-  climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); stage.appendChild(climbWrap)
-  let climbShown = false
-  const bindClimb = (btn, v) => {
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { btn.setPointerCapture(e.pointerId) } catch (_) {} if (active) active.climb = v })
-    const release = (e) => { if (e) e.stopPropagation(); if (active) active.climb = 0 }
-    btn.addEventListener('pointerup', release); btn.addEventListener('pointercancel', release)
-  }
-  bindClimb(climbUp, 1); bindClimb(climbDn, -1)
+  // とまる／すすむ トグル（飛行のときだけ・下中央）。タップでその場ホバリング⇄自動巡航。ボタンは1つだけ＝迷わない。
+  const cruiseBtn = document.createElement('button'); cruiseBtn.className = 'town3d-cruise'; cruiseBtn.textContent = 'とまる'
+  stage.appendChild(cruiseBtn)
+  let cruiseShown = false
+  cruiseBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation() }) // 長押しのテキスト選択/メニューを抑止
+  cruiseBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (!active) return
+    active.cruise = !active.cruise
+    cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ'
+  })
 
   function frame() {
     if (!active) return
@@ -2377,33 +2395,40 @@ export async function mountTown3d(parent, opts = {}) {
     let altDuck01 = 0 // 飛行高度の正規化(0..1)。高空で環境音をしぼる量へ渡す
     if (flyAmt > 0.0005 || active.flyTarget) {
       const isWalk = active.mode === 'walk'
-      // 白猫式ポイント＆ゴー: 左スティックを倒した方へ向き直って進む（横成分で旋回・倒す量で速さ）。
       const prevYaw = active.flyYaw
-      const mvMag = Math.min(1, Math.hypot(active.moveX, active.moveY))
-      const turnAmt = mvMag > 0.001 ? Math.atan2(active.moveX, active.moveY) : 0 // 上=0 / 右=+π/2 / 手前=±π
-      // 旋回入力＝押した角度を-1..1へ正規化×押し量。スムージングで手ブレを均し、斜め押しは穏やかに曲がる（快適）。
-      const turnTarget = mvMag > 0.05 ? Math.max(-1, Math.min(1, turnAmt / 1.3)) * mvMag : 0
-      active.turnSmooth += (turnTarget - active.turnSmooth) * FLY.turnEase
-      active.flyYaw += active.turnSmooth * FLY.turnRate * dt // 倒した向きへ滑らかに向き直る
-      // 高さ（右ドラッグ上下）は追従して保持。見回しオフセット（右ドラッグ左右）は離すと後ろへ戻る。
-      if (!active.lookDragging) active.lookYawOffTarget *= 0.86
-      active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.lookEase
-      active.lookYawOff += (active.lookYawOffTarget - active.lookYawOff) * FLY.lookEase
+      let dvX, dvY = 0, dvZ, cpit, spit, camYaw
+      if (isWalk) {
+        // 歩行＝白猫式ポイント＆ゴー（左スティックで旋回＋前後、カメラ追従、右ドラッグで見回し）。
+        const mvMag = Math.min(1, Math.hypot(active.moveX, active.moveY))
+        const turnAmt = mvMag > 0.001 ? Math.atan2(active.moveX, active.moveY) : 0
+        const turnTarget = mvMag > 0.05 ? Math.max(-1, Math.min(1, turnAmt / 1.3)) * mvMag : 0
+        active.turnSmooth += (turnTarget - active.turnSmooth) * FLY.turnEase
+        active.flyYaw += active.turnSmooth * FLY.turnRate * dt
+        if (!active.lookDragging) active.lookYawOffTarget *= 0.86
+        active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.lookEase
+        active.lookYawOff += (active.lookYawOffTarget - active.lookYawOff) * FLY.lookEase
+        cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
+        camYaw = active.flyYaw + active.lookYawOff
+        const throttle = mvMag * (0.55 + 0.45 * Math.max(0, Math.cos(turnAmt)))
+        dvX = Math.sin(active.flyYaw) * throttle * FLY.walkSpeed
+        dvZ = -Math.cos(active.flyYaw) * throttle * FLY.walkSpeed
+      } else {
+        // 飛行＝スキームA: ドラッグで操った進路(flyYaw/flyPitch)へ機首が向き、自動でゆっくり前進（巡航）。
+        // 機首の上下がそのまま上昇/下降。とまる中は前進0＝その場でホバリング。一本指・スティック/昇降ボタン無し。
+        active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.steerEase
+        active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.steerEase
+        active.lookYawOff = 0
+        cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
+        camYaw = active.flyYaw
+        const cruiseS = active.cruise ? FLY.cruiseSpeed : 0
+        dvX = Math.sin(active.flyYaw) * cpit * cruiseS
+        dvY = spit * cruiseS // 機首の上下で上昇/下降
+        dvZ = -Math.cos(active.flyYaw) * cpit * cruiseS
+      }
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
-      const cpit = Math.cos(active.flyPitch), spit = Math.sin(active.flyPitch)
-      // 進む向き＝進路(flyYaw)の“水平”。高さは独立の上昇/下降(climb)で操る＝止まったままでも昇降できる（ホバリング式）。
-      const mFwdX = Math.sin(active.flyYaw)
-      const mFwdZ = -Math.cos(active.flyYaw)
-      // カメラの向き＝進路＋見回しオフセット（見回しても進路は変わらない）。flyPitch はカメラの上下（見回し）専用。
-      const camYaw = active.flyYaw + active.lookYawOff
-      const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit
+      const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit // カメラの向き
 
-      // スティック量→水平の目標速度（横/後ろへ倒すほど遅く＝旋回が落ち着く）。離すと0＝惰性で停止。
-      const spd = isWalk ? FLY.walkSpeed : FLY.speed
-      const throttle = mvMag * (0.55 + 0.45 * Math.max(0, Math.cos(turnAmt))) // 曲がっても失速し過ぎない（御しやすさ）
-      const dvX = mFwdX * throttle * spd, dvZ = mFwdZ * throttle * spd
-      const dvY = isWalk ? 0 : active.climb * FLY.climbSpeed // 上昇/下降は独立入力（前進と無関係＝ホバリングで高さを変えられる）
-      const k = 1 - Math.exp(-FLY.moveEase * dt) // 慣性：目標速度へ寄せる（離すと0へ＝滑空して停止）
+      const k = 1 - Math.exp(-FLY.moveEase * dt) // 慣性：目標速度へ寄せる（とまる/離すと0へ）
       active.vel.x += (dvX - active.vel.x) * k
       active.vel.y += (dvY - active.vel.y) * k
       active.vel.z += (dvZ - active.vel.z) * k
@@ -2552,9 +2577,9 @@ export async function mountTown3d(parent, opts = {}) {
     camera.position.set(camX, camY, camZ)
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     camera.lookAt(lookX, lookY, lookZ)
-    // 上昇/下降ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。変化時だけ class を切替。
-    const showClimb = active.mode === 'fly' && active.flyP > 0.4
-    if (showClimb !== climbShown) { climbShown = showClimb; climbWrap.classList.toggle('climb--on', showClimb); if (!showClimb && active) active.climb = 0 }
+    // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
+    const showCruise = active.mode === 'fly' && active.flyP > 0.4
+    if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
@@ -2594,7 +2619,9 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
-    window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用: 上昇/下降入力(-1..1)。0で停止
+    window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
+    window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
+    window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
     window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
@@ -2622,8 +2649,9 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 操作: 窓辺はドラッグで見回し。空/地上は左半分=移動スティック・右半分=見回し（両手で同時可）。──
   const dom = renderer.domElement
   dom.style.touchAction = 'none' // スクロール/ピンチに操作を奪われない
-  let lookId = null, lookLX = 0, lookLY = 0          // 見回し中のポインタ
-  let stickId = null, stickOX = 0, stickOY = 0       // 移動スティック中のポインタ＋発生原点
+  let lookId = null, lookLX = 0, lookLY = 0          // 見回し中のポインタ（歩行）
+  let stickId = null, stickOX = 0, stickOY = 0       // 移動スティック中のポインタ＋発生原点（歩行）
+  let steerId = null, steerLX = 0, steerLY = 0       // 飛行のドラッグ操舵中のポインタ（スキームA）
   const aloftNow = () => active && (active.mode === 'fly' || active.mode === 'walk')
   const setStick = (dx, dy) => {
     let nx = dx / FLY.stickRadius, ny = -dy / FLY.stickRadius // 上方向(画面上)を前進(+)に
@@ -2644,26 +2672,32 @@ export async function mountTown3d(parent, opts = {}) {
     if (!active) return
     const rect = stage.getBoundingClientRect()
     const lx = e.clientX - rect.left
-    if (aloftNow() && stickId === null && lx < rect.width * 0.5) {
-      stickId = e.pointerId; stickOX = e.clientX; stickOY = e.clientY // 左半分＝触れた場所を原点にスティック発生
+    if (active.mode === 'fly') {
+      if (steerId === null) { steerId = e.pointerId; steerLX = e.clientX; steerLY = e.clientY } // 飛行＝どこをドラッグしても操舵
+    } else if (active.mode === 'walk' && stickId === null && lx < rect.width * 0.5) {
+      stickId = e.pointerId; stickOX = e.clientX; stickOY = e.clientY // 歩行の左半分＝スティック発生
       showStick(lx, e.clientY - rect.top); setStick(0, 0)
     } else if (lookId === null) {
-      lookId = e.pointerId; lookLX = e.clientX; lookLY = e.clientY // それ以外＝見回し（高さ/眺める）
-      active.lookDragging = true // ドラッグ中は見回しオフセットを保持（離すと後ろへ戻る）
+      lookId = e.pointerId; lookLX = e.clientX; lookLY = e.clientY // 歩行の右半分/窓辺＝見回し
+      active.lookDragging = true
     }
   }
   const onMove = (e) => {
     if (!active) return
-    if (e.pointerId === stickId) setStick(e.clientX - stickOX, e.clientY - stickOY)
+    const w = stage.clientWidth || 1, h = stage.clientHeight || 1
+    if (e.pointerId === steerId) {
+      applyTown3dSteer((e.clientX - steerLX) / w, (e.clientY - steerLY) / h) // 飛行のドラッグ操舵
+      steerLX = e.clientX; steerLY = e.clientY
+    } else if (e.pointerId === stickId) setStick(e.clientX - stickOX, e.clientY - stickOY)
     else if (e.pointerId === lookId) {
-      const w = stage.clientWidth || 1, h = stage.clientHeight || 1
       applyTown3dLook((e.clientX - lookLX) / w * -1.0, (e.clientY - lookLY) / h * 1.0)
       lookLX = e.clientX; lookLY = e.clientY
     }
   }
   const onUp = (e) => {
+    if (e.pointerId === steerId) steerId = null
     if (e.pointerId === stickId) { stickId = null; hideStick() }
-    if (e.pointerId === lookId) { lookId = null; if (active) active.lookDragging = false } // 離すと見回しは進路の後ろへ戻る
+    if (e.pointerId === lookId) { lookId = null; if (active) active.lookDragging = false }
   }
   dom.addEventListener('pointerdown', onDown)
   window.addEventListener('pointermove', onMove)
