@@ -70,6 +70,8 @@ const FLY = {
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。街区拡張に合わせ広げた。
   bound: { x: 80, zMin: -112, zMax: 40, yMax: 108, yFloor: 4.5 },
+  // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
+  yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
@@ -248,6 +250,7 @@ export async function mountTown3d(parent, opts = {}) {
   const season = opts.season || 'summer' // 季節で地面・木の色を替える
   const weather = opts.weather || null    // 'snow' | 'petals' | 'leaves' | null（降るもの）
   const kind = opts.kind || 'town'        // 'town'（坂の街）| 'yato'（谷戸＝棚田と茅葺の屋敷）
+  const bound = kind === 'yato' ? FLY.yatoBound : FLY.bound // 飛べる箱は情景ごと（谷戸は谷筋に沿う狭め）
   const onEvent = typeof opts.onEvent === 'function' ? opts.onEvent : () => {} // 定期イベント発火を外へ伝える（音の結線）
   const onSpeed = typeof opts.onSpeed === 'function' ? opts.onSpeed : () => {} // 飛行速度(0..1)を外へ伝える（風音の膨らみ）
   const onFoot = typeof opts.onFoot === 'function' ? opts.onFoot : () => {} // 歩行で一歩ごとに伝える（足音）
@@ -1962,7 +1965,7 @@ export async function mountTown3d(parent, opts = {}) {
     leanP: 0,                     // 乗り出しの線形進行(0..1)
     fovCur: 62,
     // ── 浮遊（空を飛ぶ）＆散策（歩く）モードの状態 ──
-    flyEnabled: kind !== 'yato',  // 立体の街（町／角部屋）でだけ飛べる/歩ける。谷戸は対象外
+    flyEnabled: true,             // 立体の街・谷戸いずれも飛べる/歩ける（谷戸は谷筋に沿う狭めの箱）
     mode: 'window',               // 'window'（窓辺）| 'fly'（空を飛ぶ）| 'walk'（地上を歩く）
     flyTarget: 0,                 // 窓の外にいたい(1)/窓へ戻りたい(0)。fly/walk のどちらでも 1
     flyP: 0,                      // 窓⇄外の混ざり具合 0=窓 / 1=外（これをイージングして滑らかに出入り）
@@ -2018,7 +2021,7 @@ export async function mountTown3d(parent, opts = {}) {
     return false
   }
   const tryWalk = (pos, dx, dz) => {
-    const b = FLY.bound
+    const b = bound
     const nx = Math.max(-b.x, Math.min(b.x, pos.x + dx))
     const nz = Math.max(b.zMin, Math.min(b.zMax, pos.z + dz))
     if (!blockedAt(nx, pos.z)) pos.x = nx // x方向だけ先に試す（壁に沿って横へ滑る）
@@ -2026,7 +2029,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // 着地地点が建物/樹冠の中なら、空いた近くの地点へそっと退避する（建物や木に埋もれて立たない）。
   const spawnBad = (x, z) => {
-    const b = FLY.bound
+    const b = bound
     if (x < -b.x || x > b.x || z < b.zMin || z > b.zMax) return true // 箱の外には降りない
     for (const c of spawnAvoid) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
     return false
@@ -2700,7 +2703,7 @@ export async function mountTown3d(parent, opts = {}) {
       active.vel.y += (dvY - active.vel.y) * k
       active.vel.z += (dvZ - active.vel.z) * k
 
-      const b = FLY.bound
+      const b = bound
       if (isWalk) {
         tryWalk(active.flyPos, active.vel.x * dt, active.vel.z * dt) // 当たり判定つきで水平移動
         const eyeY = heightAt(active.flyPos.x, active.flyPos.z) + FLY.eye
