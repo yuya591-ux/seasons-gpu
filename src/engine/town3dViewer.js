@@ -68,8 +68,8 @@ const FLY = {
   stickDead: 0.14,  // 不感帯（微小な震えを無視）
   turnRate: 1.7,    // 白猫式: 横へ倒すほど速く向き直る旋回速度(rad/s)
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
-  // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。
-  bound: { x: 64, zMin: -86, zMax: 34, yMax: 80, yFloor: 4.5 },
+  // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。街区拡張に合わせ広げた。
+  bound: { x: 80, zMin: -112, zMax: 40, yMax: 108, yFloor: 4.5 },
 }
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
@@ -853,16 +853,17 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
   // 格子からの揺らぎを大きめに取り、区画の大きさも独立に振って、見下ろしの「市松の屋根」を崩す。
-  for (let zi = -11; zi <= 2; zi++) {
-    for (let xi = -8; xi <= 8; xi++) {
+  for (let zi = -13; zi <= 2; zi++) {
+    for (let xi = -9; xi <= 9; xi++) {
       if (Math.abs(xi) < 1.6 && zi > -3) continue // 手前中央は道（街を見通す抜け）
       if (R() < 0.12) continue // 空地・駐車場・庭で時々抜く（碁盤の規則性を崩す）
+      if (zi < -11 && R() < 0.42) continue // 最奥の列は疎に（遠景の点描・性能の余裕を残す）
       const x = xi * 9 + (R() - 0.5) * 5.4 // 格子からの揺らぎを大きく（隣と不揃いに寄る＝密集の自然さ）
       const z = zi * 9 + (R() - 0.5) * 5.4
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は空ける
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 2) continue // 川筋は空ける
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r) continue // 駅前は空ける
-      const far = (zi + 11) / 13 // 0=奥 1=手前
+      const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
       const w = (lerp(3.0, 5.2, far) + R() * 2.4) * big
@@ -1362,8 +1363,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
     for (const c of [[-16, 19], [17, 20], [-21, 14], [21, 16]]) tree(c[0], c[1], 1.7 + R() * 0.5) // 手前の額装木立
   } else {
-    for (let i = 0; i < 140; i++) {
-      const x = (R() - 0.5) * 150, z = -100 + R() * 130
+    for (let i = 0; i < 165; i++) {
+      const x = (R() - 0.5) * 168, z = -118 + R() * 152
       if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
