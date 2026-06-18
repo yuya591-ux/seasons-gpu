@@ -1739,6 +1739,7 @@ export async function mountTown3d(parent, opts = {}) {
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
     climb: 0,                     // （旧）上昇/下降入力。スキームAでは未使用
     cruise: true,                 // スキームA: 自動巡航中か（とまる/すすむトグル）。とまる=その場でホバリング
+    zoom: 1,                      // カメラの引き具合（ピンチで0.4=寄り〜3.0=引き）。カメラ距離に掛ける
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
@@ -2493,10 +2494,10 @@ export async function mountTown3d(parent, opts = {}) {
       const bankTgt = isWalk ? 0 : Math.max(-FLY.bankMax, Math.min(FLY.bankMax, -yawV * FLY.bankGain * 0.28)) * moveFactor
       active.bankCur += (bankTgt - active.bankCur) * FLY.bankEase
 
-      // 引いた三人称カメラ：focus の後ろ上から望む。後ろが建物/地面なら寄せてのめり込みを防ぐ。
+      // 引いた三人称カメラ：focus の後ろ上から望む。ピンチのズーム(active.zoom)で引き具合を可変。後ろが建物/地面なら寄せてのめり込みを防ぐ。
       const fp = active.flyPos
-      const back0 = isWalk ? FLY.walkBack : FLY.camBack
-      const upOff = isWalk ? FLY.walkUp : FLY.camUp
+      const back0 = (isWalk ? FLY.walkBack : FLY.camBack) * active.zoom
+      const upOff = (isWalk ? FLY.walkUp : FLY.camUp) * (0.5 + 0.5 * active.zoom) // 引くほど少し高い位置から見渡す
       const ahead = isWalk ? FLY.walkAhead : FLY.camAhead
       let back = back0, dcx = fp.x, dcz = fp.z
       for (let tries = 0; tries < 5; tries++) {
@@ -2653,6 +2654,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
+    window.__town3dZoom = (v) => { if (active) active.zoom = Math.max(0.4, Math.min(3.0, v || 1)) } // 検証用: ズーム(0.4寄り〜3.0引き)
     window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
@@ -2699,8 +2701,20 @@ export async function mountTown3d(parent, opts = {}) {
     stickWrap.classList.add('stick--on'); stickKnob.style.transform = 'translate(0,0)'
   }
   const hideStick = () => { stickWrap.classList.remove('stick--on'); if (active) { active.moveX = 0; active.moveY = 0 } }
+  const pointers = new Map() // 全ポインタ id->{x,y}（ピンチ＝2本指ズームの判定用）
+  let pinchD0 = 0, pinchZoom0 = 1
   const onDown = (e) => {
     if (!active) return
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.size === 2) { // 2本指＝ピンチでズーム開始。単指の操舵/移動は解除する。
+      const p = [...pointers.values()]
+      pinchD0 = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
+      pinchZoom0 = active.zoom
+      steerId = null; stickId = null; hideStick()
+      if (lookId !== null) { lookId = null; active.lookDragging = false }
+      return
+    }
+    if (pointers.size > 2) return
     const rect = stage.getBoundingClientRect()
     const lx = e.clientX - rect.left
     if (active.mode === 'fly') {
@@ -2715,6 +2729,13 @@ export async function mountTown3d(parent, opts = {}) {
   }
   const onMove = (e) => {
     if (!active) return
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.size >= 2) { // ピンチ＝ズーム（指を開く=寄り／閉じる=引き）。止まっても飛んでも自在に引ける。
+      const p = [...pointers.values()]
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
+      active.zoom = Math.max(0.4, Math.min(3.0, pinchZoom0 * (pinchD0 / d)))
+      return
+    }
     const w = stage.clientWidth || 1, h = stage.clientHeight || 1
     if (e.pointerId === steerId) {
       applyTown3dSteer((e.clientX - steerLX) / w, (e.clientY - steerLY) / h) // 飛行のドラッグ操舵
@@ -2726,6 +2747,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   const onUp = (e) => {
+    pointers.delete(e.pointerId)
+    if (pointers.size < 2) pinchD0 = 0 // ピンチ終了
     if (e.pointerId === steerId) steerId = null
     if (e.pointerId === stickId) { stickId = null; hideStick() }
     if (e.pointerId === lookId) { lookId = null; if (active) active.lookDragging = false }
