@@ -7,10 +7,12 @@ export default {
   label: '秋の雨の夜、高台の角部屋',
   desc: '窓を流れる雨と、眼下の街あかり。時おり遠雷。指や傾きで見回す。',
   status: 'ready',
-  render: 'cornerRoom',
+  render: 'town3d',          // 立体の街エンジンへ載せ替え（見回しの正しさ・立体感）
+  town3dKind: 'corner',
+  town3dWeather: 'rain',     // 常時の雨筋＋濡れた路面の反射
   lowRise: true,
-  glass: 'rain', // 窓を流れる雨
-  foliage: 'leaves', // 紅葉が窓の外を舞う
+  glass: 'rain',
+  foliage: 'leaves',
   intensityLabel: '街あかり',
 
   palette: {

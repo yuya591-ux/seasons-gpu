@@ -1790,6 +1790,39 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 常時の雨（雨の角部屋＝3D化）。降る雨筋＋濡れた路面の反射を常時。weather==='rain'のみ。 ──
+  if (weather === 'rain') {
+    const N = 540, len = 2.6 // 雨脚＝短い筋（風で少し斜め）
+    const pos = new Float32Array(N * 2 * 3)
+    const head = new Float32Array(N * 3); const spd = new Float32Array(N)
+    for (let i = 0; i < N; i++) { head[i * 3] = (R() - 0.5) * 210; head[i * 3 + 1] = R() * 95; head[i * 3 + 2] = -130 + R() * 190; spd[i] = 32 * (0.7 + R() * 0.6) }
+    const rgeo = new THREE.BufferGeometry(); rgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const rmat = new THREE.LineBasicMaterial({ color: 0xc4d4e2, transparent: true, opacity: 0.55, fog: true, depthWrite: false })
+    const rseg = new THREE.LineSegments(rgeo, rmat); rseg.frustumCulled = false; scene.add(rseg)
+    scene.fog.far *= 0.88 // 雨で奥がけむる
+    addFx({
+      update: (age, dt) => {
+        for (let i = 0; i < N; i++) { head[i * 3 + 1] -= spd[i] * dt; head[i * 3] += 4 * dt; if (head[i * 3 + 1] < -14) { head[i * 3 + 1] = 82 + R() * 16; head[i * 3] = (R() - 0.5) * 210 } }
+        for (let i = 0; i < N; i++) { const h = i * 3, p = i * 6; pos[p] = head[h]; pos[p + 1] = head[h + 1]; pos[p + 2] = head[h + 2]; pos[p + 3] = head[h] + 0.6; pos[p + 4] = head[h + 1] - len; pos[p + 5] = head[h + 2] }
+        rgeo.attributes.position.needsUpdate = true; return true
+      },
+      cleanup: () => { scene.remove(rseg); rgeo.dispose(); rmat.dispose() },
+    })
+    // 濡れた路面のきらめき（街あかりを照り返す。evWetRoadの永続版）
+    const M = 110
+    const wpos = new Float32Array(M * 3); const waph = new Float32Array(M)
+    for (let i = 0; i < M; i++) { wpos[i * 3] = (R() - 0.5) * 9; wpos[i * 3 + 1] = 0.12; wpos[i * 3 + 2] = 18 - R() * 112; waph[i] = R() * 6.28 }
+    const wgeo = new THREE.BufferGeometry(); wgeo.setAttribute('position', new THREE.BufferAttribute(wpos, 3)); wgeo.setAttribute('aph', new THREE.BufferAttribute(waph, 1))
+    const wmat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uT: { value: 0 }, uOp: { value: 0.5 }, uCol: { value: new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2) } },
+      vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.35+0.65*(0.5+0.5*sin(uT*2.6+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=3.2*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
+      fragmentShader: 'varying float vtw; uniform vec3 uCol; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(uCol, a*vtw*uOp); }',
+    })
+    const wpts = new THREE.Points(wgeo, wmat); wpts.frustumCulled = false; town.add(wpts)
+    addFx({ update: (age) => { wmat.uniforms.uT.value = age; return true }, cleanup: () => { town.remove(wpts); wgeo.dispose(); wmat.dispose() } })
+  }
+
   // ── オーロラ（夜の超レア大当たり。緑〜紫のカーテンが空に揺らめき流れる。計算で描画） ──
   function evAurora() {
     const geo = new THREE.PlaneGeometry(340, 96)
