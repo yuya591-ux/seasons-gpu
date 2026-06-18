@@ -437,6 +437,23 @@ export function createAudio(opts) {
       else src.connect(g).connect(master)
       try { src.start(t); src.stop(t + 0.13) } catch { /* 無視 */ }
     },
+    /** 鳥が驚いて飛び立つ羽音（近づくと数回の柔らかい羽ばたき）。ごく控えめに。 */
+    birdFlush() {
+      if (!ctx) return
+      const t0 = now()
+      for (let f = 0; f < 3; f++) { // 数回の羽ばたき
+        const at = t0 + f * 0.085 + Math.random() * 0.02
+        const len = Math.floor(0.05 * ctx.sampleRate)
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate); const d = buf.getChannelData(0)
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.5)
+        const src = ctx.createBufferSource(); src.buffer = buf
+        const bp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.04, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.07)
+        if (bp) { bp.type = 'bandpass'; bp.frequency.value = 900 + Math.random() * 500; bp.Q.value = 0.6; src.connect(bp).connect(g).connect(master) }
+        else src.connect(g).connect(master)
+        try { src.start(at); src.stop(at + 0.08) } catch { /* 無視 */ }
+      }
+    },
     /** 見回しの角度(yaw)で音場を左右に動かす（右を向くと音は左へ＝視覚と一致）。聴覚にも窓の外の広がりを。 */
     setLookPan(yaw) {
       lookPan = Math.max(-0.45, Math.min(0.45, -(yaw || 0) * 0.16))

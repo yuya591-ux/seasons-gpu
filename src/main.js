@@ -162,6 +162,8 @@ function start() {
           },
           onSpeed: (v) => { if (!sleepFading) audio.setFlyWind(v) }, // 飛行速度で風音を膨らませる
           onFoot: () => { if (!sleepFading) audio.footstep() }, // 散策の足音
+          onBirdFlush: () => { if (!sleepFading) audio.birdFlush() }, // 鳥が驚いて飛び立つ羽音
+
 
 
         })

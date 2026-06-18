@@ -226,6 +226,7 @@ export async function mountTown3d(parent, opts = {}) {
   const onEvent = typeof opts.onEvent === 'function' ? opts.onEvent : () => {} // 定期イベント発火を外へ伝える（音の結線）
   const onSpeed = typeof opts.onSpeed === 'function' ? opts.onSpeed : () => {} // 飛行速度(0..1)を外へ伝える（風音の膨らみ）
   const onFoot = typeof opts.onFoot === 'function' ? opts.onFoot : () => {} // 歩行で一歩ごとに伝える（足音）
+  const onBirdFlush = typeof opts.onBirdFlush === 'function' ? opts.onBirdFlush : () => {} // 鳥が驚いて飛び立つ（羽音）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -2089,6 +2090,7 @@ export async function mountTown3d(parent, opts = {}) {
   const trail = new THREE.Points(trailGeo, trailMat); trail.frustumCulled = false; trail.visible = false; scene.add(trail)
   const trailAlpha = new Float32Array(trailN) // 各粒の寿命(0..1)
   let trailIdx = 0, trailAccum = 0
+  let birdFlushCool = 0 // 鳥の羽音の連発抑制タイマー(秒)
 
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
@@ -2097,6 +2099,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 雲を抜けるとき視界が白くかすむ（雲の中に入った手応え＝高度の実感）。
   const cloudHaze = document.createElement('div'); cloudHaze.className = 'town3d-cloudhaze'; stage.appendChild(cloudHaze)
   let cloudHazeCur = -1
+  // 高く昇るほど空気が冷たく淡くなる（高度の実感）。淡い寒色をうっすら被せる。
+  const altTint = document.createElement('div'); altTint.className = 'town3d-alt'; stage.appendChild(altTint)
+  let altTintCur = -1
 
   function frame() {
     if (!active) return
@@ -2161,18 +2166,21 @@ export async function mountTown3d(parent, opts = {}) {
       }
       weatherPts.pts.geometry.attributes.position.needsUpdate = true
     }
-    // 鳥がはばたきながら空を渡る。自機が近いと驚いて上へ逃げ、羽ばたきが大きくなる。
+    // 鳥がはばたきながら空を渡る。自機が近いと驚いて上へ逃げ、羽ばたきが大きくなる（＋羽音）。
     const flyerAloft = active && (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.5
+    birdFlushCool = Math.max(0, birdFlushCool - dt)
     for (const b of birds) {
       const u = b.userData
       const a = t * u.sp + u.ph
-      let st = u.startle || 0
+      const prev = u.startle || 0
+      let st = prev * 0.98 // 驚きはゆっくり収まる
       if (flyerAloft) {
         const dx = b.position.x - active.flyPos.x, dy = b.position.y - active.flyPos.y, dz = b.position.z - active.flyPos.z
         const near = Math.sqrt(dx * dx + dy * dy + dz * dz)
         if (near < 15) st = Math.max(st, 1 - near / 15)
       }
-      st *= 0.98; u.startle = st // 驚きはゆっくり収まる
+      if (st > 0.4 && prev <= 0.4 && birdFlushCool <= 0) { onBirdFlush(); birdFlushCool = 1.6 } // 新たに驚いた瞬間に羽音（連発を抑制）
+      u.startle = st
       b.position.set(u.cx + Math.cos(a) * u.rad, u.yy + st * 7 + Math.sin(a * 0.7) * 2.0, u.cz + Math.sin(a) * u.rad)
       b.rotation.y = -a + Math.PI / 2
       const flap = Math.sin(t * 9 + u.ph) * (0.5 + st * 0.5)
@@ -2322,6 +2330,9 @@ export async function mountTown3d(parent, opts = {}) {
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
       const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 15) * flyAmt
       if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.82).toFixed(2) }
+      // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）
+      const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
+      if (Math.abs(altT - altTintCur) > 0.02) { altTintCur = altT; altTint.style.opacity = (altT * 0.16).toFixed(2) }
       // 高空を速く飛ぶと飛行機雲を引く（後ろへ。一定距離ごとに一粒を撒く）
       if (!isWalk && active.flyPos.y > 38 && speedMag > FLY.speed * 0.45) {
         trailAccum += speedMag * dt
