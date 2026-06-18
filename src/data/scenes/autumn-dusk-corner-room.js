@@ -8,9 +8,11 @@ export default {
   label: '秋の夕暮れ、高台の角部屋',
   desc: '部屋の窓から見下ろす夕暮れの街。右を向くと隣の建物の壁。指や傾きで見回す。',
   status: 'ready',
-  render: 'cornerRoom',
+  render: 'town3d',          // 角部屋を立体の街エンジンへ載せ替え（2D視差の見回し破綻を構造から解消・立体感のため）
+  town3dKind: 'corner',      // 室内から窓越しに下町を見下ろす角部屋（townの建物・地形・車・人・イベントを流用）
+  town3dWeather: 'leaves',   // 紅葉が窓の外を舞う
   lowRise: true,
-  foliage: 'leaves', // 紅葉が窓の外を舞う
+  foliage: 'leaves',
   intensityLabel: '街あかり', // 灯る窓の多さ
 
   palette: {

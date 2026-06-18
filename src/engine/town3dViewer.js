@@ -961,6 +961,20 @@ export async function mountTown3d(parent, opts = {}) {
   }
   } // ← 建物・ランドマーク（街のみ）ここまで
 
+  // ── 隣室の壁（角部屋の右手の高層マンションの壁面）。右へ見回すと迫り出して街を遮る＝角部屋にいる手応え。kind:'corner'のみ。 ──
+  if (kind === 'corner') {
+    const nwMat = toon(0xb4b0a6)
+    const rep = 7
+    const nm = winMapBase.clone(); nm.repeat.set(rep, rep * 1.5); nm.needsUpdate = true; nwMat.map = nm
+    if (duskAmt > 0.12) { // 夕/夜は隣室の窓も灯る
+      const ne = winEmis[(R() * winEmis.length) | 0].clone(); ne.repeat.set(rep, rep * 1.5); ne.needsUpdate = true
+      nwMat.emissiveMap = ne; nwMat.emissive = new THREE.Color(0xffcaa0); nwMat.emissiveIntensity = 0.3 + duskAmt * 0.6
+    }
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(3.5, 58, 44), nwMat)
+    wall.position.set(15.5, 18, 9); wall.castShadow = true; wall.receiveShadow = true; scene.add(wall)
+    const gap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 58, 44), toon(0x2a2722)); gap.position.set(13.55, 18, 9); scene.add(gap) // 壁との間の暗い路地＝奥行き
+  }
+
   // ── 木立（トゥーンの丸い樹冠＋幹。そよ風に揺れる） ──
   const trunkMat = toon(0x6b4a2e)
   // 季節で葉色を「下＝陰の濃い色／上＝陽の当たる淡い色」の対で持つ＝樹冠に陰影の立体（綿玉のベタ球を脱す）。
