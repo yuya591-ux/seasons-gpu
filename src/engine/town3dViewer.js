@@ -489,6 +489,8 @@ export async function mountTown3d(parent, opts = {}) {
   const spawnAvoid = []
   // 鎮守の森の神社（飛んでいく目的地のランドマーク）。街の左手の一角を空けて建てる。建物/木の生成で共用するので関数本体スコープに。
   const SHRINE = { x: -32, z: -18, r: 11 }
+  // 川（街の左手の谷筋をz方向に流れる）。地形を掘って河床を作る＝飛んで川沿いを渡れる水辺のランドマーク。
+  const RIVER = { x: -52, halfW: 2.6, bankW: 5.5, depth: 4 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -516,7 +518,10 @@ export async function mountTown3d(parent, opts = {}) {
     else if (z > -52) vy = z * 0.17                              // 谷へ下る斜面（街が駆け下る）
     else vy = -52 * 0.17 + (-52 - z) * 0.16                       // 向かいの丘がゆるやかに立ち上がる（空を塞がない）
     const bump = Math.sin(x * 0.06 + 1.0) * 1.5 + Math.cos(z * 0.05) * 1.7 + Math.sin((x + z) * 0.13) * 0.9
-    return vy + bump
+    // 川の谷を掘る（x=RIVER.x を中心になだらかに沈める＝河床）。護岸が水際の段を作るので地面は緩やかでよい。
+    const rd = Math.max(0, 1 - Math.abs(x - RIVER.x) / RIVER.bankW)
+    const dip = Math.pow(rd, 1.5) * RIVER.depth
+    return vy + bump - dip
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
   // 2層構成: 低周波の大きな色斑（草地・土・陰りの“面”の多様さ＝絵画的な地面）＋高周波の細かなムラ（手触り）。
@@ -554,7 +559,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
-    const g = new THREE.PlaneGeometry(280, 300, 60, 64)
+    const g = new THREE.PlaneGeometry(280, 300, 96, 104) // 川の谷を滑らかに出すため分割を上げる
     g.rotateX(-Math.PI / 2)
     const pos = g.attributes.position
     for (let i = 0; i < pos.count; i++) {
@@ -853,6 +858,7 @@ export async function mountTown3d(parent, opts = {}) {
       const x = xi * 9 + (R() - 0.5) * 5.4 // 格子からの揺らぎを大きく（隣と不揃いに寄る＝密集の自然さ）
       const z = zi * 9 + (R() - 0.5) * 5.4
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は空ける
+      if (Math.abs(x - RIVER.x) < RIVER.bankW + 2) continue // 川筋は空ける
       const far = (zi + 11) / 13 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -882,6 +888,48 @@ export async function mountTown3d(parent, opts = {}) {
     const dmerged = doorGeos.length && BufferGeometryUtils.mergeGeometries(doorGeos, false)
     if (dmerged) { const doors = new THREE.Mesh(dmerged, toon(0x40382f)); doors.receiveShadow = true; town.add(doors) } // 暗い戸口（玄関/店先）
     doorGeos.forEach((g) => g.dispose())
+  }
+
+  // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
+  {
+    const rx = RIVER.x
+    const waterLevel = (z) => heightAt(rx, z) + RIVER.depth - 1.2 // 河床(掘った底)から少し上＝水位
+    // 水面（空を映す水鏡。MeshToonの空グラデで白飛びを防ぐ）。zに沿って河床のうねりに合わせる。
+    const wc = document.createElement('canvas'); wc.width = wc.height = 64; const wcx = wc.getContext('2d')
+    const wg = wcx.createLinearGradient(0, 0, 0, 64)
+    wg.addColorStop(0, '#' + new THREE.Color(0x6ea2c4).lerp(skyTop, 0.34).getHexString())
+    wg.addColorStop(1, '#' + new THREE.Color(0x46708e).lerp(skyHorizon, 0.18).getHexString())
+    wcx.fillStyle = wg; wcx.fillRect(0, 0, 64, 64)
+    const wsg = wcx.createLinearGradient(20, 64, 44, 0)
+    wsg.addColorStop(0, 'rgba(255,255,255,0)'); wsg.addColorStop(0.5, '#' + sunCol.clone().lerp(new THREE.Color(0xffffff), 0.2).getHexString()); wsg.addColorStop(1, 'rgba(255,255,255,0)')
+    wcx.globalAlpha = 0.4; wcx.fillStyle = wsg; wcx.fillRect(0, 0, 64, 64); wcx.globalAlpha = 1
+    for (let i = 0; i < 40; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.05})`; wcx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
+    const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(1, 10)
+    const wgeo = new THREE.PlaneGeometry(RIVER.halfW * 2, 130, 1, 80); wgeo.rotateX(-Math.PI / 2)
+    const wp = wgeo.attributes.position
+    for (let i = 0; i < wp.count; i++) wp.setY(i, waterLevel(wp.getZ(i) - 36)) // mesh は z=-36 中心
+    wgeo.computeVertexNormals()
+    const water = new THREE.Mesh(wgeo, new THREE.MeshToonMaterial({ color: 0xffffff, map: wtex, gradientMap: grad, fog: true }))
+    water.position.set(rx, 0, -36); water.receiveShadow = true; town.add(water)
+    // 護岸（水際の左右のコンクリ壁。天端は堤の肩＝grade、底は水面下。地形に沿わせ1メッシュへ）
+    const bankGeos = []
+    for (const side of [-1, 1]) {
+      for (let z = 28; z > -98; z -= 2.4) {
+        const bx = rx + side * (RIVER.halfW + 0.2)
+        const top = heightAt(rx + side * (RIVER.bankW + 0.8), z), bottom = waterLevel(z) - 1.0
+        const hgt = Math.max(0.8, top - bottom)
+        const seg = new THREE.BoxGeometry(0.5, hgt, 2.5)
+        seg.applyMatrix4(new THREE.Matrix4().makeTranslation(bx, bottom + hgt / 2, z))
+        bankGeos.push(seg)
+      }
+    }
+    if (BufferGeometryUtils.mergeGeometries) { const bm = BufferGeometryUtils.mergeGeometries(bankGeos, false); if (bm) { const banks = new THREE.Mesh(bm, toon(0x908c84)); banks.receiveShadow = true; banks.castShadow = true; town.add(banks) } }
+    bankGeos.forEach((g) => g.dispose())
+    // 橋（川を渡る一本）。デッキ＋欄干＋橋脚。橋面は grade（堤の肩）に合わせる。
+    const bz = -16, bTop = heightAt(rx, bz) + RIVER.depth
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(RIVER.halfW * 2 + 4.4, 0.4, 4), toon(0x9a958c)); deck.position.set(rx, bTop, bz); deck.castShadow = true; deck.receiveShadow = true; town.add(deck)
+    for (const rs of [-1.8, 1.8]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(RIVER.halfW * 2 + 4.4, 0.5, 0.16), toon(0xb0a48a)); rail.position.set(rx, bTop + 0.45, bz + rs); town.add(rail) }
+    for (const ps of [-RIVER.halfW, RIVER.halfW]) { const pier = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.6), toon(0x7a766e)); pier.position.set(rx + ps, bTop - 2, bz); pier.castShadow = true; town.add(pier) }
   }
 
   // ── 自販機（路傍にぽつぽつ＝日本の街の象徴。夕/夜は前面が光って灯りになる） ──
@@ -1262,6 +1310,7 @@ export async function mountTown3d(parent, opts = {}) {
       const x = (R() - 0.5) * 150, z = -100 + R() * 130
       if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
+      if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
