@@ -1211,12 +1211,13 @@ export async function mountTown3d(parent, opts = {}) {
     leaf.position.y = trunkH + r * ay * 0.5; leaf.scale.set(ax, ay, ax); leaf.castShadow = true; g.add(leaf)
     // 房を上＋横へ不規則に重ねる（陽の淡色／陰の濃色を交互）＝樹冠の不整形・綿玉脱却。
     // 近景の額装木立は房を多く（豊か）、奥の木は1〜2に抑える（霞むので軽量＝ドローコール削減）。
-    const nC = scale > 1.4 ? (tall ? 2 : 1) + ((R() * 2) | 0) : 1 + (R() < 0.45 ? 1 : 0)
+    // 近景の大木は房を増やして不整形の豊かな樹冠に（歩いて見上げる木が綿玉にならない）。奥は軽量に据え置き。
+    const nC = scale > 1.4 ? 3 + ((R() * 2) | 0) : 1 + (R() < 0.45 ? 1 : 0)
     for (let k = 0; k < nC; k++) {
-      const cr = r * (0.5 + R() * 0.34)
+      const cr = r * (0.44 + R() * 0.42)
       const cl = new THREE.Mesh(new THREE.IcosahedronGeometry(cr, det), (k % 2 ? leafHiMats : leafBaseMats)[ci])
-      cl.position.set((R() - 0.5) * r * ax * 1.2, trunkH + r * ay * (0.5 + (k + 1) / (nC + 1) * 0.9), (R() - 0.4) * r * ax * 0.9)
-      cl.scale.setScalar(0.9 + R() * 0.2); cl.castShadow = true; g.add(cl)
+      cl.position.set((R() - 0.5) * r * ax * 1.5, trunkH + r * ay * (0.42 + (k + 1) / (nC + 1) * 0.95), (R() - 0.4) * r * ax * 1.1)
+      cl.scale.setScalar(0.85 + R() * 0.3); cl.castShadow = true; g.add(cl)
     }
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02, tilt: (R() - 0.5) * 0.12 } // わずかな基準傾き＝不揃いの自然さ
