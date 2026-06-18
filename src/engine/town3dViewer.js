@@ -1028,8 +1028,24 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
   if (kind === 'yato') {
     // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
-    const waterMat = mottleMat(0x8fbcd8, 42, 0.18, [1, 1]) // 水を張った田（朝空を映す水鏡・さざ波のムラを強め煌めきを）
-    const waterSun = mottleMat(0xcadce0, 30, 0.24, [1, 1]) // 朝日を照り返す明るい水面（一部の田＝棚田の夜明けの輝き）
+    // 水鏡: 平板な水色でなく「空・地平・朝日を映す水面」に。情景の空色のグラデ＋斜めの陽の照り返し＋さざ波を
+    // 描き、自発光のように明るいMeshBasicで反射の質感を出す（評価指摘: 今は空を映さない平板な板）。
+    const makeWaterMirror = (sunStrength) => {
+      const c = document.createElement('canvas'); c.width = c.height = 64
+      const cx = c.getContext('2d')
+      const top = '#' + new THREE.Color(0x6ea2c4).lerp(skyTop, 0.32).getHexString()    // 上＝空を映す水面（はっきりした水色）
+      const bot = '#' + new THREE.Color(0x46708e).lerp(skyHorizon, 0.18).getHexString() // 下(手前)＝深い水
+      const g = cx.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, top); g.addColorStop(1, bot)
+      cx.fillStyle = g; cx.fillRect(0, 0, 64, 64)
+      const sun = '#' + sunCol.clone().lerp(new THREE.Color(0xffffff), 0.2).getHexString() // 暖色の照り返し（白にしない）
+      const sg = cx.createLinearGradient(22, 64, 42, 0); sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, sun); sg.addColorStop(1, 'rgba(255,255,255,0)')
+      cx.globalAlpha = sunStrength; cx.fillStyle = sg; cx.fillRect(0, 0, 64, 64); cx.globalAlpha = 1
+      for (let i = 0; i < 40; i++) { cx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.05})`; cx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
+      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping
+      return new THREE.MeshToonMaterial({ color: 0xffffff, map: t, gradientMap: grad, fog: true }) // トゥーンで陰影を乗せ白飛びを防ぐ
+    }
+    const waterMat = makeWaterMirror(0.34)  // 水を張った田（空を映す水鏡）
+    const waterSun = makeWaterMirror(0.58)  // 朝日を照り返す明るい水面
     // 青田（田植え後の稲の条が整然と並ぶ緑＝俯瞰で「田んぼ」と読ませる。ベタ緑を脱す）。
     const ric = document.createElement('canvas'); ric.width = ric.height = 64
     const rix = ric.getContext('2d')
