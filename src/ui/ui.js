@@ -358,8 +358,9 @@ export function buildUI(opts) {
     // シリーズ見出しで一覧の見通しを良くする（情景が増えても探しやすい）。見出しはグリッド全幅に渡る。
     const groups = [
       ['実写の窓', (s) => s.render === 'photoWindow'],
-      ['立体の街と谷戸', (s) => s.render === 'town3d'],
-      ['角部屋から', (s) => s.render === 'cornerRoom'],
+      ['立体の街と谷戸', (s) => s.render === 'town3d' && s.town3dKind !== 'corner'],
+      ['角部屋から', (s) => s.render === 'town3d' && s.town3dKind === 'corner'], // 角部屋も立体の街エンジンへ載せ替え済み
+
       ['街と自然', () => true], // 残り全部（下町・雨・海・山・屋上・デモ）
     ]
     const placed = new Set()

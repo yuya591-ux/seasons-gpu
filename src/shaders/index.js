@@ -7,7 +7,6 @@ import * as windowTown from './windowTown.js'
 import * as windowMountains from './windowMountains.js'
 import * as windowSea from './windowSea.js'
 import * as windowPano from './windowPano.js'
-import * as cornerRoom from './cornerRoom.js'
 import * as shishigaya from './shishigaya.js'
 import * as kitateraoRooftop from './kitateraoRooftop.js'
 import * as photoWindow from './photoWindow.js'
@@ -19,7 +18,7 @@ export const SHADERS = {
   windowMountains, // 窓辺の山あい
   windowSea, // 窓辺の海辺
   windowPano, // 立体パノラマの窓（360°写真＋深度視差）
-  cornerRoom, // 高台の角部屋（室内＋窓＋街＋隣の壁の遮蔽）
+  // cornerRoom は立体の街エンジン(town3dKind:'corner')へ載せ替え済み＝旧シェーダーは廃止（最重シェーダーを撤去・発熱/バンドル減）
   shishigaya, // 鶴見・獅子ヶ谷の谷戸（出身地の再現）
   kitateraoRooftop, // 北寺尾の屋上パノラマ（馴染みの一望風景）
   photoWindow, // 実写の窓（Flux生成の写真を主役にした窓辺）
