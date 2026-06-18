@@ -493,6 +493,8 @@ export async function mountTown3d(parent, opts = {}) {
   const RIVER = { x: -52, halfW: 2.6, bankW: 5.5, depth: 4 }
   // 駅（街の右手の一角）。商店街は中央の道沿い。人の集まる目的地。
   const STATION = { x: 34, z: -44, r: 10 }
+  // 公園（街の中ほどの広場）。浅い池に空を映し、太鼓橋・桜・石灯籠・ベンチで憩う。飛んで降りる目的地。
+  const PARK = { x: 16, z: -27, r: 12, pondR: 5.4, pondDepth: 2.4 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -523,7 +525,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 川の谷を掘る（x=RIVER.x を中心になだらかに沈める＝河床）。護岸が水際の段を作るので地面は緩やかでよい。
     const rd = Math.max(0, 1 - Math.abs(x - RIVER.x) / RIVER.bankW)
     const dip = Math.pow(rd, 1.5) * RIVER.depth
-    return vy + bump - dip
+    // 公園の池を掘る（PARK中心の浅い円い窪み）。石組みの縁で水際の段を作る。
+    const pd = Math.max(0, 1 - Math.hypot(x - PARK.x, z - PARK.z) / PARK.pondR)
+    const pondDip = Math.pow(pd, 1.6) * PARK.pondDepth
+    return vy + bump - dip - pondDip
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
   // 2層構成: 低周波の大きな色斑（草地・土・陰りの“面”の多様さ＝絵画的な地面）＋高周波の細かなムラ（手触り）。
@@ -863,6 +868,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は空ける
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 2) continue // 川筋は空ける
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r) continue // 駅前は空ける
+      if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r) continue // 公園の広場は空ける
       const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1369,6 +1375,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r - 2) continue // 駅前は空ける
+      if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r - 1) continue // 公園は専用の木立で囲む
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
@@ -1399,6 +1406,93 @@ export async function mountTown3d(parent, opts = {}) {
       town.add(grp)
       for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283, rr = 7.5 + R() * 3.5; tree(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr, 1.5 + R() * 0.8) } // 鎮守の森
       colliders.push({ x: sx, z: sz - 3.5, r: 3.2 }) // 歩行: 社殿には入らない
+    }
+
+    // ── 公園（街の中ほどの広場）。空を映す池＋太鼓橋＋桜・石灯籠・ベンチ＝飛んで降りて憩う水辺の広場。──
+    {
+      const px0 = PARK.x, pz0 = PARK.z, pondR = PARK.pondR
+      const pondGround = heightAt(px0, pz0) + PARK.pondDepth // 掘る前の中心地面
+      const waterY = pondGround - 0.7
+      const stoneMat = toon(0x9a958c), woodMat = toon(0x8a6a48)
+      // 水面（空を映す水鏡。MeshToonの空グラデで白飛びを防ぐ）。池なので淡くおだやかに。
+      const pc = document.createElement('canvas'); pc.width = pc.height = 64; const pcx = pc.getContext('2d')
+      const pg = pcx.createLinearGradient(0, 0, 0, 64)
+      pg.addColorStop(0, '#' + new THREE.Color(0x7aa6c4).lerp(skyTop, 0.4).getHexString())
+      pg.addColorStop(1, '#' + new THREE.Color(0x4f748e).lerp(skyHorizon, 0.22).getHexString())
+      pcx.fillStyle = pg; pcx.fillRect(0, 0, 64, 64)
+      for (let i = 0; i < 30; i++) { pcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.05})`; pcx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
+      const ptex = new THREE.CanvasTexture(pc)
+      const pondGeo = new THREE.CircleGeometry(pondR + 0.1, 36); pondGeo.rotateX(-Math.PI / 2)
+      const pond = new THREE.Mesh(pondGeo, new THREE.MeshToonMaterial({ color: 0xffffff, map: ptex, gradientMap: grad, fog: true }))
+      pond.position.set(px0, waterY, pz0); pond.receiveShadow = true; town.add(pond)
+      // 石組みの縁（地形に沿って水際に段を作る＝池の輪郭がはっきりする。不揃いの石を1メッシュへ）。
+      const rimGeos = []
+      for (let i = 0; i < 42; i++) {
+        const a = i / 42 * 6.283 + R() * 0.05
+        const rr = pondR + 0.25 + (R() - 0.5) * 0.5
+        const rx2 = px0 + Math.cos(a) * rr, rz2 = pz0 + Math.sin(a) * rr
+        const top = heightAt(rx2, rz2), bottom = waterY - 0.8
+        const h = Math.max(0.5, top - bottom), s = 0.7 + R() * 0.5
+        const seg = new THREE.BoxGeometry(s, h, s); seg.rotateY(R())
+        seg.applyMatrix4(new THREE.Matrix4().makeTranslation(rx2, bottom + h / 2, rz2))
+        rimGeos.push(seg)
+      }
+      if (BufferGeometryUtils.mergeGeometries) { const rm = BufferGeometryUtils.mergeGeometries(rimGeos, false); if (rm) { const rim = new THREE.Mesh(rm, stoneMat); rim.castShadow = true; rim.receiveShadow = true; town.add(rim) } }
+      rimGeos.forEach((g) => g.dispose())
+      // 太鼓橋（池に架かる朱の反り橋）。円弧に沿う板＋欄干。span を池より少し長く取り両岸に乗せる。
+      {
+        const deckMat = toon(0xc24a33), span = pondR * 2 + 2.8, archH = 1.6, baseLift = 0.7, N = 13, width = 2.2
+        const grp = new THREE.Group(); grp.position.set(px0, 0, pz0); town.add(grp)
+        for (let i = 0; i < N; i++) {
+          const t = i / (N - 1)
+          const lx = (t - 0.5) * span
+          const ly = waterY + baseLift + archH * Math.sin(Math.PI * t)
+          const ang = Math.atan2(archH * Math.PI * Math.cos(Math.PI * t), span) // 円弧の接線の傾き
+          const plank = new THREE.Mesh(new THREE.BoxGeometry(span / (N - 1) * 1.25, 0.28, width), deckMat)
+          plank.position.set(lx, ly, 0); plank.rotation.z = -ang; plank.castShadow = true; plank.receiveShadow = true; grp.add(plank)
+          if (i % 2 === 0) for (const rs of [-1, 1]) { // 欄干の親柱
+            const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.16), deckMat); post.position.set(lx, ly + 0.35, rs * (width / 2 - 0.12)); grp.add(post)
+          }
+        }
+        for (const rs of [-1, 1]) for (let i = 0; i < N - 1; i++) { // 欄干の手すり（弧に沿う）
+          const t = (i + 0.5) / (N - 1), lx = (t - 0.5) * span
+          const ly = waterY + baseLift + archH * Math.sin(Math.PI * t) + 0.58
+          const ang = Math.atan2(archH * Math.PI * Math.cos(Math.PI * t), span)
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(span / (N - 1) * 1.2, 0.12, 0.12), deckMat)
+          rail.position.set(lx, ly, rs * (width / 2 - 0.12)); rail.rotation.z = -ang; grp.add(rail)
+        }
+      }
+      // 桜（淡紅の花房。緑の木立に色を差す）。橋の線（x軸）を避けて配置。
+      for (const c of [[px0 - 6.5, pz0 + 5.5], [px0 + 6, pz0 - 6], [px0 - 5, pz0 - 6.5], [px0 + 5.5, pz0 + 6]]) {
+        const gy = heightAt(c[0], c[1]); const sg = new THREE.Group(); sg.position.set(c[0], gy, c[1]); town.add(sg)
+        const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 2.4, 7), woodMat); tr.position.y = 1.2; tr.castShadow = true; sg.add(tr)
+        const sakuraMat = toon(0xf0bcce)
+        for (const bl of [[0, 2.9, 0, 1.5], [-0.9, 2.5, 0.4, 1.0], [0.8, 2.6, -0.5, 1.05], [0.2, 3.4, 0.3, 0.9]]) {
+          const bs = new THREE.Mesh(new THREE.SphereGeometry(bl[3], 8, 7), sakuraMat); bs.position.set(bl[0], bl[1], bl[2]); bs.castShadow = true; sg.add(bs)
+        }
+        colliders.push({ x: c[0], z: c[1], r: 0.6 }); spawnAvoid.push({ x: c[0], z: c[1], r: 2.0 })
+      }
+      // 石灯籠×2（池のほとりに。夕夜はほのかに灯る）
+      for (const lp of [[px0 - pondR - 1.2, pz0 + 2.5], [px0 + pondR + 1.2, pz0 - 2.5]]) {
+        const gy = heightAt(lp[0], lp[1]); const lan = new THREE.Group(); lan.position.set(lp[0], gy, lp[1]); town.add(lan)
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 0.5, 8), stoneMat); foot.position.y = 0.25
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 1.1, 8), stoneMat); post.position.y = 1.05
+        const fire = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.46, 0.58), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffce86 }) : toon(0xb0a890)); fire.position.y = 1.85
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.4, 4), stoneMat); cap.rotation.y = Math.PI / 4; cap.position.y = 2.25
+        for (const m of [foot, post, fire, cap]) { m.castShadow = true; lan.add(m) }
+        colliders.push({ x: lp[0], z: lp[1], r: 0.5 })
+      }
+      // ベンチ×3（広場に。池の方を向く）
+      for (const bp of [[px0 - 8, pz0 - 1, 1.4], [px0 + 8.5, pz0 + 1, -1.4], [px0 - 1, pz0 + 8.5, 3.0]]) {
+        const gy = heightAt(bp[0], bp[1]); const bg = new THREE.Group(); bg.position.set(bp[0], gy, bp[1]); bg.rotation.y = bp[2]; town.add(bg)
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 0.5), woodMat); seat.position.y = 0.5; seat.castShadow = true; bg.add(seat)
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, 0.1), woodMat); back.position.set(0, 0.78, -0.22); bg.add(back)
+        for (const sx2 of [-0.8, 0.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.46), toon(0x6a5a48)); leg.position.set(sx2, 0.25, 0); bg.add(leg) }
+      }
+      // 公園の縁を低めの木立で囲む（広場の輪郭。中央の池・橋・桜は開けておく＝水面が見える）
+      for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3, rr = PARK.r - 0.4 + R() * 0.8; tree(px0 + Math.cos(a) * rr, pz0 + Math.sin(a) * rr, 0.8 + R() * 0.4) }
+      colliders.push({ x: px0, z: pz0, r: pondR * 0.85 }) // 歩行: 池には入らない
+      spawnAvoid.push({ x: px0, z: pz0, r: pondR + 1.5 }) // 着地: 池に降りない
     }
   }
 
