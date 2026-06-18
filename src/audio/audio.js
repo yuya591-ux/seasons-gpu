@@ -139,7 +139,7 @@ export function createAudio(opts) {
     } else {
       layerGain.connect(master)
     }
-    const layer = { layerGain, stopped: false, panner, basePan: pan }
+    const layer = { layerGain, stopped: false, panner, basePan: pan, baseGain: gainVal }
     layers.push(layer)
 
     let nextStart = now() + 0.05
@@ -299,6 +299,7 @@ export function createAudio(opts) {
   // master 経由なので音量/ミュート/おやすみに自動追従。値は控えめ（うっすら空気が動く程度）。
   let windNode = null
   let flyWindV = 0 // 飛行速度に応じた風の強さ（setFlyWind）。細かな変化を無視する基準
+  let altDuckV = 0 // 高度に応じた環境音のしぼり（setAltitudeDuck）。細かな変化を無視する基準
   function startWind() {
     if (!ctx || windNode || !ctx.createBiquadFilter) return
     const len = Math.floor(2 * ctx.sampleRate)
@@ -436,6 +437,18 @@ export function createAudio(opts) {
       if (lp) { lp.type = 'lowpass'; lp.frequency.value = 680 + Math.random() * 280; src.connect(lp).connect(g).connect(master) } // こもった足音
       else src.connect(g).connect(master)
       try { src.start(t); src.stop(t + 0.13) } catch { /* 無視 */ }
+    },
+    /** 高く昇るほど街の環境音をしぼる（風はそのまま＝高空は風だけの静けさへ）。v=高度(0..1)。 */
+    setAltitudeDuck(v) {
+      if (!ctx) return
+      v = Math.max(0, Math.min(1, v || 0))
+      if (Math.abs(v - altDuckV) < 0.04) return
+      altDuckV = v
+      const t = now()
+      for (const l of layers) {
+        if (l.stopped) continue
+        try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.72)), t, 0.4) } catch { /* 無視 */ }
+      }
     },
     /** 鳥が驚いて飛び立つ羽音（近づくと数回の柔らかい羽ばたき）。ごく控えめに。 */
     birdFlush() {

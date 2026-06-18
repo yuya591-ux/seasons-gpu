@@ -227,6 +227,7 @@ export async function mountTown3d(parent, opts = {}) {
   const onSpeed = typeof opts.onSpeed === 'function' ? opts.onSpeed : () => {} // 飛行速度(0..1)を外へ伝える（風音の膨らみ）
   const onFoot = typeof opts.onFoot === 'function' ? opts.onFoot : () => {} // 歩行で一歩ごとに伝える（足音）
   const onBirdFlush = typeof opts.onBirdFlush === 'function' ? opts.onBirdFlush : () => {} // 鳥が驚いて飛び立つ（羽音）
+  const onAltitude = typeof opts.onAltitude === 'function' ? opts.onAltitude : () => {} // 飛行高度(0..1)を外へ伝える（高空で環境音をしぼる）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -2092,6 +2093,20 @@ export async function mountTown3d(parent, opts = {}) {
   let trailIdx = 0, trailAccum = 0
   let birdFlushCool = 0 // 鳥の羽音の連発抑制タイマー(秒)
 
+  // 夕暮れ・夜は空気に光の粒が舞う（蛍/塵）。暗い空ほど見え、カメラ周辺を漂い流れる。空/地上でだけ。
+  const moteN = LIGHT ? 50 : 90
+  const motePos = new Float32Array(moteN * 3)
+  for (let i = 0; i < moteN; i++) { motePos[i * 3] = (R() - 0.5) * 72; motePos[i * 3 + 1] = (R() - 0.5) * 46; motePos[i * 3 + 2] = (R() - 0.5) * 72 }
+  const moteGeo = new THREE.BufferGeometry(); moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3))
+  const moteTex = (() => {
+    const s = 32, c = document.createElement('canvas'); c.width = c.height = s
+    const g = c.getContext('2d'); const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+    gr.addColorStop(0, 'rgba(255,244,214,0.95)'); gr.addColorStop(0.5, 'rgba(255,236,196,0.4)'); gr.addColorStop(1, 'rgba(255,232,190,0)')
+    g.fillStyle = gr; g.fillRect(0, 0, s, s); return new THREE.CanvasTexture(c)
+  })()
+  const moteMat = new THREE.PointsMaterial({ map: moteTex, size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
+  const motes = new THREE.Points(moteGeo, moteMat); motes.frustumCulled = false; motes.visible = false; scene.add(motes)
+
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
   const speedVig = document.createElement('div'); speedVig.className = 'town3d-speedvig'; stage.appendChild(speedVig)
@@ -2223,6 +2238,7 @@ export async function mountTown3d(parent, opts = {}) {
     let upX = 0, upY = 1, upZ = 0
     let lookX = look.x, lookY = look.y, lookZ = look.z
     let windSpeed01 = 0 // 飛行速度の正規化(0..1)。風音の膨らみへ渡す
+    let altDuck01 = 0 // 飛行高度の正規化(0..1)。高空で環境音をしぼる量へ渡す
     if (flyAmt > 0.0005 || active.flyTarget) {
       // 見回し（右ドラッグ）を目標へ追従＝指を離しても余韻。旋回角速度はバンクの素。
       const prevYaw = active.flyYaw
@@ -2330,9 +2346,27 @@ export async function mountTown3d(parent, opts = {}) {
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
       const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 15) * flyAmt
       if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.82).toFixed(2) }
-      // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）
+      // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）＋環境音をしぼる
       const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
       if (Math.abs(altT - altTintCur) > 0.02) { altTintCur = altT; altTint.style.opacity = (altT * 0.16).toFixed(2) }
+      altDuck01 = altT
+      // 夕暮れ・夜の光の粒（暗い空ほど見え、カメラ周辺を漂い流れる）
+      const moteOp = duskAmt * flyAmt * 0.4
+      motes.visible = moteOp > 0.015
+      if (motes.visible) {
+        const mp = moteGeo.attributes.position.array
+        const HX = 36, HY = 24, HZ = 36
+        for (let i = 0; i < moteN; i++) {
+          mp[i * 3] += Math.sin(t * 0.3 + i) * 0.004
+          mp[i * 3 + 1] += Math.cos(t * 0.22 + i * 1.3) * 0.003 + 0.004 // ゆるく昇る
+          mp[i * 3 + 2] += Math.sin(t * 0.26 + i * 0.7) * 0.004
+          if (mp[i * 3] - camX > HX) mp[i * 3] -= 2 * HX; else if (mp[i * 3] - camX < -HX) mp[i * 3] += 2 * HX
+          if (mp[i * 3 + 1] - camY > HY) mp[i * 3 + 1] -= 2 * HY; else if (mp[i * 3 + 1] - camY < -HY) mp[i * 3 + 1] += 2 * HY
+          if (mp[i * 3 + 2] - camZ > HZ) mp[i * 3 + 2] -= 2 * HZ; else if (mp[i * 3 + 2] - camZ < -HZ) mp[i * 3 + 2] += 2 * HZ
+        }
+        moteGeo.attributes.position.needsUpdate = true
+        moteMat.opacity = moteOp
+      }
       // 高空を速く飛ぶと飛行機雲を引く（後ろへ。一定距離ごとに一粒を撒く）
       if (!isWalk && active.flyPos.y > 38 && speedMag > FLY.speed * 0.45) {
         trailAccum += speedMag * dt
@@ -2373,6 +2407,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     camera.lookAt(lookX, lookY, lookZ)
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
+    onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
     // 窓ガラスと横桟は、あけると横へすべって消える（引き違い窓）。乗り出すと枠ごと外へ退く。
     glass.style.transform = `translateX(${(wo * 96).toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
