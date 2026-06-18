@@ -68,8 +68,8 @@ const FLY = {
   stickDead: 0.14,  // 不感帯（微小な震えを無視）
   turnRate: 1.7,    // 白猫式: 横へ倒すほど速く向き直る旋回速度(rad/s)
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
-  // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。街区拡張に合わせ広げた。
-  bound: { x: 80, zMin: -112, zMax: 40, yMax: 108, yFloor: 4.5 },
+  // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
+  bound: { x: 86, zMin: -118, zMax: 42, yMax: 122, yFloor: 4.5 },
   // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
   yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
@@ -1673,6 +1673,8 @@ export async function mountTown3d(parent, opts = {}) {
         const postMat = toon(0xe06f8a)
         for (const px of [-4.4, 4.4]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 5.6, 10), postMat); p.position.set(px, 2.8, 0); p.castShadow = true; grp.add(p) }
         const arch = new THREE.Mesh(new THREE.TorusGeometry(4.4, 0.42, 8, 20, Math.PI), toon(0xf2c14e)); arch.position.set(0, 5.4, 0); grp.add(arch)
+        const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }) // アーチの豆電球（昼も明るく・夕夜は灯りに）
+        for (let i = 1; i < 11; i++) { const a = i / 11 * Math.PI; const bb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), bulbMat); bb.position.set(Math.cos(a) * 4.4, 5.4 + Math.sin(a) * 4.4, 0.12); grp.add(bb) }
         const bc = document.createElement('canvas'); bc.width = 256; bc.height = 64; const bx2 = bc.getContext('2d')
         bx2.fillStyle = '#e8567f'; bx2.fillRect(0, 0, 256, 64); bx2.strokeStyle = '#fff3d0'; bx2.lineWidth = 4; bx2.strokeRect(3, 3, 250, 58)
         bx2.fillStyle = '#fff8e8'; bx2.font = 'bold 33px sans-serif'; bx2.textAlign = 'center'; bx2.textBaseline = 'middle'; bx2.fillText('ゆうえんち', 128, 36)
@@ -2111,6 +2113,9 @@ export async function mountTown3d(parent, opts = {}) {
     { x: 0, z: -14, n: 4, rad: 2.6 },                                 // 商店街のゲート下
     { x: -45.5, z: -17, n: 3, rad: 2.4 },                             // 川辺（東岸の遊歩道）
     { x: 14, z: -19, n: 4, rad: 2.4 },                                // 公園の池のほとり
+    { x: TEMPLE.x, z: TEMPLE.z + 7, n: 4, rad: 2.6 },                 // 寺の参道
+    { x: SCHOOL.x, z: SCHOOL.z + 6, n: 4, rad: 3.0 },                 // 学校の校庭
+    { x: FUN.x, z: FUN.z + 9, n: 5, rad: 3.0 },                       // 遊園地のゲート前
   ]
   for (const s of crowdSpots) for (let i = 0; i < s.n; i++) {
     const g = makePeep()
