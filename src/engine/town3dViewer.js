@@ -157,6 +157,7 @@ export function setTown3dLand(land) {
     active.flyYaw = active.flyYawTarget = active.openYaw(sx, sz) // 壁や木を正面にせず、抜けのある方へ向き直る
     active.flyPitchTarget = -0.05 // 立って街路をそっと見渡す
     active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.camReady = false
+    active.landedFired = false // 接地した瞬間に砂ぼこり＋沈み込みを起こす
     active.mode = 'walk'
     active.flyTarget = 1
   } else {
@@ -224,6 +225,7 @@ export async function mountTown3d(parent, opts = {}) {
   const kind = opts.kind || 'town'        // 'town'（坂の街）| 'yato'（谷戸＝棚田と茅葺の屋敷）
   const onEvent = typeof opts.onEvent === 'function' ? opts.onEvent : () => {} // 定期イベント発火を外へ伝える（音の結線）
   const onSpeed = typeof opts.onSpeed === 'function' ? opts.onSpeed : () => {} // 飛行速度(0..1)を外へ伝える（風音の膨らみ）
+  const onFoot = typeof opts.onFoot === 'function' ? opts.onFoot : () => {} // 歩行で一歩ごとに伝える（足音）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -1587,6 +1589,8 @@ export async function mountTown3d(parent, opts = {}) {
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
+    landedFired: true,            // 着地の砂ぼこり/沈み込みを発火済みか（着地で false→接地で発火）
+    landDustT: 0, dipT: 0,        // 砂ぼこり/カメラ沈み込みの残り時間(秒)
     winLook: new THREE.Vector3(), // 窓ビューの注視点（飛び立つ瞬間の視線引き継ぎ用に毎フレーム保持）
     dispose() {
       // シーングラフ全体の geometry/material/texture を解放（連打切替でのGPUメモリ蓄積＝コンテキストロストを防ぐ）
@@ -2060,6 +2064,16 @@ export async function mountTown3d(parent, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: true }))
     m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m); return m
   })()
+  // 着地の砂ぼこり（地面に広がって消える柔らかい輪）。飛び降りて着地した瞬間にふわっと立つ。
+  const landDust = (() => {
+    const s = 64, c = document.createElement('canvas'); c.width = c.height = s
+    const g = c.getContext('2d')
+    const grd = g.createRadialGradient(s / 2, s / 2, s * 0.12, s / 2, s / 2, s / 2)
+    grd.addColorStop(0, 'rgba(228,221,208,0)'); grd.addColorStop(0.5, 'rgba(224,216,200,0.55)'); grd.addColorStop(1, 'rgba(220,212,196,0)')
+    g.fillStyle = grd; g.fillRect(0, 0, s, s)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: true }))
+    m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m); return m
+  })()
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
   const speedVig = document.createElement('div'); speedVig.className = 'town3d-speedvig'; stage.appendChild(speedVig)
@@ -2117,13 +2131,21 @@ export async function mountTown3d(parent, opts = {}) {
       }
       weatherPts.pts.geometry.attributes.position.needsUpdate = true
     }
-    // 鳥がはばたきながら空を渡る
+    // 鳥がはばたきながら空を渡る。自機が近いと驚いて上へ逃げ、羽ばたきが大きくなる。
+    const flyerAloft = active && (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.5
     for (const b of birds) {
       const u = b.userData
       const a = t * u.sp + u.ph
-      b.position.set(u.cx + Math.cos(a) * u.rad, u.yy + Math.sin(a * 0.7) * 2.0, u.cz + Math.sin(a) * u.rad)
+      let st = u.startle || 0
+      if (flyerAloft) {
+        const dx = b.position.x - active.flyPos.x, dy = b.position.y - active.flyPos.y, dz = b.position.z - active.flyPos.z
+        const near = Math.sqrt(dx * dx + dy * dy + dz * dz)
+        if (near < 15) st = Math.max(st, 1 - near / 15)
+      }
+      st *= 0.98; u.startle = st // 驚きはゆっくり収まる
+      b.position.set(u.cx + Math.cos(a) * u.rad, u.yy + st * 7 + Math.sin(a * 0.7) * 2.0, u.cz + Math.sin(a) * u.rad)
       b.rotation.y = -a + Math.PI / 2
-      const flap = Math.sin(t * 9 + u.ph) * 0.5
+      const flap = Math.sin(t * 9 + u.ph) * (0.5 + st * 0.5)
       b.children.forEach((w) => { w.rotation.z = w.userData.side * flap })
     }
     // 窓あけ／乗り出しの「線形進行(0..1)」を所要時間ぶんだけ目標へ一定速度で進め、ease-in-out をかける。
@@ -2192,6 +2214,14 @@ export async function mountTown3d(parent, opts = {}) {
         const eyeY = heightAt(active.flyPos.x, active.flyPos.z) + FLY.eye
         const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
         active.flyPos.y += (eyeY - active.flyPos.y) * ky // 着地はやわらかく・以降は地形に沿う
+        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 接地した瞬間＝砂ぼこり＋沈み込み
+          active.landedFired = true; active.landDustT = 0.7; active.dipT = 0.42
+          landDust.position.set(active.flyPos.x, heightAt(active.flyPos.x, active.flyPos.z) + 0.06, active.flyPos.z); landDust.visible = true
+        }
+        // 足音: 歩いた距離を貯め、一歩ぶん進むごとに鳴らす（止まっている間は鳴らない）
+        const hstep = Math.hypot(active.vel.x, active.vel.z) * dt
+        active.walkDist = (active.walkDist || 0) + hstep
+        if (active.walkDist > 2.1) { active.walkDist = 0; onFoot() }
       } else {
         active.flyPos.x += active.vel.x * dt; active.flyPos.y += active.vel.y * dt; active.flyPos.z += active.vel.z * dt
         active.flyPos.x = Math.max(-b.x, Math.min(b.x, active.flyPos.x))
@@ -2244,6 +2274,8 @@ export async function mountTown3d(parent, opts = {}) {
         camY += (Math.sin(t * 0.8) * 0.16 * (1 - sp01) + Math.sin(t * 7.3) * 0.12 * sp01) * flyAmt
         camX += Math.sin(t * 5.1) * 0.12 * sp01 * flyAmt
       }
+      // 着地の沈み込み（とんと沈んで戻る＝接地の手応え）
+      if (active.dipT > 0) { active.dipT -= dt; const pp = 1 - Math.max(0, active.dipT) / 0.42; camY -= Math.sin(pp * Math.PI) * 0.6 }
       // 自分の影が真下の地面を走る（高度で大きさ・濃さが変わる＝飛んでいる手応え）
       const gY = heightAt(active.flyPos.x, active.flyPos.z)
       const alt = Math.max(0, active.flyPos.y - gY)
@@ -2260,6 +2292,15 @@ export async function mountTown3d(parent, opts = {}) {
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
       const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 15) * flyAmt
       if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.82).toFixed(2) }
+    }
+    // 着地の砂ぼこりが広がって薄れる
+    if (active.landDustT > 0) {
+      active.landDustT -= dt
+      const p = 1 - Math.max(0, active.landDustT) / 0.7
+      const sc = 1.4 + p * 5.5
+      landDust.scale.set(sc, sc, sc)
+      landDust.material.opacity = Math.max(0, 1 - p) * 0.5
+      if (active.landDustT <= 0) landDust.visible = false
     }
     camera.up.set(upX, upY, upZ)
     camera.position.set(camX, camY, camZ)

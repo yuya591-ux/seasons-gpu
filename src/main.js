@@ -161,6 +161,8 @@ function start() {
             if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録
           },
           onSpeed: (v) => { if (!sleepFading) audio.setFlyWind(v) }, // 飛行速度で風音を膨らませる
+          onFoot: () => { if (!sleepFading) audio.footstep() }, // 散策の足音
+
 
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
