@@ -495,6 +495,8 @@ export async function mountTown3d(parent, opts = {}) {
   const STATION = { x: 34, z: -44, r: 10 }
   // 公園（街の中ほどの広場）。浅い池に空を映し、太鼓橋・桜・石灯籠・ベンチで憩う。飛んで降りる目的地。
   const PARK = { x: 16, z: -27, r: 12, pondR: 5.4, pondDepth: 2.4 }
+  // 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。谷の中ほどに立てる。
+  const TOWER = { x: -7, z: -48, r: 6 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -869,6 +871,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 2) continue // 川筋は空ける
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r) continue // 駅前は空ける
       if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r) continue // 公園の広場は空ける
+      if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
       const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1376,6 +1379,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r - 2) continue // 駅前は空ける
       if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r - 1) continue // 公園は専用の木立で囲む
+      if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
@@ -1493,6 +1497,36 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3, rr = PARK.r - 0.4 + R() * 0.8; tree(px0 + Math.cos(a) * rr, pz0 + Math.sin(a) * rr, 0.8 + R() * 0.4) }
       colliders.push({ x: px0, z: pz0, r: pondR * 0.85 }) // 歩行: 池には入らない
       spawnAvoid.push({ x: px0, z: pz0, r: pondR + 1.5 }) // 着地: 池に降りない
+    }
+
+    // ── 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。──
+    {
+      const tx = TOWER.x, tz = TOWER.z, baseY = heightAt(tx, tz)
+      const concrete = toon(0xcfcabf), deckMat = toon(0xbcb6aa), railMat = toon(0x877f72), roofMat = toon(0x586a6c), bandMat = toon(0xa9a395)
+      const grp = new THREE.Group(); grp.position.set(tx, baseY, tz); town.add(grp)
+      const shaftH = 24
+      // 基壇（足元のコンクリ台）
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4.4, 2.0, 14), concrete); base.position.y = 1.0; base.castShadow = true; base.receiveShadow = true; grp.add(base)
+      // シャフト（先細りの塔身）
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 2.7, shaftH, 14), concrete); shaft.position.y = 2 + shaftH / 2; shaft.castShadow = true; shaft.receiveShadow = true; grp.add(shaft); grp.add(addOutline(shaft))
+      // 横帯（塔身に細いリング＝スケール感と手描きの陰影の起伏）
+      for (const fy of [0.34, 0.64]) { const ringR = 2.7 - (2.7 - 1.7) * fy; const ring = new THREE.Mesh(new THREE.TorusGeometry(ringR + 0.06, 0.12, 6, 18), bandMat); ring.rotation.x = Math.PI / 2; ring.position.y = 2 + shaftH * fy; grp.add(ring) }
+      const deckY = 2 + shaftH - 1.2
+      // 展望台（張り出す円盤）
+      const deck = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 3.6, 0.6, 18), deckMat); deck.position.y = deckY; deck.castShadow = true; deck.receiveShadow = true; grp.add(deck)
+      // 手すり（リングの上桟＋細い縦桟）
+      const rail = new THREE.Mesh(new THREE.TorusGeometry(3.9, 0.07, 6, 26), railMat); rail.rotation.x = Math.PI / 2; rail.position.y = deckY + 1.0; grp.add(rail)
+      for (let i = 0; i < 20; i++) { const a = i / 20 * 6.283; const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.0, 0.07), railMat); post.position.set(Math.cos(a) * 3.9, deckY + 0.5, Math.sin(a) * 3.9); grp.add(post) }
+      // 展望室（ガラスの小部屋）と窓帯
+      const cab = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.9, 3.0, 18), concrete); cab.position.y = deckY + 0.3 + 1.6; cab.castShadow = true; grp.add(cab)
+      const glass = new THREE.Mesh(new THREE.CylinderGeometry(2.73, 2.82, 1.7, 18), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffce86 }) : toon(0x444c52)); glass.position.y = deckY + 0.3 + 1.9; grp.add(glass) // 夕夜は灯る展望室
+      // 屋根（円錐）＋天辺のアンテナ・赤い灯り
+      const roofY = deckY + 0.3 + 3.1
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.4, 18), roofMat); roof.position.y = roofY + 1.2; roof.castShadow = true; grp.add(roof); grp.add(addOutline(roof))
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.14, 3.2, 6), railMat); spire.position.y = roofY + 2.4 + 1.6; grp.add(spire)
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff5a4a })); beacon.position.y = roofY + 2.4 + 3.2; grp.add(beacon) // 航空障害灯（夜も街に灯る赤）
+      colliders.push({ x: tx, z: tz, r: 4.4 }) // 歩行: 塔身には入らない
+      spawnAvoid.push({ x: tx, z: tz, r: 5.5 }) // 着地: 塔の真下には降りない
     }
   }
 
