@@ -1903,20 +1903,38 @@ export async function mountTown3d(parent, opts = {}) {
     town.add(g); cars.push(g)
   }
 
-  // ── 歩く住民（歩道を行き交う小さな人影） ──
+  // ── 歩く住民（歩道を行き交う小さな人影）＋ランドマークの賑わい ──
   const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8]
   const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24]
   const skinMat = toon(0xf0c49c)
-  peeps = []
-  for (let i = 0; i < 11; i++) {
+  const makePeep = () => {
     const g = new THREE.Group()
     const legs = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.58, 0.32), toon(pantsCols[(R() * pantsCols.length) | 0])); legs.position.y = 0.4; legs.castShadow = true; g.add(legs) // ズボン
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.42, 3, 6), toon(peepCols[i % peepCols.length])); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 上着
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.42, 3, 6), toon(peepCols[(R() * peepCols.length) | 0])); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 上着
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 8, 6), skinMat); head.position.y = 1.42; g.add(head)
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.245, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.62), toon(hairCols[(R() * hairCols.length) | 0])); hair.position.y = 1.45; g.add(hair) // 髪
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
+    return g
+  }
+  peeps = []
+  for (let i = 0; i < 11; i++) {
+    const g = makePeep()
     const dir = (i % 2 === 0) ? 1 : -1
     g.userData = { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 }
+    town.add(g); peeps.push(g)
+  }
+  // ランドマークの賑わい（駅前・商店街・川辺・公園に人が集う。その場でゆっくり佇み・体の向きを変える）。
+  const crowdSpots = [
+    { x: STATION.x, z: STATION.z + STATION.r - 1.5, n: 5, rad: 3.2 }, // 駅前の広場
+    { x: 0, z: -14, n: 4, rad: 2.6 },                                 // 商店街のゲート下
+    { x: -45.5, z: -17, n: 3, rad: 2.4 },                             // 川辺（東岸の遊歩道）
+    { x: 14, z: -19, n: 4, rad: 2.4 },                                // 公園の池のほとり
+  ]
+  for (const s of crowdSpots) for (let i = 0; i < s.n; i++) {
+    const g = makePeep()
+    const hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
+    g.userData = { loiter: true, hx, hz, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 }
+    g.position.set(hx, heightAt(hx, hz), hz)
     town.add(g); peeps.push(g)
   }
   } // ← 車・住民（街のみ）ここまで
@@ -2540,6 +2558,13 @@ export async function mountTown3d(parent, opts = {}) {
     // 住民が歩道を歩く（少し上下に弾む）
     for (const p of peeps) {
       const u = p.userData
+      if (u.loiter) { // ランドマークの賑わい: 定位置の周りをゆっくり佇み歩き、体の向きを少しずつ変える
+        const px = u.hx + Math.sin(t * u.sp + u.ph) * u.rad
+        const pz = u.hz + Math.cos(t * u.sp * 0.8 + u.ph * 1.3) * u.rad
+        p.position.set(px, heightAt(px, pz) + Math.abs(Math.sin(t * 2.4 + u.ph)) * 0.05, pz)
+        p.rotation.y = u.face + Math.sin(t * 0.3 + u.ph) * 0.7
+        continue
+      }
       u.z += u.dir * u.speed * dt
       if (u.z > 20) u.z = -88
       if (u.z < -88) u.z = 20
