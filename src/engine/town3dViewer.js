@@ -367,7 +367,8 @@ export async function mountTown3d(parent, opts = {}) {
   // 壁＋窓のテクスチャ（乗算マップ）。壁はベタ白を避け、コンクリの微細なムラ＋雨だれの経年汚れを描いて
   // 実写の建物の質感に近づける。窓は灰（通常）／暖色emissive（灯り）。64pxで滑らかに。
   function makeWinTex(lit, seed) {
-    const S = 64
+    // 128pxへ拡張＝歩行・低空で近づいても窓が崩れない。サッシ枠・十字桟・窓台を描き、ベタ硝子の板を脱す。
+    const S = 128
     const c = document.createElement('canvas'); c.width = c.height = S
     const g = c.getContext('2d')
     let s = seed * 2654435761
@@ -376,41 +377,54 @@ export async function mountTown3d(parent, opts = {}) {
     else {
       g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S)
       // コンクリ/モルタルの微細なムラ（乗算なので暗いほど陰る＝のっぺり白を避ける）
-      for (let i = 0; i < 110; i++) {
+      for (let i = 0; i < 360; i++) {
         const v = 206 + (rnd() * 49 | 0)
-        g.fillStyle = `rgba(${v},${v},${v - 8},0.22)`
-        g.fillRect(rnd() * S, rnd() * S, 1 + rnd() * 3, 1 + rnd() * 3)
+        g.fillStyle = `rgba(${v},${v},${v - 8},0.20)`
+        g.fillRect(rnd() * S, rnd() * S, 1 + rnd() * 5, 1 + rnd() * 5)
       }
       // 縦の雨だれ筋（窓下から伸びる経年の汚れ＝建物のリアルさ）
-      for (let k = 0; k < 7; k++) {
+      for (let k = 0; k < 13; k++) {
         const sx = rnd() * S
         g.fillStyle = `rgba(118,120,128,${0.05 + rnd() * 0.06})`
-        g.fillRect(sx, rnd() * S * 0.4, 0.8 + rnd(), S * (0.3 + rnd() * 0.5))
+        g.fillRect(sx, rnd() * S * 0.4, 1.2 + rnd() * 1.4, S * (0.3 + rnd() * 0.5))
       }
     }
-    // 窓の格子（3列×4段）
+    // 窓の格子（3列×4段）。各窓にサッシ枠＋十字桟＋窓台を描く＝近接で「窓」と読める立体。
     for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) {
-      const px = 8 + xx * 18, py = 7 + yy * 14, pw = 11, ph = 9
+      const px = 16 + xx * 36, py = 14 + yy * 28, pw = 24, ph = 19
       if (lit) {
-        g.fillStyle = rnd() < 0.45 ? '#ffd089' : '#0a0a0a'
+        const on = rnd() < 0.45
+        g.fillStyle = on ? '#ffd089' : '#0a0a0a'
         g.fillRect(px, py, pw, ph)
+        if (on) { // 灯った窓は十字桟が影で抜ける＝障子/サッシのシルエット
+          g.fillStyle = 'rgba(40,28,12,0.55)'
+          g.fillRect(px, py + ph * 0.5 - 0.7, pw, 1.4)
+          g.fillRect(px + pw * 0.5 - 0.7, py, 1.4, ph)
+        }
       } else {
-        // ガラス：上ほど空を映してやや明るく→下ほど室内で翳る縦グラデ＝ベタ灰の板でなく「硝子」。
-        // 窓ごとに寒暖を振る（空映りの寒色／障子・カーテンの暖色）＝のっぺり一様を脱し生活感。
+        // サッシ枠（窓周りの一段明るい縁＝コンクリの窓台/見切り）
+        g.fillStyle = 'rgba(238,236,232,0.9)'
+        g.fillRect(px - 2, py - 2, pw + 4, ph + 4)
+        // ガラス：上ほど空を映してやや明るく→下ほど室内で翳る縦グラデ＝硝子。窓ごとに寒暖を振る。
         const cool = rnd() < 0.5
         const grad = g.createLinearGradient(0, py, 0, py + ph)
-        if (cool) { grad.addColorStop(0, '#8e9aa8'); grad.addColorStop(1, '#5c606a') }
-        else { grad.addColorStop(0, '#827e7a'); grad.addColorStop(1, '#5a5652') }
+        if (cool) { grad.addColorStop(0, '#90a0b2'); grad.addColorStop(1, '#586068') }
+        else { grad.addColorStop(0, '#867f78'); grad.addColorStop(1, '#574f49') }
         g.fillStyle = grad
         g.fillRect(px, py, pw, ph)
-        // 中桟（上げ下げ窓の横さん）＝ガラスが2枚に割れて見える立体
-        g.fillStyle = 'rgba(150,150,158,0.45)'
-        g.fillRect(px, py + ph * 0.5 - 0.5, pw, 1)
+        // 十字桟（上下・左右に割れて見える立体の窓）
+        g.fillStyle = 'rgba(214,214,220,0.5)'
+        g.fillRect(px, py + ph * 0.5 - 0.6, pw, 1.2)
+        g.fillRect(px + pw * 0.5 - 0.6, py, 1.2, ph)
+        // 上辺の空映りのハイライト＋窓台の影（下）＝窓がへこんで付いて見える
+        g.fillStyle = 'rgba(255,255,255,0.28)'; g.fillRect(px, py, pw, 1.4)
+        g.fillStyle = 'rgba(60,58,64,0.34)'; g.fillRect(px - 2, py + ph + 1.4, pw + 4, 2)
       }
     }
     const t = new THREE.CanvasTexture(c)
     t.wrapS = t.wrapT = THREE.RepeatWrapping
     t.magFilter = THREE.LinearFilter // 微細な壁質感を滑らかに（Nearestのブロック感を脱す）
+    t.anisotropy = LIGHT ? 1 : 4 // 斜め見の壁面でも窓がにじまない（歩行・低空で効く）
     return t
   }
   const winMapBase = makeWinTex(false, 1)
