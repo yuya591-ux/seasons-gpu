@@ -1603,6 +1603,64 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; if (Math.sin(a) > 0.2) continue; const rr = 11.5 + R() * 3; tree(tx + Math.cos(a) * rr, tz + Math.sin(a) * rr, 1.0 + R() * 0.6) }
       spawnAvoid.push({ x: tx, z: tz, r: 8 }) // 寺の境内に降りない
     }
+
+    // ── 学校（校舎と校庭）。街の右手の馴染みの場所。時計・トラック・桜並木・プール・遊具。──
+    {
+      const cx = SCHOOL.x, cz = SCHOOL.z, baseY = heightAt(cx, cz)
+      const wallMat = toon(0xe4dac4), roofMat = toon(0x8a7e70), winMat = toon(0x39474f), trimMat = toon(0xbcae94)
+      const grp = new THREE.Group(); grp.position.set(cx, baseY, cz); town.add(grp) // 校庭(+z)を街の中心へ向ける
+      const makeWing = (w, d, px, pz) => {
+        const wing = new THREE.Group(); wing.position.set(px, 0, pz); grp.add(wing)
+        const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 1.6, d + 0.3), trimMat); found.position.y = -0.5; wing.add(found) // 基礎（傾斜のすき間を隠す）
+        const body = new THREE.Mesh(new THREE.BoxGeometry(w, 8.4, d), wallMat); body.position.y = 4.2; body.castShadow = true; body.receiveShadow = true; wing.add(body)
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.5, d + 0.4), roofMat); roof.position.y = 8.6; wing.add(roof)
+        for (let fl = 0; fl < 3; fl++) { // 窓の帯（3階）。前面(+z)に暗いガラスの帯＋窓台。
+          const band = new THREE.Mesh(new THREE.BoxGeometry(w - 1.0, 1.5, 0.12), winMat); band.position.set(0, 2.2 + fl * 2.5, d / 2 + 0.02); wing.add(band)
+          const sill = new THREE.Mesh(new THREE.BoxGeometry(w - 0.6, 0.16, 0.22), trimMat); sill.position.set(0, 1.4 + fl * 2.5, d / 2 + 0.04); wing.add(sill)
+        }
+        return wing
+      }
+      makeWing(17, 5.5, 0, -7)     // 主棟（東西に長い・校庭の奥）
+      makeWing(5.5, 10, -8.5, -1)  // 翼（南北に伸びてL字）
+      const cfz = -7 + 2.78 // 主棟の前面
+      const clockBg = new THREE.Mesh(new THREE.CircleGeometry(0.95, 22), toon(0xf4efe2)); clockBg.position.set(0, 7.2, cfz); grp.add(clockBg)
+      const clkRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.08, 6, 22), trimMat); clkRing.position.set(0, 7.2, cfz + 0.01); grp.add(clkRing)
+      const hh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.04), toon(0x33312c)); hh.position.set(0, 7.35, cfz + 0.02); grp.add(hh)
+      const mh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.72, 0.04), toon(0x33312c)); mh.position.set(0.18, 7.25, cfz + 0.02); mh.rotation.z = -0.9; grp.add(mh)
+      // 校庭のトラック（白線の楕円。地面に沿わせ段差なく敷く）
+      for (let i = 0; i < 48; i++) {
+        const a = i / 48 * 6.283, lx = Math.cos(a) * 7, lz = 4 + Math.sin(a) * 5
+        const gy = heightAt(cx + lx, cz + lz) - baseY
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 0.34), toon(0xeae3d4)); seg.position.set(lx, gy + 0.06, lz); seg.rotation.y = -a + Math.PI / 2; grp.add(seg)
+      }
+      // プール（水色の長方形＋低いコンクリ縁）。校庭の右手。
+      {
+        const plx = 10.5, plz = 2, pgy = heightAt(cx + plx, cz + plz) - baseY
+        const water = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 7), new THREE.MeshToonMaterial({ color: 0x8fc4dd, gradientMap: grad, fog: true })); water.rotateX(-Math.PI / 2)
+        water.position.set(plx, pgy + 0.14, plz); grp.add(water)
+        for (const e of [[0, 3.6, 4.8, 0.4], [0, -3.6, 4.8, 0.4], [2.3, 0, 0.4, 7.6], [-2.3, 0, 0.4, 7.6]]) {
+          const rim = new THREE.Mesh(new THREE.BoxGeometry(e[2], 0.5, e[3]), toon(0xd8d2c4)); rim.position.set(plx + e[0], pgy + 0.22, plz + e[1]); grp.add(rim)
+        }
+      }
+      // 桜並木（校門から校舎へ）
+      for (const c of [[-6, 9], [6, 9], [-6, 4.5], [6, 4.5]]) {
+        const gy = heightAt(cx + c[0], cz + c[1]); const sg = new THREE.Group(); sg.position.set(cx + c[0], gy, cz + c[1]); town.add(sg)
+        const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 7), toon(0x8a6a48)); tr.position.y = 1.1; tr.castShadow = true; sg.add(tr)
+        const sakuraMat = toon(0xf0bcce)
+        for (const bl of [[0, 2.7, 0, 1.3], [-0.8, 2.4, 0.4, 0.9], [0.7, 2.5, -0.4, 0.95]]) { const bs = new THREE.Mesh(new THREE.SphereGeometry(bl[3], 8, 7), sakuraMat); bs.position.set(bl[0], bl[1], bl[2]); bs.castShadow = true; sg.add(bs) }
+        colliders.push({ x: cx + c[0], z: cz + c[1], r: 0.5 })
+      }
+      // 国旗ポール
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 7, 6), toon(0xd0d4d8)); pole.position.set(-4.5, (heightAt(cx - 4.5, cz + 2) - baseY) + 3.5, 2); grp.add(pole)
+      // ジャングルジム（立方格子）
+      {
+        const jx = -10, jz = 8, jgy = heightAt(cx + jx, cz + jz) - baseY, barMat = toon(0xcf6a5a)
+        for (let a = 0; a <= 3; a++) for (let b = 0; b <= 3; b++) { const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.0, 0.06), barMat); v.position.set(jx + (a - 1.5) * 0.7, jgy + 1.0, jz + (b - 1.5) * 0.7); grp.add(v) }
+        for (let lvl = 1; lvl <= 2; lvl++) for (let b = 0; b <= 3; b++) { const hbar = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.06, 0.06), barMat); hbar.position.set(jx, jgy + lvl * 1.0, jz + (b - 1.5) * 0.7); grp.add(hbar) }
+      }
+      colliders.push({ x: cx, z: cz - 7, r: 8 }) // 校舎の塊
+      spawnAvoid.push({ x: cx, z: cz - 7, r: 9 })
+    }
   }
 
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
