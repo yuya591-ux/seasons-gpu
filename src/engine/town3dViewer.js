@@ -495,6 +495,7 @@ export async function mountTown3d(parent, opts = {}) {
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
+  let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -2309,6 +2310,9 @@ export async function mountTown3d(parent, opts = {}) {
     { x: TEMPLE.x, z: TEMPLE.z + 7, n: 4, rad: 2.6 },                 // 寺の参道
     { x: SCHOOL.x, z: SCHOOL.z + 6, n: 4, rad: 3.0 },                 // 学校の校庭
     { x: FUN.x, z: FUN.z + 9, n: 5, rad: 3.0 },                       // 遊園地のゲート前
+    { x: 73, z: -34, n: 3, rad: 2.6 },                                // 砂浜（海辺の人）
+    { x: HARBOR.x - 2, z: HARBOR.z + 1, n: 3, rad: 3.0 },             // 港（働く人）
+    { x: -47, z: -42, n: 2, rad: 2.2 },                               // 川辺の遊歩道（南寄り）
   ]
   for (const s of crowdSpots) for (let i = 0; i < s.n; i++) {
     const g = makePeep()
@@ -2347,6 +2351,18 @@ export async function mountTown3d(parent, opts = {}) {
     scene.add(pts)
     // 落ち葉・花びらは大きく舞う（横揺れを強く）。雪はまっすぐ静かに落ちる。
     weatherPts = { pts, pos, spd, phs, N, swirl: weather === 'snow' ? 0.9 : weather === 'petals' ? 2.6 : 3.0 }
+  }
+
+  // ── 季節の降りもの（春=桜の花びら／秋=落ち葉が公園のあたりに舞う）。街のみ・天気が降りものでない時。──
+  if (kind !== 'yato' && (season === 'spring' || season === 'autumn') && weather !== 'petals' && weather !== 'leaves') {
+    const N = LIGHT ? 70 : 130
+    const bx = PARK.x, bz = PARK.z, R0 = 18, floor = heightAt(PARK.x, PARK.z) - 0.5
+    const pos = new Float32Array(N * 3), spd = new Float32Array(N), phs = new Float32Array(N)
+    for (let i = 0; i < N; i++) { pos[i * 3] = bx + (R() - 0.5) * R0 * 2; pos[i * 3 + 1] = floor + R() * 20; pos[i * 3 + 2] = bz + (R() - 0.5) * R0 * 2; spd[i] = 0.7 + R() * 0.9; phs[i] = R() * 6.28 }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const mat = new THREE.PointsMaterial({ color: season === 'spring' ? 0xf2bcd0 : 0xd07e2a, size: season === 'spring' ? 0.8 : 0.92, transparent: true, opacity: 0.92, sizeAttenuation: true, fog: true, depthWrite: false })
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
+    seasonFall = { pts, pos, spd, phs, N, bx, bz, R0, floor, swirl: season === 'spring' ? 2.2 : 2.8 }
   }
 
   // ── カメラ（高台のマンション上階の窓から見下ろす）。谷戸は少し低く寄せて谷を見渡す ──
@@ -2997,6 +3013,17 @@ export async function mountTown3d(parent, opts = {}) {
         if (pos[k + 1] < -14) { pos[k + 1] = 66 + R() * 12; pos[k] = (R() - 0.5) * 200 }
       }
       weatherPts.pts.geometry.attributes.position.needsUpdate = true
+    }
+    if (seasonFall) { // 季節の降りもの（公園のあたりに舞う花びら/落ち葉。範囲内で循環）
+      const f = seasonFall
+      for (let i = 0; i < f.N; i++) {
+        const k = i * 3
+        f.pos[k + 1] -= f.spd[i] * dt
+        f.pos[k] += Math.sin(t * 0.7 + f.phs[i]) * f.swirl * dt
+        f.pos[k + 2] += Math.cos(t * 0.5 + f.phs[i]) * f.swirl * 0.4 * dt
+        if (f.pos[k + 1] < f.floor) { f.pos[k + 1] = f.floor + 18 + Math.random() * 4; f.pos[k] = f.bx + (Math.random() - 0.5) * f.R0 * 2; f.pos[k + 2] = f.bz + (Math.random() - 0.5) * f.R0 * 2 }
+      }
+      f.pts.geometry.attributes.position.needsUpdate = true
     }
     // 鳥がはばたきながら空を渡る。自機が近いと驚いて上へ逃げ、羽ばたきが大きくなる（＋羽音）。
     const flyerAloft = active && (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.5
