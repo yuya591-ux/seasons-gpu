@@ -1834,15 +1834,25 @@ export async function mountTown3d(parent, opts = {}) {
     {
       const hx = HARBOR.x, hz = HARBOR.z, padY = HARBOR.padY
       const metal = toon(0x8a939a), metal2 = toon(0xb0aaa0), frameMat = toon(0x596169), tankMat = toon(0xc6cace)
+      const lit = duskAmt > 0.2 // 夕夜は工場夜景の灯り（窓・投光器・作業灯）
+      const warmLight = new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }), coolLight = new THREE.MeshBasicMaterial({ color: 0xdfeaff, fog: true }), tealLight = new THREE.MeshBasicMaterial({ color: 0x86e0d4, fog: true })
       // 埋立地の舗装（コンクリの盤）。平らな緑地でなく工業の岸に見せる。
       const padDisc = new THREE.Mesh(new THREE.CircleGeometry(HARBOR.r - 0.4, 30), toon(season === 'winter' ? 0xb8bcc0 : 0x8e8c87)); padDisc.rotateX(-Math.PI / 2); padDisc.position.set(hx, padY + 0.04, hz); padDisc.receiveShadow = true; town.add(padDisc)
-      // 倉庫×2（金属の長い陸屋根＋シャッター）
+      // 倉庫×2（金属の長い陸屋根＋シャッター。夕夜は窓が灯る）
       for (const w of [[-5, 3, 8, 5.5, 4.2], [-6, -5, 6.5, 4.5, 3.6]]) {
         const g = new THREE.Group(); g.position.set(hx + w[0], padY, hz + w[1]); town.add(g)
         const body = new THREE.Mesh(new THREE.BoxGeometry(w[2], w[4], w[3]), metal2); body.position.y = w[4] / 2; body.castShadow = true; body.receiveShadow = true; g.add(body)
         const roof = new THREE.Mesh(new THREE.BoxGeometry(w[2] + 0.3, 0.4, w[3] + 0.3), metal); roof.position.y = w[4] + 0.2; roof.castShadow = true; g.add(roof)
         const door = new THREE.Mesh(new THREE.BoxGeometry(w[2] * 0.4, w[4] * 0.7, 0.12), toon(0x3a3e42)); door.position.set(0, w[4] * 0.35, w[3] / 2 + 0.07); g.add(door)
+        if (lit) for (let i = 0; i < 4; i++) { const win = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.08), warmLight); win.position.set((i - 1.5) * w[2] * 0.2, w[4] * 0.62, w[3] / 2 + 0.05); g.add(win) } // 灯る窓
         colliders.push({ x: hx + w[0], z: hz + w[1], r: Math.max(w[2], w[3]) / 2 })
+      }
+      // 投光器（照明塔）×3＝工場夜景の主役。背の高い柱の上で煌々と灯る。
+      for (const fp of [[8, 6], [-9, -7], [3, -8]]) {
+        const g = new THREE.Group(); g.position.set(hx + fp[0], padY, hz + fp[1]); town.add(g)
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 11, 6), frameMat); pole.position.y = 5.5; pole.castShadow = true; g.add(pole)
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.2, 0.3), frameMat); bar.position.y = 10.9; g.add(bar)
+        for (const lx of [-0.7, 0, 0.7]) { const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.4), lit ? coolLight : toon(0x9aa0a4)); head.position.set(lx, 10.9, 0.1); g.add(head) } // 投光ヘッド（夕夜は白く灯る）
       }
       // 煙突×2（紅白の帯・天辺に赤灯・うっすら煙）
       for (const c of [[6.5, -3.5], [4, 4.5]]) {
@@ -1859,6 +1869,7 @@ export async function mountTown3d(parent, opts = {}) {
         const g = new THREE.Group(); g.position.set(hx - 3, padY, hz + 7); town.add(g)
         const sphere = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 12), tankMat); sphere.position.y = 4.4; sphere.castShadow = true; g.add(sphere); g.add(addOutline(sphere))
         for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.4, 6), frameMat); leg.position.set(Math.cos(a) * 2.4, 1.7, Math.sin(a) * 2.4); g.add(leg) }
+        if (lit) for (const a of [0.5, 2.6, 4.7]) { const sl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), tealLight); sl.position.set(Math.cos(a) * 3.05, 4.4 + Math.sin(a) * 1.5, Math.sin(a) * 3.05); g.add(sl) } // 球面の保安灯（青緑）
         colliders.push({ x: hx - 3, z: hz + 7, r: 3.3 })
       }
       // ガントリークレーン（門型・水際へブームを張り出す）
@@ -1868,6 +1879,7 @@ export async function mountTown3d(parent, opts = {}) {
         const beam = new THREE.Mesh(new THREE.BoxGeometry(7, 0.7, 1.0), frameMat); beam.position.set(0, 12, 0); g.add(beam)
         const boom = new THREE.Mesh(new THREE.BoxGeometry(15, 0.5, 0.7), frameMat); boom.position.set(5.5, 12.7, 0); boom.castShadow = true; g.add(boom) // 海側へ張り出す
         const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.0, 1.3), toon(0xc24a33)); cab.position.set(0, 11.1, 0); g.add(cab)
+        if (lit) { for (const bx2 of [-5.5, 0, 11]) { const wl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.3), warmLight); wl.position.set(bx2, 12.0, 0.4); g.add(wl) } const rb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff5a4a, fog: true })); rb.position.set(0, 12.9, 0); g.add(rb) } // 作業灯＋頂部の赤灯
         colliders.push({ x: hx + 9, z: hz - 1, r: 4 })
       }
       // コンテナ（色とりどりの箱を積む）
