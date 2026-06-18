@@ -47,6 +47,12 @@ const FLY = {
   pitchEase: 0.10,  // 上下（操舵）の追従の鈍さ
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。
   bound: { x: 64, zMin: -86, zMax: 34, yMax: 80, yFloor: 4.5 },
+  // ── 着地して歩く（一人称散策） ──
+  eye: 1.62,        // 立ったときの目線の高さ（地形+この高さ）
+  walkSpeed: 4.0,   // 歩く速さ(u/s)。ゆっくりした散歩のペース
+  stepLen: 5.0,     // タップ1回で進む距離(u)。連打で歩き続けられる
+  landDur: 1.4,     // 飛び降りて着地する所要(秒)＝なめらかに下りる
+  walkFov: 66,      // 歩行時の画角(度)。立った目線に自然な広さ（飛行70より控えめ）
 }
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
@@ -107,20 +113,47 @@ export function setTown3dLean(lean) {
 // 景色がワープせず地続きに浮かび上がる。frame loop が flyP を 0↔1 にイージングして滑らかに出入りする。
 export function setTown3dFly(on) {
   if (!active || !active.flyEnabled) return
-  if (on && !active.flyTarget) {
-    const cp = active.camera.position, wl = active.winLook
-    active.flyPos.copy(cp)
-    let dx = wl.x - cp.x, dy = wl.y - cp.y, dz = wl.z - cp.z
-    const len = Math.hypot(dx, dy, dz) || 1
-    dx /= len; dy /= len; dz /= len
-    active.flyYaw = active.flyYawTarget = Math.atan2(dx, -dz)      // 0=奥(-z)を向く
-    active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy)))     // いまの見下ろしから地続きに
-    active.flyPitchTarget = Math.max(-0.1, active.flyPitch)        // 飛び立つと視線がそっと上がり、街へ舞い上がる（地面へ突っ込まない）
+  if (on) {
+    if (active.mode === 'window') {
+      // 窓の景色から地続きに飛び立つ（いまの視点・視線を引き継ぐ）
+      const cp = active.camera.position, wl = active.winLook
+      active.flyPos.copy(cp)
+      let dx = wl.x - cp.x, dy = wl.y - cp.y, dz = wl.z - cp.z
+      const len = Math.hypot(dx, dy, dz) || 1
+      dx /= len; dy /= len; dz /= len
+      active.flyYaw = active.flyYawTarget = Math.atan2(dx, -dz)      // 0=奥(-z)を向く
+      active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy)))     // いまの見下ろしから地続きに
+      active.flyPitchTarget = Math.max(-0.1, active.flyPitch)        // 飛び立つと視線がそっと上がり街へ舞い上がる
+    } else if (active.mode === 'walk') {
+      active.flyPitchTarget = 0.22 // 歩きから飛び立つ＝視線を上げてふわりと舞い上がる
+    }
+    active.mode = 'fly'
+    active.flyTarget = 1
+  } else {
+    active.mode = 'window'
+    active.flyTarget = 0
   }
-  active.flyTarget = on ? 1 : 0
 }
 
-// この情景が浮遊できるか（立体の街エンジンのときだけ）。UIの「飛ぶ」ボタン表示判定に使う。
+// 飛び降りて着地して歩く／また飛び立つ（一人称散策）。land=true で現在地の真下へなめらかに下りる。
+export function setTown3dLand(land) {
+  if (!active || !active.flyEnabled) return
+  if (land) {
+    if (active.mode === 'window') return // 窓辺から直接は歩けない（空を経由）
+    // いまの真下の安全な地点へ着地（建物/樹冠に埋もれないよう退避）し、街路の抜ける方を向く
+    const [sx, sz] = active.resolveSpawn(active.flyPos.x, active.flyPos.z)
+    active.flyPos.x = sx; active.flyPos.z = sz
+    active.flyYaw = active.flyYawTarget = active.openYaw(sx, sz) // 壁や木を正面にせず、抜けのある方へ向き直る
+    active.flyPitchTarget = -0.05 // 立って街路をそっと見渡す
+    active.stepRemain = 0
+    active.mode = 'walk'
+    active.flyTarget = 1
+  } else {
+    setTown3dFly(true) // 歩きから空へ（飛び立つ）
+  }
+}
+
+// この情景が浮遊/散策できるか（立体の街エンジンのときだけ）。UIのボタン表示判定に使う。
 export function isTown3dFlyable() {
   return !!(active && active.flyEnabled)
 }
@@ -395,6 +428,10 @@ export async function mountTown3d(parent, opts = {}) {
   let cars = []
   let peeps = []
   let ferris = null
+  // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
+  const colliders = []
+  // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
+  const spawnAvoid = []
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -674,6 +711,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 屋根の向きを散らす（碁盤の同一方向を崩す）。多くは街路にゆるく沿い、時々大きく振れて棟の向きが変わる。
     g.rotation.y = R() < 0.26 ? (R() - 0.5) * 1.5 : (R() - 0.5) * 0.5
     town.add(g)
+    const foot = (w + d) * 0.25 + 0.5
+    colliders.push({ x, z, r: foot })        // 歩行の当たり判定（敷地を円で近似＋人の半径）
+    spawnAvoid.push({ x, z, r: foot + 1.0 }) // 着地は壁ぎわを避けて少し離れて降りる
   }
 
   // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
@@ -1062,6 +1102,8 @@ export async function mountTown3d(parent, opts = {}) {
     g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02, tilt: (R() - 0.5) * 0.12 } // わずかな基準傾き＝不揃いの自然さ
     g.rotation.z = g.userData.tilt
+    colliders.push({ x, z, r: scale * 0.35 + 0.3 })   // 歩行: 幹だけ避ける（樹冠の下はくぐれる）
+    spawnAvoid.push({ x, z, r: scale * 1.7 + 0.5 })   // 着地: 樹冠に埋もれて降りない
     treesArr.push(g)
   }
   if (kind === 'yato') {
@@ -1507,12 +1549,14 @@ export async function mountTown3d(parent, opts = {}) {
     lean: 0, leanTarget: 0,        // 身を乗り出す（枠を越えて前へ＝視界が広がる）。lean=ease済みの実値
     leanP: 0,                     // 乗り出しの線形進行(0..1)
     fovCur: 62,
-    // ── 浮遊（空を飛ぶ）モードの状態 ──
-    flyEnabled: kind !== 'yato',  // 立体の街（町／角部屋）でだけ飛べる。谷戸は対象外
-    flyTarget: 0,                 // 飛びたい(1)/窓へ戻りたい(0)
-    flyP: 0,                      // 浮遊の混ざり具合 0=窓 / 1=空（これをイージングして滑らかに出入り）
-    flyPos: new THREE.Vector3(),  // 空での自機の位置
-    flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // 機首の向き（操舵で動かす）
+    // ── 浮遊（空を飛ぶ）＆散策（歩く）モードの状態 ──
+    flyEnabled: kind !== 'yato',  // 立体の街（町／角部屋）でだけ飛べる/歩ける。谷戸は対象外
+    mode: 'window',               // 'window'（窓辺）| 'fly'（空を飛ぶ）| 'walk'（地上を歩く）
+    flyTarget: 0,                 // 窓の外にいたい(1)/窓へ戻りたい(0)。fly/walk のどちらでも 1
+    flyP: 0,                      // 窓⇄外の混ざり具合 0=窓 / 1=外（これをイージングして滑らかに出入り）
+    flyPos: new THREE.Vector3(),  // 外（空/地上）での自機の位置
+    flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // 機首/視線の向き（操舵で動かす）
+    stepRemain: 0,                // 歩行: 残りの前進距離（タップで増える。フレームごとに消費）
     winLook: new THREE.Vector3(), // 窓ビューの注視点（飛び立つ瞬間の視線引き継ぎ用に毎フレーム保持）
     dispose() {
       // シーングラフ全体の geometry/material/texture を解放（連打切替でのGPUメモリ蓄積＝コンテキストロストを防ぐ）
@@ -1543,6 +1587,49 @@ export async function mountTown3d(parent, opts = {}) {
     renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix()
   }
   window.addEventListener('resize', resize)
+
+  // ── 歩行（散策）の当たり判定 ──
+  // 建物フットプリント(円)に入らないよう、軸ごとに分けて判定＝壁ぎわをかすめて進める（引っかかって止まらない）。
+  const blockedAt = (x, z) => {
+    for (const c of colliders) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
+    return false
+  }
+  const tryWalk = (pos, dx, dz) => {
+    const b = FLY.bound
+    const nx = Math.max(-b.x, Math.min(b.x, pos.x + dx))
+    const nz = Math.max(b.zMin, Math.min(b.zMax, pos.z + dz))
+    if (!blockedAt(nx, pos.z)) pos.x = nx // x方向だけ先に試す（壁に沿って横へ滑る）
+    if (!blockedAt(pos.x, nz)) pos.z = nz // z方向だけ試す
+  }
+  // 着地地点が建物/樹冠の中なら、空いた近くの地点へそっと退避する（建物や木に埋もれて立たない）。
+  const spawnBad = (x, z) => {
+    const b = FLY.bound
+    if (x < -b.x || x > b.x || z < b.zMin || z > b.zMax) return true // 箱の外には降りない
+    for (const c of spawnAvoid) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
+    return false
+  }
+  active.resolveSpawn = (x, z) => {
+    if (!spawnBad(x, z)) return [x, z]
+    for (let r = 1.5; r <= 18; r += 1.5) {
+      for (let a = 0; a < 12; a++) {
+        const nx = x + Math.cos(a / 12 * 6.2832) * r, nz = z + Math.sin(a / 12 * 6.2832) * r
+        if (!spawnBad(nx, nz)) return [nx, nz]
+      }
+    }
+    return [x, z]
+  }
+  // 着地時に最も視界の抜ける向き（街路や建物の隙間の奥）を選ぶ＝壁や木立を正面にしない。
+  active.openYaw = (x, z) => {
+    let best = 0, bestD = -1
+    for (let a = 0; a < 16; a++) {
+      const yaw = a / 16 * 6.2832
+      const hx = Math.sin(yaw), hz = -Math.cos(yaw)
+      let d = 1.0
+      for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break }
+      if (d > bestD) { bestD = d; best = yaw }
+    }
+    return best
+  }
 
   const startT = performance.now() // THREE.Clock は非推奨→performance.now 差分で経過秒を出す（警告解消・依存削減）
   let lastT = 0
@@ -2031,7 +2118,18 @@ export async function mountTown3d(parent, opts = {}) {
       const dirX = Math.sin(active.flyYaw) * cp
       const dirY = Math.sin(active.flyPitch)
       const dirZ = -Math.cos(active.flyYaw) * cp
-      if (active.flyTarget) {
+      if (active.mode === 'walk') {
+        // 地上を歩く: 目線の高さを地形に沿わせ（飛び降りはやわらかく着地）、タップで前進、建物は貫通しない。
+        const eyeY = heightAt(active.flyPos.x, active.flyPos.z) + FLY.eye
+        const k = 1 - Math.pow(0.02, dt / FLY.landDur) // フレーム率に依らず landDur 秒で着地・地形追従
+        active.flyPos.y += (eyeY - active.flyPos.y) * k
+        if (active.stepRemain > 0.0001) {
+          const adv = Math.min(active.stepRemain, FLY.walkSpeed * dt)
+          active.stepRemain -= adv
+          const hx = Math.sin(active.flyYaw), hz = -Math.cos(active.flyYaw) // 水平の歩行方向（見上げ/見下ろしで進路は変えない）
+          tryWalk(active.flyPos, hx * adv, hz * adv)
+        }
+      } else if (active.flyTarget) {
         // 機首の向きへゆるやかに前進（=飛んでいる）。戻り中(flyTarget=0)は前進を止め位置を保つ。
         const step = FLY.speed * dt
         active.flyPos.x += dirX * step
@@ -2052,7 +2150,7 @@ export async function mountTown3d(parent, opts = {}) {
       camY = lerp(ey, fp.y, flyAmt)
       camZ = lerp(ez, fp.z, flyAmt)
       look.set(lerp(look.x, flyLookX, flyAmt), lerp(look.y, flyLookY, flyAmt), lerp(look.z, flyLookZ, flyAmt))
-      fov = lerp(winFov, FLY.fov, flyAmt)
+      fov = lerp(winFov, active.mode === 'walk' ? FLY.walkFov : FLY.fov, flyAmt) // 歩行は自然な画角・飛行は少し広く
     }
     camera.position.set(camX, camY, camZ)
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
@@ -2092,9 +2190,11 @@ export async function mountTown3d(parent, opts = {}) {
   if (/[?&]dev=1/.test(location.search)) {
     window.__town3dSetView = (y, p) => { if (active) { active.yaw = active.yawTarget = y || 0; active.pitch = active.pitchTarget = p || 0 } }
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
-    window.__town3dDbg = () => active && ({ // 検証用: 浮遊の自機状態（境界クランプの数値確認）
-      fly: active.flyP, x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
-      yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2),
+    window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
+    window.__town3dStep = () => { if (active && active.mode === 'walk') active.stepRemain = Math.min(FLY.stepLen * 3, active.stepRemain + FLY.stepLen) } // 検証用: 数歩すすむ
+    window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・境界・着地の数値確認）
+      mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
+      yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2), step: +active.stepRemain.toFixed(1),
     })
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
@@ -2106,17 +2206,24 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
-  // スワイプで見回す（自前のポインタ操作）。
-  let dragging = false, lx = 0, ly = 0
+  // スワイプで見回す（自前のポインタ操作）。歩行中は「軽いタップ＝数歩すすむ」も拾う。
+  let dragging = false, lx = 0, ly = 0, moved = 0
   const dom = renderer.domElement
-  const onDown = (e) => { dragging = true; lx = e.clientX; ly = e.clientY }
+  const onDown = (e) => { dragging = true; lx = e.clientX; ly = e.clientY; moved = 0 }
   const onMove = (e) => {
     if (!dragging || !active) return
     const w = stage.clientWidth || 1, h = stage.clientHeight || 1
+    moved += Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly)
     applyTown3dLook((e.clientX - lx) / w * -1.0, (e.clientY - ly) / h * 1.0)
     lx = e.clientX; ly = e.clientY
   }
-  const onUp = () => { dragging = false }
+  const onUp = () => {
+    // 歩行中の「ほぼ動かさないタップ」＝前へ数歩。連打で歩き続け、ためれば長く進む。
+    if (dragging && active && active.mode === 'walk' && moved < 8) {
+      active.stepRemain = Math.min(FLY.stepLen * 3, active.stepRemain + FLY.stepLen)
+    }
+    dragging = false
+  }
   dom.addEventListener('pointerdown', onDown)
   window.addEventListener('pointermove', onMove)
   window.addEventListener('pointerup', onUp)
