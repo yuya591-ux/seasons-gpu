@@ -517,6 +517,8 @@ export async function mountTown3d(parent, opts = {}) {
   // 海（街の東の縁が湾へ下る）。x>coast で地形を海底へ下げ、shore より沖は水面。飛んで海まで行ける。
   // 海面は谷底より低く取る＝谷を水没させず、東の縁だけが汀へ落ちる（丘が海へ落ちる入江状の海岸線）。
   const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5 }
+  // 臨海の港（埋立地の平らな工業の岸）。倉庫・煙突・クレーン・ガスタンク＝鶴見の臨海らしさ。
+  const HARBOR = { x: 74, z: -64, r: 11, padY: SEA.level + 2 }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -554,6 +556,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 海への傾斜（東の縁 x>coast で海底へ向けて下げる＝丘が汀へ落ちる）。
     const sb = Math.min(1, Math.max(0, (x - SEA.coast) / (SEA.shore - SEA.coast)))
     if (sb > 0) h += (SEA.floor - h) * (sb * sb)
+    // 臨海の港の埋立地＝平らな岸（海面より少し上の盤）。縁はなだらかに均す。
+    const hd = Math.hypot(x - HARBOR.x, z - HARBOR.z)
+    if (hd < HARBOR.r) h += (HARBOR.padY - h) * Math.min(1, (HARBOR.r - hd) / 4)
     return h
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
@@ -900,6 +905,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) continue // 海・汀のセルは建てない（水没を防ぐ）
+      if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 臨海の港（工業地帯）は専用に建てる
       const far = (zi + 13) / 15 // 0=奥 1=手前
       // 敷地の大小を独立に・広めに振る（同寸の屋根が並ぶ均質感を崩す。時々大きな町工場/団地の塊）
       const big = R() < 0.12 ? 1.7 : 1.0
@@ -1412,6 +1418,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.5) continue // 海・汀には木を生やさない
+      if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 工業地帯には木を生やさない
       tree(x, z, 0.7 + R() * 0.8)
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
@@ -1788,6 +1795,62 @@ export async function mountTown3d(parent, opts = {}) {
       for (let z = 26; z > -98; z -= 2.3) { const sx = shoreXat(z); const cxb = sx - 2.0; const gy = heightAt(cxb, z); const seg = new THREE.BoxGeometry(6.0, 0.16, 2.5); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(cxb, gy + 0.05, z)); beachGeos.push(seg) }
       if (BufferGeometryUtils.mergeGeometries) { const bm2 = BufferGeometryUtils.mergeGeometries(beachGeos, false); if (bm2) { const beach = new THREE.Mesh(bm2, beachMat); beach.receiveShadow = true; town.add(beach) } }
       beachGeos.forEach((g) => g.dispose())
+    }
+
+    // ── 臨海の港（埋立地の工業の岸）。倉庫・紅白の煙突・ガントリークレーン・ガスタンク・コンテナ。──
+    {
+      const hx = HARBOR.x, hz = HARBOR.z, padY = HARBOR.padY
+      const metal = toon(0x8a939a), metal2 = toon(0xb0aaa0), frameMat = toon(0x596169), tankMat = toon(0xc6cace)
+      // 埋立地の舗装（コンクリの盤）。平らな緑地でなく工業の岸に見せる。
+      const padDisc = new THREE.Mesh(new THREE.CircleGeometry(HARBOR.r - 0.4, 30), toon(season === 'winter' ? 0xb8bcc0 : 0x8e8c87)); padDisc.rotateX(-Math.PI / 2); padDisc.position.set(hx, padY + 0.04, hz); padDisc.receiveShadow = true; town.add(padDisc)
+      // 倉庫×2（金属の長い陸屋根＋シャッター）
+      for (const w of [[-5, 3, 8, 5.5, 4.2], [-6, -5, 6.5, 4.5, 3.6]]) {
+        const g = new THREE.Group(); g.position.set(hx + w[0], padY, hz + w[1]); town.add(g)
+        const body = new THREE.Mesh(new THREE.BoxGeometry(w[2], w[4], w[3]), metal2); body.position.y = w[4] / 2; body.castShadow = true; body.receiveShadow = true; g.add(body)
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(w[2] + 0.3, 0.4, w[3] + 0.3), metal); roof.position.y = w[4] + 0.2; roof.castShadow = true; g.add(roof)
+        const door = new THREE.Mesh(new THREE.BoxGeometry(w[2] * 0.4, w[4] * 0.7, 0.12), toon(0x3a3e42)); door.position.set(0, w[4] * 0.35, w[3] / 2 + 0.07); g.add(door)
+        colliders.push({ x: hx + w[0], z: hz + w[1], r: Math.max(w[2], w[3]) / 2 })
+      }
+      // 煙突×2（紅白の帯・天辺に赤灯・うっすら煙）
+      for (const c of [[6.5, -3.5], [4, 4.5]]) {
+        const g = new THREE.Group(); g.position.set(hx + c[0], padY, hz + c[1]); town.add(g)
+        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 16, 12), toon(0xe8e4dc)); stack.position.y = 8; stack.castShadow = true; g.add(stack)
+        for (const by of [4, 8, 12]) { const band = new THREE.Mesh(new THREE.CylinderGeometry(0.72 - by * 0.012, 0.86 - by * 0.012, 1.3, 12), toon(0xc24a33)); band.position.y = by; g.add(band) }
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff5a4a, fog: true })); tip.position.y = 16.4; g.add(tip)
+        const smokeMat = new THREE.MeshBasicMaterial({ color: 0xd8dde2, transparent: true, opacity: 0.16, depthWrite: false, fog: true })
+        for (let s = 0; s < 3; s++) { const pf = new THREE.Mesh(new THREE.SphereGeometry(1.0 + s * 0.5, 7, 6), smokeMat); pf.position.set(0.4 + s * 0.5, 17.5 + s * 1.8, 0.2); g.add(pf) } // たなびく煙（淡い）
+        colliders.push({ x: hx + c[0], z: hz + c[1], r: 1.1 })
+      }
+      // ガスタンク（球形・脚付き）
+      {
+        const g = new THREE.Group(); g.position.set(hx - 3, padY, hz + 7); town.add(g)
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 12), tankMat); sphere.position.y = 4.4; sphere.castShadow = true; g.add(sphere); g.add(addOutline(sphere))
+        for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.4, 6), frameMat); leg.position.set(Math.cos(a) * 2.4, 1.7, Math.sin(a) * 2.4); g.add(leg) }
+        colliders.push({ x: hx - 3, z: hz + 7, r: 3.3 })
+      }
+      // ガントリークレーン（門型・水際へブームを張り出す）
+      {
+        const g = new THREE.Group(); g.position.set(hx + 9, padY, hz - 1); town.add(g)
+        for (const lx of [-3, 3]) for (const lz of [-2, 2]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 12, 0.4), frameMat); leg.position.set(lx, 6, lz); leg.castShadow = true; g.add(leg) }
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(7, 0.7, 1.0), frameMat); beam.position.set(0, 12, 0); g.add(beam)
+        const boom = new THREE.Mesh(new THREE.BoxGeometry(15, 0.5, 0.7), frameMat); boom.position.set(5.5, 12.7, 0); boom.castShadow = true; g.add(boom) // 海側へ張り出す
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.0, 1.3), toon(0xc24a33)); cab.position.set(0, 11.1, 0); g.add(cab)
+        colliders.push({ x: hx + 9, z: hz - 1, r: 4 })
+      }
+      // コンテナ（色とりどりの箱を積む）
+      const contCols = [0xc24a33, 0x3a6a8a, 0x5a8a5a, 0xd0a040, 0xaa5a3a, 0x6a6a72]
+      for (let i = 0; i < 9; i++) { const ox = -9 + (i % 5) * 2.6, oz = -8.5 + ((i / 5) | 0) * 2.4; const stack = 1 + ((R() * 2.4) | 0); for (let s = 0; s < stack; s++) { const ct = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 2.0), toon(contCols[(R() * contCols.length) | 0])); ct.position.set(hx + ox, padY + 0.6 + s * 1.25, hz + oz); ct.castShadow = true; town.add(ct) } }
+      // 貨物船（岸壁に着けた一隻＝港の主役）。船体・甲板・船橋・煙突・甲板のコンテナ。
+      {
+        const g = new THREE.Group(); g.position.set(hx + 13, SEA.level, hz - 1); g.userData = { ph: R() * 6.28 }; town.add(g) // 船腹を岸(z方向)と平行に＝長軸z
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 19), toon(0x9a3f34)); hull.position.y = 1.3; hull.castShadow = true; g.add(hull)
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.6, 19.2), toon(0x4a4640)); deck.position.y = 2.8; g.add(deck)
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3, 3.6), toon(0xe6e0d4)); bridge.position.set(0, 4.5, -6.5); bridge.castShadow = true; g.add(bridge)
+        const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.72, 2.4, 10), toon(0xc24a33)); funnel.position.set(0, 5.2, -8.2); g.add(funnel)
+        for (let i = 0; i < 5; i++) { const ct = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.3, 2.5), toon(contCols[(R() * contCols.length) | 0])); ct.position.set(0, 3.75, 5 - i * 2.7); ct.castShadow = true; g.add(ct) }
+        boats.push(g)
+      }
+      spawnAvoid.push({ x: hx, z: hz, r: HARBOR.r })
     }
 
     // ── 川辺の遊歩道（東岸の護岸の上を歩ける帯）。路面＋手すり＋街灯＋ベンチ＋並木。──
