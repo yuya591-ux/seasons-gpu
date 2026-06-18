@@ -15,6 +15,8 @@ import {
   resetTown3dLook,
   setTown3dWindowOpen,
   setTown3dLean,
+  setTown3dFly,
+  isTown3dFlyable,
   setTown3dSettings,
 } from './engine/town3dViewer.js'
 
@@ -327,6 +329,13 @@ function start() {
       else renderer.setLeanOut(lean)
       if (lean) audio.setWindowOpen(true) // 乗り出すと窓は開く＝外音もさらに澄む
     },
+    onToggleFly(fly) {
+      if (town3dMode) setTown3dFly(fly) // 立体の街は空へ飛び立ち、滑空して見渡す
+      if (fly) audio.setWindowOpen(true) // 空にいる＝外気の音
+    },
+    isFlyable() {
+      return town3dMode && isTown3dFlyable() // 「飛ぶ」を出してよい情景か（立体の街のとき）
+    },
   })
 
   // 開発時のみ: コンソール/検証から描画を触れるようにする（遠雷フラッシュ・サムネ生成など）
@@ -337,6 +346,7 @@ function start() {
     window.__sceneIds = SCENES.filter((s) => s.public !== false && s.status === 'ready').map((s) => s.id)
     window.__town3dWindow = (b) => setTown3dWindowOpen(b) // 検証用: 3Dの街の窓をあける/しめる
     window.__town3dLean = (b) => setTown3dLean(b) // 検証用: 3Dの街で身を乗り出す/もどる
+    window.__town3dFlyToggle = (b) => setTown3dFly(b) // 検証用: 3Dの街で空へ飛び立つ/もどる
     window.__sleepNow = () => startSleepFade() // 検証用: おやすみの暗転を即時に起こす
     window.__lookDemo = () => maybeLookDemo() // 検証用: 初回の見回しデモを起こす（flagは呼び元で消す）
     window.__sleepState = () => ({ fading: sleepFading, on: sleepOverlay.classList.contains('sleep-overlay--on') })

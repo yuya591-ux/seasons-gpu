@@ -340,7 +340,11 @@ body.idle .topbar button {
   position: fixed;
   top: max(1rem, env(safe-area-inset-top));
   right: max(1rem, env(safe-area-inset-right));
+  /* ボタンが増えても（窓・乗り出す・空へ…）狭い画面で溢れず右寄せで折り返す */
+  max-width: calc(100vw - 2rem);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.5rem;
 }
 
@@ -385,6 +389,19 @@ body.idle .topbar button {
   background: rgba(74, 134, 96, 0.6);
 }
 .iconbtn--lean.is-open {
+  background: rgba(120, 96, 50, 0.5);
+  border-color: rgba(255, 224, 180, 0.45);
+}
+/* 「空へ」＝立体の街を飛んで見渡すモード。空色のアクセントで区別 */
+.iconbtn--fly {
+  background: rgba(72, 116, 158, 0.46);
+  border-color: rgba(196, 226, 255, 0.42);
+  color: rgba(238, 248, 255, 0.98);
+}
+.iconbtn--fly:hover {
+  background: rgba(92, 140, 184, 0.6);
+}
+.iconbtn--fly.is-open {
   background: rgba(120, 96, 50, 0.5);
   border-color: rgba(255, 224, 180, 0.45);
 }

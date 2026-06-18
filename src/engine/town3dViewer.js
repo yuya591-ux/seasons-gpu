@@ -34,6 +34,21 @@ const CAM = {
   fov0: 62,         // 基準画角(度)
 }
 
+// ── 浮遊（空を飛ぶ）モードの調整パラメータ ──
+// 乗り出した先から空へ飛び立ち、鳥のようにゆるやかに滑空しながら街を見渡す。
+// 操舵はドラッグのみ（上を向く＝上昇／下を向く＝下降）。常時前進＝「飛んでいる」手応え。
+// 速度は控えめ・操舵は鈍く追従＝3D酔いを避ける瞑想的な飛翔。境界で街の縁（未生成域）を見せない。
+const FLY = {
+  speed: 9.0,       // 滑空速度(u/s)。街の奥行(約120)を10数秒で渡る＝ゆったり
+  fov: 70,          // 浮遊時の画角(度)。窓より少し広く＝空の開放感
+  enterDur: 1.7,    // 飛び立つ／窓へ戻るの所要(秒)。両端やわらかく
+  pitchMax: 1.15,   // 上下に向ける限界(rad≈±66°)。真下/真上で破綻させない
+  yawEase: 0.09,    // 旋回（操舵）の追従の鈍さ。小さいほどゆっくり大きく回り込む
+  pitchEase: 0.10,  // 上下（操舵）の追従の鈍さ
+  // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。
+  bound: { x: 64, zMin: -86, zMax: 34, yMax: 80, yFloor: 4.5 },
+}
+
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
 // applyTown3dLook(スワイプ時)とframeループ(戻り時の追従)の両方で使い、範囲を一元管理する。
 const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.45 + lean * CAM.leanPitchDn })
@@ -58,6 +73,12 @@ export function isTown3dActive() {
 // 見回し（スワイプ）。nx,ny は累積の相対量。乗り出すと見回せる幅が広がる。
 export function applyTown3dLook(dx, dy) {
   if (!active) return
+  // 浮遊中はドラッグ＝機首の操舵（左右に旋回／上下に向ける＝進む向き＝上昇・下降）。
+  if (active.flyTarget) {
+    active.flyYawTarget += dx * 1.8                 // 左右に旋回（無制限＝ぐるりと回り込める）
+    active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget + dy * 0.9))
+    return
+  }
   const l = active.lean || 0
   const yawMax = 0.9 + l * 0.7   // 乗り出すと左右に大きく見渡せる
   const lim = pitchLimits(l)     // 乗り出すと上（空・ビル上層）も下も大きく見られる
@@ -80,6 +101,28 @@ export function setTown3dLean(lean) {
   if (!active) return
   active.leanTarget = lean ? 1 : 0
   if (lean) active.winOpenTarget = 1
+}
+
+// 空へ飛び立つ／窓へもどる（浮遊モード）。飛び立つ瞬間にいまの窓の視点・視線を引き継ぎ、
+// 景色がワープせず地続きに浮かび上がる。frame loop が flyP を 0↔1 にイージングして滑らかに出入りする。
+export function setTown3dFly(on) {
+  if (!active || !active.flyEnabled) return
+  if (on && !active.flyTarget) {
+    const cp = active.camera.position, wl = active.winLook
+    active.flyPos.copy(cp)
+    let dx = wl.x - cp.x, dy = wl.y - cp.y, dz = wl.z - cp.z
+    const len = Math.hypot(dx, dy, dz) || 1
+    dx /= len; dy /= len; dz /= len
+    active.flyYaw = active.flyYawTarget = Math.atan2(dx, -dz)      // 0=奥(-z)を向く
+    active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy)))     // いまの見下ろしから地続きに
+    active.flyPitchTarget = Math.max(-0.1, active.flyPitch)        // 飛び立つと視線がそっと上がり、街へ舞い上がる（地面へ突っ込まない）
+  }
+  active.flyTarget = on ? 1 : 0
+}
+
+// この情景が浮遊できるか（立体の街エンジンのときだけ）。UIの「飛ぶ」ボタン表示判定に使う。
+export function isTown3dFlyable() {
+  return !!(active && active.flyEnabled)
 }
 
 // 設定（明るさ・描き込み品質）を3Dの街にも効かせる（従来は設定が3Dに無反応だった）。
@@ -1464,6 +1507,13 @@ export async function mountTown3d(parent, opts = {}) {
     lean: 0, leanTarget: 0,        // 身を乗り出す（枠を越えて前へ＝視界が広がる）。lean=ease済みの実値
     leanP: 0,                     // 乗り出しの線形進行(0..1)
     fovCur: 62,
+    // ── 浮遊（空を飛ぶ）モードの状態 ──
+    flyEnabled: kind !== 'yato',  // 立体の街（町／角部屋）でだけ飛べる。谷戸は対象外
+    flyTarget: 0,                 // 飛びたい(1)/窓へ戻りたい(0)
+    flyP: 0,                      // 浮遊の混ざり具合 0=窓 / 1=空（これをイージングして滑らかに出入り）
+    flyPos: new THREE.Vector3(),  // 空での自機の位置
+    flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // 機首の向き（操舵で動かす）
+    winLook: new THREE.Vector3(), // 窓ビューの注視点（飛び立つ瞬間の視線引き継ぎ用に毎フレーム保持）
     dispose() {
       // シーングラフ全体の geometry/material/texture を解放（連打切替でのGPUメモリ蓄積＝コンテキストロストを防ぐ）
       try {
@@ -1944,8 +1994,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 戻る時も出だし・止まり際の両方がそっと加減速する＝ヌルヌルで酔わない窓の開閉・覗き込みになる。
     active.winOpenP = approach(active.winOpenP, active.winOpenTarget, dt / CAM.winOpenDur)
     active.leanP = approach(active.leanP, active.leanTarget, dt / CAM.leanDur)
+    active.flyP = approach(active.flyP, active.flyTarget, dt / FLY.enterDur) // 空へ／窓へを所要時間で滑らかに
     const wo = easeInOut(active.winOpenP)
     const lean = easeInOut(active.leanP)
+    const flyAmt = easeInOut(active.flyP) // 0=窓 / 1=空（カメラ位置・視線・画角をこの量で混ぜる）
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
 
     // 乗り出しを戻すと見上げの可動域も縮むので、目標ピッチも追従して下げる（上を向いたまま固まらない）
@@ -1961,14 +2013,49 @@ export async function mountTown3d(parent, opts = {}) {
     const ex = 0
     const ey = eye.y - wo * CAM.winDown - lean * CAM.leanDown
     const ez = eye.z - wo * CAM.winFwd - lean * CAM.leanFwd
-    camera.position.set(ex, ey, ez)
-    const fov = CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov
-    if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
+    const winFov = CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov
     const look = new THREE.Vector3(
       ex + Math.sin(yaw) * 18,
       ey - 10.5 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.05, // 既定は見下ろし（手前の木に落ち込み過ぎない程度に）／上スワイプで空・ビル上層も仰げる
       ez - Math.cos(yaw) * 22,
     )
+    active.winLook.copy(look) // 飛び立つ瞬間の視線引き継ぎ用に、窓ビューの注視点を毎フレーム保持
+
+    // 既定は窓ビュー。浮遊中(flyP>0)は空での自機の位置・視線・画角を混ぜる（出入りが地続きに滑らか）。
+    let camX = ex, camY = ey, camZ = ez, fov = winFov
+    if (flyAmt > 0.0005 || active.flyTarget) {
+      // 機首の向きを操舵目標へゆっくり追従（指を離しても余韻＝ぬるりと回り込む）
+      active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.yawEase
+      active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.pitchEase
+      const cp = Math.cos(active.flyPitch)
+      const dirX = Math.sin(active.flyYaw) * cp
+      const dirY = Math.sin(active.flyPitch)
+      const dirZ = -Math.cos(active.flyYaw) * cp
+      if (active.flyTarget) {
+        // 機首の向きへゆるやかに前進（=飛んでいる）。戻り中(flyTarget=0)は前進を止め位置を保つ。
+        const step = FLY.speed * dt
+        active.flyPos.x += dirX * step
+        active.flyPos.y += dirY * step
+        active.flyPos.z += dirZ * step
+        // 飛べる箱に収める＝手描きの街の縁・未生成の余白を見せない。床は地形+一定で街すれすれまで降りられる。
+        const b = FLY.bound
+        active.flyPos.x = Math.max(-b.x, Math.min(b.x, active.flyPos.x))
+        active.flyPos.z = Math.max(b.zMin, Math.min(b.zMax, active.flyPos.z))
+        const floor = heightAt(active.flyPos.x, active.flyPos.z) + b.yFloor
+        active.flyPos.y = Math.max(floor, Math.min(b.yMax, active.flyPos.y))
+      }
+      const fp = active.flyPos
+      const flyLookX = fp.x + dirX * 20
+      const flyLookY = fp.y + dirY * 20 + Math.sin(t * 0.5) * 0.05 // ほのかな息づかい
+      const flyLookZ = fp.z + dirZ * 20
+      camX = lerp(ex, fp.x, flyAmt)
+      camY = lerp(ey, fp.y, flyAmt)
+      camZ = lerp(ez, fp.z, flyAmt)
+      look.set(lerp(look.x, flyLookX, flyAmt), lerp(look.y, flyLookY, flyAmt), lerp(look.z, flyLookZ, flyAmt))
+      fov = lerp(winFov, FLY.fov, flyAmt)
+    }
+    camera.position.set(camX, camY, camZ)
+    if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     camera.lookAt(look)
 
     // 窓ガラスと横桟は、あけると横へすべって消える（引き違い窓）。乗り出すと枠ごと外へ退く。
@@ -2004,6 +2091,19 @@ export async function mountTown3d(parent, opts = {}) {
   // 検証用: 見回しを外から設定（?dev=1 のサムネ/撮影で角度を指定）
   if (/[?&]dev=1/.test(location.search)) {
     window.__town3dSetView = (y, p) => { if (active) { active.yaw = active.yawTarget = y || 0; active.pitch = active.pitchTarget = p || 0 } }
+    window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
+    window.__town3dDbg = () => active && ({ // 検証用: 浮遊の自機状態（境界クランプの数値確認）
+      fly: active.flyP, x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
+      yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2),
+    })
+    // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
+    window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
+      if (!active || !active.flyEnabled) return
+      active.flyPos.set(x, y, z)
+      active.flyYaw = active.flyYawTarget = yaw || 0
+      active.flyPitch = active.flyPitchTarget = pitch || 0
+      active.flyP = 1; active.flyTarget = 1
+    }
   }
 
   // スワイプで見回す（自前のポインタ操作）。
