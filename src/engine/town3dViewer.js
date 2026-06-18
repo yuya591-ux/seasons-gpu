@@ -496,6 +496,7 @@ export async function mountTown3d(parent, opts = {}) {
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
   let crossing = null // 踏切（電車が近づくと遮断機が下り警報灯が点滅）
+  let gulls = [] // 海鳥（湾の上を旋回する）
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
@@ -1981,6 +1982,30 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
 
+    // ── 磯・岩場（南の海岸の岩礁）＋白波、そして海鳥。海辺の自然を厚く。──
+    {
+      const rockMat = toon(0x7a756c), rockMat2 = toon(0x8c8378)
+      const foamMat = new THREE.MeshBasicMaterial({ color: 0xeef2f4, transparent: true, opacity: 0.45, depthWrite: false, fog: true })
+      const rocks = [[76, -14, 1.6], [79, -17, 2.2], [81, -20, 1.4], [77, -22, 1.9], [80.5, -25, 2.4], [78, -28, 1.7], [83, -18, 1.1], [75, -26, 1.3], [82, -23, 1.5], [79.5, -31, 2.0], [74.5, -20, 1.4], [84, -22, 0.9], [76.5, -33, 1.5]]
+      for (const r of rocks) {
+        const rx = r[0], rz = r[1], rs = r[2], gy = heightAt(rx, rz)
+        const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(rs, 0), R() < 0.5 ? rockMat : rockMat2)
+        rk.position.set(rx, Math.max(gy, SEA.level) + rs * 0.25, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.66 + R() * 0.4; rk.castShadow = true; rk.receiveShadow = true; town.add(rk)
+        if (gy < SEA.level + 0.6) { const foam = new THREE.Mesh(new THREE.CircleGeometry(rs * 1.6, 12), foamMat); foam.rotateX(-Math.PI / 2); foam.position.set(rx, SEA.level + 0.13, rz); town.add(foam) } // 水中の岩の根の白波
+        if (gy > SEA.level - 1) colliders.push({ x: rx, z: rz, r: rs * 0.8 })
+      }
+      // 海鳥（かもめ。湾の上をゆるく旋回し、はばたく）
+      gulls = []
+      for (let i = 0; i < 6; i++) {
+        const g = new THREE.Group()
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body)
+        const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wingL.position.z = 0.85; g.add(wingL)
+        const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wingR.position.z = -0.85; g.add(wingR)
+        g.userData = { cx: 88 + R() * 16, cz: -42 + (R() - 0.5) * 56, rad: 6 + R() * 10, y: SEA.level + 9 + R() * 11, sp: (R() < 0.5 ? 1 : -1) * (0.18 + R() * 0.16), ph: R() * 6.28 }
+        scene.add(g); gulls.push(g)
+      }
+    }
+
     // ── 川辺の遊歩道（東岸の護岸の上を歩ける帯）。路面＋手すり＋街灯＋ベンチ＋並木。──
     {
       const px = RIVER.x + 4.0          // 東岸の遊歩道の中心（護岸の上）
@@ -3090,6 +3115,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
+    for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
     if (train) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
       const u = train.userData
       u.x += u.speed * dt
