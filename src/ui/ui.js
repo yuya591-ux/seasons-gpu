@@ -189,7 +189,7 @@ export function buildUI(opts) {
     flyBtn.classList.toggle('is-open', isAloft)
   }
   // 空/地上へ出た時に一度だけ、そっと操作を伝える。静かな文言・数秒で消える。
-  const walkHint = h('div', 'walk-hint', '左で進む・倒した方へ曲がる　右で見まわす・高さ')
+  const walkHint = h('div', 'walk-hint', '左で進む・曲がる　右で見まわす　右の↑↓で高さ')
   root.appendChild(walkHint)
   let walkHintShown = false
   let walkHintTimer = null
