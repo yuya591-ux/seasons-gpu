@@ -2928,6 +2928,7 @@ export async function mountTown3d(parent, opts = {}) {
   const winRoom = new THREE.Group()
   const winRoomMats = []
   let winSashR = null, winSashX0 = 0, winSashX1 = 0 // 引き違いの可動ガラス障子（窓をあけると横へすべる）
+  const winCurtains = [] // 窓辺のカーテン（窓をあけると外気でそっとそよぐ）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -3083,7 +3084,7 @@ export async function mountTown3d(parent, opts = {}) {
     else if (season === 'summer') { cyl(0.04, 0.04, 1.0, -3.0, FY + 0.5, 5.2, blackMat); const fan = cyl(0.32, 0.32, 0.1, -3.0, FY + 1.0, 5.2, ceramMat, 16); fan.rotation.z = Math.PI / 2; box(0.5, 0.1, 0.5, -3.0, FY + 0.05, 5.2, blackMat) } // 扇風機（夏）
     // ── 窓辺のカーテン（淡い色。窓の左右） ──
     const curtMat = mk(C(0xd8cbb0, 0x4a4450))
-    for (const cs of [-1, 1]) box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.22, curtMat)
+    for (const cs of [-1, 1]) { const ct = box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.22, curtMat); ct.userData.cs = cs; ct.userData.x0 = cs * (owW / 2 + 0.18); winCurtains.push(ct) }
     box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.24, curtMat) // 上飾り
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -4150,6 +4151,7 @@ export async function mountTown3d(parent, opts = {}) {
     // lean>0.16で非表示＝カメラがベランダの手すり/窓枠へ達する前に室内ごと消す（貫通して見えるのを防ぐ）。空/地上でも非表示。
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
+    if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.22 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
