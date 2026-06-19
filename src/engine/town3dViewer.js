@@ -2934,7 +2934,8 @@ export async function mountTown3d(parent, opts = {}) {
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
     climb: 0,                     // （旧）上昇/下降入力。スキームAでは未使用
     cruise: true,                 // スキームA: 自動巡航中か（とまる/すすむトグル）。とまる=その場でホバリング
-    zoom: 1,                      // カメラの引き具合（ピンチで0.4=寄り〜3.0=引き）。カメラ距離に掛ける
+    zoom: 1,                      // カメラの引き具合（ピンチ/ズームボタンで0.4=寄り〜3.0=引き）。カメラ距離に掛ける
+    zoomTarget: 1,                // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
@@ -3482,6 +3483,19 @@ export async function mountTown3d(parent, opts = {}) {
     cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ'
   })
 
+  // ── ズームボタン（＋寄る／−引く）。ピンチが効きにくい/不安なので、確実に効く明示ボタンを併置（地図/航空アプリ流儀）。
+  // zoom は小さいほど寄り(0.4)・大きいほど引き(3.0)。＋で寄る＝zoomTargetを下げる、−で引く＝上げる。frameでzoomが滑らかに追従。
+  const zoomWrap = document.createElement('div'); zoomWrap.className = 'town3d-zoom'
+  const zoomIn = document.createElement('button'); zoomIn.className = 'town3d-zoom__btn'; zoomIn.textContent = '＋'; zoomIn.setAttribute('aria-label', '寄る')
+  const zoomOut = document.createElement('button'); zoomOut.className = 'town3d-zoom__btn'; zoomOut.textContent = '−'; zoomOut.setAttribute('aria-label', '引く')
+  zoomWrap.appendChild(zoomIn); zoomWrap.appendChild(zoomOut); stage.appendChild(zoomWrap)
+  let zoomShown = false
+  const nudgeZoom = (factor) => { if (!active) return; active.zoomTarget = Math.max(0.4, Math.min(3.0, active.zoomTarget * factor)) }
+  for (const [btn, f] of [[zoomIn, 0.72], [zoomOut, 1.0 / 0.72]]) {
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation() }) // 操舵/ピンチと混ざらないように
+    btn.addEventListener('click', (e) => { e.stopPropagation(); nudgeZoom(f) })
+  }
+
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
@@ -3677,6 +3691,7 @@ export async function mountTown3d(parent, opts = {}) {
     const lean = easeInOut(active.leanP)
     const flyAmt = easeInOut(active.flyP) // 0=窓 / 1=空（カメラ位置・視線・画角をこの量で混ぜる）
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
+    active.zoom += (active.zoomTarget - active.zoom) * 0.16 // ズームを目標へ滑らかに追従（ボタン/ピンチ共通＝確実に効き、急変で酔わない）
 
     // 乗り出しを戻すと見上げの可動域も縮むので、目標ピッチも追従して下げる（上を向いたまま固まらない）
     const plim = pitchLimits(lean)
@@ -3779,12 +3794,26 @@ export async function mountTown3d(parent, opts = {}) {
       const back0 = (isWalk ? FLY.walkBack : FLY.camBack) * active.zoom
       const upOff = (isWalk ? FLY.walkUp : FLY.camUp) * (0.5 + 0.5 * active.zoom) // 引くほど少し高い位置から見渡す
       const ahead = isWalk ? FLY.walkAhead : FLY.camAhead
-      let back = back0, dcx = fp.x, dcz = fp.z
-      for (let tries = 0; tries < 5; tries++) {
-        dcx = fp.x - fwdX * back; dcz = fp.z - fwdZ * back
-        if (!blockedAt(dcx, dcz)) break
-        back *= 0.62
+      // 後方アンカーが建物にめり込む時だけ寄せる。ただし blockedAt は高さを見ない平面判定なので、上空を巡航中に
+      // 後ろの建物列を跨ぐたびに寄せ判定がオンオフして“カメラが前後にドリー”＝酔いの原因になっていた。
+      // 屋根より十分高い時は建物に当たらないので寄せ判定を切り、さらに寄せ距離自体をなめらかに追従させて前後酔いを断つ。
+      const camAlt = fp.y - heightAt(fp.x, fp.z)
+      const checkBlock = isWalk || camAlt < 13 // 低空/歩行でだけ当たりで寄せる（上空は素通し＝開けた俯瞰）
+      let backTgt = back0
+      if (checkBlock) {
+        let back = back0
+        for (let tries = 0; tries < 5; tries++) {
+          const tx = fp.x - fwdX * back, tz = fp.z - fwdZ * back
+          if (!blockedAt(tx, tz)) break
+          back *= 0.62
+        }
+        backTgt = back
       }
+      // 寄せ距離をなめらかに追従（瞬間スナップを排す＝寄せ/戻りで前後にカクつかない）
+      if (!active.camReady || active.camBackCur === undefined) active.camBackCur = backTgt
+      else active.camBackCur += (backTgt - active.camBackCur) * 0.1
+      const back = active.camBackCur
+      let dcx = fp.x - fwdX * back, dcz = fp.z - fwdZ * back
       let dcy = fp.y - fwdY * back + upOff
       const camFloor = heightAt(dcx, dcz) + (isWalk ? 1.35 : 1.6) // 歩行は一人称寄り＝目線をやや低く許す
       if (dcy < camFloor) dcy = camFloor
@@ -3827,8 +3856,10 @@ export async function mountTown3d(parent, opts = {}) {
       // 雲を抜けると白くかすむ＝いちばん近い雲の中心までの距離で白みを出す（飛行のみ）
       let nearC = 1e9
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
-      const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 15) * flyAmt
-      if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.82).toFixed(2) }
+      // 雲の芯のごく近く(9u以内)だけ軽く霞む。以前は半径15・濃さ0.82で“少し高く飛ぶと白飛び”していた→
+      // 街全体を見渡せる開放感を優先し、雲に分け入った時だけ淡く霞ませる（軽い白飛びの雰囲気は残す）。
+      const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 9) * flyAmt
+      if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.4).toFixed(2) }
       // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）＋環境音をしぼる
       const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
       if (Math.abs(altT - altTintCur) > 0.02) { altTintCur = altT; altTint.style.opacity = (altT * 0.16).toFixed(2) }
@@ -3892,6 +3923,8 @@ export async function mountTown3d(parent, opts = {}) {
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
     const showCruise = active.mode === 'fly' && active.flyP > 0.4
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
+    const showZoom = (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.4 // 空/地上ではズームボタンを出す
+    if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom) }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
@@ -3934,7 +3967,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
-    window.__town3dZoom = (v) => { if (active) active.zoom = Math.max(0.4, Math.min(3.0, v || 1)) } // 検証用: ズーム(0.4寄り〜3.0引き)
+    window.__town3dZoom = (v) => { if (active) { active.zoomTarget = Math.max(0.4, Math.min(3.0, v || 1)); active.zoom = active.zoomTarget } } // 検証用: ズーム(0.4寄り〜3.0引き)
     window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
@@ -3990,7 +4023,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (pointers.size === 2) { // 2本指＝ピンチでズーム開始。単指の操舵/移動は解除する。
       const p = [...pointers.values()]
       pinchD0 = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
-      pinchZoom0 = active.zoom
+      pinchZoom0 = active.zoomTarget
       steerId = null; stickId = null; hideStick()
       if (lookId !== null) { lookId = null; active.lookDragging = false }
       return
@@ -4014,7 +4047,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (pointers.size >= 2) { // ピンチ＝ズーム（指を開く=寄り／閉じる=引き）。止まっても飛んでも自在に引ける。
       const p = [...pointers.values()]
       const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
-      active.zoom = Math.max(0.4, Math.min(3.0, pinchZoom0 * (pinchD0 / d)))
+      active.zoomTarget = Math.max(0.4, Math.min(3.0, pinchZoom0 * (pinchD0 / d)))
       return
     }
     const w = stage.clientWidth || 1, h = stage.clientHeight || 1

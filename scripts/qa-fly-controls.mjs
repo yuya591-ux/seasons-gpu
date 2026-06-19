@@ -1,0 +1,35 @@
+// 飛行操作の検証: ズームボタンの表示/効き、高空での白飛び（cloudHaze）の抑制を確認。
+import { chromium } from 'playwright'
+const port = process.env.PORT || '4801'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
+await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(700)
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2300)
+await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTimeout(400)
+await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(1000)
+await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(500)
+await page.evaluate(() => { window.__town3dCruise(false); window.__town3dFlyPose(10, 30, 24, -0.4, -0.25) })
+await page.waitForTimeout(900)
+// ズームボタンが見えるか
+const zoomBtns = await page.locator('.town3d-zoom__btn').count()
+const zoomVisible = await page.locator('.town3d-zoom').evaluate((e) => getComputedStyle(e).opacity)
+await page.screenshot({ path: 'scripts/_shots/fly-controls.png' })
+// ＋ボタンで寄る（zoomTarget下がる）
+const z0 = await page.evaluate(() => window.__town3dDbg && window.__town3dDbg() ? window.__town3dDbg() : null)
+const zt0 = await page.evaluate(() => window.__town3dActiveZoom ? null : (window.__dbgZoomT = (window.__town3dZoomT && window.__town3dZoomT())))
+await page.locator('.town3d-zoom__btn').first().click()
+await page.waitForTimeout(700)
+await page.locator('.town3d-zoom__btn').first().click()
+await page.waitForTimeout(900)
+await page.screenshot({ path: 'scripts/_shots/fly-controls-zoomed.png' })
+// 高空の白飛び（cloudHaze opacity）を確認: 雲層付近(y45)へ
+await page.evaluate(() => window.__town3dFlyPose(0, 46, 10, 0, -0.5))
+await page.waitForTimeout(1000)
+const haze = await page.locator('.town3d-cloudhaze').evaluate((e) => e.style.opacity || '0')
+await page.screenshot({ path: 'scripts/_shots/fly-high.png' })
+console.log('zoomBtns=', zoomBtns, 'zoomWrapOpacity=', zoomVisible, 'highCloudHazeOpacity=', haze)
+await browser.close()
