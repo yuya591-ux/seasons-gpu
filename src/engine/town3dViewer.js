@@ -493,6 +493,7 @@ export async function mountTown3d(parent, opts = {}) {
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
   let teacups = null // 遊園地のコーヒーカップ（回る）
   let steamPuffs = [] // 夏祭りの屋台の湯気（立ちのぼる）
+  let koinobori = [] // 春の鯉のぼり（風になびく）
   let swanBoats = [] // 遊園地のスワンボート（池を漂う）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
@@ -2816,6 +2817,27 @@ export async function mountTown3d(parent, opts = {}) {
     seasonFall = { pts, pos, spd, phs, N, bx, bz, R0, floor, swirl: season === 'spring' ? 2.2 : 2.8 }
   }
 
+  // ── 鯉のぼり（春。真鯉・緋鯉・子鯉が風になびく）。街のみ・春のみ。 ──
+  if (kind !== 'yato' && season === 'spring') {
+    koinobori = []
+    const carpCols = [0x2a2a2e, 0xc23a2e, 0x3a6a8a, 0x6a8a5a] // 黒(真鯉)/赤(緋鯉)/青/緑
+    for (const sp of [[-44, -22], [-12, -40], [50, -12], [10, -56], [-28, -36]]) {
+      const x = sp[0], z = sp[1], gy = heightAt(x, z)
+      const g = new THREE.Group(); g.position.set(x, gy, z); g.rotation.y = (R() - 0.5) * 1.2; town.add(g) // 向きを少し振る
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 9, 6), toon(0xb0aaa0)); pole.position.y = 4.5; pole.castShadow = true; g.add(pole)
+      const yagu = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.05, 6, 10), toon(0xd9b44a)); yagu.position.y = 9.1; yagu.rotation.x = Math.PI / 2; g.add(yagu) // 矢車
+      const fuki = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 1.5, 8, 1, true), toon(0xe0a838)); fuki.rotation.z = Math.PI / 2; fuki.position.set(0.85, 8.6, 0); g.add(fuki) // 吹き流し
+      const sizes = [2.5, 1.9, 1.4]; let cy = 8.0
+      for (let i = 0; i < 3; i++) {
+        const carp = new THREE.Group(); carp.position.set(0, cy, 0); g.add(carp); koinobori.push({ grp: carp, ph: i * 0.6 + R() * 0.4 })
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.07, sizes[i], 9, 1, true), toon(carpCols[i % carpCols.length])); body.rotation.z = Math.PI / 2; body.position.x = sizes[i] / 2; body.castShadow = true; carp.add(body)
+        for (const ez of [-0.16, 0.16]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), toon(0xf0ece0)); eye.position.set(0.18, 0.13, ez); carp.add(eye) }
+        cy -= 0.85
+      }
+      colliders.push({ x, z, r: 0.5 })
+    }
+  }
+
   // 全ての木の幹を1メッシュへ統合（静止）＝ドローコールを大きく削る（葉は木ごとに揺れるので別）。
   if (trunkGeos.length && BufferGeometryUtils.mergeGeometries) {
     const tm = BufferGeometryUtils.mergeGeometries(trunkGeos, false)
@@ -3458,6 +3480,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
     if (teacups) { teacups.rotation.y += dt * 0.5; for (const cup of teacups.children) cup.rotation.y -= dt * 1.1 } // 台が回り、各カップは逆に回る
     for (const sp of steamPuffs) { const cy = (t * 0.5 + sp.ph) % 2.4, p = cy / 2.4; sp.mesh.position.y = sp.base + p * 1.7; sp.mesh.position.x = 0.4 + Math.sin(t * 1.3 + sp.ph) * 0.18; sp.mesh.material.opacity = 0.32 * Math.sin(p * Math.PI); sp.mesh.scale.setScalar(0.55 + p * 0.8) } // 屋台の湯気が立ちのぼる
+    for (const k of koinobori) { k.grp.rotation.y = Math.sin(t * 1.1 + k.ph) * 0.32; k.grp.rotation.z = 0.05 + Math.sin(t * 0.85 + k.ph) * 0.12 } // 鯉のぼりが風になびく
     for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
