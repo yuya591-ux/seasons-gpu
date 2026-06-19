@@ -2931,7 +2931,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.3, SX = 3.95, BZ = 6.2, WINCY = 1.0
     const C = (d, n) => isNight ? n : d
-    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(m); return m }
+    // 不透明＝室内が深度を書き込み、手前の壁が奥の壁/家具と「窓の外の街」を遮蔽＝隠れた街の塗り(fill)を早期Zで省く＋
+    // 半透明ブレンドの全画面オーバードローをゼロに（カクつきの主因を断つ）。乗り出すとカメラが窓の開口を通って前へ
+    // 出るので室内は自然に背後へ退く（フェード不要）。
+    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); winRoomMats.push(m); return m }
     const box = (w, h, d, x, y, z, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
     const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
     const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
@@ -4076,11 +4079,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 世界固定の3D枠なので、カメラの室内視差(roomParallax)＋回転で「近い枠と遠い景色が視差で分離」して、
     // 部屋の中から窓越しに外を覗く手応えになる。CSSの中央桟・窓台は3D枠と二重になるので隠す。
     const roomAmtF = Math.max(0, 1 - lean)
-    winRoom.visible = flyAmt < 0.6
-    if (winRoom.visible) {
-      const ro = Math.max(0, 1 - lean * 3.2) // 乗り出すと素早くフェード（カメラが枠へ達する前に消す＝めり込み回避）
-      if (Math.abs(ro - roomMatCur) > 0.02) { roomMatCur = ro; for (const m of winRoomMats) m.opacity = ro }
-    }
+    // 室内は不透明（街を遮蔽してfill節約・カクつき対策）。乗り出すとカメラが窓の開口を抜けて前へ出る＝室内は背後へ退く。
+    // lean>0.5で非表示（その時カメラは窓の外で前方を向き、背後の室内は見えない＝スナップに気づかない）。空/地上でも非表示。
+    winRoom.visible = flyAmt < 0.6 && lean < 0.5
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
