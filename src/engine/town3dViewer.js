@@ -2039,6 +2039,35 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
 
+    // ── 海釣りの桟橋（南の海へ伸びる木の桟橋）＋釣り人。静かな海辺の暮らし。──
+    {
+      const pz = -5, x0 = 73, x1 = 92, deckY = SEA.level + 2
+      const woodMat = toon(0x9a7a52), pileMat = toon(0x6a5238), railMat = toon(0x866a48)
+      const deckGeos = [], railGeos = []
+      for (let x = x0; x <= x1; x += 1.1) { const seg = new THREE.BoxGeometry(1.2, 0.18, 3.0); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, deckY, pz)); deckGeos.push(seg) }
+      for (let x = x0; x <= x1; x += 2.2) for (const rz of [-1.4, 1.4]) { const post = new THREE.BoxGeometry(0.1, 0.7, 0.1); post.applyMatrix4(new THREE.Matrix4().makeTranslation(x, deckY + 0.42, pz + rz)); railGeos.push(post); const top = new THREE.BoxGeometry(2.2, 0.08, 0.08); top.applyMatrix4(new THREE.Matrix4().makeTranslation(x + 1.1, deckY + 0.78, pz + rz)); railGeos.push(top) }
+      if (BufferGeometryUtils.mergeGeometries) {
+        const dm = BufferGeometryUtils.mergeGeometries(deckGeos, false); if (dm) { const deck = new THREE.Mesh(dm, woodMat); deck.castShadow = true; deck.receiveShadow = true; town.add(deck) }
+        const rm = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rm) town.add(new THREE.Mesh(rm, railMat))
+      }
+      deckGeos.concat(railGeos).forEach((g) => g.dispose())
+      // 杭（水中へ）
+      const pileH = deckY - (SEA.level - 3)
+      for (let x = x0 + 1; x <= x1; x += 3.6) for (const dz of [-1.3, 1.3]) { const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, pileH, 6), pileMat); pile.position.set(x, deckY - pileH / 2 + 0.1, pz + dz); pile.castShadow = true; town.add(pile) }
+      // 釣り人×3（桟橋の先で海へ竿を垂れる）。腰掛け＋体＋頭＋竿＋バケツ。
+      const skinMat = toon(0xf0c49c), rodMat = toon(0x40382c)
+      for (const ap of [[87, 1.0], [89.5, -0.8], [84, 1.2]]) {
+        const ax = ap[0], az = pz + ap[1], g = new THREE.Group(); g.position.set(ax, deckY + 0.18, az); town.add(g)
+        const stool = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), toon(0x6a5238)); stool.position.y = 0.2; g.add(stool)
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.5, 3, 6), toon([0x5a78a0, 0x6a8a5a, 0xb0894a][(R() * 3) | 0])); body.position.y = 0.85; body.castShadow = true; g.add(body)
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), skinMat); head.position.y = 1.32; g.add(head)
+        const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.1, 10), toon(0xcfc6a8)); hat.position.y = 1.46; g.add(hat) // 麦わら帽
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, 4.2, 4), rodMat); rod.position.set(1.6, 1.6, 0); rod.rotation.z = -0.7; g.add(rod) // 海へ伸びる竿
+        const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.4, 8), toon(0x9aa0a4)); bucket.position.set(-0.5, 0.2, 0.2); g.add(bucket)
+      }
+      spawnAvoid.push({ x: (x0 + x1) / 2, z: pz, r: 12 }) // 桟橋・海上には降りない
+    }
+
     // ── 砂浜の海の家＋ビーチパラソル＋浮き輪。夏の海辺の賑わい。──
     {
       const bx = 71, bz = -36, by = heightAt(bx, bz) // 砂浜の上（汀の手前の乾いた砂）
