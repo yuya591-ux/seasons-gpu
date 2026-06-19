@@ -1808,6 +1808,7 @@ export async function mountTown3d(parent, opts = {}) {
         const rtex = new THREE.CanvasTexture(rc); rtex.wrapS = THREE.RepeatWrapping; rtex.repeat.set(6, 1)
         const roof = new THREE.Mesh(new THREE.ConeGeometry(4.7, 1.9, 20), new THREE.MeshToonMaterial({ map: rtex, gradientMap: grad, fog: true })); roof.position.y = 4.9; roof.castShadow = true; outer.add(roof)
         const ball = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), toon(0xf2c14e)); ball.position.y = 5.95; outer.add(ball)
+        if (duskAmt > 0.25) { const cbulb = new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }); for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; const b = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 6), cbulb); b.position.set(Math.cos(a) * 4.5, 4.0, Math.sin(a) * 4.5); outer.add(b) } } // 屋根の縁の電飾
         const spin = new THREE.Group(); outer.add(spin); carousel = spin
         const plat = new THREE.Mesh(new THREE.CylinderGeometry(4.1, 4.3, 0.5, 20), toon(0xf0e6d2)); plat.position.y = 0.25; plat.receiveShadow = true; spin.add(plat)
         for (let i = 0; i < 6; i++) {
@@ -2376,6 +2377,14 @@ export async function mountTown3d(parent, opts = {}) {
       const roof = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.3, 1.8), gondMats[(i + 2) % gondMats.length]); roof.position.y = 0.85; gond.add(roof)
       if (duskAmt > 0.25) { const lit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.05), litMat); lit.position.z = 0.83; gond.add(lit) }
       wheel.add(gond); gondolas.push(gond)
+    }
+    // 夕夜の電飾（リムに沿う豆電球＋ハブ＋スポークの灯り。車輪と一緒に回って瞬く）
+    if (duskAmt > 0.25) {
+      const bulbA = new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }), bulbB = new THREE.MeshBasicMaterial({ color: 0xff9a6a, fog: true }), bulbC = new THREE.MeshBasicMaterial({ color: 0x86c0e8, fog: true })
+      const NB = 40
+      for (let i = 0; i < NB; i++) { const a = i / NB * 6.283; const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 6), [bulbA, bulbB, bulbC][i % 3]); bulb.position.set(Math.cos(a) * R0, Math.sin(a) * R0, 0.22); wheel.add(bulb) }
+      const hub = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), bulbA); hub.position.z = 0.3; wheel.add(hub)
+      for (let i = 0; i < N; i++) { const a = (i / N) * 6.283; const sb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), bulbA); sb.position.set(Math.cos(a) * R0 * 0.52, Math.sin(a) * R0 * 0.52, 0.22); wheel.add(sb) }
     }
     ferris = { wheel, gondolas }
   }
