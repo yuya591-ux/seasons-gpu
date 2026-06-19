@@ -2921,6 +2921,30 @@ export async function mountTown3d(parent, opts = {}) {
   const eye = kind === 'yato'
     ? new THREE.Vector3(0, 28, 27)  // 谷戸: 少し低く・谷へ寄る（棚田と茅葺屋敷が映える）
     : new THREE.Vector3(0, 31, 30)  // 街: 高台の上階から見下ろす
+
+  // ── 室内の窓枠（3Dの壁＋窓の開口）。部屋の中から窓越しに外を覗く“本物”の手応え＝近い窓枠と遠い景色が
+  //    視差で分離して動き、見回す（＝室内で頭を動かす）と窓が視界を横切り壁の側が覗く。乗り出すと退いて街へ。
+  //    世界座標に固定（カメラに親子付けしない）＝カメラの平行移動/回転で枠と景色が正しくずれる。 ──
+  const winRoom = new THREE.Group()
+  const winRoomMats = []
+  {
+    const dWall = 3.2, owW = 1.5, owH = 2.7, wallW = 13, wallH = 15, th = 0.3 // 開口/壁の寸法（開口を小さめにして壁＝部屋感を出す）
+    const wallCol = isNight ? 0x14121a : 0x2b2620 // 室内の壁/サッシ（陰の暗色。夜はさらに沈める）
+    const mk = (col) => { const m = new THREE.MeshBasicMaterial({ color: col, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(m); return m }
+    const wm = mk(wallCol), bm = mk(isNight ? 0x20202a : 0x3a342c), sm = mk(isNight ? 0x2a2a34 : 0x4c4236)
+    const panel = (w, h, x, y, mat) => { const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, th), mat); p.position.set(x, y, 0); p.renderOrder = 2; winRoom.add(p) }
+    const sideW = (wallW - owW) / 2, sideH = (wallH - owH) / 2
+    panel(wallW, sideH, 0, owH / 2 + sideH / 2, wm)   // 上の壁
+    panel(wallW, sideH, 0, -owH / 2 - sideH / 2, wm)  // 下の壁
+    panel(sideW, owH, owW / 2 + sideW / 2, 0, wm)     // 右の壁
+    panel(sideW, owH, -owW / 2 - sideW / 2, 0, wm)    // 左の壁
+    const vbar = new THREE.Mesh(new THREE.BoxGeometry(0.09, owH, 0.07), bm); vbar.position.z = 0.05; vbar.renderOrder = 2; winRoom.add(vbar) // 縦桟
+    const hbar = new THREE.Mesh(new THREE.BoxGeometry(owW, 0.09, 0.07), bm); hbar.position.z = 0.05; hbar.renderOrder = 2; winRoom.add(hbar) // 横桟
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(owW + 0.5, 0.2, 0.55), sm); sill.position.set(0, -owH / 2 - 0.05, 0.3); sill.renderOrder = 2; winRoom.add(sill) // 室内側の窓台
+    winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
+    scene.add(winRoom)
+  }
+
   active = {
     renderer, scene, camera, stage, raf: 0,
     yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0,
@@ -3055,6 +3079,7 @@ export async function mountTown3d(parent, opts = {}) {
   stage.appendChild(frame2)
   let clarityCur = -1
   let roomDarkCur = -1 // 室内の周辺減光の現在値（変化時だけ box-shadow を書き換える）
+  let roomMatCur = -1  // 3Dの室内窓枠の不透明度の現在値（変化時だけマテリアルへ反映）
   // ── 設定（明るさ・描き込み品質）をtown3dに反映する（従来は設定が3Dに全く効かなかった＝UX評価の最重要指摘）。 ──
   // 明るさ: stageのCSSフィルタの brightness に、窓あけclarityの明るさ×ユーザ明るさを合成。描き込み: pixelRatioを即変更。
   let userBright = opts.brightness || 1
@@ -3952,29 +3977,28 @@ export async function mountTown3d(parent, opts = {}) {
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
-    // ── 窓の視差: 部屋の中（乗り出していない間）は、手前の窓枠を見回しと逆向きに画面内でずらす。
-    // 近い枠（固定の窓）と遠い景色がはっきりずれて動く＝「部屋の中から窓越しに外を覗いている」手応え。
-    // カメラ側の室内視差(roomParallax)と合わせ、枠が景色の上をすべる。乗り出す(lean)と0になり枠を越えて街へ。
+    // ── 3Dの室内窓枠の見え隠れ。部屋の中（窓辺）で見え、乗り出すと素早く退いて街へ。空/地上では消す。
+    // 世界固定の3D枠なので、カメラの室内視差(roomParallax)＋回転で「近い枠と遠い景色が視差で分離」して、
+    // 部屋の中から窓越しに外を覗く手応えになる。CSSの中央桟・窓台は3D枠と二重になるので隠す。
     const roomAmtF = Math.max(0, 1 - lean)
-    const fpx = -Math.sin(yaw) * 5.4 * roomAmtF       // 右を見ると窓枠が左へ流れる（覗き込む頭の動き）
-    const fpy = Math.max(-1, Math.min(1, pitch)) * 4.4 * roomAmtF // 見上げると窓枠が下へ流れる
-    // 窓ガラスと横桟は、あけると横へすべって消える（引き違い窓）。乗り出すと枠ごと外へ退く。
-    glass.style.transform = `translate(${(wo * 96 + fpx).toFixed(1)}%, ${fpy.toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
+    winRoom.visible = flyAmt < 0.6
+    if (winRoom.visible) {
+      const ro = Math.max(0, 1 - lean * 3.2) // 乗り出すと素早くフェード（カメラが枠へ達する前に消す＝めり込み回避）
+      if (Math.abs(ro - roomMatCur) > 0.02) { roomMatCur = ro; for (const m of winRoomMats) m.opacity = ro }
+    }
+    // 窓ガラスは引き違いで横へすべって消える。外枠は乗り出すと退く。中央桟・窓台はCSS側を隠す（3D枠を使う）。
+    glass.style.transform = `translateX(${(wo * 96).toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
     glass.style.opacity = ((1 - wo * 0.92) * (1 - lean)).toFixed(3)
-    cross.style.transform = `translate(${(wo * 96 + fpx).toFixed(1)}%, ${fpy.toFixed(1)}%)`
-    cross.style.opacity = ((1 - wo) * (1 - lean)).toFixed(3)
-    // サッシ・窓台は乗り出すと拡大しながら退いて外気だけに（枠を通り抜ける手応え）。
-    // 乗り出しきったら完全に消す（×0.96/×0.9だと中央の縦桟や枠が4〜10%残って黒い線になる＝指摘の不具合）。
-    frame2.style.transform = `translate(${fpx.toFixed(1)}%, ${fpy.toFixed(1)}%) scale(${(1 + lean * 0.55).toFixed(3)})`
+    cross.style.opacity = '0'
+    frame2.style.transform = `scale(${(1 + lean * 0.55).toFixed(3)})`
     frame2.style.opacity = Math.max(0, 1 - lean * 1.2).toFixed(3)
     // 部屋の中ほど周辺を暗く（薄暗い室内から明るい窓を覗く明暗）。窓を開け／乗り出すと晴れる。変化時だけ書き換え。
     const roomDark = roomAmtF * (1 - wo * 0.45)
     if (Math.abs(roomDark - roomDarkCur) > 0.03) {
       roomDarkCur = roomDark
-      frame2.style.boxShadow = `inset 0 0 0 13px #2b2722, inset 0 0 0 14.5px rgba(255,255,255,0.14), inset 0 0 ${(150 + roomDark * 140).toFixed(0)}px ${(28 + roomDark * 44).toFixed(0)}px rgba(0,0,0,${(0.42 + roomDark * 0.26).toFixed(2)})`
+      frame2.style.boxShadow = `inset 0 0 0 9px #241f1a, inset 0 0 ${(150 + roomDark * 150).toFixed(0)}px ${(30 + roomDark * 50).toFixed(0)}px rgba(0,0,0,${(0.4 + roomDark * 0.28).toFixed(2)})`
     }
-    sill.style.transform = `translate(${fpx.toFixed(1)}%, ${(lean * 130 + fpy).toFixed(1)}%)`
-    sill.style.opacity = Math.max(0, 1 - lean * 1.18).toFixed(3)
+    sill.style.opacity = '0'
     paper.style.opacity = (0.18 * (1 - lean * 0.6)).toFixed(3) // 紙目をやや強め水彩の手触りに（乗り出すと薄れる）
     // ガラス越しのくすみを、あけ／乗り出しに応じて晴らす（外気が澄む）。変化時だけ書き換え。
     const clarity = Math.min(1, wo * 0.6 + lean * 0.7)
