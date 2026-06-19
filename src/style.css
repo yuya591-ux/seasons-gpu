@@ -286,10 +286,19 @@ body {
   inset: 0;
   z-index: 2;
   pointer-events: none;
+  /* 細い窓枠の見切りのみ（重いブラーの周辺減光は廃止→室内の薄暗がりは .town3d-roomvig が担う＝軽い） */
   box-shadow:
-    inset 0 0 0 13px #2b2722,
-    inset 0 0 0 14.5px rgba(255, 255, 255, 0.14),
-    inset 0 0 150px 28px rgba(0, 0, 0, 0.42);
+    inset 0 0 0 10px #2b2722,
+    inset 0 0 0 11.5px rgba(255, 255, 255, 0.12);
+}
+/* 室内の薄暗がり（周辺減光）。静的なグラデ＝合成が軽い。JSで不透明度だけを動かす（部屋の中=濃い）。 */
+.town3d-roomvig {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(125% 90% at 50% 46%, transparent 38%, rgba(8, 6, 12, 0.5) 86%, rgba(6, 4, 10, 0.66));
 }
 /* 窓台（下枠を厚く・上端に光＝部屋から覗く手応え） */
 .town3d-frame::after,

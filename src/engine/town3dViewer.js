@@ -2928,19 +2928,35 @@ export async function mountTown3d(parent, opts = {}) {
   const winRoom = new THREE.Group()
   const winRoomMats = []
   {
-    const dWall = 3.2, owW = 1.5, owH = 2.7, wallW = 13, wallH = 15, th = 0.3 // 開口/壁の寸法（開口を小さめにして壁＝部屋感を出す）
-    const wallCol = isNight ? 0x14121a : 0x2b2620 // 室内の壁/サッシ（陰の暗色。夜はさらに沈める）
+    const dWall = 3.2, owW = 1.7, owH = 2.9, wallW = 14, wallH = 16, th = 0.3 // 開口/壁の寸法（開口を小さめにして壁＝部屋感を出す）
+    const wallCol = isNight ? 0x171520 : 0x342c24 // 室内の壁（暖かい暗色。明暗を少し和らげ縁のジャギを抑える。夜は沈める）
     const mk = (col) => { const m = new THREE.MeshBasicMaterial({ color: col, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(m); return m }
-    const wm = mk(wallCol), bm = mk(isNight ? 0x20202a : 0x3a342c), sm = mk(isNight ? 0x2a2a34 : 0x4c4236)
+    const wm = mk(wallCol), bm = mk(isNight ? 0x232130 : 0x40382e), sm = mk(isNight ? 0x2c2a36 : 0x52473a)
     const panel = (w, h, x, y, mat) => { const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, th), mat); p.position.set(x, y, 0); p.renderOrder = 2; winRoom.add(p) }
     const sideW = (wallW - owW) / 2, sideH = (wallH - owH) / 2
     panel(wallW, sideH, 0, owH / 2 + sideH / 2, wm)   // 上の壁
     panel(wallW, sideH, 0, -owH / 2 - sideH / 2, wm)  // 下の壁
     panel(sideW, owH, owW / 2 + sideW / 2, 0, wm)     // 右の壁
     panel(sideW, owH, -owW / 2 - sideW / 2, 0, wm)    // 左の壁
+    // 窓の見切り（開口の内側の浅い額縁＝明るい街への明暗の段差を一段やわらげ、縁のジャギを抑える）
+    const jamb = mk(isNight ? 0x2a2838 : 0x4a4234)
+    const jambT = 0.13
+    panel(owW + jambT * 2, jambT, 0, owH / 2 + jambT / 2, jamb); panel(owW + jambT * 2, jambT, 0, -owH / 2 - jambT / 2, jamb)
+    panel(jambT, owH, owW / 2 + jambT / 2, 0, jamb); panel(jambT, owH, -owW / 2 - jambT / 2, 0, jamb)
     const vbar = new THREE.Mesh(new THREE.BoxGeometry(0.09, owH, 0.07), bm); vbar.position.z = 0.05; vbar.renderOrder = 2; winRoom.add(vbar) // 縦桟
     const hbar = new THREE.Mesh(new THREE.BoxGeometry(owW, 0.09, 0.07), bm); hbar.position.z = 0.05; hbar.renderOrder = 2; winRoom.add(hbar) // 横桟
     const sill = new THREE.Mesh(new THREE.BoxGeometry(owW + 0.5, 0.2, 0.55), sm); sill.position.set(0, -owH / 2 - 0.05, 0.3); sill.renderOrder = 2; winRoom.add(sill) // 室内側の窓台
+    // ── 部屋の気配（カーテン・上飾り・窓辺の鉢植え）＝「中が寂しい」を解消。布の襞テクスチャで縁もやわらぐ。 ──
+    const cc = document.createElement('canvas'); cc.width = 32; cc.height = 96
+    const ctx = cc.getContext('2d'); ctx.fillStyle = isNight ? '#332c3c' : '#7a5a48'; ctx.fillRect(0, 0, 32, 96)
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? 'rgba(255,236,210,0.10)' : 'rgba(0,0,0,0.18)'; ctx.fillRect((32 / 6) * i, 0, 32 / 6, 96) } // 縦の襞
+    const curtTex = new THREE.CanvasTexture(cc); curtTex.colorSpace = THREE.SRGBColorSpace
+    const curtMat = new THREE.MeshBasicMaterial({ map: curtTex, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(curtMat)
+    for (const cs of [-1, 1]) { const cur = new THREE.Mesh(new THREE.BoxGeometry(0.34, owH + 0.34, 0.05), curtMat); cur.position.set(cs * (owW / 2 - 0.05), 0.06, 0.18); cur.renderOrder = 3; winRoom.add(cur) } // 左右のカーテン
+    const valance = new THREE.Mesh(new THREE.BoxGeometry(owW + 0.5, 0.36, 0.06), curtMat); valance.position.set(0, owH / 2 + 0.04, 0.2); valance.renderOrder = 3; winRoom.add(valance) // 窓上のひだ飾り
+    const potMat = mk(isNight ? 0x4a3a2e : 0x9a5e3e), leafMat = mk(isNight ? 0x26361f : 0x4e7446) // 窓辺の鉢植え
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.18, 9), potMat); pot.position.set(-owW / 2 + 0.24, -owH / 2 + 0.12, 0.36); pot.renderOrder = 3; winRoom.add(pot)
+    for (let i = 0; i < 4; i++) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), leafMat); lf.position.set(-owW / 2 + 0.24 + (R() - 0.5) * 0.16, -owH / 2 + 0.3 + R() * 0.12, 0.36 + (R() - 0.5) * 0.12); lf.renderOrder = 3; winRoom.add(lf) }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
   }
@@ -3077,6 +3093,9 @@ export async function mountTown3d(parent, opts = {}) {
   const frame2 = document.createElement('div')
   frame2.className = 'town3d-frame'
   stage.appendChild(frame2)
+  // 室内の薄暗がり（周辺減光）。巨大box-shadowブラーは毎フレームの合成が重い→静的なradial-gradientの
+  // 不透明度だけを動かす（合成が軽い＝端末が重くならない）。部屋の中ほど濃く、窓を開け/乗り出すと晴れる。
+  const roomVig = document.createElement('div'); roomVig.className = 'town3d-roomvig'; stage.appendChild(roomVig)
   let clarityCur = -1
   let roomDarkCur = -1 // 室内の周辺減光の現在値（変化時だけ box-shadow を書き換える）
   let roomMatCur = -1  // 3Dの室内窓枠の不透明度の現在値（変化時だけマテリアルへ反映）
@@ -3992,12 +4011,9 @@ export async function mountTown3d(parent, opts = {}) {
     cross.style.opacity = '0'
     frame2.style.transform = `scale(${(1 + lean * 0.55).toFixed(3)})`
     frame2.style.opacity = Math.max(0, 1 - lean * 1.2).toFixed(3)
-    // 部屋の中ほど周辺を暗く（薄暗い室内から明るい窓を覗く明暗）。窓を開け／乗り出すと晴れる。変化時だけ書き換え。
-    const roomDark = roomAmtF * (1 - wo * 0.45)
-    if (Math.abs(roomDark - roomDarkCur) > 0.03) {
-      roomDarkCur = roomDark
-      frame2.style.boxShadow = `inset 0 0 0 9px #241f1a, inset 0 0 ${(150 + roomDark * 150).toFixed(0)}px ${(30 + roomDark * 50).toFixed(0)}px rgba(0,0,0,${(0.4 + roomDark * 0.28).toFixed(2)})`
-    }
+    // 部屋の中ほど周辺を暗く（薄暗い室内から明るい窓を覗く明暗）。静的グラデの不透明度だけ動かす＝軽い。
+    const roomDark = roomAmtF * (1 - wo * 0.4)
+    if (Math.abs(roomDark - roomDarkCur) > 0.02) { roomDarkCur = roomDark; roomVig.style.opacity = roomDark.toFixed(2) }
     sill.style.opacity = '0'
     paper.style.opacity = (0.18 * (1 - lean * 0.6)).toFixed(3) // 紙目をやや強め水彩の手触りに（乗り出すと薄れる）
     // ガラス越しのくすみを、あけ／乗り出しに応じて晴らす（外気が澄む）。変化時だけ書き換え。
