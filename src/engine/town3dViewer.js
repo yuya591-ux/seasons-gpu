@@ -32,8 +32,8 @@ const CAM = {
   leanPitchDn: 0.55, // 乗り出し時に下を見下ろせる範囲の拡張（ユーザー要望でさらに下＝足下の街まで覗ける）
   lookPitch: 18,    // 見上げ/見下ろしの効き（pitch→視線の縦移動量）。大きいほど少しのスワイプで大きく振れる
   fov0: 62,         // 基準画角(度)
-  roomParallaxX: 4.2, // 室内視差(横): 見回すと頭が左右にずれて窓越しの景色が動く（部屋の中で覗き込む手応え）。乗り出すと消える
-  roomParallaxY: 2.8, // 室内視差(縦): 見上げ/見下ろしで頭が上下にずれる量
+  roomParallaxX: 1.2, // 室内視差(横): 見回すと頭がわずかに左右へ（覗き込む手応え）。3Dの室内壁を突き抜けないよう控えめに
+  roomParallaxY: 0.8, // 室内視差(縦): 見上げ/見下ろしで頭が上下にわずかにずれる量
 }
 
 // ── 浮遊（空を飛ぶ）／散策（歩く）モードの調整パラメータ ──
@@ -79,7 +79,7 @@ const FLY = {
 
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
 // applyTown3dLook(スワイプ時)とframeループ(戻り時の追従)の両方で使い、範囲を一元管理する。
-const pitchLimits = (lean) => ({ up: 0.5 + lean * CAM.leanPitchUp, dn: 0.45 + lean * CAM.leanPitchDn })
+const pitchLimits = (lean) => ({ up: 1.15 + lean * (CAM.leanPitchUp - 0.65), dn: 0.95 + lean * (CAM.leanPitchDn - 0.5) }) // 部屋の中でも天井(照明)・床まで見回せる。乗り出すと従来どおり空/足下へ
 
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
@@ -108,8 +108,8 @@ export function applyTown3dLook(dx, dy) {
     return
   }
   const l = active.lean || 0
-  const yawMax = 0.9 + l * 0.7   // 乗り出すと左右に大きく見渡せる
-  const lim = pitchLimits(l)     // 乗り出すと上（空・ビル上層）も下も大きく見られる
+  const yawMax = 1.65 + l * 0.2  // 部屋の中を左右に見渡せる（横を向くと側壁・家具が見える）。乗り出すとさらに広く
+  const lim = pitchLimits(l)     // 上（天井・照明）も下（床・街）も見られる
   // 目標値を動かし、frame loop でイージング追従（指を離しても余韻＝ヌルヌル）。感度UP。
   active.yawTarget = Math.max(-yawMax, Math.min(yawMax, active.yawTarget + dx * 2.4))
   active.pitchTarget = Math.max(-lim.dn, Math.min(lim.up, active.pitchTarget + dy * 1.2)) // 縦の感度を下げ、手前の木立へ視線が落ち込み過ぎないように（評価UX-H2）
@@ -2928,7 +2928,7 @@ export async function mountTown3d(parent, opts = {}) {
   const winRoom = new THREE.Group()
   const winRoomMats = []
   {
-    const dWall = 3.2, owW = 1.7, owH = 2.9, wallW = 14, wallH = 16, th = 0.3 // 開口/壁の寸法（開口を小さめにして壁＝部屋感を出す）
+    const dWall = 3.2, owW = 1.7, owH = 2.9, wallW = 8.6, wallH = 7.2, th = 0.3 // 開口/前壁の寸法（部屋の前壁＝窓のある壁）
     const wallCol = isNight ? 0x171520 : 0x342c24 // 室内の壁（暖かい暗色。明暗を少し和らげ縁のジャギを抑える。夜は沈める）
     const mk = (col) => { const m = new THREE.MeshBasicMaterial({ color: col, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(m); return m }
     const wm = mk(wallCol), bm = mk(isNight ? 0x232130 : 0x40382e), sm = mk(isNight ? 0x2c2a36 : 0x52473a)
@@ -2957,6 +2957,45 @@ export async function mountTown3d(parent, opts = {}) {
     const potMat = mk(isNight ? 0x4a3a2e : 0x9a5e3e), leafMat = mk(isNight ? 0x26361f : 0x4e7446) // 窓辺の鉢植え
     const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.18, 9), potMat); pot.position.set(-owW / 2 + 0.24, -owH / 2 + 0.12, 0.36); pot.renderOrder = 3; winRoom.add(pot)
     for (let i = 0; i < 4; i++) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), leafMat); lf.position.set(-owW / 2 + 0.24 + (R() - 0.5) * 0.16, -owH / 2 + 0.3 + R() * 0.12, 0.36 + (R() - 0.5) * 0.12); lf.renderOrder = 3; winRoom.add(lf) }
+
+    // ── 部屋の中（見渡せる3Dの室内）。カメラはこの箱(局所原点=窓の中心、カメラは局所(0,1.5,3.2))の中にいる。
+    //    床・天井・両側壁・奥壁＋家具。見回す(yaw/pitch)と室内が見える。乗り出すと部屋ごと退いて街へ。 ──
+    const box = (w, h, d, x, y, z, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
+    const floorMat = mk(isNight ? 0x2b2832 : 0x9a8a5c) // 畳/床（窓の光を受けて明るめ）
+    const rwMat = mk(isNight ? 0x211e29 : 0x5a4a36)    // 室内の壁（暖色）
+    const ceilMat = mk(isNight ? 0x16131c : 0x3a3026)  // 天井（暗め）
+    const woodMat = mk(isNight ? 0x2c241d : 0x6a4a30), fabMat = mk(isNight ? 0x3a2c36 : 0x9a5a48)
+    const lampMat = mk(isNight ? 0xffd98a : 0xfff0c8), scrollMat = mk(isNight ? 0x6a6258 : 0xe8e0cc), accMat = mk(isNight ? 0x4a3a3e : 0x8a6a5a)
+    // 室内面に頂点色の陰影（窓に近いほど明るく・奥/床際ほど暗い＝平らな箱でなく光のある3D室内に見せる）
+    floorMat.vertexColors = rwMat.vertexColors = ceilMat.vertexColors = true
+    const grad = (m) => {
+      const p = m.geometry.attributes.position, c = new Float32Array(p.count * 3)
+      for (let i = 0; i < p.count; i++) { const lz = m.position.z + p.getZ(i), ly = m.position.y + p.getY(i); const b = Math.max(0.5, Math.min(1.1, (1.1 - (lz / 6.6) * 0.52) * (0.82 + Math.min(1, (ly + 2.7) / 6.4) * 0.3))); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = b }
+      m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3)); return m
+    }
+    grad(box(8.6, 0.3, 6.8, 0, -2.6, 3.0, floorMat))   // 床
+    grad(box(8.6, 0.3, 6.8, 0, 3.6, 3.0, ceilMat))     // 天井
+    grad(box(8.6, 6.8, 0.3, 0, 0.5, 6.1, rwMat))       // 奥壁
+    grad(box(0.3, 6.8, 6.8, -4.1, 0.5, 3.0, rwMat))    // 左壁
+    grad(box(0.3, 6.8, 6.8, 4.1, 0.5, 3.0, rwMat))     // 右壁
+    // 天井から下がる和紙の照明（明るい＝灯りに見える）
+    box(0.05, 1.0, 0.05, 0, 3.0, 2.2, woodMat)   // 吊り紐
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 12), lampMat); lamp.position.set(0, 2.35, 2.2); lamp.renderOrder = 2; winRoom.add(lamp)
+    box(0.4, 0.06, 0.4, 0, 2.62, 2.2, woodMat); box(0.4, 0.06, 0.4, 0, 2.08, 2.2, woodMat) // 上下の木枠
+    // ちゃぶ台＋座布団（右手前）＝畳に座る暮らし
+    box(1.5, 0.13, 0.95, 1.6, -2.05, 4.2, woodMat) // 卓上
+    for (const [lx, lz] of [[0.62, 0.36], [-0.62, 0.36], [0.62, -0.36], [-0.62, -0.36]]) box(0.1, 0.42, 0.1, 1.6 + lx, -2.35, 4.2 + lz, woodMat) // 脚
+    box(0.18, 0.1, 0.18, 1.45, -1.93, 4.1, accMat) // 卓上の湯のみ
+    box(0.74, 0.1, 0.74, 1.55, -2.43, 3.2, fabMat); box(0.74, 0.1, 0.74, 2.5, -2.43, 4.7, fabMat) // 座布団×2
+    // 隅の観葉植物（大きめ）
+    const cpot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.5, 10), woodMat); cpot.position.set(-3.4, -2.2, 5.3); cpot.renderOrder = 2; winRoom.add(cpot)
+    for (let i = 0; i < 7; i++) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 0), leafMat); lf.position.set(-3.4 + (R() - 0.5) * 0.7, -1.7 + R() * 0.7, 5.3 + (R() - 0.5) * 0.7); lf.renderOrder = 2; winRoom.add(lf) }
+    // 掛け軸（左壁）＋床の間風の低い棚
+    box(0.04, 1.7, 0.52, -3.93, 0.7, 2.7, scrollMat); box(0.06, 0.1, 0.62, -3.93, 1.6, 2.7, woodMat); box(0.06, 0.1, 0.62, -3.93, -0.18, 2.7, woodMat) // 掛け軸＋軸木
+    box(0.7, 0.5, 1.2, -3.7, -2.35, 2.7, woodMat) // 低い棚
+    // 右壁の小棚＋小物
+    box(0.62, 0.08, 1.3, 3.74, 0.2, 3.4, woodMat)
+    box(0.18, 0.34, 0.18, 3.7, 0.42, 3.0, accMat); box(0.16, 0.26, 0.5, 3.7, 0.38, 3.9, scrollMat) // 花瓶＋本
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
   }
@@ -3774,7 +3813,8 @@ export async function mountTown3d(parent, opts = {}) {
     const ex = Math.sin(yaw) * CAM.roomParallaxX * roomAmt
     const ey = eye.y - wo * CAM.winDown - lean * CAM.leanDown + pitch * CAM.roomParallaxY * roomAmt
     const ez = eye.z - wo * CAM.winFwd - lean * CAM.leanFwd
-    const winFov = CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov
+    // 部屋の中でもズーム可（FOVで寄り引き。zoom 0.4=寄り→画角を狭めて窓の外を引き寄せる／3.0=引き）。
+    const winFov = Math.max(26, Math.min(100, (CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov) * (0.55 + 0.45 * active.zoom)))
     const look = new THREE.Vector3(
       ex + Math.sin(yaw) * 18,
       ey - 10.5 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.05, // 既定は見下ろし（手前の木に落ち込み過ぎない程度に）／上スワイプで空・ビル上層も仰げる
@@ -3991,7 +4031,7 @@ export async function mountTown3d(parent, opts = {}) {
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
     const showCruise = active.mode === 'fly' && active.flyP > 0.4
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
-    const showZoom = (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.4 // 空/地上ではズームボタンを出す
+    const showZoom = active.mode === 'window' || active.flyP > 0.4 // 部屋の中（窓辺）でも空/地上でもズームボタンを出す
     if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
@@ -4005,12 +4045,11 @@ export async function mountTown3d(parent, opts = {}) {
       const ro = Math.max(0, 1 - lean * 3.2) // 乗り出すと素早くフェード（カメラが枠へ達する前に消す＝めり込み回避）
       if (Math.abs(ro - roomMatCur) > 0.02) { roomMatCur = ro; for (const m of winRoomMats) m.opacity = ro }
     }
-    // 窓ガラスは引き違いで横へすべって消える。外枠は乗り出すと退く。中央桟・窓台はCSS側を隠す（3D枠を使う）。
-    glass.style.transform = `translateX(${(wo * 96).toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
-    glass.style.opacity = ((1 - wo * 0.92) * (1 - lean)).toFixed(3)
+    // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
+    // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
+    glass.style.opacity = '0'
     cross.style.opacity = '0'
-    frame2.style.transform = `scale(${(1 + lean * 0.55).toFixed(3)})`
-    frame2.style.opacity = Math.max(0, 1 - lean * 1.2).toFixed(3)
+    frame2.style.opacity = '0'
     // 部屋の中ほど周辺を暗く（薄暗い室内から明るい窓を覗く明暗）。静的グラデの不透明度だけ動かす＝軽い。
     const roomDark = roomAmtF * (1 - wo * 0.4)
     if (Math.abs(roomDark - roomDarkCur) > 0.02) { roomDarkCur = roomDark; roomVig.style.opacity = roomDark.toFixed(2) }
