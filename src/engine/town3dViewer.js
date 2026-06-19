@@ -25,7 +25,7 @@ const CAM = {
   winDown: 0.4,     // 窓あけでカメラが下がる量
   winFov: 3.5,      // 窓あけで画角が広がる量(度)
   leanFwd: 9.0,     // 乗り出しでカメラが前へ出る量（枠を越えて街へ顔を出す）
-  leanDown: 4.5,    // 乗り出しでカメラが下がる量
+  leanDown: 2.0,    // 乗り出しでカメラが下がる量（落とし過ぎると窓の下・ベランダ手すりを貫通＝高めの位置で手すりの上から乗り出す）
   leanFov: 7.0,     // 乗り出しで画角が広がる量(度)
   leanLook: 3.2,    // 乗り出しで視線が下を覗き込む量（手前の木立へ落ち込み過ぎない程度に抑制＝評価UX-H2）
   leanPitchUp: 1.10, // 乗り出し時に上を見上げられる範囲（空・ビル上層まで仰げる）。大きいほど上が見える
@@ -2930,14 +2930,16 @@ export async function mountTown3d(parent, opts = {}) {
   let winSashR = null, winSashX0 = 0, winSashX1 = 0 // 引き違いの可動ガラス障子（窓をあけると横へすべる）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
-    const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.3, SX = 3.95, BZ = 6.2, WINCY = 1.0
+    const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
+    const RW = 2 * SX + 0.8, RD = BZ + 0.9, WT = CY + 0.3 // 室の幅/奥行/壁の上端（躯体はこれで一括スケール）
     const C = (d, n) => isNight ? n : d
     // 不透明＝室内が深度を書き込み、手前の壁が奥の壁/家具と「窓の外の街」を遮蔽＝隠れた街の塗り(fill)を早期Zで省く＋
     // 半透明ブレンドの全画面オーバードローをゼロに（カクつきの主因を断つ）。乗り出すとカメラが窓の開口を通って前へ
     // 出るので室内は自然に背後へ退く（フェード不要）。
     const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); m.vertexColors = true; winRoomMats.push(m); return m }
-    // 角をわずかに面取り（街のトゥーンの丸みに合わせ、硬い箱の安っぽさを和らげる）。極薄物は普通の箱。
-    const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.05, Math.min(w, h, d) * 0.24); const g = r > 0.015 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）
+    // 角をわずかに面取り（街のトゥーンの丸みに合わせ、硬い箱の安っぽさを和らげる）。細い桟/薄板は面取りすると角が
+    // 立ってチカチカするので平らな箱にする（しきい値を上げて家具だけ丸める）。
+    const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.05, Math.min(w, h, d) * 0.24); const g = r > 0.032 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）
     const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m }
     const maxAniso = renderer.capabilities.getMaxAnisotropy() // 浅い角度の床テクスチャの明滅(モアレ)を抑える
     const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; return t }
@@ -2962,37 +2964,39 @@ export async function mountTown3d(parent, opts = {}) {
       const p = m.geometry.attributes.position, c = new Float32Array(p.count * 3)
       for (let i = 0; i < p.count; i++) {
         const lz = m.position.z + p.getZ(i), ly = m.position.y + p.getY(i)
-        const near = Math.max(0, 1 - lz / 6.2)             // 窓に近い=1／奥=0（窓からの採光）
-        const lo = Math.min(1, Math.max(0, (ly - FY) / 4.4)) // 床=0／天井=1
+        const near = Math.max(0, 1 - lz / (BZ + 0.4))       // 窓に近い=1／奥=0（窓からの採光）
+        const lo = Math.min(1, Math.max(0, (ly - FY) / (CY - FY + 0.6))) // 床=0／天井=1
         const b = Math.max(0.4, Math.min(1.36, (0.6 + near * 0.74) * (0.86 + lo * 0.2))) // 窓際ほど明るい
         const warm = near * (isNight ? 0.25 : 0.5)         // 窓際は暖色（昼の外光）／奥は素
         c[i * 3] = Math.min(1.5, b * (1 + warm * 0.14)); c[i * 3 + 1] = b; c[i * 3 + 2] = b * (1 - warm * 0.16)
       }
       m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3)); return m
     }
-    // ── 躯体（床=畳／天井=竿縁／奥・両側=砂壁） ──
-    grad(box(8.6, 0.3, 7.4, 0, FY - 0.15, 3.1, tatMat))   // 床（畳）
-    grad(box(8.6, 0.3, 7.4, 0, CY, 3.1, cmat))            // 天井（板目）
-    grad(box(8.6, 5.6, 0.3, 0, 1.1, BZ, wallMat))         // 奥壁
-    grad(box(0.3, 5.6, 7.4, -SX, 1.1, 3.1, wallMat))      // 左壁
-    grad(box(0.3, 5.6, 7.4, SX, 1.1, 3.1, wallMat))       // 右壁
+    // ── 躯体（床=畳／天井=竿縁／奥・両側=砂壁）。RW/RD/WTで一括スケール。 ──
+    const WH = WT - FY + 0.6 // 壁の高さ
+    grad(box(RW, 0.3, RD, 0, FY - 0.15, BZ / 2, tatMat))        // 床（畳）
+    grad(box(RW, 0.3, RD, 0, CY, BZ / 2, cmat))                // 天井（板目）
+    grad(box(RW, WH, 0.3, 0, (WT + FY) / 2, BZ, wallMat))       // 奥壁
+    grad(box(0.3, WH, RD, -SX, (WT + FY) / 2, BZ / 2, wallMat)) // 左壁
+    grad(box(0.3, WH, RD, SX, (WT + FY) / 2, BZ / 2, wallMat))  // 右壁
     // ── 前壁（窓のある壁）。腰壁＋上壁＋左右壁で“ちょうど開ける高さの窓”に。 ──
     const oT = WINCY + owH / 2, oB = WINCY - owH / 2 // 開口の上端/下端
-    grad(box(8.6, 3.6 - oT, 0.3, 0, (oT + 3.6) / 2, 0, wallMat))     // 窓の上の壁
-    box(8.6, oB - (FY - 0.4), 0.3, 0, (oB + FY - 0.4) / 2, 0, wainsMat) // 腰壁（窓の下＝羽目板）
-    grad(box((8.6 - owW) / 2, owH, 0.3, -(owW / 2 + (8.6 - owW) / 4), WINCY, 0, wallMat)) // 窓の左の壁
-    grad(box((8.6 - owW) / 2, owH, 0.3, owW / 2 + (8.6 - owW) / 4, WINCY, 0, wallMat))    // 窓の右の壁
-    box(8.6, 0.1, 0.34, 0, oB - 0.0, 0.1, woodMat) // 腰壁上の見切り（窓台のライン）
+    grad(box(RW, WT - oT, 0.3, 0, (oT + WT) / 2, 0, wallMat))     // 窓の上の壁
+    box(RW, oB - (FY - 0.4), 0.3, 0, (oB + FY - 0.4) / 2, 0, wainsMat) // 腰壁（窓の下＝羽目板）
+    grad(box((RW - owW) / 2, owH, 0.3, -(owW / 2 + (RW - owW) / 4), WINCY, 0, wallMat)) // 窓の左の壁
+    grad(box((RW - owW) / 2, owH, 0.3, owW / 2 + (RW - owW) / 4, WINCY, 0, wallMat))    // 窓の右の壁
+    box(RW, 0.1, 0.34, 0, oB - 0.0, 0.1, woodMat) // 腰壁上の見切り（窓台のライン）
     // アルミサッシの窓枠＋引き違いの召し合わせ（団地/マンションの掃き出し窓）＋窓台
     const alMat = mk(C(0x9ea29e, 0x44484c)) // アルミサッシ（明るすぎる細桟はチカチカするので鈍い銀灰に）
     for (const [w, h, x, y] of [[owW + 0.2, 0.1, 0, oT], [owW + 0.2, 0.1, 0, oB], [0.1, owH + 0.2, -owW / 2 - 0.05, WINCY], [0.1, owH + 0.2, owW / 2 + 0.05, WINCY]]) box(w, h, 0.1, x, y, 0.06, alMat)
     box(0.06, owH, 0.06, 0, WINCY, 0.05, alMat) // 中央の召し合わせ（引き違い）
     box(0.14, 0.06, 0.08, 0.1, WINCY - 0.06, 0.08, alMat) // クレセント錠
     // 引き違いのガラス障子（2枚）。閉=開口を覆う／窓をあけると右の障子が左へすべって右半分が開く（実際の窓の開閉）。
-    const glassTex = cv(64, 64, (x) => { x.fillStyle = 'rgba(190,210,228,0.12)'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,0.34)'; x.lineWidth = 7; x.beginPath(); x.moveTo(6, 64); x.lineTo(44, 0); x.stroke(); x.lineWidth = 3; x.beginPath(); x.moveTo(36, 64); x.lineTo(56, 0); x.stroke() })
+    // ガラスは“ごく淡い映り込み”だけ（景色を曇らせない）。斜めの細い光の筋を1本＋極薄の地色。端はパネルを枠の内側に隠す。
+    const glassTex = cv(64, 64, (x) => { x.fillStyle = 'rgba(206,220,232,0.035)'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,0.2)'; x.lineWidth = 4; x.beginPath(); x.moveTo(10, 64); x.lineTo(46, 0); x.stroke(); x.strokeStyle = 'rgba(255,255,255,0.1)'; x.lineWidth = 2; x.beginPath(); x.moveTo(40, 64); x.lineTo(56, 0); x.stroke() })
     const glassMat = new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, opacity: 1, depthWrite: false, fog: false }); winRoomMats.push(glassMat)
-    const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.02, owH - 0.02), glassMat); lpane.position.set(-owW / 4, WINCY, 0.03); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定）
-    const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.02, owH - 0.02), glassMat); rpane.position.set(owW / 4, WINCY, 0.07); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
+    const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); lpane.position.set(-owW / 4, WINCY, 0.03); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定）
+    const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); rpane.position.set(owW / 4, WINCY, 0.07); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
     winSashR = rpane; winSashX0 = owW / 4; winSashX1 = -owW / 4
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
