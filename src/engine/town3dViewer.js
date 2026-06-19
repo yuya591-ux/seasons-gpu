@@ -32,8 +32,8 @@ const CAM = {
   leanPitchDn: 0.55, // 乗り出し時に下を見下ろせる範囲の拡張（ユーザー要望でさらに下＝足下の街まで覗ける）
   lookPitch: 18,    // 見上げ/見下ろしの効き（pitch→視線の縦移動量）。大きいほど少しのスワイプで大きく振れる
   fov0: 62,         // 基準画角(度)
-  roomParallaxX: 3.0, // 室内視差(横): 見回すと頭が左右にずれて窓越しの景色が動く（部屋の中で覗き込む手応え）。乗り出すと消える
-  roomParallaxY: 2.0, // 室内視差(縦): 見上げ/見下ろしで頭が上下にずれる量
+  roomParallaxX: 4.2, // 室内視差(横): 見回すと頭が左右にずれて窓越しの景色が動く（部屋の中で覗き込む手応え）。乗り出すと消える
+  roomParallaxY: 2.8, // 室内視差(縦): 見上げ/見下ろしで頭が上下にずれる量
 }
 
 // ── 浮遊（空を飛ぶ）／散策（歩く）モードの調整パラメータ ──
@@ -3048,6 +3048,7 @@ export async function mountTown3d(parent, opts = {}) {
   frame2.className = 'town3d-frame'
   stage.appendChild(frame2)
   let clarityCur = -1
+  let roomDarkCur = -1 // 室内の周辺減光の現在値（変化時だけ box-shadow を書き換える）
   // ── 設定（明るさ・描き込み品質）をtown3dに反映する（従来は設定が3Dに全く効かなかった＝UX評価の最重要指摘）。 ──
   // 明るさ: stageのCSSフィルタの brightness に、窓あけclarityの明るさ×ユーザ明るさを合成。描き込み: pixelRatioを即変更。
   let userBright = opts.brightness || 1
@@ -3493,9 +3494,21 @@ export async function mountTown3d(parent, opts = {}) {
   zoomWrap.appendChild(zoomIn); zoomWrap.appendChild(zoomOut); stage.appendChild(zoomWrap)
   let zoomShown = false
   const nudgeZoom = (factor) => { if (!active) return; active.zoomTarget = Math.max(0.4, Math.min(3.0, active.zoomTarget * factor)) }
-  for (const [btn, f] of [[zoomIn, 0.72], [zoomOut, 1.0 / 0.72]]) {
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation() }) // 操舵/ピンチと混ざらないように
-    btn.addEventListener('click', (e) => { e.stopPropagation(); nudgeZoom(f) })
+  let zoomHold = null
+  const stopZoomHold = () => { if (zoomHold) { clearInterval(zoomHold); zoomHold = null } }
+  // ＋寄る／−引く。タップで一段、押しっぱなし(長押し)で連続ズーム、連打でも各タップが効く（確実な寄り引き）。
+  for (const [btn, tap, hold] of [[zoomIn, 0.8, 0.955], [zoomOut, 1 / 0.8, 1 / 0.955]]) {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation()
+      try { btn.setPointerCapture(e.pointerId) } catch { /* 無視 */ }
+      nudgeZoom(tap)                                    // タップで一段
+      stopZoomHold()
+      zoomHold = setInterval(() => nudgeZoom(hold), 55) // 長押しで滑らかに連続ズーム
+    })
+    const end = (e) => { if (e) e.stopPropagation(); stopZoomHold() }
+    btn.addEventListener('pointerup', end)
+    btn.addEventListener('pointercancel', end)
+    btn.addEventListener('pointerleave', end)
   }
 
   function frame() {
@@ -3929,20 +3942,32 @@ export async function mountTown3d(parent, opts = {}) {
     const showCruise = active.mode === 'fly' && active.flyP > 0.4
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
     const showZoom = (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.4 // 空/地上ではズームボタンを出す
-    if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom) }
+    if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
+    // ── 窓の視差: 部屋の中（乗り出していない間）は、手前の窓枠を見回しと逆向きに画面内でずらす。
+    // 近い枠（固定の窓）と遠い景色がはっきりずれて動く＝「部屋の中から窓越しに外を覗いている」手応え。
+    // カメラ側の室内視差(roomParallax)と合わせ、枠が景色の上をすべる。乗り出す(lean)と0になり枠を越えて街へ。
+    const roomAmtF = Math.max(0, 1 - lean)
+    const fpx = -Math.sin(yaw) * 5.4 * roomAmtF       // 右を見ると窓枠が左へ流れる（覗き込む頭の動き）
+    const fpy = Math.max(-1, Math.min(1, pitch)) * 4.4 * roomAmtF // 見上げると窓枠が下へ流れる
     // 窓ガラスと横桟は、あけると横へすべって消える（引き違い窓）。乗り出すと枠ごと外へ退く。
-    glass.style.transform = `translateX(${(wo * 96).toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
+    glass.style.transform = `translate(${(wo * 96 + fpx).toFixed(1)}%, ${fpy.toFixed(1)}%) scale(${(1 + lean * 0.5).toFixed(3)})`
     glass.style.opacity = ((1 - wo * 0.92) * (1 - lean)).toFixed(3)
-    cross.style.transform = `translateX(${(wo * 96).toFixed(1)}%)`
+    cross.style.transform = `translate(${(wo * 96 + fpx).toFixed(1)}%, ${fpy.toFixed(1)}%)`
     cross.style.opacity = ((1 - wo) * (1 - lean)).toFixed(3)
     // サッシ・窓台は乗り出すと拡大しながら退いて外気だけに（枠を通り抜ける手応え）。
     // 乗り出しきったら完全に消す（×0.96/×0.9だと中央の縦桟や枠が4〜10%残って黒い線になる＝指摘の不具合）。
-    frame2.style.transform = `scale(${(1 + lean * 0.55).toFixed(3)})`
+    frame2.style.transform = `translate(${fpx.toFixed(1)}%, ${fpy.toFixed(1)}%) scale(${(1 + lean * 0.55).toFixed(3)})`
     frame2.style.opacity = Math.max(0, 1 - lean * 1.2).toFixed(3)
-    sill.style.transform = `translateY(${(lean * 130).toFixed(1)}%)`
+    // 部屋の中ほど周辺を暗く（薄暗い室内から明るい窓を覗く明暗）。窓を開け／乗り出すと晴れる。変化時だけ書き換え。
+    const roomDark = roomAmtF * (1 - wo * 0.45)
+    if (Math.abs(roomDark - roomDarkCur) > 0.03) {
+      roomDarkCur = roomDark
+      frame2.style.boxShadow = `inset 0 0 0 13px #2b2722, inset 0 0 0 14.5px rgba(255,255,255,0.14), inset 0 0 ${(150 + roomDark * 140).toFixed(0)}px ${(28 + roomDark * 44).toFixed(0)}px rgba(0,0,0,${(0.42 + roomDark * 0.26).toFixed(2)})`
+    }
+    sill.style.transform = `translate(${fpx.toFixed(1)}%, ${(lean * 130 + fpy).toFixed(1)}%)`
     sill.style.opacity = Math.max(0, 1 - lean * 1.18).toFixed(3)
     paper.style.opacity = (0.18 * (1 - lean * 0.6)).toFixed(3) // 紙目をやや強め水彩の手触りに（乗り出すと薄れる）
     // ガラス越しのくすみを、あけ／乗り出しに応じて晴らす（外気が澄む）。変化時だけ書き換え。
@@ -4061,7 +4086,8 @@ export async function mountTown3d(parent, opts = {}) {
       steerLX = e.clientX; steerLY = e.clientY
     } else if (e.pointerId === stickId) setStick(e.clientX - stickOX, e.clientY - stickOY)
     else if (e.pointerId === lookId) {
-      applyTown3dLook((e.clientX - lookLX) / w * -1.0, (e.clientY - lookLY) / h * 1.0)
+      // 横は素直に（右ドラッグ＝右を向く＝マリオ等のゲームと同じ向き）。縦はそのまま（下ドラッグ＝見上げる＝景色を引き寄せる手触り・ユーザー好み）。
+      applyTown3dLook((e.clientX - lookLX) / w * 1.0, (e.clientY - lookLY) / h * 1.0)
       lookLX = e.clientX; lookLY = e.clientY
     }
   }
