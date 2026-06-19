@@ -2747,17 +2747,23 @@ export async function mountTown3d(parent, opts = {}) {
     for (const c of colliders) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
     return false
   }
+  // 水際（海・川）は歩いて踏み込まない＝汀で止まる。歩行のみで使う。
+  const wetAt = (x, z) => kind !== 'yato' && ((x > SEA.coast && heightAt(x, z) < SEA.level + 0.4) || Math.abs(x - RIVER.x) < RIVER.halfW)
   const tryWalk = (pos, dx, dz) => {
     const b = bound
     const nx = Math.max(-b.x, Math.min(b.xMax || b.x, pos.x + dx))
     const nz = Math.max(b.zMin, Math.min(b.zMax, pos.z + dz))
-    if (!blockedAt(nx, pos.z)) pos.x = nx // x方向だけ先に試す（壁に沿って横へ滑る）
-    if (!blockedAt(pos.x, nz)) pos.z = nz // z方向だけ試す
+    if (!blockedAt(nx, pos.z) && !wetAt(nx, pos.z)) pos.x = nx // x方向だけ先に試す（壁/水際に沿って横へ滑る）
+    if (!blockedAt(pos.x, nz) && !wetAt(pos.x, nz)) pos.z = nz // z方向だけ試す
   }
   // 着地地点が建物/樹冠の中なら、空いた近くの地点へそっと退避する（建物や木に埋もれて立たない）。
   const spawnBad = (x, z) => {
     const b = bound
     if (x < -b.x || x > (b.xMax || b.x) || z < b.zMin || z > b.zMax) return true // 箱の外には降りない
+    if (kind !== 'yato') {
+      if (x > SEA.coast && heightAt(x, z) < SEA.level + 0.6) return true // 海・汀には降りない（水没を防ぐ）
+      if (Math.abs(x - RIVER.x) < RIVER.halfW + 1.3) return true // 川には降りない
+    }
     for (const c of spawnAvoid) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
     return false
   }
