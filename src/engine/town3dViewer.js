@@ -504,6 +504,7 @@ export async function mountTown3d(parent, opts = {}) {
   let tug = null // 湾を行き来するタグボート
   let ferry = null // 湾を渡る連絡船
   let balloons = [] // 空を漂う熱気球
+  let fishJumps = [] // 海面で時々跳ねる魚＋波紋
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
@@ -2196,6 +2197,15 @@ export async function mountTown3d(parent, opts = {}) {
         const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.4, 8), toon(0x9aa0a4)); bucket.position.set(-0.5, 0.2, 0.2); g.add(bucket)
       }
       spawnAvoid.push({ x: (x0 + x1) / 2, z: pz, r: 12 }) // 桟橋・海上には降りない
+      // 魚が時々跳ねる（桟橋・磯のあたりの海面）＋広がる波紋。海辺の生き物の気配。
+      const fishMat = toon(0xa8c0cc), rippleMat = new THREE.MeshBasicMaterial({ color: 0xeef2f4, transparent: true, opacity: 0.4, depthWrite: false, fog: true })
+      for (const sp of [[89, -10], [93, -24], [87, -34], [95, -15], [91, -45]]) {
+        const fish = new THREE.Group(); fish.visible = false; town.add(fish)
+        const bodyF = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.66, 3, 6), fishMat); bodyF.rotation.z = Math.PI / 2; fish.add(bodyF)
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.42, 4), fishMat); tail.rotation.z = -Math.PI / 2; tail.position.x = -0.58; fish.add(tail)
+        const ripple = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 5, 18), rippleMat.clone()); ripple.rotation.x = -Math.PI / 2; ripple.position.set(sp[0], SEA.level + 0.12, sp[1]); ripple.visible = false; town.add(ripple)
+        fishJumps.push({ fish, ripple, x: sp[0], z: sp[1], t0: R() * 8, period: 6 + R() * 5, jumpDur: 1.1 })
+      }
     }
 
     // ── 砂浜の海の家＋ビーチパラソル＋浮き輪。夏の海辺の賑わい。──
@@ -3426,6 +3436,12 @@ export async function mountTown3d(parent, opts = {}) {
       const x = u.cx + Math.cos(a) * u.rad, z = u.cz + Math.sin(a) * u.rad * 0.6
       tug.position.set(x, SEA.level + 0.2 + Math.sin(t * 0.8) * 0.1, z)
       tug.rotation.y = -a + Math.PI / 2; tug.rotation.z = Math.sin(t * 0.7) * 0.04
+    }
+    for (const fj of fishJumps) { // 魚が放物線で跳ね、波紋が広がる
+      const cy = (t - fj.t0) % fj.period
+      if (cy < fj.jumpDur) { const p = cy / fj.jumpDur; fj.fish.visible = true; fj.fish.position.set(fj.x, SEA.level + Math.sin(p * Math.PI) * 2.2, fj.z); fj.fish.rotation.z = (p - 0.5) * 2.4 } else fj.fish.visible = false
+      const rd = 2.2 // 波紋の寿命
+      if (cy < rd) { fj.ripple.visible = true; const rp = cy / rd; fj.ripple.scale.setScalar(0.3 + rp * 3.0); fj.ripple.material.opacity = 0.45 * (1 - rp) } else fj.ripple.visible = false
     }
     for (const g of balloons) { // 熱気球が空をゆっくり漂う
       const u = g.userData, a = t * u.sp + u.ph
