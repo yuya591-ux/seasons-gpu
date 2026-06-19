@@ -2938,10 +2938,12 @@ export async function mountTown3d(parent, opts = {}) {
     // 角をわずかに面取り（街のトゥーンの丸みに合わせ、硬い箱の安っぽさを和らげる）。極薄物は普通の箱。
     const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.05, Math.min(w, h, d) * 0.24); const g = r > 0.015 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）
     const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m }
-    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
+    const maxAniso = renderer.capabilities.getMaxAnisotropy() // 浅い角度の床テクスチャの明滅(モアレ)を抑える
+    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; return t }
     // テクスチャ: 畳・天井板・カレンダー・障子
-    const tatTex = cv(256, 256, (x) => { x.fillStyle = C('#9a9c5e', '#3a3c2c'); x.fillRect(0, 0, 256, 256); x.strokeStyle = 'rgba(0,0,0,0.05)'; x.lineWidth = 1; for (let y = 0; y < 256; y += 4) { x.beginPath(); x.moveTo(0, y); x.lineTo(256, y); x.stroke() } x.strokeStyle = C('#2c2a1c', '#15140d'); x.lineWidth = 8; x.strokeRect(3, 3, 122, 250); x.strokeRect(131, 3, 122, 250) })
-    tatTex.wrapS = tatTex.wrapT = THREE.RepeatWrapping; tatTex.repeat.set(2, 2)
+    // 畳の目は粗く・低コントラストに（4px間隔の細線はモアレでチカチカするので避ける）。縁(畳縁)だけ残す。
+    const tatTex = cv(256, 256, (x) => { x.fillStyle = C('#9a9c5e', '#3a3c2c'); x.fillRect(0, 0, 256, 256); x.strokeStyle = 'rgba(0,0,0,0.035)'; x.lineWidth = 3; for (let y = 8; y < 256; y += 20) { x.beginPath(); x.moveTo(0, y); x.lineTo(256, y); x.stroke() } x.strokeStyle = C('#403c28', '#191811'); x.lineWidth = 7; x.strokeRect(3, 3, 122, 250); x.strokeRect(131, 3, 122, 250) })
+    tatTex.wrapS = tatTex.wrapT = THREE.RepeatWrapping; tatTex.repeat.set(1.5, 1.5)
     const ceilTex = cv(128, 128, (x) => { x.fillStyle = C('#4a3e2c', '#211c16'); x.fillRect(0, 0, 128, 128); x.strokeStyle = 'rgba(0,0,0,0.34)'; x.lineWidth = 3; for (let i = 0; i <= 128; i += 22) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 128); x.stroke() } })
     ceilTex.wrapS = ceilTex.wrapT = THREE.RepeatWrapping; ceilTex.repeat.set(3, 3)
     const calTex = cv(64, 88, (x) => { x.fillStyle = '#efe9da'; x.fillRect(0, 0, 64, 88); x.fillStyle = '#b83c30'; x.fillRect(0, 0, 64, 20); x.fillStyle = 'rgba(70,58,46,0.55)'; for (let r = 0; r < 5; r++) for (let cc2 = 0; cc2 < 7; cc2++) x.fillRect(5 + cc2 * 8, 26 + r * 11, 5, 7) })
@@ -2981,14 +2983,14 @@ export async function mountTown3d(parent, opts = {}) {
     grad(box((8.6 - owW) / 2, owH, 0.3, owW / 2 + (8.6 - owW) / 4, WINCY, 0, wallMat))    // 窓の右の壁
     box(8.6, 0.1, 0.34, 0, oB - 0.0, 0.1, woodMat) // 腰壁上の見切り（窓台のライン）
     // アルミサッシの窓枠＋引き違いの召し合わせ（団地/マンションの掃き出し窓）＋窓台
-    const alMat = mk(C(0xbcc0c4, 0x4c5056))
+    const alMat = mk(C(0x9ea29e, 0x44484c)) // アルミサッシ（明るすぎる細桟はチカチカするので鈍い銀灰に）
     for (const [w, h, x, y] of [[owW + 0.2, 0.1, 0, oT], [owW + 0.2, 0.1, 0, oB], [0.1, owH + 0.2, -owW / 2 - 0.05, WINCY], [0.1, owH + 0.2, owW / 2 + 0.05, WINCY]]) box(w, h, 0.1, x, y, 0.06, alMat)
     box(0.06, owH, 0.06, 0, WINCY, 0.05, alMat) // 中央の召し合わせ（引き違い）
     box(0.14, 0.06, 0.08, 0.1, WINCY - 0.06, 0.08, alMat) // クレセント錠
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
     // ベランダの手すり（窓の外・下＝団地の上階から街を見下ろす気配）。室内と一緒に乗り出すと退く。
-    const railMat = mk(C(0xc4c0b6, 0x3e424a))
+    const railMat = mk(C(0xa6a298, 0x3a3e44)) // ベランダ手すり（鈍い色でチカチカ抑制）
     box(owW + 0.7, 0.08, 0.08, 0, oB + 0.62, -0.55, railMat); box(owW + 0.7, 0.08, 0.08, 0, oB + 0.04, -0.55, railMat) // 上下の手すり桟
     for (let i = -3; i <= 3; i++) box(0.05, 0.62, 0.05, i * ((owW + 0.5) / 6.2), oB + 0.33, -0.55, railMat) // 縦の手すり子
     // ── 天井から下がる和紙の照明（昭和の傘＋裸電球。明るい＝灯り） ──
@@ -3843,8 +3845,8 @@ export async function mountTown3d(parent, opts = {}) {
     // 見回しを目標へ滑らかに追従（イージング＝指を離しても余韻があるヌルヌルの見回し）
     active.yaw += (active.yawTarget - active.yaw) * 0.16
     active.pitch += (active.pitchTarget - active.pitch) * 0.16
-    // 見回し（息づかいの微揺れ付き）
-    const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
+    // 見回し（息づかいの微揺れ付き。細い桟/畳がチカチカするので微揺れは控えめに）
+    const yaw = active.yaw + Math.sin(t * 0.2) * 0.004
     const pitch = active.pitch
     // 窓をあけると視界がふっと前へ開け(=控えめ)、乗り出すとさらに前へ・下へ寄って画角が広がる（枠を越えて街へ顔を出す）
     // 室内視差: 部屋の中（乗り出していない間）は、見回しに連れてカメラがわずかに平行移動する＝頭を動かして
@@ -3857,7 +3859,7 @@ export async function mountTown3d(parent, opts = {}) {
     const winFov = Math.max(26, Math.min(100, (CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov) * (0.55 + 0.45 * active.zoom)))
     const look = new THREE.Vector3(
       ex + Math.sin(yaw) * 18,
-      ey - 10.5 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.05, // 既定は見下ろし（手前の木に落ち込み過ぎない程度に）／上スワイプで空・ビル上層も仰げる
+      ey - 10.5 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.014, // 既定は見下ろし（手前の木に落ち込み過ぎない程度に）／上スワイプで空・ビル上層も仰げる
       ez - Math.cos(yaw) * 22,
     )
     active.winLook.copy(look) // 飛び立つ瞬間の視線引き継ぎ用に、窓ビューの注視点を毎フレーム保持
