@@ -2639,8 +2639,12 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── ふわふわの雲（白い球の塊＝立体的な積雲。底は平ら・上は盛り上がり、雲底は翳って立体に） ──
   const clouds = []
-  const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })       // 陽の当たる白
-  const cloudBot = new THREE.MeshToonMaterial({ color: isNight ? 0x767e92 : 0xe9e4dc, gradientMap: grad, fog: false }) // 影になる雲底（やわらかな陰＝厚みは残しつつ、見上げても重い灰の天井に見せない）
+  // 雪は一面の明るい空＝トゥーンの陰影で雲底が暗く落ちると「重い灰の天井」に見える。雪天だけ陰影を持たない
+  // フラット材(MeshBasic)にし、淡い白〜冷灰のやわらかな曇り空に溶かす（積雲の翳りは晴天/夜のみ）。
+  const SNOWY = weather === 'snow'
+  const mkCloud = (col) => SNOWY ? new THREE.MeshBasicMaterial({ color: col, fog: false }) : new THREE.MeshToonMaterial({ color: col, gradientMap: grad, fog: false })
+  const cloudMat = mkCloud(SNOWY ? 0xf6f4f0 : 0xfbfaf6)       // 陽の当たる白（雪天は少し落として白飛びを抑える）
+  const cloudBot = mkCloud(isNight ? 0x767e92 : (SNOWY ? 0xe6e9ee : 0xe9e4dc)) // 影になる雲底（やわらかな陰。雪天は淡い冷灰でほぼ均一＝明るい空に溶ける）
   // 数を増やし高さを少し下げて、縦窓の狭い視界でも空が間延びしないように（light端末は控えめ）。
   const cloudN = LIGHT ? 10 : 16
   for (let i = 0; i < cloudN; i++) {
