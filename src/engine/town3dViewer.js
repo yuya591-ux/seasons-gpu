@@ -1489,36 +1489,43 @@ export async function mountTown3d(parent, opts = {}) {
   const leafBaseMats = leafBase.map(toon)
   const leafHiMats = leafHi.map(toon)
   const treesArr = []
+  const trunkGeos = [] // 全ての幹を1メッシュへ統合（静止＝ドローコール大幅削減）
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
     const r = 1.6 + R() * 1.4
-    const ci = (R() * leafBaseMats.length) | 0 // 木ごとの「種」（下＝陰色／上＝陽色の対を揃える）
+    const ci = (R() * leafBaseMats.length) | 0
     const det = scale > 1.4 ? 2 : 1 // 近景の大木だけ細分を上げて輪郭を丸く（奥は1=軽量）
-    // 樹形のばらつき＝同形のロリポップ畑を脱す（評価 美術-H3）。縦長(杉檜風)/横広(落葉樹の傘)/標準を振る。
+    // 樹形のばらつき＝同形のロリポップ畑を脱す。縦長(杉檜風)/横広(落葉樹の傘)/標準を振る。
     const form = R()
     const tall = form > 0.68, broad = form < 0.28
     const trunkH = tall ? 3.0 : broad ? 1.7 : 2.3
     const ax = broad ? 1.32 : tall ? 0.72 : 1.06           // 樹冠の横倍率
     const ay = tall ? 1.5 : broad ? 0.74 : 0.9 + R() * 0.16 // 樹冠の縦倍率
-    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.36, trunkH, det > 1 ? 9 : 6), trunkMat)
-    tr.position.y = trunkH / 2; tr.castShadow = true; g.add(tr)
-    // 主房（陰の濃色）を縦長/横広に変形＝輪郭を木ごとに変える。
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, det), leafBaseMats[ci])
-    leaf.position.y = trunkH + r * ay * 0.5; leaf.scale.set(ax, ay, ax); leaf.castShadow = true; g.add(leaf)
-    // 房を上＋横へ不規則に重ねる（陽の淡色／陰の濃色を交互）＝樹冠の不整形・綿玉脱却。
-    // 近景の額装木立は房を多く（豊か）、奥の木は1〜2に抑える（霞むので軽量＝ドローコール削減）。
-    // 近景の大木は房を増やして不整形の豊かな樹冠に（歩いて見上げる木が綿玉にならない）。奥は軽量に据え置き。
+    const tilt = (R() - 0.5) * 0.12 // わずかな基準傾き
+    // 幹: 木ごとの world 変換を焼き込んで trunkGeos へ（後でまとめて1メッシュ・静止）。
+    const tg = new THREE.CylinderGeometry(0.2, 0.36, trunkH, det > 1 ? 9 : 6)
+    tg.applyMatrix4(new THREE.Matrix4().makeTranslation(0, trunkH / 2, 0))
+    tg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, gy, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, tilt)), new THREE.Vector3(scale, scale, scale)))
+    trunkGeos.push(tg)
+    // 葉: 主房＋房をローカルで作り1つへ統合（木ごとに1メッシュ。陰色で統一＝トゥーンの陰影で立体感）。
+    const leafGeos = []
+    const main = new THREE.IcosahedronGeometry(r, det)
+    main.applyMatrix4(new THREE.Matrix4().makeScale(ax, ay, ax)); main.applyMatrix4(new THREE.Matrix4().makeTranslation(0, trunkH + r * ay * 0.5, 0))
+    leafGeos.push(main)
     const nC = scale > 1.4 ? 3 + ((R() * 2) | 0) : 1 + (R() < 0.45 ? 1 : 0)
     for (let k = 0; k < nC; k++) {
-      const cr = r * (0.44 + R() * 0.42)
-      const cl = new THREE.Mesh(new THREE.IcosahedronGeometry(cr, det), (k % 2 ? leafHiMats : leafBaseMats)[ci])
-      cl.position.set((R() - 0.5) * r * ax * 1.5, trunkH + r * ay * (0.42 + (k + 1) / (nC + 1) * 0.95), (R() - 0.4) * r * ax * 1.1)
-      cl.scale.setScalar(0.85 + R() * 0.3); cl.castShadow = true; g.add(cl)
+      const cr = r * (0.44 + R() * 0.42), s = 0.85 + R() * 0.3
+      const cg = new THREE.IcosahedronGeometry(cr, det)
+      cg.applyMatrix4(new THREE.Matrix4().makeScale(s, s, s))
+      cg.applyMatrix4(new THREE.Matrix4().makeTranslation((R() - 0.5) * r * ax * 1.5, trunkH + r * ay * (0.42 + (k + 1) / (nC + 1) * 0.95), (R() - 0.4) * r * ax * 1.1))
+      leafGeos.push(cg)
     }
-    g.position.set(x, gy, z); g.scale.setScalar(scale); town.add(g)
-    g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02, tilt: (R() - 0.5) * 0.12 } // わずかな基準傾き＝不揃いの自然さ
-    g.rotation.z = g.userData.tilt
+    const merged = BufferGeometryUtils.mergeGeometries ? BufferGeometryUtils.mergeGeometries(leafGeos, false) : leafGeos[0]
+    leafGeos.forEach((lg) => { if (lg !== merged) lg.dispose() })
+    const leafMesh = new THREE.Mesh(merged, leafBaseMats[ci]); leafMesh.castShadow = true; g.add(leafMesh)
+    g.position.set(x, gy, z); g.scale.setScalar(scale); g.rotation.z = tilt; town.add(g)
+    g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02, tilt }
     colliders.push({ x, z, r: scale * 0.35 + 0.3 })   // 歩行: 幹だけ避ける（樹冠の下はくぐれる）
     spawnAvoid.push({ x, z, r: scale * 1.7 + 0.5 })   // 着地: 樹冠に埋もれて降りない
     treesArr.push(g)
@@ -2786,6 +2793,13 @@ export async function mountTown3d(parent, opts = {}) {
     seasonFall = { pts, pos, spd, phs, N, bx, bz, R0, floor, swirl: season === 'spring' ? 2.2 : 2.8 }
   }
 
+  // 全ての木の幹を1メッシュへ統合（静止）＝ドローコールを大きく削る（葉は木ごとに揺れるので別）。
+  if (trunkGeos.length && BufferGeometryUtils.mergeGeometries) {
+    const tm = BufferGeometryUtils.mergeGeometries(trunkGeos, false)
+    if (tm) { const trunks = new THREE.Mesh(tm, trunkMat); trunks.castShadow = true; trunks.receiveShadow = true; town.add(trunks) }
+    trunkGeos.forEach((g) => g.dispose())
+  }
+
   // ── カメラ（高台のマンション上階の窓から見下ろす）。谷戸は少し低く寄せて谷を見渡す ──
   const camera = new THREE.PerspectiveCamera(62, W / H, 0.5, 600)
   const eye = kind === 'yato'
@@ -3817,6 +3831,7 @@ export async function mountTown3d(parent, opts = {}) {
       yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2),
       vel: +Math.hypot(active.vel.x, active.vel.y, active.vel.z).toFixed(2), mvX: +active.moveX.toFixed(2), mvY: +active.moveY.toFixed(2), bank: +active.bankCur.toFixed(2),
     })
+    window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2) } } // 検証用: 描画コール/三角形/オブジェクト数
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
