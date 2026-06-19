@@ -2376,11 +2376,12 @@ export async function mountTown3d(parent, opts = {}) {
     const snowField = WIN ? mottleMat(0xdce6f0, 34, 0.12, [1, 1]) : null // 雪をかぶった田（淡い青の起伏の影＝段々が読める）
     const iceField = WIN ? mottleMat(0xc4d6e2, 26, 0.14, [1, 1]) : null  // 凍った水面（薄氷の青）
     for (let pz = -44; pz <= 2.5; pz += 5.6) {
+      const rowR = R() // 段ごとの作付けの素＝同じ段は似た材になり「棚田が段で揃う」。市松のばらつき(散漫なタイル感)を脱す
       for (let px = -11; px <= 11; px += 5.6) {
         const jx = (R() - 0.5) * 0.5
         const gy = heightAt(px + jx, pz)
-        const r = R()
-        const w = 4.9 + R() * 0.4
+        const r = rowR * 0.64 + R() * 0.36 // 段の傾向6.4割＋区画ごとのゆらぎ＝段で揃いつつ単調にならない
+        const w = 5.28 + R() * 0.28 // 区画を広げ隙間を詰める（5.6格子にほぼ接する＝割れたタイルの隙間を消す）
         // 冬=雪原主体＋凍った水面、夏=水鏡主体＋青田、秋=刈田主体＋水鏡少なめ。一部の水は陽を照り返す。
         const paddy = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, w),
           WIN
