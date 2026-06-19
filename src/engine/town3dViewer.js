@@ -500,6 +500,7 @@ export async function mountTown3d(parent, opts = {}) {
   let gulls = [] // 海鳥（湾の上を旋回する）
   let crane = null // ガントリークレーンの動く部分（トロリー＋フック）
   let tug = null // 湾を行き来するタグボート
+  let ferry = null // 湾を渡る連絡船
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
@@ -1982,6 +1983,19 @@ export async function mountTown3d(parent, opts = {}) {
         const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 1.0, 8), toon(0xc24a33)); funnel.position.set(0, 2.0, -1.0); tug.add(funnel)
         tug.userData = { cx: 92, cz: -56, rad: 13 }
       }
+      // 連絡船（湾を大きな楕円で渡る客船。二層の甲板・窓・煙突。夜は窓が灯る）
+      {
+        ferry = new THREE.Group(); ferry.position.set(88, SEA.level + 0.2, -38); town.add(ferry)
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(8.4, 2.0, 2.8), toon(0x2f5a86)); hull.position.y = 1.0; hull.castShadow = true; ferry.add(hull)
+        const hullTop = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.5, 2.9), toon(0xeae4d6)); hullTop.position.y = 2.1; ferry.add(hullTop)
+        const deck1 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.5, 2.4), toon(0xf0ece2)); deck1.position.set(-0.3, 3.1, 0); deck1.castShadow = true; ferry.add(deck1)
+        const deck2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.3, 2.1), toon(0xf0ece2)); deck2.position.set(-0.6, 4.4, 0); ferry.add(deck2)
+        const wheelhouse = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 2.0), toon(0xe2dccf)); wheelhouse.position.set(2.4, 3.0, 0); ferry.add(wheelhouse) // 船橋（前方）
+        const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.56, 1.8, 10), toon(0xc24a33)); funnel.position.set(-1.4, 5.4, 0); ferry.add(funnel)
+        const winMat = duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffe6b0, fog: true }) : toon(0x39474f)
+        for (const dy of [3.1, 4.4]) for (const dz of [-1.16, 1.16]) { const w = new THREE.Mesh(new THREE.BoxGeometry(dy > 4 ? 3.8 : 5.6, 0.6, 0.05), winMat); w.position.set(-0.4, dy, dz); ferry.add(w) }
+        ferry.userData = { cx: 88, cz: -46, rx: 15, rz: 17 }
+      }
       spawnAvoid.push({ x: hx, z: hz, r: HARBOR.r })
     }
 
@@ -3282,6 +3296,13 @@ export async function mountTown3d(parent, opts = {}) {
       const x = u.cx + Math.cos(a) * u.rad, z = u.cz + Math.sin(a) * u.rad * 0.6
       tug.position.set(x, SEA.level + 0.2 + Math.sin(t * 0.8) * 0.1, z)
       tug.rotation.y = -a + Math.PI / 2; tug.rotation.z = Math.sin(t * 0.7) * 0.04
+    }
+    if (ferry) { // 連絡船が湾を大きな楕円で渡る
+      const u = ferry.userData, a = -t * 0.07 + 1.2 // タグと逆回りでゆっくり
+      const x = u.cx + Math.cos(a) * u.rx, z = u.cz + Math.sin(a) * u.rz
+      const x2 = u.cx + Math.cos(a + 0.02) * u.rx, z2 = u.cz + Math.sin(a + 0.02) * u.rz
+      ferry.position.set(x, SEA.level + 0.2 + Math.sin(t * 0.6) * 0.08, z)
+      ferry.rotation.y = Math.atan2(x2 - x, z2 - z); ferry.rotation.z = Math.sin(t * 0.5) * 0.025
     }
     for (const tr of [train, train2]) if (tr) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
       const u = tr.userData
