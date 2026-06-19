@@ -1014,11 +1014,15 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = -3; i <= 3; i++) { const lt = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), lightMat); lt.position.set(i * 1.3, 5.75, 0); grp.add(lt) } // アーチ上の灯り
     // 提灯（赤い提灯を通り沿いに連ねる）
     const lantMat = toon(0xc23a2e), capMat = toon(0x2a2622)
+    const lanBodies = [], lanCaps = [] // 提灯の胴/笠を1メッシュずつへ統合（ドローコール削減）
     for (const lx of [-2.9, 2.9]) for (let z = -15; z > -40; z -= 3.0) {
-      const lan = new THREE.Group(); lan.position.set(lx, heightAt(lx, z) + 3.8, z)
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 10), lantMat); body.scale.y = 1.15; lan.add(body)
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.21, 0.1, 8), capMat); cap.position.y = 0.33; lan.add(cap)
-      town.add(lan)
+      const ly = heightAt(lx, z) + 3.8
+      const bg = new THREE.CylinderGeometry(0.32, 0.32, 0.5, 10); bg.scale(1, 1.15, 1); bg.translate(lx, ly, z); lanBodies.push(bg)
+      const cg = new THREE.CylinderGeometry(0.15, 0.21, 0.1, 8); cg.translate(lx, ly + 0.33, z); lanCaps.push(cg)
+    }
+    if (BufferGeometryUtils.mergeGeometries) {
+      const bm = BufferGeometryUtils.mergeGeometries(lanBodies, false); if (bm) town.add(new THREE.Mesh(bm, lantMat)); lanBodies.forEach((g) => g.dispose())
+      const cm = BufferGeometryUtils.mergeGeometries(lanCaps, false); if (cm) town.add(new THREE.Mesh(cm, capMat)); lanCaps.forEach((g) => g.dispose())
     }
     // 店先（通りの両側に小さな店＝庇のテント・暖簾・看板・夕夜は灯る店窓）。通りを「商店街」に。
     const shopCols = [0xd8c8a8, 0xcfa886, 0xc8bfa8, 0xd0b090, 0xc6c0b0], awnCols = [0xc0453a, 0x3a7a5e, 0x3a6a8a, 0xc89030]
@@ -1696,10 +1700,15 @@ export async function mountTown3d(parent, opts = {}) {
         const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 1.6, 4), toon(0x55585e)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.castShadow = true; yag.add(roof)
         // 放射状の提灯（やぐら頂上→周囲のポールへ。黄/赤/青）
         const lantCols = [toon(0xe8a838), redMat, toon(0x3a8ac0)], NP = LIGHT ? 5 : 8, poleR = 9.5
+        const poleGeos = [], lanGeos = [[], [], []] // ポール・提灯を色ごとに統合（ドローコール削減）
         for (let i = 0; i < NP; i++) {
           const a = i / NP * 6.283, ppx = yx + Math.cos(a) * poleR, ppz = yz + Math.sin(a) * poleR, pgy = heightAt(ppx, ppz)
-          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 6), woodMat); pole.position.set(ppx, pgy + 2.5, ppz); town.add(pole)
-          for (let k = 1; k <= 4; k++) { const tt = k / 5; const lx2 = yx + (ppx - yx) * tt, lz2 = yz + (ppz - yz) * tt, ly2 = (ygy + 5.8) + ((pgy + 5) - (ygy + 5.8)) * tt - 0.2; const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), lantCols[k % 3]); lan.scale.y = 1.2; lan.position.set(lx2, ly2, lz2); town.add(lan) }
+          const pg2 = new THREE.CylinderGeometry(0.08, 0.1, 5, 6); pg2.translate(ppx, pgy + 2.5, ppz); poleGeos.push(pg2)
+          for (let k = 1; k <= 4; k++) { const tt = k / 5; const lx2 = yx + (ppx - yx) * tt, lz2 = yz + (ppz - yz) * tt, ly2 = (ygy + 5.8) + ((pgy + 5) - (ygy + 5.8)) * tt - 0.2; const lg = new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8); lg.scale(1, 1.2, 1); lg.translate(lx2, ly2, lz2); lanGeos[k % 3].push(lg) }
+        }
+        if (BufferGeometryUtils.mergeGeometries) {
+          const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, woodMat)); poleGeos.forEach((g) => g.dispose())
+          for (let c = 0; c < 3; c++) { if (lanGeos[c].length) { const lm = BufferGeometryUtils.mergeGeometries(lanGeos[c], false); if (lm) town.add(new THREE.Mesh(lm, lantCols[c])); lanGeos[c].forEach((g) => g.dispose()) } }
         }
         // 屋台×4（縁沿い。暖簾の品書き）
         const stallWords = ['たこやき', 'わたあめ', 'かきごおり', 'やきとり']
@@ -2587,9 +2596,12 @@ export async function mountTown3d(parent, opts = {}) {
     if (duskAmt > 0.25) {
       const bulbA = new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }), bulbB = new THREE.MeshBasicMaterial({ color: 0xff9a6a, fog: true }), bulbC = new THREE.MeshBasicMaterial({ color: 0x86c0e8, fog: true })
       const NB = LIGHT ? 20 : 40 // 非力端末は電飾を半分に
-      for (let i = 0; i < NB; i++) { const a = i / NB * 6.283; const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 6), [bulbA, bulbB, bulbC][i % 3]); bulb.position.set(Math.cos(a) * R0, Math.sin(a) * R0, 0.22); wheel.add(bulb) }
-      const hub = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), bulbA); hub.position.z = 0.3; wheel.add(hub)
-      if (!LIGHT) for (let i = 0; i < N; i++) { const a = (i / N) * 6.283; const sb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), bulbA); sb.position.set(Math.cos(a) * R0 * 0.52, Math.sin(a) * R0 * 0.52, 0.22); wheel.add(sb) }
+      // 豆電球を色ごとに1メッシュへ統合（車輪と一緒に回る。ドローコール削減）
+      const gA = [], gB = [], gC = [], ball = new THREE.SphereGeometry(0.17, 6, 6)
+      for (let i = 0; i < NB; i++) { const a = i / NB * 6.283; const b = ball.clone(); b.translate(Math.cos(a) * R0, Math.sin(a) * R0, 0.22); [gA, gB, gC][i % 3].push(b) }
+      const hubG = new THREE.SphereGeometry(0.5, 8, 8); hubG.translate(0, 0, 0.3); gA.push(hubG)
+      if (!LIGHT) { const sball = new THREE.SphereGeometry(0.12, 6, 6); for (let i = 0; i < N; i++) { const a = (i / N) * 6.283; const s = sball.clone(); s.translate(Math.cos(a) * R0 * 0.52, Math.sin(a) * R0 * 0.52, 0.22); gA.push(s) } }
+      for (const [geos, mat] of [[gA, bulbA], [gB, bulbB], [gC, bulbC]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) wheel.add(new THREE.Mesh(m, mat)); geos.forEach((g) => g.dispose()) } }
     }
     ferris = { wheel, gondolas }
   }
