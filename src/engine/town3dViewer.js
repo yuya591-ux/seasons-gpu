@@ -2437,6 +2437,35 @@ export async function mountTown3d(parent, opts = {}) {
     g.userData = { dir, lane: dir > 0 ? -1.5 : 1.5, speed: 7 + R() * 5, z: -90 + R() * 110 }
     town.add(g); cars.push(g)
   }
+  // バス（街道を走る大型車。クリーム＋緑帯・夜は室内灯）。cars に混ぜて同じ流れで走る。
+  for (let b = 0; b < 2; b++) {
+    const g = new THREE.Group()
+    const body = new THREE.Mesh(new RoundedBoxGeometry(2.0, 2.3, 6.6, 2, 0.3), toon(0xe8e2d0)); body.position.y = 1.3; body.castShadow = true; g.add(body)
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(2.04, 0.42, 6.62), toon(0x4a8a5a)); belt.position.y = 0.95; g.add(belt)
+    const win = new THREE.Mesh(new THREE.BoxGeometry(2.06, 0.72, 5.6), glassMat); win.position.y = 1.7; g.add(win)
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(2.0, 0.2, 6.4, 1, 0.1), toon(0xe8e2d0)); roof.position.y = 2.45; roof.castShadow = true; g.add(roof)
+    for (const wx of [-0.95, 0.95]) for (const wz of [-2.1, 2.1]) { const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.22, 12), wheelMat); wheel.rotation.z = Math.PI / 2; wheel.position.set(wx, 0.42, wz); g.add(wheel) }
+    const dir = b === 0 ? 1 : -1
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.18, 0.08), new THREE.MeshBasicMaterial({ color: 0xc23a2c, fog: true })); tail.position.set(0, 0.8, dir > 0 ? 3.34 : -3.34); g.add(tail)
+    if (duskAmt > 0.2) { const light = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.22, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true })); light.position.set(0, 0.78, dir > 0 ? -3.34 : 3.34); g.add(light); const inl = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.5, 5.4), new THREE.MeshBasicMaterial({ color: 0xffe0a0, fog: true })); inl.position.y = 1.7; g.add(inl) }
+    g.userData = { dir, lane: dir > 0 ? -1.7 : 1.7, speed: 5 + R() * 2, z: -90 + R() * 120 }
+    town.add(g); cars.push(g)
+  }
+  // 駅前のロータリー（島・植栽）＋バス停（上屋・ベンチ・丸看板）。駅(34,-44)の手前。
+  {
+    const rx = 31, rz = -36, ry = heightAt(rx, rz)
+    const curb = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.28, 6, 20), toon(0xb6b0a4)); curb.rotation.x = Math.PI / 2; curb.position.set(rx, ry + 0.22, rz); town.add(curb)
+    const isle = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.0, 0.32, 20), toon(season === 'spring' ? 0x7a9a4e : season === 'autumn' ? 0x9a8048 : 0x6e8a4e)); isle.position.set(rx, ry + 0.16, rz); isle.receiveShadow = true; town.add(isle)
+    tree(rx, rz, 1.2 + R() * 0.3)
+    const stopX = rx - 5.5, stopZ = rz - 1, sgy = heightAt(stopX, stopZ)
+    const sg = new THREE.Group(); sg.position.set(stopX, sgy, stopZ); town.add(sg)
+    const proof = new THREE.Mesh(new THREE.BoxGeometry(3, 0.16, 1.6), toon(0x6a8a9a)); proof.position.set(0, 2.6, 0); proof.castShadow = true; sg.add(proof)
+    for (const px of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6), toon(0x8a8680)); post.position.set(px, 1.3, -0.6); sg.add(post) }
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 0.4), toon(0x8a6a48)); bench.position.set(0, 0.5, -0.5); sg.add(bench)
+    const signpost = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6), toon(0x8a8680)); signpost.position.set(1.7, 1.2, 0.5); sg.add(signpost)
+    const sign = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 16), new THREE.MeshBasicMaterial({ color: 0xf0ece0 })); sign.rotation.x = Math.PI / 2; sign.position.set(1.7, 2.4, 0.5); sg.add(sign)
+    colliders.push({ x: rx, z: rz, r: 3.2 })
+  }
 
   // ── 歩く住民（歩道を行き交う小さな人影）＋ランドマークの賑わい ──
   const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8]
