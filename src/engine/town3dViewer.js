@@ -1014,6 +1014,22 @@ export async function mountTown3d(parent, opts = {}) {
       const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.21, 0.1, 8), capMat); cap.position.y = 0.33; lan.add(cap)
       town.add(lan)
     }
+    // 店先（通りの両側に小さな店＝庇のテント・暖簾・看板・夕夜は灯る店窓）。通りを「商店街」に。
+    const shopCols = [0xd8c8a8, 0xcfa886, 0xc8bfa8, 0xd0b090, 0xc6c0b0], awnCols = [0xc0453a, 0x3a7a5e, 0x3a6a8a, 0xc89030]
+    const shopLit = duskAmt > 0.2, norenWords = ['しょくどう', 'やおや', 'さかなや', 'とこや', 'パンや', 'せん']
+    for (const side of [-1, 1]) {
+      for (let z = -14.5; z > -39; z -= 4.2) {
+        const fx = side * 3.8, fd = -side, gy = heightAt(fx, z) // fd=道側(+x for left)
+        const g = new THREE.Group(); g.position.set(fx, gy, z); town.add(g)
+        const h = 3.0 + R() * 1.3
+        const store = new THREE.Mesh(new THREE.BoxGeometry(1.7, h, 3.4), toon(shopCols[(R() * shopCols.length) | 0])); store.position.set(-fd * 0.45, h / 2, 0); store.castShadow = true; store.receiveShadow = true; g.add(store)
+        const awn = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 3.2), toon(awnCols[(R() * awnCols.length) | 0])); awn.position.set(fd * 0.95, 2.15, 0); awn.rotation.z = fd * 0.2; awn.castShadow = true; g.add(awn)
+        const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 2.6), shopLit ? new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: true }) : toon(0x40484e)); win.position.set(fd * 0.48, 1.0, 0); g.add(win)
+        const nc = document.createElement('canvas'); nc.width = 64; nc.height = 24; const ncx = nc.getContext('2d'); ncx.fillStyle = '#' + new THREE.Color(awnCols[(R() * awnCols.length) | 0]).getHexString(); ncx.fillRect(0, 0, 64, 24); ncx.fillStyle = '#f0ece0'; ncx.font = 'bold 15px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText(norenWords[(R() * norenWords.length) | 0], 32, 12)
+        const noren = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 2.3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); noren.position.set(fd * 0.52, 1.85, 0); g.add(noren)
+        colliders.push({ x: fx, z, r: 1.5 })
+      }
+    }
   }
 
   // ── 駅（街の右手。人の集まる目的地。駅舎＋ホーム＋駅名標＋短い線路）。──
@@ -2507,6 +2523,7 @@ export async function mountTown3d(parent, opts = {}) {
   const crowdSpots = [
     { x: STATION.x, z: STATION.z + STATION.r - 1.5, n: 5, rad: 3.2 }, // 駅前の広場
     { x: 0, z: -14, n: 4, rad: 2.6 },                                 // 商店街のゲート下
+    { x: 0, z: -28, n: 5, rad: 3.0 },                                 // 商店街の通り（買い物客）
     { x: -45.5, z: -17, n: 3, rad: 2.4 },                             // 川辺（東岸の遊歩道）
     { x: 14, z: -19, n: 4, rad: 2.4 },                                // 公園の池のほとり
     { x: TEMPLE.x, z: TEMPLE.z + 7, n: 4, rad: 2.6 },                 // 寺の参道
