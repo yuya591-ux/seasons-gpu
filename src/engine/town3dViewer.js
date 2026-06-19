@@ -495,6 +495,7 @@ export async function mountTown3d(parent, opts = {}) {
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
+  let train2 = null // もう一本の電車（色違い・半周ずらして走る）
   let crossing = null // 踏切（電車が近づくと遮断機が下り警報灯が点滅）
   let gulls = [] // 海鳥（湾の上を旋回する）
   let crane = null // ガントリークレーンの動く部分（トロリー＋フック）
@@ -1074,19 +1075,36 @@ export async function mountTown3d(parent, opts = {}) {
       const rm = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rm) { const rmesh = new THREE.Mesh(rm, toon(0x55555c)); town.add(rmesh) }
     }
     ballGeos.concat(sleepGeos, railGeos).forEach((g) => g.dispose())
-    // 電車（3両編成。車体・窓帯・床下・台車。夜は窓が灯る）
-    train = new THREE.Group(); town.add(train)
-    const NCAR = 3, carLen = 5.4, gap = 0.7, bodyCol = 0xd98a3c // 郷愁の朱橙（旧型通勤電車）
+    // 電車（3両編成。車体・窓帯・床下・台車。夜は窓が灯る）。色違いを2本、半周ずらして走らせる。
+    const NCAR = 3, carLen = 5.4, gap = 0.7
     const glassMat = duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffe6b0, fog: true }) : toon(0x36404a)
-    for (let i = 0; i < NCAR; i++) {
-      const car = new THREE.Group(); car.position.x = i * (carLen + gap); car.userData = { ox: i * (carLen + gap) }; train.add(car)
-      const body = new THREE.Mesh(new RoundedBoxGeometry(carLen, 2.3, 1.95, 2, 0.32), toon(bodyCol)); body.position.y = 1.55; body.castShadow = true; car.add(body)
-      const belt = new THREE.Mesh(new THREE.BoxGeometry(carLen + 0.02, 0.2, 1.97), toon(0xeae2d2)); belt.position.y = 2.05; car.add(belt) // 窓上のクリーム帯
-      const win = new THREE.Mesh(new THREE.BoxGeometry(carLen * 0.82, 0.72, 1.99), glassMat); win.position.y = 1.95; car.add(win) // 窓帯（夜は灯り）
-      const skirt = new THREE.Mesh(new THREE.BoxGeometry(carLen, 0.6, 1.8), toon(0x4a4640)); skirt.position.y = 0.55; car.add(skirt) // 床下
-      for (const bx of [-carLen * 0.3, carLen * 0.3]) { const bogie = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.7), toon(0x2a2a2e)); bogie.position.set(bx, 0.32, 0); car.add(bogie) } // 台車
+    const makeTrain = (bodyCol, beltCol) => {
+      const tr = new THREE.Group(); town.add(tr)
+      for (let i = 0; i < NCAR; i++) {
+        const car = new THREE.Group(); car.position.x = i * (carLen + gap); car.userData = { ox: i * (carLen + gap) }; tr.add(car)
+        const body = new THREE.Mesh(new RoundedBoxGeometry(carLen, 2.3, 1.95, 2, 0.32), toon(bodyCol)); body.position.y = 1.55; body.castShadow = true; car.add(body)
+        const belt = new THREE.Mesh(new THREE.BoxGeometry(carLen + 0.02, 0.2, 1.97), toon(beltCol)); belt.position.y = 2.05; car.add(belt)
+        const win = new THREE.Mesh(new THREE.BoxGeometry(carLen * 0.82, 0.72, 1.99), glassMat); win.position.y = 1.95; car.add(win)
+        const skirt = new THREE.Mesh(new THREE.BoxGeometry(carLen, 0.6, 1.8), toon(0x4a4640)); skirt.position.y = 0.55; car.add(skirt)
+        for (const bx of [-carLen * 0.3, carLen * 0.3]) { const bogie = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.7), toon(0x2a2a2e)); bogie.position.set(bx, 0.32, 0); car.add(bogie) }
+      }
+      return tr
     }
-    train.userData = { x: RAIL.x0, speed: 9, len: NCAR * (carLen + gap) }
+    const trainLen = NCAR * (carLen + gap)
+    train = makeTrain(0xd98a3c, 0xeae2d2); train.userData = { x: RAIL.x0, speed: 9, len: trainLen } // 朱橙
+    train2 = makeTrain(0x4a7ab0, 0xe0e6ea); train2.userData = { x: RAIL.x0 + (RAIL.x1 - RAIL.x0 + 8) * 0.5, speed: 9, len: trainLen } // 青
+    // 郊外の小さな停留所（無人駅。低いホーム＋上屋＋駅名標＋ベンチ）。線路の東寄り。
+    {
+      const sxx = 52, szz = RAIL.z + 1.5, syy = heightAt(sxx, szz)
+      const g = new THREE.Group(); g.position.set(sxx, syy, szz); town.add(g)
+      const plat = new THREE.Mesh(new THREE.BoxGeometry(10, 0.5, 2.4), toon(0xb8b2a6)); plat.position.y = 0.25; plat.receiveShadow = true; g.add(plat)
+      for (const px of [-3.6, 3.6]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.3, 6), toon(0x8a8680)); post.position.set(px, 1.4, 0.6); g.add(post) }
+      const proof = new THREE.Mesh(new THREE.BoxGeometry(9, 0.14, 2.0), toon(0x9a9690)); proof.position.set(0, 2.5, 0.5); proof.castShadow = true; g.add(proof)
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 0.4), toon(0x8a6a48)); bench.position.set(0, 0.7, 0.7); g.add(bench)
+      const nc = document.createElement('canvas'); nc.width = 128; nc.height = 40; const ncx = nc.getContext('2d'); ncx.fillStyle = '#f4efe4'; ncx.fillRect(0, 0, 128, 40); ncx.fillStyle = '#3a6a4a'; ncx.fillRect(0, 31, 128, 9); ncx.fillStyle = '#2a3a4a'; ncx.font = 'bold 22px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText('にしの', 64, 17)
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 0.08), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); sign.position.set(-2.6, 1.5, -0.3); g.add(sign)
+      for (const sp of [-3.6, -1.6]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), toon(0x8a8680)); post.position.set(sp, 0.85, -0.3); g.add(post) }
+    }
 
     // ── 踏切（道が線路と交わる所。電車が近づくと遮断機が下り、警報灯が点滅する）。──
     const crossX = 6
@@ -3265,12 +3283,12 @@ export async function mountTown3d(parent, opts = {}) {
       tug.position.set(x, SEA.level + 0.2 + Math.sin(t * 0.8) * 0.1, z)
       tug.rotation.y = -a + Math.PI / 2; tug.rotation.z = Math.sin(t * 0.7) * 0.04
     }
-    if (train) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
-      const u = train.userData
+    for (const tr of [train, train2]) if (tr) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
+      const u = tr.userData
       u.x += u.speed * dt
       if (u.x > RAIL.x1 + 2) u.x = RAIL.x0 - u.len
-      train.position.set(u.x, 0, RAIL.z)
-      for (const car of train.children) car.position.y = heightAt(u.x + car.userData.ox, RAIL.z) + 0.05
+      tr.position.set(u.x, 0, RAIL.z)
+      for (const car of tr.children) car.position.y = heightAt(u.x + car.userData.ox, RAIL.z) + 0.05
     }
     if (crossing && train) { // 踏切: 電車が近づくと遮断機が下り、警報灯が交互に点滅
       const active = Math.abs(train.userData.x - crossing.cx) < 13
