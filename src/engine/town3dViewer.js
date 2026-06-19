@@ -1403,7 +1403,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // ── 道沿いの生垣（低い緑の連なりが通りを縁取る＝住宅街の生活感。門口で時々途切れる） ──
   const hedgeCol = season === 'autumn' ? 0x867c46 : weather === 'snow' ? 0x6e7a64 : season === 'spring' ? 0x6f8a4a : 0x577142 // 季節で色味
-  const hMat = toon(hedgeCol)
+  const hMat = mottleMat(hedgeCol, 72, 0.26, [3, 1]) // 葉の塊の濃淡ムラ＝刈り込んだ生垣の葉表（近景でベタ緑の板を脱す。描画数は不変・材1枚）
   // 生垣の季節の彩り（春＝ツツジの紅桃白、秋＝色づき/実の紅橙、冬＝雪に映える山茶花の紅。夏は青々と無し）。
   const bloomCols =
     season === 'spring' ? [0xe884a4, 0xf0a8be, 0xf6ecf0]
