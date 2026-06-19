@@ -3013,6 +3013,7 @@ export async function mountTown3d(parent, opts = {}) {
     box(0.5, 0.05, 0.5, 0, 2.55, 2.4, woodDk); cyl(0.09, 0.09, 0.14, 0, 2.06, 2.4, lampMat) // 傘の天板＋電球
     box(0.018, 0.42, 0.018, 0.17, 1.86, 2.4, woodDk); cyl(0.04, 0.04, 0.09, 0.17, 1.6, 2.4, lampMat) // 灯りの引き紐＋握り玉（昭和の暮らし）
     { const gTex = cv(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 1, 32, 32, 32); g.addColorStop(0, 'rgba(255,232,178,0.95)'); g.addColorStop(0.45, 'rgba(255,216,150,0.32)'); g.addColorStop(1, 'rgba(255,216,150,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64) }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gTex, transparent: true, opacity: isNight ? 0.9 : 0.42, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); gl.position.set(0, 2.12, 2.4); gl.scale.set(2.4, 2.4, 1); gl.renderOrder = 6; winRoom.add(gl); winRoomMats.push(gl.material) } // 灯りの暖かいにじみ（夜ほど強い）
+    if (isNight) { const pTex = cv(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, 'rgba(255,224,168,0.55)'); g.addColorStop(0.6, 'rgba(255,210,150,0.18)'); g.addColorStop(1, 'rgba(255,210,150,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64) }); const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: pTex, transparent: true, opacity: 0.6, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); pool.rotation.x = -Math.PI / 2; pool.position.set(0, FY + 0.04, 2.4); pool.renderOrder = 4; winRoom.add(pool); winRoomMats.push(pool.material) } // 夜: 灯りが畳に落とす暖かな光だまり
     // ── 和室の骨格: 四隅の柱と壁をめぐる長押（昭和の茶の間らしい陰影） ──
     const postMat = mk(C(0x6f573c, 0x40342a)) // 飴色の柱・長押
     for (const [px, pz] of [[-SX + 0.11, 0.22], [SX - 0.11, 0.22], [-SX + 0.11, BZ - 0.22], [SX - 0.11, BZ - 0.22]]) box(0.17, WT - FY, 0.17, px, (WT + FY) / 2, pz, postMat) // 四隅の柱
@@ -3038,6 +3039,21 @@ export async function mountTown3d(parent, opts = {}) {
     box(0.6, 0.46, 0.05, -SX + 0.06, 1.7, 1.6, woodDk); box(0.5, 0.36, 0.03, -SX + 0.1, 1.7, 1.6, scrollMat) // 壁の額（家族写真）
     box(1.4, 1.4, 0.56, -SX + 0.33, FY + 0.7, 4.7, woodMat); box(1.1, 1.0, 0.06, -SX + 0.62, FY + 0.78, 4.7, screenMat) // 茶箪笥＋ガラス戸
     for (const dz of [-0.3, 0.0, 0.3]) box(0.16, 0.18, 0.16, -SX + 0.33, FY + 1.5, 4.7 + dz, ceramMat) // 箪笥上の器
+    // ── 暮らしの小物（生活感）: 招き猫＋観葉植物 ──
+    const white = mk(C(0xf1ebe0, 0xccc4b8)), redCol = mk(C(0xbe4030, 0x6e2a26)), potMat = mk(C(0xb37a52, 0x5a4030)), leaf = mk(C(0x6f8f5a, 0x3a5340))
+    { const mx = SX - 1.06, mz = 2.62, my = FY + 0.66 // 招き猫（テレビ台の上）
+      box(0.2, 0.05, 0.16, mx, my + 0.02, mz, redCol)                          // 赤い座布団
+      box(0.17, 0.2, 0.14, mx, my + 0.13, mz, white)                           // 胴
+      const mh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), white); mh.position.set(mx, my + 0.3, mz); mh.renderOrder = 2; winRoom.add(mh) // 頭
+      for (const ex of [-0.06, 0.06]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.07, 8), white); ear.position.set(mx + ex, my + 0.39, mz); ear.renderOrder = 2; winRoom.add(ear) } // 耳
+      box(0.05, 0.12, 0.05, mx + 0.09, my + 0.18, mz - 0.02, white)            // 招く前足
+      box(0.16, 0.04, 0.02, mx, my + 0.22, mz + 0.07, redCol)                  // 首輪
+      cyl(0.045, 0.045, 0.02, mx, my + 0.15, mz + 0.08, brass, 10)             // 小判
+    }
+    { const px = 1.9, pz = 0.9 // 観葉植物（窓辺の床）
+      cyl(0.19, 0.14, 0.34, px, FY + 0.17, pz, potMat, 14)                     // 鉢
+      for (const [dx, dy, dz, s] of [[0, 0.42, 0, 0.24], [-0.13, 0.34, 0.06, 0.18], [0.12, 0.36, -0.05, 0.19], [0.02, 0.54, -0.02, 0.16]]) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), leaf); lf.position.set(px + dx, FY + 0.34 + dy, pz + dz); lf.renderOrder = 2; winRoom.add(lf) } // 葉群
+    }
     // ── 奥壁（振り返ると）: 襖＋神棚＋黒電話 ──
     for (let i = 0; i < 4; i++) { const fx = -3.0 + i * 2.0; box(1.94, 3.0, 0.06, fx, 0.6, BZ - 0.1, creamMat); box(0.08, 3.0, 0.09, fx - 0.98, 0.6, BZ - 0.12, woodMat); box(0.16, 0.24, 0.05, fx + 0.7, 0.6, BZ - 0.16, woodDk) } // 4枚の襖＋框＋引手
     const bclk = cyl(0.26, 0.26, 0.05, 2.0, 2.4, BZ - 0.14, creamMat, 18); bclk.rotation.x = Math.PI / 2 // 壁掛け時計（奥壁）
