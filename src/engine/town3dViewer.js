@@ -1095,8 +1095,8 @@ export async function mountTown3d(parent, opts = {}) {
       return tr
     }
     const trainLen = NCAR * (carLen + gap)
-    train = makeTrain(0xd98a3c, 0xeae2d2); train.userData = { x: RAIL.x0, speed: 9, len: trainLen } // 朱橙
-    train2 = makeTrain(0x4a7ab0, 0xe0e6ea); train2.userData = { x: RAIL.x0 + (RAIL.x1 - RAIL.x0 + 8) * 0.5, speed: 9, len: trainLen } // 青
+    train = makeTrain(0xd98a3c, 0xeae2d2); train.userData = { x: RAIL.x0, speed: 9, len: trainLen, stops: true } // 朱橙＝各駅停車（駅で停まる）
+    train2 = makeTrain(0x4a7ab0, 0xe0e6ea); train2.userData = { x: RAIL.x0 + (RAIL.x1 - RAIL.x0 + 8) * 0.5, speed: 11, len: trainLen, stops: false } // 青＝通過（速い）
     // 郊外の小さな停留所（無人駅。低いホーム＋上屋＋駅名標＋ベンチ）。線路の東寄り。
     {
       const sxx = 52, szz = RAIL.z + 1.5, syy = heightAt(sxx, szz)
@@ -2696,6 +2696,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ランドマークの賑わい（駅前・商店街・川辺・公園に人が集う。その場でゆっくり佇み・体の向きを変える）。
   const crowdSpots = [
     { x: STATION.x, z: STATION.z + STATION.r - 1.5, n: 5, rad: 3.2 }, // 駅前の広場
+    { x: STATION.x, z: STATION.z - 4.6, n: 5, rad: 3.4 },             // 駅のホーム（電車を待つ人）
     { x: 0, z: -14, n: 4, rad: 2.6 },                                 // 商店街のゲート下
     { x: 0, z: -28, n: 5, rad: 3.0 },                                 // 商店街の通り（買い物客）
     { x: -45.5, z: -17, n: 3, rad: 2.4 },                             // 川辺（東岸の遊歩道）
@@ -3423,8 +3424,17 @@ export async function mountTown3d(parent, opts = {}) {
     }
     for (const tr of [train, train2]) if (tr) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
       const u = tr.userData
-      u.x += u.speed * dt
-      if (u.x > RAIL.x1 + 2) u.x = RAIL.x0 - u.len
+      // 各駅停車（train のみ）: 駅(x≈30)の手前で減速・停車し、しばらくして発車する
+      let move = true
+      if (u.stops) {
+        const sX = 25 // 編成中央がホーム中央(x≈34)に来る停車位置（u.xは最後尾）
+        if (!u.stopDone && u.x > sX - 7 && u.x < sX) { u.speed2 = Math.max(0, u.speed * (sX - u.x) / 7) } // 減速
+        else u.speed2 = u.speed
+        if (!u.stopDone && u.x >= sX - 0.3) { if (!u.stopUntil) u.stopUntil = t + 3.2; if (t < u.stopUntil) move = false; else { u.stopDone = true } } // 停車→発車
+        if (u.stopDone && u.x > sX + 10) { u.stopDone = false; u.stopUntil = 0 } // 駅を出たら次の周回用にリセット
+      }
+      if (move) u.x += (u.stops ? (u.speed2 ?? u.speed) : u.speed) * dt
+      if (u.x > RAIL.x1 + 2) { u.x = RAIL.x0 - u.len; u.stopDone = false; u.stopUntil = 0 }
       tr.position.set(u.x, 0, RAIL.z)
       for (const car of tr.children) car.position.y = heightAt(u.x + car.userData.ox, RAIL.z) + 0.05
     }
