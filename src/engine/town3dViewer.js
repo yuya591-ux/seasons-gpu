@@ -2929,6 +2929,7 @@ export async function mountTown3d(parent, opts = {}) {
   const winRoomMats = []
   let winSashR = null, winSashX0 = 0, winSashX1 = 0 // 引き違いの可動ガラス障子（窓をあけると横へすべる）
   const winCurtains = [] // 窓辺のカーテン（窓をあけると外気でそっとそよぐ）
+  const teaSteam = [] // 急須から立ちのぼる湯気
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -3078,6 +3079,8 @@ export async function mountTown3d(parent, opts = {}) {
     for (const [dx, dz, m] of [[0, -1.05, fabMat], [-1.05, 0.2, fab2], [0.7, 0.95, fabMat]]) box(0.74, 0.09, 0.74, tcx + dx, FY + 0.05, tcz + dz, m) // 座布団×3
     cyl(0.14, 0.17, 0.2, tcx - 0.25, FY + 0.6, tcz - 0.1, ceramMat); box(0.18, 0.05, 0.05, tcx - 0.42, FY + 0.66, tcz - 0.1, ceramMat) // 急須＋注ぎ口
     for (const dx of [0.2, 0.42]) cyl(0.07, 0.06, 0.1, tcx + dx, FY + 0.55, tcz + 0.2, ceramMat) // 湯呑み×2
+    { const stTex = cv(48, 48, (x) => { const g = x.createRadialGradient(24, 24, 1, 24, 24, 24); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.32)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 48, 48) })
+      for (let i = 0; i < 3; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stTex, transparent: true, opacity: 0, depthWrite: false, fog: false })); sp.position.set(tcx - 0.2, FY + 0.7, tcz - 0.1); sp.userData = { x0: tcx - 0.2, y0: FY + 0.7, ph: i / 3 }; sp.renderOrder = 7; winRoom.add(sp); teaSteam.push(sp); winRoomMats.push(sp.material) } } // 急須から立ちのぼる湯気
     cyl(0.2, 0.18, 0.12, tcx + 0.1, FY + 0.56, tcz - 0.35, woodMat); for (let i = 0; i < 3; i++) { const mk2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), mikanMat); mk2.position.set(tcx + 0.1 + (R() - 0.5) * 0.16, FY + 0.66, tcz - 0.35 + (R() - 0.5) * 0.16); mk2.renderOrder = 2; winRoom.add(mk2) } // みかん籠
     box(0.34, 0.03, 0.46, tcx - 0.5, FY + 0.06, tcz + 0.7, creamMat) // たたんだ新聞
     if (season === 'winter') { box(1.95, 0.5, 1.95, tcx, FY + 0.28, tcz, fabMat) } // こたつの布団
@@ -4152,6 +4155,7 @@ export async function mountTown3d(parent, opts = {}) {
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
     if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.22 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
+    if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
