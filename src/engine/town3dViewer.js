@@ -492,6 +492,7 @@ export async function mountTown3d(parent, opts = {}) {
   let ferris = null
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
   let teacups = null // 遊園地のコーヒーカップ（回る）
+  let steamPuffs = [] // 夏祭りの屋台の湯気（立ちのぼる）
   let swanBoats = [] // 遊園地のスワンボート（池を漂う）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
@@ -1721,6 +1722,9 @@ export async function mountTown3d(parent, opts = {}) {
           const sc = document.createElement('canvas'); sc.width = 64; sc.height = 24; const scx = sc.getContext('2d'); scx.fillStyle = '#f0ece0'; scx.fillRect(0, 0, 64, 24); scx.fillStyle = '#c0392b'; scx.font = 'bold 15px sans-serif'; scx.textAlign = 'center'; scx.textBaseline = 'middle'; scx.fillText(stallWords[s], 32, 12)
           const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.06), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc) })); sign.position.set(0, 1.55, 0.75); g.add(sign)
           const stallLan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : redMat); stallLan.scale.y = 1.2; stallLan.position.set(-1.2, 1.8, 0.7); g.add(stallLan)
+          if ((s === 0 || s === 3) && !LIGHT) { // 焼き物の屋台(たこやき/やきとり)は湯気が立ちのぼる
+            for (let p = 0; p < 3; p++) { const puff = new THREE.Mesh(new THREE.SphereGeometry(0.32, 7, 6), new THREE.MeshBasicMaterial({ color: 0xf2f0ea, transparent: true, opacity: 0, depthWrite: false, fog: true })); puff.position.set(0.4, 1.4, 0.1); g.add(puff); steamPuffs.push({ mesh: puff, base: 1.4, ph: p * 0.8 + R() * 0.6 }) }
+          }
           colliders.push({ x: sx, z: sz, r: 1.6 })
         }
         // 盆踊りの輪（やぐらを囲む人。中心を向き、片手を上げる）
@@ -2589,6 +2593,7 @@ export async function mountTown3d(parent, opts = {}) {
       gond.position.set(Math.cos(a) * (R0 + 0.9), Math.sin(a) * (R0 + 0.9), 0)
       const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 1.6), gondMats[i % gondMats.length]); gond.add(cab)
       const roof = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.3, 1.8), gondMats[(i + 2) % gondMats.length]); roof.position.y = 0.85; gond.add(roof)
+      if (!LIGHT && i % 2 === 0) { const rider = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.34, 3, 6), toon([0x5a78a0, 0xc06a6a, 0x6a8a5a][i % 3])); rider.position.set((R() - 0.5) * 0.4, -0.1, 0.3); gond.add(rider); const rh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 6), toon(0xf0c49c)); rh.position.set(rider.position.x, 0.32, 0.3); gond.add(rh) } // 乗客
       if (duskAmt > 0.25) { const lit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.05), litMat); lit.position.z = 0.83; gond.add(lit) }
       wheel.add(gond); gondolas.push(gond)
     }
@@ -3452,6 +3457,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
     if (teacups) { teacups.rotation.y += dt * 0.5; for (const cup of teacups.children) cup.rotation.y -= dt * 1.1 } // 台が回り、各カップは逆に回る
+    for (const sp of steamPuffs) { const cy = (t * 0.5 + sp.ph) % 2.4, p = cy / 2.4; sp.mesh.position.y = sp.base + p * 1.7; sp.mesh.position.x = 0.4 + Math.sin(t * 1.3 + sp.ph) * 0.18; sp.mesh.material.opacity = 0.32 * Math.sin(p * Math.PI); sp.mesh.scale.setScalar(0.55 + p * 0.8) } // 屋台の湯気が立ちのぼる
     for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
