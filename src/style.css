@@ -739,6 +739,82 @@ body.idle .topbar button {
   letter-spacing: 0.06em;
   color: rgba(255, 235, 200, 0.7);
 }
+/* この作品について（出典・ライセンス） */
+.credits {
+  overflow-y: auto;
+  max-height: min(66vh, 34rem);
+  -webkit-overflow-scrolling: touch;
+  padding-right: 0.2rem;
+}
+.credits__lead,
+.credits__outro {
+  font-size: 0.8rem;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0 0 0.9rem;
+}
+.credits__outro {
+  margin: 1.1rem 0 0.2rem;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.74rem;
+}
+.credits__group {
+  margin: 1.1rem 0 0.5rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: rgba(255, 235, 200, 0.72);
+}
+.credits__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.credits__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'note title' 'note by' 'note link';
+  column-gap: 0.6rem;
+  row-gap: 0.1rem;
+  align-items: baseline;
+}
+.credits__note {
+  grid-area: note;
+  align-self: start;
+  min-width: 3.2rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+  padding-top: 0.12rem;
+}
+.credits__title {
+  grid-area: title;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+}
+.credits__by {
+  grid-area: by;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.5);
+}
+.credits__link {
+  grid-area: link;
+  justify-self: start;
+  margin-top: 0.12rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: rgba(150, 200, 235, 0.82);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(150, 200, 235, 0.35);
+}
+.credits__link:hover {
+  color: rgba(180, 220, 245, 0.95);
+}
 .scene-card {
   appearance: none;
   display: flex;

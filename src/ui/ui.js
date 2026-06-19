@@ -2,6 +2,7 @@
 // 文言は静かで上質に。システム用語は出さない。
 
 import { SCENES, pickNowScene } from '../data/scenes/index.js'
+import { CREDIT_INTRO, CREDIT_SOUNDS, CREDIT_IMAGES, CREDIT_TOOLS, CREDIT_OUTRO } from '../data/credits.js'
 
 const h = (tag, cls, text) => {
   const el = document.createElement(tag)
@@ -246,6 +247,10 @@ export function buildUI(opts) {
   const panelJournal = buildJournalPanel()
   root.appendChild(panelJournal.el)
 
+  // ── この作品について（素材の出典・ライセンス。CC BY/BY-SA素材を配信物の中で帰属する） ──
+  const panelCredits = buildCreditsPanel()
+  root.appendChild(panelCredits.el)
+
   // ── 設定パネル ──
   const panelSet = buildSettingsPanel()
   root.appendChild(panelSet.el)
@@ -260,7 +265,7 @@ export function buildUI(opts) {
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return
     let closed = false
-    ;[panelScene.el, panelSet.el].forEach((p) => {
+    ;[panelScene.el, panelSet.el, panelJournal.el, panelCredits.el].forEach((p) => {
       if (p.classList.contains('panel--open')) {
         p.classList.remove('panel--open')
         closed = true
@@ -343,6 +348,51 @@ export function buildUI(opts) {
     return {
       el,
       open() { render(); el.classList.add('panel--open'); requestAnimationFrame(() => close.focus()) },
+    }
+  }
+
+  // ── この作品について：素材の出典・ライセンスを配信物の中で帰属表示する（CC BY/BY-SA遵守） ──
+  function buildCreditsPanel() {
+    const el = h('div', 'panel panel--credits')
+    const head = h('div', 'panel__head')
+    head.appendChild(h('h2', 'panel__title', 'この作品について'))
+    const close = h('button', 'iconbtn', '×')
+    close.setAttribute('aria-label', '閉じる')
+    head.appendChild(close)
+    el.appendChild(head)
+    const bodyEl = h('div', 'credits')
+    el.appendChild(bodyEl)
+    close.addEventListener('click', () => { el.classList.remove('panel--open'); poke() })
+
+    bodyEl.appendChild(h('p', 'credits__lead', CREDIT_INTRO))
+    const section = (title, items) => {
+      bodyEl.appendChild(h('h3', 'credits__group', title))
+      const list = h('ul', 'credits__list')
+      for (const it of items) {
+        const li = h('li', 'credits__item')
+        li.appendChild(h('span', 'credits__note', it.note))
+        const t = h('span', 'credits__title', it.title)
+        li.appendChild(t)
+        li.appendChild(h('span', 'credits__by', `${it.by}　／　${it.license}`))
+        if (it.url) {
+          const a = h('a', 'credits__link', '出典を見る')
+          a.href = it.url
+          a.target = '_blank'
+          a.rel = 'noopener noreferrer'
+          li.appendChild(a)
+        }
+        list.appendChild(li)
+      }
+      bodyEl.appendChild(list)
+    }
+    section('環境音', CREDIT_SOUNDS)
+    section('窓の外の絵', CREDIT_IMAGES)
+    section('描画・道具', CREDIT_TOOLS)
+    bodyEl.appendChild(h('p', 'credits__outro', CREDIT_OUTRO))
+
+    return {
+      el,
+      open() { el.classList.add('panel--open'); requestAnimationFrame(() => close.focus()) },
     }
   }
 
@@ -606,6 +656,20 @@ export function buildUI(opts) {
     journalChips.appendChild(journalBtn)
     journalRow.appendChild(journalChips)
     el.appendChild(journalRow)
+
+    // この作品について：素材の出典・ライセンス（配信物の中で帰属表示する）
+    const aboutRow = h('div', 'setrow')
+    aboutRow.appendChild(h('span', 'setrow__label', '出典'))
+    const aboutChips = h('div', 'axis__chips')
+    const aboutBtn = h('button', 'chip', 'この作品について')
+    aboutBtn.addEventListener('click', () => {
+      el.classList.remove('panel--open') // 設定を閉じてクレジットへ
+      panelCredits.open()
+      poke()
+    })
+    aboutChips.appendChild(aboutBtn)
+    aboutRow.appendChild(aboutChips)
+    el.appendChild(aboutRow)
 
     close.addEventListener('click', () => {
       el.classList.remove('panel--open')
