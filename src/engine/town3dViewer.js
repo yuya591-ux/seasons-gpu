@@ -2006,6 +2006,43 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
 
+    // ── 砂浜の海の家＋ビーチパラソル＋浮き輪。夏の海辺の賑わい。──
+    {
+      const bx = 71, bz = -36, by = heightAt(bx, bz) // 砂浜の上（汀の手前の乾いた砂）
+      // 海の家（板の小屋＋庇＋暖簾）。海(+x)へ開く。
+      const hut = new THREE.Group(); hut.position.set(bx, by, bz); town.add(hut)
+      const body = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 4), toon(0xcdb185)); body.position.y = 1.3; body.castShadow = true; body.receiveShadow = true; hut.add(body)
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 4.8), toon(0x9a6a4e)); roof.position.y = 2.7; roof.castShadow = true; hut.add(roof)
+      const eave = new THREE.Mesh(new THREE.BoxGeometry(5, 0.18, 1.8), toon(0x9a6a4e)); eave.position.set(2.4, 2.2, 0); hut.add(eave) // 海側の庇
+      for (const pz of [-1.7, 1.7]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.0, 6), toon(0x7a5a40)); post.position.set(3.0, 1.0, pz); hut.add(post) }
+      // 暖簾（青の布）
+      const nc = document.createElement('canvas'); nc.width = 96; nc.height = 40; const ncx = nc.getContext('2d')
+      ncx.fillStyle = '#3a6a8a'; ncx.fillRect(0, 0, 96, 40); ncx.fillStyle = '#f0ece0'; ncx.font = 'bold 22px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText('うみのいえ', 48, 21)
+      const noren = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 3.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); noren.position.set(2.4, 1.7, 0); hut.add(noren)
+      colliders.push({ x: bx, z: bz, r: 2.6 })
+      // ビーチパラソル＋浮き輪＋ビーチボール（冬は仕舞う）
+      if (season !== 'winter') {
+        const paraCols = [[0xd84a4a, 0xf0ece0], [0x3a8ac0, 0xf0ece0], [0xe0a030, 0xf0ece0]]
+        for (const pp of [[74, -32], [76, -38], [73.5, -40]]) {
+          const px2 = pp[0], pz2 = pp[1], pgy = heightAt(px2, pz2)
+          const g = new THREE.Group(); g.position.set(px2, pgy, pz2); town.add(g)
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 6), toon(0xdedacc)); pole.position.y = 1.3; g.add(pole)
+          const cols = paraCols[(R() * paraCols.length) | 0]
+          const rc = document.createElement('canvas'); rc.width = 32; rc.height = 8; const rcx = rc.getContext('2d')
+          for (let i = 0; i < 8; i++) { rcx.fillStyle = '#' + new THREE.Color(i % 2 ? cols[0] : cols[1]).getHexString(); rcx.fillRect(i * 4, 0, 4, 8) }
+          const rtex = new THREE.CanvasTexture(rc); rtex.wrapS = THREE.RepeatWrapping; rtex.repeat.set(4, 1)
+          const top = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.8, 12), new THREE.MeshToonMaterial({ map: rtex, gradientMap: grad })); top.position.y = 2.7; top.castShadow = true; g.add(top)
+        }
+        // 浮き輪（水面に浮かぶ・揺れる）
+        const ring = new THREE.Group(); ring.position.set(80, SEA.level + 0.15, -34); ring.userData = { ph: R() * 6.28 }; town.add(ring)
+        const tube = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.26, 8, 16), toon(0xe24a4a)); tube.rotation.x = Math.PI / 2; ring.add(tube)
+        for (let i = 0; i < 4; i++) { const a = i / 4 * 6.283; const wseg = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.27, 8, 4, 0.8), toon(0xf0ece0)); wseg.rotation.x = Math.PI / 2; wseg.rotation.z = a; ring.add(wseg) }
+        boats.push(ring) // 波で揺れる
+        // ビーチボール
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), toon(0xf0c040)); ball.position.set(75, heightAt(75, -34) + 0.5, -34); ball.castShadow = true; town.add(ball)
+      }
+    }
+
     // ── 川辺の遊歩道（東岸の護岸の上を歩ける帯）。路面＋手すり＋街灯＋ベンチ＋並木。──
     {
       const px = RIVER.x + 4.0          // 東岸の遊歩道の中心（護岸の上）
