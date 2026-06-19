@@ -10,6 +10,7 @@ import photoWindowWinter from './photo-window-winter.js'
 import photoWindowAutumn from './photo-window-autumn.js'
 import photoWindowSnowNight from './photo-window-snow-night.js'
 import summerRainDusk from './summer-rain-dusk.js'
+import summerRainMorning from './summer-rain-morning.js'
 import summerRainNight from './summer-rain-night.js'
 import autumnRainDusk from './autumn-rain-dusk.js'
 import summerClearNoon from './summer-clear-noon.js'
@@ -69,6 +70,7 @@ export const SCENES = [
   winterSnowDuskCornerRoom,
   // 下町・自然・その他のシェーダー情景
   summerRainDusk,
+  summerRainMorning,
   summerRainNight,
   autumnRainDusk,
   summerClearNoon,

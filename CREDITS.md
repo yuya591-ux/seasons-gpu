@@ -107,6 +107,7 @@
 | 「夏の雨、夕暮れ」窓の外 | `public/bg/summer-rain-dusk-b.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 12・1280×768 |
 | 「夏の雨の夜」窓の外 | `public/bg/summer-rain-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 33・1280×768 |
 | 「秋の雨、夕暮れ」窓の外（雨ガラス越し・水彩寄り） | `public/bg/autumn-rain-dusk.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 71・縦580×1015（超解像なし＝雨で和らぐ画調を維持） |
+| 「梅雨の朝、あじさい」窓の外（雨ガラス越し・水彩寄り） | `public/bg/summer-rain-morning.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-19・seed 83・縦約580×1015（超解像なし＝雨で和らぐ画調を維持） |
 | 「北寺尾の窓辺、立体の街」奥の実写遠景 | `public/bg/town3d-day.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 5・1536×640 |
 | 「立体の街（夜）」奥の実写遠景 | `public/bg/town3d-night.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 6・1536×640 |
 | 「立体の街（紅葉）」奥の実写遠景 | `public/bg/town3d-autumn.jpg` | Pollinations.AI / Flux モデル（無料） | 生成日 2026-06-16・seed 8・1536×640 |
