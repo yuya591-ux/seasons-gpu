@@ -119,8 +119,9 @@ export function applyTown3dLook(dx, dy) {
 // （右ドラッグ=dx+ / 下ドラッグ=dy+）。横で旋回、上で上昇・下で下降。離しても巡航は続く。
 export function applyTown3dSteer(dx, dy) {
   if (!active) return
-  active.flyYawTarget += dx * FLY.steerYaw // 右ドラッグ＝右へ旋回
-  active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget - dy * FLY.steerPitch)) // 上ドラッグ＝機首上げ＝上昇
+  active.flyYawTarget += dx * FLY.steerYaw // 右ドラッグ＝右へ旋回（窓辺の見回しと同じ素直な横）
+  // 縦は窓辺の見回しと統一（マリオ式）: 下ドラッグ＝機首上げ＝見上げて上昇／上ドラッグ＝見下ろして下降。
+  active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget + dy * FLY.steerPitch))
 }
 
 // とまる／すすむ（スキームA）。とまる中はその場でホバリング、すすむで自動巡航を再開。
@@ -2678,7 +2679,8 @@ export async function mountTown3d(parent, opts = {}) {
   const mkCloud = (col) => SNOWY ? new THREE.MeshBasicMaterial({ color: col, fog: false }) : new THREE.MeshToonMaterial({ color: col, gradientMap: grad, fog: false })
   const cloudMat = mkCloud(SNOWY ? 0xf6f4f0 : 0xfbfaf6)       // 陽の当たる白（雪天は少し落として白飛びを抑える）
   const cloudBot = mkCloud(isNight ? 0x767e92 : (SNOWY ? 0xe6e9ee : 0xe9e4dc)) // 影になる雲底（やわらかな陰。雪天は淡い冷灰でほぼ均一＝明るい空に溶ける）
-  // 数を増やし高さを少し下げて、縦窓の狭い視界でも空が間延びしないように（light端末は控えめ）。
+  // 雲は高い空に置く（街を見渡す巡航高度の上）。低いと飛んで街を見渡す時に雲が邪魔になる（実機FB）。
+  // 高くしても窓辺で見上げれば見え、ぐっと高く飛べば雲に分け入れる＝双方の良いとこ取り。light端末は控えめ。
   const cloudN = LIGHT ? 10 : 16
   for (let i = 0; i < cloudN; i++) {
     const g = new THREE.Group()
@@ -2691,7 +2693,11 @@ export async function mountTown3d(parent, opts = {}) {
       puff.scale.y = 0.58
       g.add(puff)
     }
-    g.position.set((R() - 0.5) * 250, 31 + R() * 24, -52 - R() * 90)
+    // 二層構成で「飛行の邪魔をしない」と「窓辺の空に雲がある」を両立（実機FB）:
+    // 7割は高い空の積雲（街を見渡す巡航高度の上＝俯瞰を遮らない／ぐっと高く飛べば雲に分け入れる）、
+    // 3割は遠い地平の雲（飛べる街より奥に低く浮かぶ＝窓辺の遠景の空に雲が見え、巡航の邪魔にならない）。
+    if (i < cloudN * 0.7) g.position.set((R() - 0.5) * 250, 58 + R() * 28, -52 - R() * 86)
+    else g.position.set((R() - 0.5) * 230, 30 + R() * 16, -126 - R() * 52)
     scene.add(g); clouds.push(g)
   }
 
