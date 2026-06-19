@@ -1486,7 +1486,7 @@ export async function mountTown3d(parent, opts = {}) {
         : weather === 'snow'
           ? [[0x44543e, 0x4e6048, 0x42503c], [0x586a50, 0x627458, 0x54664e]]
           : [[0x4f6e3e, 0x547640, 0x5c7c46], [0x6f9050, 0x7a9c5a, 0x82a262]]
-  const leafBaseMats = leafBase.map(toon)
+  const leafBaseMats = leafBase.map((c) => { const m = toon(c); m.vertexColors = true; return m }) // 樹冠に頂点色の上下グラデ（陰陽）を効かせる
   const leafHiMats = leafHi.map(toon)
   const treesArr = []
   const trunkGeos = [] // 全ての幹を1メッシュへ統合（静止＝ドローコール大幅削減）
@@ -1523,6 +1523,12 @@ export async function mountTown3d(parent, opts = {}) {
     }
     const merged = BufferGeometryUtils.mergeGeometries ? BufferGeometryUtils.mergeGeometries(leafGeos, false) : leafGeos[0]
     leafGeos.forEach((lg) => { if (lg !== merged) lg.dispose() })
+    // 樹冠の上下に陰影（下=陰り0.8 / 上=陽の当たり1.22）を頂点色で焼く＝統合で失った陰陽の立体感を無コストで回復。
+    { const mp = merged.attributes.position, cols = new Float32Array(mp.count * 3); let minY = Infinity, maxY = -Infinity
+      for (let i = 0; i < mp.count; i++) { const y = mp.getY(i); if (y < minY) minY = y; if (y > maxY) maxY = y }
+      const span = Math.max(0.001, maxY - minY)
+      for (let i = 0; i < mp.count; i++) { const v = 0.8 + (mp.getY(i) - minY) / span * 0.42; cols[i * 3] = v; cols[i * 3 + 1] = v; cols[i * 3 + 2] = v }
+      merged.setAttribute('color', new THREE.BufferAttribute(cols, 3)) }
     const leafMesh = new THREE.Mesh(merged, leafBaseMats[ci]); leafMesh.castShadow = true; g.add(leafMesh)
     g.position.set(x, gy, z); g.scale.setScalar(scale); g.rotation.z = tilt; town.add(g)
     g.userData = { ph: R() * 6.28, amp: 0.02 + R() * 0.02, tilt }
