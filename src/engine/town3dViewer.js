@@ -2930,6 +2930,7 @@ export async function mountTown3d(parent, opts = {}) {
   let winSashR = null, winSashX0 = 0, winSashX1 = 0 // 引き違いの可動ガラス障子（窓をあけると横へすべる）
   const winCurtains = [] // 窓辺のカーテン（窓をあけると外気でそっとそよぐ）
   const teaSteam = [] // 急須から立ちのぼる湯気
+  let winPendulum = null // 振り子柱時計（振り子が静かに揺れる）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -3039,8 +3040,17 @@ export async function mountTown3d(parent, opts = {}) {
     for (const dz of [-0.18, 0.18]) cyl(0.05, 0.05, 0.05, SX - 1.02, FY + 0.78, 3.0 + dz, woodDk, 8) // つまみ
     for (const a of [-0.5, 0.5]) { const ant = box(0.02, 0.66, 0.02, SX - 0.5, FY + 1.7, 3.0, blackMat); ant.rotation.z = a } // V字アンテナ
     box(0.34, 0.16, 0.26, SX - 0.5, FY + 1.52, 3.1, mk(C(0x8a6a5a, 0x47393e))) // テレビ上の小物
-    const clk = cyl(0.3, 0.3, 0.06, SX - 0.06, 1.75, 2.4, creamMat, 18); clk.rotation.z = Math.PI / 2 // 丸い柱時計（-x向き）
-    box(0.02, 0.2, 0.03, SX - 0.12, 1.8, 2.4, blackMat); box(0.02, 0.03, 0.16, SX - 0.12, 1.75, 2.45, blackMat) // 時計の針
+    // 昭和の振り子柱時計（右壁。振り子が静かに時を刻む）
+    const clkCase = mk(C(0x6a4f34, 0x382a1c)), clkBrass = new THREE.MeshBasicMaterial({ color: C(0xc2a85e, 0x6e5e34), fog: false }); winRoomMats.push(clkBrass) // 振り子は手動メッシュ＝頂点色なしの素直な材で（黒落ち回避）
+    const cwx = SX - 0.22 // 壁から室内側へ十分出す基準x（壁に埋まらないように）
+    box(0.13, 0.92, 0.42, cwx, 1.5, 2.4, clkCase)                               // 時計の箱（濃い飴色）
+    const cf = cyl(0.15, 0.15, 0.04, cwx - 0.085, 1.78, 2.4, creamMat, 20); cf.rotation.z = Math.PI / 2 // 文字盤（-x向き）
+    box(0.02, 0.11, 0.022, cwx - 0.11, 1.81, 2.4, blackMat); box(0.02, 0.022, 0.12, cwx - 0.11, 1.78, 2.42, blackMat) // 針（短・長）
+    box(0.012, 0.46, 0.32, cwx - 0.075, 1.36, 2.4, mk(C(0x241f1a, 0x120f0c)))   // 振り子室の暗がり
+    const pend = new THREE.Group(); pend.position.set(cwx - 0.12, 1.6, 2.4); winRoom.add(pend) // 振り子（上端を軸に揺れる）
+    const prod = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.34, 0.016), clkBrass); prod.position.y = -0.17; pend.add(prod) // 棹
+    const pbob = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 16), clkBrass); pbob.rotation.z = Math.PI / 2; pbob.position.y = -0.36; pend.add(pbob) // 錘（真鍮の円盤）
+    winPendulum = pend
     box(0.04, 0.7, 0.5, SX - 0.06, 0.9, 4.3, mk(0xffffff, calTex)) // カレンダー
     // ── 左壁＝暮らしの壁: 整理ダンス＋壁の額（家族写真）、奥に茶箪笥（食器棚）。団地の居間らしく。 ──
     const brass = mk(C(0xc0a060, 0x4a4030))
@@ -3055,15 +3065,15 @@ export async function mountTown3d(parent, opts = {}) {
     { const mx = SX - 1.06, mz = 2.62, my = FY + 0.66 // 招き猫（テレビ台の上）
       box(0.2, 0.05, 0.16, mx, my + 0.02, mz, redCol)                          // 赤い座布団
       box(0.17, 0.2, 0.14, mx, my + 0.13, mz, white)                           // 胴
-      const mh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), white); mh.position.set(mx, my + 0.3, mz); mh.renderOrder = 2; winRoom.add(mh) // 頭
-      for (const ex of [-0.06, 0.06]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.07, 8), white); ear.position.set(mx + ex, my + 0.39, mz); ear.renderOrder = 2; winRoom.add(ear) } // 耳
+      const mh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), white); mh.position.set(mx, my + 0.3, mz); grad(mh); mh.renderOrder = 2; winRoom.add(mh) // 頭
+      for (const ex of [-0.06, 0.06]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.07, 8), white); ear.position.set(mx + ex, my + 0.39, mz); grad(ear); ear.renderOrder = 2; winRoom.add(ear) } // 耳
       box(0.05, 0.12, 0.05, mx + 0.09, my + 0.18, mz - 0.02, white)            // 招く前足
       box(0.16, 0.04, 0.02, mx, my + 0.22, mz + 0.07, redCol)                  // 首輪
       cyl(0.045, 0.045, 0.02, mx, my + 0.15, mz + 0.08, brass, 10)             // 小判
     }
     { const px = 1.9, pz = 0.9 // 観葉植物（窓辺の床）
       cyl(0.19, 0.14, 0.34, px, FY + 0.17, pz, potMat, 14)                     // 鉢
-      for (const [dx, dy, dz, s] of [[0, 0.42, 0, 0.24], [-0.13, 0.34, 0.06, 0.18], [0.12, 0.36, -0.05, 0.19], [0.02, 0.54, -0.02, 0.16]]) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), leaf); lf.position.set(px + dx, FY + 0.34 + dy, pz + dz); lf.renderOrder = 2; winRoom.add(lf) } // 葉群
+      for (const [dx, dy, dz, s] of [[0, 0.42, 0, 0.24], [-0.13, 0.34, 0.06, 0.18], [0.12, 0.36, -0.05, 0.19], [0.02, 0.54, -0.02, 0.16]]) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), leaf); lf.position.set(px + dx, FY + 0.34 + dy, pz + dz); grad(lf); lf.renderOrder = 2; winRoom.add(lf) } // 葉群
     }
     // ── 奥壁（振り返ると）: 襖＋神棚＋黒電話 ──
     for (let i = 0; i < 4; i++) { const fx = -3.0 + i * 2.0; box(1.94, 3.0, 0.06, fx, 0.6, BZ - 0.1, creamMat); box(0.08, 3.0, 0.09, fx - 0.98, 0.6, BZ - 0.12, woodMat); box(0.16, 0.24, 0.05, fx + 0.7, 0.6, BZ - 0.16, woodDk) } // 4枚の襖＋框＋引手
@@ -3081,7 +3091,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (const dx of [0.2, 0.42]) cyl(0.07, 0.06, 0.1, tcx + dx, FY + 0.55, tcz + 0.2, ceramMat) // 湯呑み×2
     { const stTex = cv(48, 48, (x) => { const g = x.createRadialGradient(24, 24, 1, 24, 24, 24); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.32)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 48, 48) })
       for (let i = 0; i < 3; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stTex, transparent: true, opacity: 0, depthWrite: false, fog: false })); sp.position.set(tcx - 0.2, FY + 0.7, tcz - 0.1); sp.userData = { x0: tcx - 0.2, y0: FY + 0.7, ph: i / 3 }; sp.renderOrder = 7; winRoom.add(sp); teaSteam.push(sp); winRoomMats.push(sp.material) } } // 急須から立ちのぼる湯気
-    cyl(0.2, 0.18, 0.12, tcx + 0.1, FY + 0.56, tcz - 0.35, woodMat); for (let i = 0; i < 3; i++) { const mk2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), mikanMat); mk2.position.set(tcx + 0.1 + (R() - 0.5) * 0.16, FY + 0.66, tcz - 0.35 + (R() - 0.5) * 0.16); mk2.renderOrder = 2; winRoom.add(mk2) } // みかん籠
+    cyl(0.2, 0.18, 0.12, tcx + 0.1, FY + 0.56, tcz - 0.35, woodMat); for (let i = 0; i < 3; i++) { const mk2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), mikanMat); mk2.position.set(tcx + 0.1 + (R() - 0.5) * 0.16, FY + 0.66, tcz - 0.35 + (R() - 0.5) * 0.16); grad(mk2); mk2.renderOrder = 2; winRoom.add(mk2) } // みかん籠
     box(0.34, 0.03, 0.46, tcx - 0.5, FY + 0.06, tcz + 0.7, creamMat) // たたんだ新聞
     if (season === 'winter') { box(1.95, 0.5, 1.95, tcx, FY + 0.28, tcz, fabMat) } // こたつの布団
     else if (season === 'summer') { cyl(0.04, 0.04, 1.0, -3.0, FY + 0.5, 5.2, blackMat); const fan = cyl(0.32, 0.32, 0.1, -3.0, FY + 1.0, 5.2, ceramMat, 16); fan.rotation.z = Math.PI / 2; box(0.5, 0.1, 0.5, -3.0, FY + 0.05, 5.2, blackMat) } // 扇風機（夏）
@@ -4156,6 +4166,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
     if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.22 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
+    if (winRoom.visible && winPendulum) winPendulum.rotation.x = Math.sin(t * 2.0) * 0.16 // 柱時計の振り子が静かに時を刻む
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
