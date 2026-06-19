@@ -32,6 +32,8 @@ const CAM = {
   leanPitchDn: 0.55, // 乗り出し時に下を見下ろせる範囲の拡張（ユーザー要望でさらに下＝足下の街まで覗ける）
   lookPitch: 18,    // 見上げ/見下ろしの効き（pitch→視線の縦移動量）。大きいほど少しのスワイプで大きく振れる
   fov0: 62,         // 基準画角(度)
+  roomParallaxX: 3.0, // 室内視差(横): 見回すと頭が左右にずれて窓越しの景色が動く（部屋の中で覗き込む手応え）。乗り出すと消える
+  roomParallaxY: 2.0, // 室内視差(縦): 見上げ/見下ろしで頭が上下にずれる量
 }
 
 // ── 浮遊（空を飛ぶ）／散策（歩く）モードの調整パラメータ ──
@@ -3703,8 +3705,11 @@ export async function mountTown3d(parent, opts = {}) {
     const yaw = active.yaw + Math.sin(t * 0.2) * 0.012
     const pitch = active.pitch
     // 窓をあけると視界がふっと前へ開け(=控えめ)、乗り出すとさらに前へ・下へ寄って画角が広がる（枠を越えて街へ顔を出す）
-    const ex = 0
-    const ey = eye.y - wo * CAM.winDown - lean * CAM.leanDown
+    // 室内視差: 部屋の中（乗り出していない間）は、見回しに連れてカメラがわずかに平行移動する＝頭を動かして
+    // 窓の外を覗き込む手応え（近い窓枠と遠い景色がずれて動く）。乗り出す(lean)と0になり、枠を越えて街へ顔を出す。
+    const roomAmt = Math.max(0, 1 - lean)
+    const ex = Math.sin(yaw) * CAM.roomParallaxX * roomAmt
+    const ey = eye.y - wo * CAM.winDown - lean * CAM.leanDown + pitch * CAM.roomParallaxY * roomAmt
     const ez = eye.z - wo * CAM.winFwd - lean * CAM.leanFwd
     const winFov = CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov
     const look = new THREE.Vector3(
