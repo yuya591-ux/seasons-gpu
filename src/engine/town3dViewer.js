@@ -2456,11 +2456,15 @@ export async function mountTown3d(parent, opts = {}) {
       const bFL = [-hw, 0, hd], bFR = [hw, 0, hd], bBR = [hw, 0, -hd], bBL = [-hw, 0, -hd]
       const rL = [-hr, h, 0], rR = [hr, h, 0]
       const tri = [bFL, bFR, rR, bFL, rR, rL, bBR, bBL, rL, bBR, rL, rR, bBL, bFL, rL, bFR, bBR, rR] // 前/後の勾配＋左右の寄せ
-      const pos = [], uv = []
-      for (const v of tri) { pos.push(v[0], v[1], v[2]); uv.push((v[0] / baseW + 0.5) * 2.0, 0.85 - v[1] / h * 0.8) } // 茅の縦筋が勾配を下る
+      const pos = [], uv = [], col = []
+      for (const v of tri) {
+        pos.push(v[0], v[1], v[2]); uv.push((v[0] / baseW + 0.5) * 2.0, 0.85 - v[1] / h * 0.8) // 茅の縦筋が勾配を下る
+        const f = 0.8 + (v[1] / h) * 0.34; col.push(f, f, f) // 軒=翳り0.8→大棟=明1.14の縦グラデ（大屋根に量感を出す。vertexColors材のみ反映）
+      }
       const geo = new THREE.BufferGeometry()
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
       geo.computeVertexNormals()
       return geo
     }
@@ -2473,12 +2477,18 @@ export async function mountTown3d(parent, opts = {}) {
       const skirt = new THREE.Mesh(new THREE.BoxGeometry(9.1, 1.0, 6.6), toon(0x5e4d3c)); skirt.position.y = 0.5; g.add(skirt) // 下見板（腰壁）
       // 茅葺の質感（縦の茅の筋）。主屋と長屋門の屋根で共有。
       const tc = document.createElement('canvas'); tc.width = tc.height = 64
-      const tcx = tc.getContext('2d'); const tb = new THREE.Color(0x6a5a3c)
+      const tcx = tc.getContext('2d'); const tb = new THREE.Color(0x564a2e) // 深い茅色（陽で起きてちょうど麦藁色に。淡い合板感を脱す）
       tcx.fillStyle = '#' + tb.getHexString(); tcx.fillRect(0, 0, 64, 64)
-      for (let i = 0; i < 80; i++) { const col = tb.clone().offsetHSL((R() - 0.5) * 0.02, (R() - 0.5) * 0.05, (R() - 0.5) * 0.2); tcx.strokeStyle = '#' + col.getHexString(); tcx.lineWidth = 0.6 + R() * 1.2; tcx.globalAlpha = 0.5; const lx = R() * 64; tcx.beginPath(); tcx.moveTo(lx, 0); tcx.lineTo(lx + (R() - 0.5) * 5, 64); tcx.stroke() }
+      // 横の茅の段（葺き重ねた束の段＝段の下に影、すぐ上に束の照り）＝合板でなく「葺いた茅」に読ませる
+      for (let y = 7; y < 64; y += 12) {
+        tcx.fillStyle = 'rgba(38,30,16,0.5)'; tcx.fillRect(0, y, 64, 2.6)          // 段の影
+        tcx.fillStyle = 'rgba(150,128,84,0.32)'; tcx.fillRect(0, y + 2.6, 64, 1.7) // 束の照り
+      }
+      // 縦の茅の筋（葺きおろし）
+      for (let i = 0; i < 120; i++) { const col = tb.clone().offsetHSL((R() - 0.5) * 0.02, (R() - 0.5) * 0.06, (R() - 0.5) * 0.26); tcx.strokeStyle = '#' + col.getHexString(); tcx.lineWidth = 0.5 + R() * 1.3; tcx.globalAlpha = 0.42; const lx = R() * 64; tcx.beginPath(); tcx.moveTo(lx, 0); tcx.lineTo(lx + (R() - 0.5) * 4, 64); tcx.stroke() }
       tcx.globalAlpha = 1
-      const thatchTex = new THREE.CanvasTexture(tc); thatchTex.wrapS = thatchTex.wrapT = THREE.RepeatWrapping; thatchTex.repeat.set(3, 1)
-      const thatchMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: thatchTex })
+      const thatchTex = new THREE.CanvasTexture(tc); thatchTex.wrapS = thatchTex.wrapT = THREE.RepeatWrapping; thatchTex.repeat.set(3, 2)
+      const thatchMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: thatchTex, vertexColors: true })
       // 茅葺の寄棟屋根: 水平の大棟＋四方の勾配＋深い軒。四角錐の「段ボール箱」を本物の寄棟へ作り直す（評価指摘）。
       const roof = new THREE.Mesh(makeHipRoof(10.8, 8.2, 5.6, 3.5), thatchMat)
       roof.position.y = 2.7; roof.castShadow = true; roof.receiveShadow = true; g.add(roof) // 軒を壁の上端(3.2)より下げ＝深い軒の量感
@@ -2492,7 +2502,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 屋敷林（屋敷を「後ろから」抱く高木の木立）。主屋(z=-18)の手前を空け、背後と側面奥にのみ立てる。
     for (const c of [[-8, -26], [8, -25], [-6, -31], [7, -30], [0, -33], [-11, -28], [11, -27]]) tree(c[0], c[1], 1.3 + R() * 0.5)
     // 谷の斜面に点在する瓦屋根の農家（数軒。奥にも足して空の間延びを締める）
-    const farmRoof = [toon(0x6a6258), toon(0x7a5e50), toon(0x5e6a5c)]
+    const farmRoof = [toon(0x6a6258), toon(0x7a5e50), toon(0x5e6a5c)].map((m) => { m.vertexColors = true; return m }) // 寄棟の縦グラデで瓦屋根にも量感
     for (const c of [[-19, -8, 0.9], [20, -14, 1.0], [-22, -24, 1.1], [23, -30, 1.0], [-17, -36, 0.9], [16, -41, 0.95], [-24, -43, 1.0], [9, -45, 0.85]]) {
       const gy = heightAt(c[0], c[1])
       const fg = new THREE.Group(); fg.position.set(c[0], gy, c[1]); fg.scale.setScalar(c[2]); fg.rotation.y = (R() - 0.5) * 0.8; town.add(fg)
