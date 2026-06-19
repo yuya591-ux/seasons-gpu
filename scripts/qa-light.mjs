@@ -1,0 +1,13 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+page.on('pageerror', e => console.log('ERR', e.message))
+await page.addInitScript(() => { try { localStorage.setItem('seasons.state.v1', JSON.stringify({ settings: { quality: 'light' } })) } catch(e){} })
+await page.goto('http://localhost:4801/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(()=>{})
+await page.waitForTimeout(600)
+await page.evaluate(()=>window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2600)
+const st = await page.evaluate(()=>window.__town3dStats && window.__town3dStats())
+console.log('light品質:', JSON.stringify(st))
+await browser.close()

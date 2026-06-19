@@ -1043,13 +1043,13 @@ export async function mountTown3d(parent, opts = {}) {
       const haloMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.22, depthWrite: false, fog: true })
       const poleMat = toon(0x44464a)
       for (const side of [-1, 1]) {
-        for (let z = 16 + (side > 0 ? 4.5 : 0); z > -52; z -= 9) {
+        for (let z = 16 + (side > 0 ? 4.5 : 0); z > -52; z -= (LIGHT ? 18 : 9)) {
           const gx = side * 4.7, gz = z, gy = heightAt(gx, gz)
           const g = new THREE.Group(); g.position.set(gx, gy, gz); town.add(g)
           const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 4.2, 6), poleMat); pole.position.y = 2.1; pole.castShadow = true; g.add(pole)
           const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.1), poleMat); arm.position.set(-side * 0.35, 4.1, 0); g.add(arm)
           const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), headMat); head.position.set(-side * 0.65, 4.0, 0); g.add(head)
-          if (litHead) { const halo = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 8), haloMat); halo.position.copy(head.position); g.add(halo) }
+          if (litHead && !LIGHT) { const halo = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 8), haloMat); halo.position.copy(head.position); g.add(halo) }
         }
       }
     }
@@ -1539,7 +1539,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     for (const c of [[-16, 19], [17, 20], [-21, 14], [21, 16]]) tree(c[0], c[1], 1.7 + R() * 0.5) // 手前の額装木立
   } else {
-    for (let i = 0; i < 165; i++) {
+    for (let i = 0; i < (LIGHT ? 108 : 165); i++) { // 非力端末は散在木を間引く
       const x = (R() - 0.5) * 168, z = -118 + R() * 152
       if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
@@ -1689,7 +1689,7 @@ export async function mountTown3d(parent, opts = {}) {
         const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.0, 12), redMat); drum.rotation.z = Math.PI / 2; drum.position.y = 4.1; yag.add(drum) // 太鼓
         const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 1.6, 4), toon(0x55585e)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.castShadow = true; yag.add(roof)
         // 放射状の提灯（やぐら頂上→周囲のポールへ。黄/赤/青）
-        const lantCols = [toon(0xe8a838), redMat, toon(0x3a8ac0)], NP = 8, poleR = 9.5
+        const lantCols = [toon(0xe8a838), redMat, toon(0x3a8ac0)], NP = LIGHT ? 5 : 8, poleR = 9.5
         for (let i = 0; i < NP; i++) {
           const a = i / NP * 6.283, ppx = yx + Math.cos(a) * poleR, ppz = yz + Math.sin(a) * poleR, pgy = heightAt(ppx, ppz)
           const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 6), woodMat); pole.position.set(ppx, pgy + 2.5, ppz); town.add(pole)
@@ -1710,7 +1710,7 @@ export async function mountTown3d(parent, opts = {}) {
         }
         // 盆踊りの輪（やぐらを囲む人。中心を向き、片手を上げる）
         const skinMat = toon(0xf0c49c), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0]
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < (LIGHT ? 8 : 12); i++) {
           const a = i / 12 * 6.283, dx2 = yx + Math.cos(a) * 5.8, dz2 = yz + Math.sin(a) * 5.8, dgy = heightAt(dx2, dz2)
           const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(yx - dx2, yz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
           const yuk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])); yuk.position.y = 0.6; yuk.castShadow = true; d.add(yuk) // 浴衣
@@ -2580,10 +2580,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 夕夜の電飾（リムに沿う豆電球＋ハブ＋スポークの灯り。車輪と一緒に回って瞬く）
     if (duskAmt > 0.25) {
       const bulbA = new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }), bulbB = new THREE.MeshBasicMaterial({ color: 0xff9a6a, fog: true }), bulbC = new THREE.MeshBasicMaterial({ color: 0x86c0e8, fog: true })
-      const NB = 40
+      const NB = LIGHT ? 20 : 40 // 非力端末は電飾を半分に
       for (let i = 0; i < NB; i++) { const a = i / NB * 6.283; const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 6), [bulbA, bulbB, bulbC][i % 3]); bulb.position.set(Math.cos(a) * R0, Math.sin(a) * R0, 0.22); wheel.add(bulb) }
       const hub = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), bulbA); hub.position.z = 0.3; wheel.add(hub)
-      for (let i = 0; i < N; i++) { const a = (i / N) * 6.283; const sb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), bulbA); sb.position.set(Math.cos(a) * R0 * 0.52, Math.sin(a) * R0 * 0.52, 0.22); wheel.add(sb) }
+      if (!LIGHT) for (let i = 0; i < N; i++) { const a = (i / N) * 6.283; const sb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), bulbA); sb.position.set(Math.cos(a) * R0 * 0.52, Math.sin(a) * R0 * 0.52, 0.22); wheel.add(sb) }
     }
     ferris = { wheel, gondolas }
   }
@@ -2721,7 +2721,7 @@ export async function mountTown3d(parent, opts = {}) {
     return g
   }
   peeps = []
-  for (let i = 0; i < 11; i++) {
+  for (let i = 0; i < (LIGHT ? 6 : 11); i++) {
     const g = makePeep()
     const dir = (i % 2 === 0) ? 1 : -1
     g.userData = { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 }
@@ -2742,7 +2742,7 @@ export async function mountTown3d(parent, opts = {}) {
     { x: HARBOR.x - 2, z: HARBOR.z + 1, n: 3, rad: 3.0 },             // 港（働く人）
     { x: -47, z: -42, n: 2, rad: 2.2 },                               // 川辺の遊歩道（南寄り）
   ]
-  for (const s of crowdSpots) for (let i = 0; i < s.n; i++) {
+  for (const s of crowdSpots) for (let i = 0; i < (LIGHT ? Math.ceil(s.n * 0.5) : s.n); i++) {
     const g = makePeep()
     const hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
     g.userData = { loiter: true, hx, hz, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 }
