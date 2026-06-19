@@ -24,8 +24,8 @@ const CAM = {
   winFwd: 1.8,      // 窓あけでカメラが前へ進む量（控えめ＝視界がふっと開ける程度）
   winDown: 0.4,     // 窓あけでカメラが下がる量
   winFov: 3.5,      // 窓あけで画角が広がる量(度)
-  leanFwd: 9.0,     // 乗り出しでカメラが前へ出る量（枠を越えて街へ顔を出す）
-  leanDown: 2.0,    // 乗り出しでカメラが下がる量（落とし過ぎると窓の下・ベランダ手すりを貫通＝高めの位置で手すりの上から乗り出す）
+  leanFwd: 6.5,     // 乗り出しでカメラが前へ出る量（枠の手前で“引き気味”に顔を出す＝のめり込み過ぎず街を見渡す）
+  leanDown: 0.9,    // 乗り出しでカメラが下がる量（落とし過ぎると窓の下・ベランダ手すりを貫通＝なるべく高い位置で手すりの上から乗り出す）
   leanFov: 7.0,     // 乗り出しで画角が広がる量(度)
   leanLook: 3.2,    // 乗り出しで視線が下を覗き込む量（手前の木立へ落ち込み過ぎない程度に抑制＝評価UX-H2）
   leanPitchUp: 1.10, // 乗り出し時に上を見上げられる範囲（空・ビル上層まで仰げる）。大きいほど上が見える
@@ -57,7 +57,7 @@ const FLY = {
   enterDur: 1.7, pitchMax: 1.2, landDur: 1.4,
   lookEase: 0.18,   // 見回し（右ドラッグ）の追従
   // 引いた三人称“浮遊カメラ”（後方上から望む）
-  camBack: 9.5, camUp: 3.2, camAhead: 9,      // 飛行: 後方/上/注視先
+  camBack: 11.5, camUp: 3.6, camAhead: 9,     // 飛行: 後方/上/注視先（既定をやや引き気味＝街を広く望む。±ズームで前後可変）
   walkBack: 1.5, walkUp: 0.4, walkAhead: 4.5, // 歩行: 一人称寄り（通行人と目線を揃える＝地に足のついた散策。アバター無し）
   camLag: 0.12,     // カメラ位置の遅れ追従（わずかな揺らぎ＝空気の流れ）
   // 旋回バンク（飛行の没入の要）
@@ -2988,12 +2988,15 @@ export async function mountTown3d(parent, opts = {}) {
     box(RW, 0.1, 0.34, 0, oB - 0.0, 0.1, woodMat) // 腰壁上の見切り（窓台のライン）
     // アルミサッシの窓枠＋引き違いの召し合わせ（団地/マンションの掃き出し窓）＋窓台
     const alMat = mk(C(0x9ea29e, 0x44484c)) // アルミサッシ（明るすぎる細桟はチカチカするので鈍い銀灰に）
-    for (const [w, h, x, y] of [[owW + 0.2, 0.1, 0, oT], [owW + 0.2, 0.1, 0, oB], [0.1, owH + 0.2, -owW / 2 - 0.05, WINCY], [0.1, owH + 0.2, owW / 2 + 0.05, WINCY]]) box(w, h, 0.1, x, y, 0.06, alMat)
-    box(0.06, owH, 0.06, 0, WINCY, 0.05, alMat) // 中央の召し合わせ（引き違い）
+    // 窓の角のチカチカの真因＝4本の桟が同じzで角で重なりZファイティング。横桟=奥(0.05)/縦桟=手前(0.08)へ前後をずらし、
+    // 角で縦桟が横桟を確実に覆う＝重なりの深度取り合いを解消する。
+    box(owW + 0.2, 0.1, 0.1, 0, oT, 0.05, alMat); box(owW + 0.2, 0.1, 0.1, 0, oB, 0.05, alMat)                 // 上下の横桟（奥）
+    box(0.1, owH + 0.2, 0.1, -owW / 2 - 0.05, WINCY, 0.08, alMat); box(0.1, owH + 0.2, 0.1, owW / 2 + 0.05, WINCY, 0.08, alMat) // 左右の縦桟（手前）
+    box(0.06, owH, 0.06, 0, WINCY, 0.083, alMat) // 中央の召し合わせ（さらに手前）
     box(0.14, 0.06, 0.08, 0.1, WINCY - 0.06, 0.08, alMat) // クレセント錠
     // 引き違いのガラス障子（2枚）。閉=開口を覆う／窓をあけると右の障子が左へすべって右半分が開く（実際の窓の開閉）。
     // ガラスは“ごく淡い映り込み”だけ（景色を曇らせない）。斜めの細い光の筋を1本＋極薄の地色。端はパネルを枠の内側に隠す。
-    const glassTex = cv(64, 64, (x) => { x.fillStyle = 'rgba(206,220,232,0.035)'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,0.2)'; x.lineWidth = 4; x.beginPath(); x.moveTo(10, 64); x.lineTo(46, 0); x.stroke(); x.strokeStyle = 'rgba(255,255,255,0.1)'; x.lineWidth = 2; x.beginPath(); x.moveTo(40, 64); x.lineTo(56, 0); x.stroke() })
+    const glassTex = cv(64, 64, (x) => { x.fillStyle = 'rgba(210,222,234,0.02)'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,0.12)'; x.lineWidth = 3.5; x.beginPath(); x.moveTo(12, 64); x.lineTo(46, 0); x.stroke(); x.strokeStyle = 'rgba(255,255,255,0.06)'; x.lineWidth = 2; x.beginPath(); x.moveTo(40, 64); x.lineTo(56, 0); x.stroke() })
     const glassMat = new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, opacity: 1, depthWrite: false, fog: false }); winRoomMats.push(glassMat)
     const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); lpane.position.set(-owW / 4, WINCY, 0.03); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定）
     const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); rpane.position.set(owW / 4, WINCY, 0.07); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
@@ -3008,6 +3011,14 @@ export async function mountTown3d(parent, opts = {}) {
     box(0.05, CY - 2.5, 0.05, 0, CY - (CY - 2.5) / 2, 2.4, woodDk) // 吊りコード
     cyl(0.42, 0.34, 0.42, 0, 2.32, 2.4, lampMat, 14)             // 和紙の傘
     box(0.5, 0.05, 0.5, 0, 2.55, 2.4, woodDk); cyl(0.09, 0.09, 0.14, 0, 2.06, 2.4, lampMat) // 傘の天板＋電球
+    box(0.018, 0.42, 0.018, 0.17, 1.86, 2.4, woodDk); cyl(0.04, 0.04, 0.09, 0.17, 1.6, 2.4, lampMat) // 灯りの引き紐＋握り玉（昭和の暮らし）
+    { const gTex = cv(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 1, 32, 32, 32); g.addColorStop(0, 'rgba(255,232,178,0.95)'); g.addColorStop(0.45, 'rgba(255,216,150,0.32)'); g.addColorStop(1, 'rgba(255,216,150,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64) }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gTex, transparent: true, opacity: isNight ? 0.9 : 0.42, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); gl.position.set(0, 2.12, 2.4); gl.scale.set(2.4, 2.4, 1); gl.renderOrder = 6; winRoom.add(gl); winRoomMats.push(gl.material) } // 灯りの暖かいにじみ（夜ほど強い）
+    // ── 和室の骨格: 四隅の柱と壁をめぐる長押（昭和の茶の間らしい陰影） ──
+    const postMat = mk(C(0x6f573c, 0x40342a)) // 飴色の柱・長押
+    for (const [px, pz] of [[-SX + 0.11, 0.22], [SX - 0.11, 0.22], [-SX + 0.11, BZ - 0.22], [SX - 0.11, BZ - 0.22]]) box(0.17, WT - FY, 0.17, px, (WT + FY) / 2, pz, postMat) // 四隅の柱
+    const ngY = oT + 0.5 // 長押の高さ（窓・鴨居の上）
+    box(RW, 0.1, 0.06, 0, ngY, 0.05, postMat); box(RW, 0.1, 0.06, 0, ngY, BZ - 0.05, postMat) // 前後の長押
+    box(0.06, 0.1, RD, -SX + 0.04, ngY, BZ / 2, postMat); box(0.06, 0.1, RD, SX - 0.04, ngY, BZ / 2, postMat) // 左右の長押
     // ── 右壁＝居間の顔: ブラウン管テレビ＋木の台＋柱時計＋カレンダー ──
     box(1.5, 0.66, 0.7, SX - 0.42, FY + 0.33, 3.0, woodMat)        // テレビ台
     box(1.04, 0.78, 0.66, SX - 0.5, FY + 1.05, 3.0, tvMat)         // テレビ筐体
