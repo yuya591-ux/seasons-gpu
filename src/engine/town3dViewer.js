@@ -2934,9 +2934,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 不透明＝室内が深度を書き込み、手前の壁が奥の壁/家具と「窓の外の街」を遮蔽＝隠れた街の塗り(fill)を早期Zで省く＋
     // 半透明ブレンドの全画面オーバードローをゼロに（カクつきの主因を断つ）。乗り出すとカメラが窓の開口を通って前へ
     // 出るので室内は自然に背後へ退く（フェード不要）。
-    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); winRoomMats.push(m); return m }
-    const box = (w, h, d, x, y, z, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
-    const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
+    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); m.vertexColors = true; winRoomMats.push(m); return m }
+    // 角をわずかに面取り（街のトゥーンの丸みに合わせ、硬い箱の安っぽさを和らげる）。極薄物は普通の箱。
+    const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.05, Math.min(w, h, d) * 0.24); const g = r > 0.015 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）
+    const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m }
     const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
     // テクスチャ: 畳・天井板・カレンダー・障子
     const tatTex = cv(256, 256, (x) => { x.fillStyle = C('#9a9c5e', '#3a3c2c'); x.fillRect(0, 0, 256, 256); x.strokeStyle = 'rgba(0,0,0,0.05)'; x.lineWidth = 1; for (let y = 0; y < 256; y += 4) { x.beginPath(); x.moveTo(0, y); x.lineTo(256, y); x.stroke() } x.strokeStyle = C('#2c2a1c', '#15140d'); x.lineWidth = 8; x.strokeRect(3, 3, 122, 250); x.strokeRect(131, 3, 122, 250) })
