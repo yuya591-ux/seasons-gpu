@@ -1647,6 +1647,51 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3, rr = PARK.r - 0.4 + R() * 0.8; tree(px0 + Math.cos(a) * rr, pz0 + Math.sin(a) * rr, 0.8 + R() * 0.4) }
       colliders.push({ x: px0, z: pz0, r: pondR * 0.85 }) // 歩行: 池には入らない
       spawnAvoid.push({ x: px0, z: pz0, r: pondR + 1.5 }) // 着地: 池に降りない
+      // ── 夏祭り（公園の北の開けた所を会場に。やぐら＋放射状の提灯＋屋台＋盆踊りの輪）。──
+      {
+        const yx = px0, yz = pz0 - 9, ygy = heightAt(yx, yz) // 池の北
+        const woodMat = toon(0x9a7048), redMat = toon(0xc0392b)
+        // やぐら（二段の木の櫓＋紅白幕＋太鼓＋宝形屋根）
+        const yag = new THREE.Group(); yag.position.set(yx, ygy, yz); town.add(yag)
+        for (const lx of [-1.8, 1.8]) for (const lz of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 4.6, 0.25), woodMat); leg.position.set(lx, 2.3, lz); leg.castShadow = true; yag.add(leg) }
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.3, 4.4), woodMat); deck.position.y = 3.3; deck.castShadow = true; yag.add(deck)
+        // 紅白幕（上段の周り）
+        const mc = document.createElement('canvas'); mc.width = 48; mc.height = 8; const mcx = mc.getContext('2d'); for (let i = 0; i < 6; i++) { mcx.fillStyle = i % 2 ? '#c0392b' : '#f0ece0'; mcx.fillRect(i * 8, 0, 8, 8) }
+        const mtex = new THREE.CanvasTexture(mc); mtex.wrapS = THREE.RepeatWrapping; mtex.repeat.set(8, 1)
+        const maku = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 0.8, 4, 1, true), new THREE.MeshToonMaterial({ map: mtex, gradientMap: grad, side: THREE.DoubleSide })); maku.rotation.y = Math.PI / 4; maku.position.y = 4.6; yag.add(maku)
+        const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.0, 12), redMat); drum.rotation.z = Math.PI / 2; drum.position.y = 4.1; yag.add(drum) // 太鼓
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 1.6, 4), toon(0x55585e)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.castShadow = true; yag.add(roof)
+        // 放射状の提灯（やぐら頂上→周囲のポールへ。黄/赤/青）
+        const lantCols = [toon(0xe8a838), redMat, toon(0x3a8ac0)], NP = 8, poleR = 9.5
+        for (let i = 0; i < NP; i++) {
+          const a = i / NP * 6.283, ppx = yx + Math.cos(a) * poleR, ppz = yz + Math.sin(a) * poleR, pgy = heightAt(ppx, ppz)
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 6), woodMat); pole.position.set(ppx, pgy + 2.5, ppz); town.add(pole)
+          for (let k = 1; k <= 4; k++) { const tt = k / 5; const lx2 = yx + (ppx - yx) * tt, lz2 = yz + (ppz - yz) * tt, ly2 = (ygy + 5.8) + ((pgy + 5) - (ygy + 5.8)) * tt - 0.2; const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), lantCols[k % 3]); lan.scale.y = 1.2; lan.position.set(lx2, ly2, lz2); town.add(lan) }
+        }
+        // 屋台×4（縁沿い。暖簾の品書き）
+        const stallWords = ['たこやき', 'わたあめ', 'かきごおり', 'やきとり']
+        const stallPos = [[yx - 9, yz + 4], [yx + 9, yz + 2], [yx - 4, yz + 11], [yx + 6, yz + 10]]
+        for (let s = 0; s < 4; s++) {
+          const sx = stallPos[s][0], sz = stallPos[s][1], sgy = heightAt(sx, sz), g = new THREE.Group(); g.position.set(sx, sgy, sz); town.add(g)
+          const counter = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 1.4), toon(0xcdb185)); counter.position.y = 0.55; counter.castShadow = true; g.add(counter)
+          const awn = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.7), toon([0xc0453a, 0x3a7a5e, 0x3a6a8a, 0xc89030][s])); awn.position.y = 2.1; awn.castShadow = true; g.add(awn)
+          for (const bx of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 6), toon(0x8a6a48)); post.position.set(bx, 1.05, 0); g.add(post) }
+          const sc = document.createElement('canvas'); sc.width = 64; sc.height = 24; const scx = sc.getContext('2d'); scx.fillStyle = '#f0ece0'; scx.fillRect(0, 0, 64, 24); scx.fillStyle = '#c0392b'; scx.font = 'bold 15px sans-serif'; scx.textAlign = 'center'; scx.textBaseline = 'middle'; scx.fillText(stallWords[s], 32, 12)
+          const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.06), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc) })); sign.position.set(0, 1.55, 0.75); g.add(sign)
+          const stallLan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : redMat); stallLan.scale.y = 1.2; stallLan.position.set(-1.2, 1.8, 0.7); g.add(stallLan)
+          colliders.push({ x: sx, z: sz, r: 1.6 })
+        }
+        // 盆踊りの輪（やぐらを囲む人。中心を向き、片手を上げる）
+        const skinMat = toon(0xf0c49c), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0]
+        for (let i = 0; i < 12; i++) {
+          const a = i / 12 * 6.283, dx2 = yx + Math.cos(a) * 5.8, dz2 = yz + Math.sin(a) * 5.8, dgy = heightAt(dx2, dz2)
+          const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(yx - dx2, yz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
+          const yuk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])); yuk.position.y = 0.6; yuk.castShadow = true; d.add(yuk) // 浴衣
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat); head.position.y = 1.4; d.add(head)
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), toon(yukataCols[i % yukataCols.length])); arm.position.set(0.22, 1.15, 0.1); arm.rotation.z = -0.9; d.add(arm) // 上げた手
+        }
+        colliders.push({ x: yx, z: yz, r: 2.6 }); spawnAvoid.push({ x: yx, z: yz, r: 7 })
+      }
     }
 
     // ── 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。──
