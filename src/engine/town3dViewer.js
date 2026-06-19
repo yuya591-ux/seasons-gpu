@@ -2838,6 +2838,30 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 庭・空き地の季節の花（夏=ひまわり／秋=コスモス）。merged で軽く。街のみ。 ──
+  if (kind !== 'yato' && (season === 'summer' || season === 'autumn')) {
+    const isHimawari = season === 'summer'
+    const stemGeos = [], headGeos = [], centerGeos = []
+    for (const cl of [[-20, -10], [22, -6], [-7, -52], [42, -34], [-46, -16]]) {
+      const n = 3 + ((R() * 3) | 0)
+      for (let i = 0; i < n; i++) {
+        const fx = cl[0] + (R() - 0.5) * 4, fz = cl[1] + (R() - 0.5) * 4, fgy = heightAt(fx, fz)
+        if (fx > SEA.coast || Math.abs(fx - RIVER.x) < RIVER.halfW + 1) continue // 海・川は避ける
+        const h = isHimawari ? 2.0 + R() * 0.7 : 1.2 + R() * 0.5
+        const sg = new THREE.CylinderGeometry(0.04, 0.06, h, 5); sg.translate(fx, fgy + h / 2, fz); stemGeos.push(sg)
+        const hr = isHimawari ? 0.5 : 0.24
+        const hd = new THREE.CylinderGeometry(hr, hr, 0.1, isHimawari ? 14 : 8); hd.rotateX(0.5 + (R() - 0.5) * 0.4); hd.translate(fx, fgy + h, fz); headGeos.push(hd)
+        if (isHimawari) { const ct = new THREE.CylinderGeometry(0.26, 0.26, 0.12, 12); ct.rotateX(0.5); ct.translate(fx, fgy + h + 0.02, fz); centerGeos.push(ct) }
+      }
+    }
+    if (BufferGeometryUtils.mergeGeometries) {
+      const sm = stemGeos.length && BufferGeometryUtils.mergeGeometries(stemGeos, false); if (sm) town.add(new THREE.Mesh(sm, toon(0x5e8a4a)))
+      const hm = headGeos.length && BufferGeometryUtils.mergeGeometries(headGeos, false); if (hm) { const heads = new THREE.Mesh(hm, toon(isHimawari ? 0xe8b830 : 0xe884a4)); heads.castShadow = true; town.add(heads) }
+      const cm = centerGeos.length && BufferGeometryUtils.mergeGeometries(centerGeos, false); if (cm) town.add(new THREE.Mesh(cm, toon(0x5a4030)))
+      stemGeos.concat(headGeos, centerGeos).forEach((g) => g.dispose())
+    }
+  }
+
   // 全ての木の幹を1メッシュへ統合（静止）＝ドローコールを大きく削る（葉は木ごとに揺れるので別）。
   if (trunkGeos.length && BufferGeometryUtils.mergeGeometries) {
     const tm = BufferGeometryUtils.mergeGeometries(trunkGeos, false)
