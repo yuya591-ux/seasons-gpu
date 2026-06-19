@@ -2927,6 +2927,7 @@ export async function mountTown3d(parent, opts = {}) {
   //    世界座標に固定（カメラに親子付けしない）＝カメラの平行移動/回転で枠と景色が正しくずれる。 ──
   const winRoom = new THREE.Group()
   const winRoomMats = []
+  let winSashR = null, winSashX0 = 0, winSashX1 = 0 // 引き違いの可動ガラス障子（窓をあけると横へすべる）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.3, SX = 3.95, BZ = 6.2, WINCY = 1.0
@@ -2987,6 +2988,12 @@ export async function mountTown3d(parent, opts = {}) {
     for (const [w, h, x, y] of [[owW + 0.2, 0.1, 0, oT], [owW + 0.2, 0.1, 0, oB], [0.1, owH + 0.2, -owW / 2 - 0.05, WINCY], [0.1, owH + 0.2, owW / 2 + 0.05, WINCY]]) box(w, h, 0.1, x, y, 0.06, alMat)
     box(0.06, owH, 0.06, 0, WINCY, 0.05, alMat) // 中央の召し合わせ（引き違い）
     box(0.14, 0.06, 0.08, 0.1, WINCY - 0.06, 0.08, alMat) // クレセント錠
+    // 引き違いのガラス障子（2枚）。閉=開口を覆う／窓をあけると右の障子が左へすべって右半分が開く（実際の窓の開閉）。
+    const glassTex = cv(64, 64, (x) => { x.fillStyle = 'rgba(190,210,228,0.12)'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,0.34)'; x.lineWidth = 7; x.beginPath(); x.moveTo(6, 64); x.lineTo(44, 0); x.stroke(); x.lineWidth = 3; x.beginPath(); x.moveTo(36, 64); x.lineTo(56, 0); x.stroke() })
+    const glassMat = new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, opacity: 1, depthWrite: false, fog: false }); winRoomMats.push(glassMat)
+    const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.02, owH - 0.02), glassMat); lpane.position.set(-owW / 4, WINCY, 0.03); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定）
+    const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.02, owH - 0.02), glassMat); rpane.position.set(owW / 4, WINCY, 0.07); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
+    winSashR = rpane; winSashX0 = owW / 4; winSashX1 = -owW / 4
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
     // ベランダの手すり（窓の外・下＝団地の上階から街を見下ろす気配）。室内と一緒に乗り出すと退く。
@@ -4083,8 +4090,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 部屋の中から窓越しに外を覗く手応えになる。CSSの中央桟・窓台は3D枠と二重になるので隠す。
     const roomAmtF = Math.max(0, 1 - lean)
     // 室内は不透明（街を遮蔽してfill節約・カクつき対策）。乗り出すとカメラが窓の開口を抜けて前へ出る＝室内は背後へ退く。
-    // lean>0.5で非表示（その時カメラは窓の外で前方を向き、背後の室内は見えない＝スナップに気づかない）。空/地上でも非表示。
-    winRoom.visible = flyAmt < 0.6 && lean < 0.5
+    // lean>0.16で非表示＝カメラがベランダの手すり/窓枠へ達する前に室内ごと消す（貫通して見えるのを防ぐ）。空/地上でも非表示。
+    winRoom.visible = flyAmt < 0.6 && lean < 0.16
+    if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
