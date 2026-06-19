@@ -2944,9 +2944,18 @@ export async function mountTown3d(parent, opts = {}) {
     const maxAniso = renderer.capabilities.getMaxAnisotropy() // 浅い角度の床テクスチャの明滅(モアレ)を抑える
     const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; return t }
     // テクスチャ: 畳・天井板・カレンダー・障子
-    // 畳の目は粗く・低コントラストに（4px間隔の細線はモアレでチカチカするので避ける）。縁(畳縁)だけ残す。
-    const tatTex = cv(256, 256, (x) => { x.fillStyle = C('#9a9c5e', '#3a3c2c'); x.fillRect(0, 0, 256, 256); x.strokeStyle = 'rgba(0,0,0,0.035)'; x.lineWidth = 3; for (let y = 8; y < 256; y += 20) { x.beginPath(); x.moveTo(0, y); x.lineTo(256, y); x.stroke() } x.strokeStyle = C('#403c28', '#191811'); x.lineWidth = 7; x.strokeRect(3, 3, 122, 250); x.strokeRect(131, 3, 122, 250) })
-    tatTex.wrapS = tatTex.wrapT = THREE.RepeatWrapping; tatTex.repeat.set(1.5, 1.5)
+    // 畳: 市松に目を互い違い（縦目／横目）＋畳縁で“ちゃんとした畳の間”に。目は低コントラスト・粗めでモアレ(チカチカ)を避ける。
+    const tatTex = cv(256, 256, (x) => {
+      const base = C('#9a9c5e', '#3a3c2c'), hem = C('#414a2b', '#181a10'), grain = C('rgba(58,64,28,0.06)', 'rgba(8,10,5,0.08)')
+      x.fillStyle = base; x.fillRect(0, 0, 256, 256)
+      const cell = (cx, cy, vert) => { x.strokeStyle = grain; x.lineWidth = 2
+        if (vert) { for (let gx = cx + 12; gx < cx + 122; gx += 13) { x.beginPath(); x.moveTo(gx, cy + 8); x.lineTo(gx, cy + 120); x.stroke() } }
+        else { for (let gy = cy + 12; gy < cy + 122; gy += 13) { x.beginPath(); x.moveTo(cx + 8, gy); x.lineTo(cx + 120, gy); x.stroke() } } }
+      cell(0, 0, false); cell(128, 0, true); cell(0, 128, true); cell(128, 128, false) // 互い違いの目（市松）
+      x.strokeStyle = hem; x.lineWidth = 6
+      for (const g of [0, 128, 256]) { x.beginPath(); x.moveTo(g, 0); x.lineTo(g, 256); x.stroke(); x.beginPath(); x.moveTo(0, g); x.lineTo(256, g); x.stroke() } // 畳縁（タイル継ぎ目で連続）
+    })
+    tatTex.wrapS = tatTex.wrapT = THREE.RepeatWrapping; tatTex.repeat.set(3, 2.4)
     const ceilTex = cv(128, 128, (x) => { x.fillStyle = C('#4a3e2c', '#211c16'); x.fillRect(0, 0, 128, 128); x.strokeStyle = 'rgba(0,0,0,0.34)'; x.lineWidth = 3; for (let i = 0; i <= 128; i += 22) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 128); x.stroke() } })
     ceilTex.wrapS = ceilTex.wrapT = THREE.RepeatWrapping; ceilTex.repeat.set(3, 3)
     const calTex = cv(64, 88, (x) => { x.fillStyle = '#efe9da'; x.fillRect(0, 0, 64, 88); x.fillStyle = '#b83c30'; x.fillRect(0, 0, 64, 20); x.fillStyle = 'rgba(70,58,46,0.55)'; for (let r = 0; r < 5; r++) for (let cc2 = 0; cc2 < 7; cc2++) x.fillRect(5 + cc2 * 8, 26 + r * 11, 5, 7) })
