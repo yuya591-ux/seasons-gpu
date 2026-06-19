@@ -84,7 +84,11 @@ export function createAudio(opts) {
       if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
       if (started) unlockMediaSession()
     }
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) rearm() })
+    // バックグラウンド（ホーム画面/他アプリ切替/タブ非表示）では音を止める。復帰したら鳴り直す。
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}) } else rearm()
+    })
+    window.addEventListener('pagehide', () => { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}) })
     window.addEventListener('focus', rearm)
     document.addEventListener('touchend', rearm, { passive: true })
   }
@@ -108,7 +112,8 @@ export function createAudio(opts) {
     }
     // 割り込みで running から外れたら、復帰操作時に起こし直せるよう監視
     ctx.onstatechange = () => {
-      if (started && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
+      // バックグラウンド中は起こし直さない（音を止めたまま）。前面に戻ったら rearm が再開する。
+      if (started && !document.hidden && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
     }
     bindRearm()
   }

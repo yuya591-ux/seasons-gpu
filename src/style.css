@@ -280,6 +280,48 @@ body {
 .town3d-zoom__btn:active {
   background: rgba(72, 116, 158, 0.6);
 }
+/* 速度ボタン（左下に速く/遅くを縦に。飛行のときだけ） */
+.town3d-speed {
+  position: absolute;
+  left: max(1.1rem, calc(env(safe-area-inset-left) + 0.6rem));
+  bottom: max(2.4rem, calc(env(safe-area-inset-bottom) + 1.8rem));
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.town3d-speed.speed--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.town3d-speed__btn {
+  appearance: none;
+  min-width: 58px;
+  height: 44px;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(20, 16, 26, 0.46);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.town3d-speed__btn:active {
+  background: rgba(72, 116, 158, 0.6);
+}
+/* 無操作でHUDが静かに消えるとき、飛行/窓辺の操作ボタンも一緒に消えて画面全体が見える。タップで戻る。 */
+body.idle .town3d-cruise.cruise--on,
+body.idle .town3d-zoom.zoom--on,
+body.idle .town3d-speed.speed--on {
+  opacity: 0;
+  pointer-events: none;
+}
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {
   position: absolute;

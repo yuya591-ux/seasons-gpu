@@ -3076,6 +3076,7 @@ export async function mountTown3d(parent, opts = {}) {
     cruise: true,                 // スキームA: 自動巡航中か（とまる/すすむトグル）。とまる=その場でホバリング
     zoom: 1,                      // カメラの引き具合（ピンチ/ズームボタンで0.4=寄り〜3.0=引き）。カメラ距離に掛ける
     zoomTarget: 1,                // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
+    speedMul: 0.55,               // 飛行速度の倍率（既定はゆっくりめ。速く/遅くボタンで0.35〜1.7に調整）
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
@@ -3652,6 +3653,20 @@ export async function mountTown3d(parent, opts = {}) {
     btn.addEventListener('pointercancel', end)
     btn.addEventListener('pointerleave', end)
   }
+  // ── 速度ボタン（速く／遅く＝飛行速度の調整。左下。タップで一段、長押しで連続。既定はゆっくり） ──
+  const speedWrap = document.createElement('div'); speedWrap.className = 'town3d-speed'
+  const spUp = document.createElement('button'); spUp.className = 'town3d-speed__btn'; spUp.textContent = '速く'; spUp.setAttribute('aria-label', '速く飛ぶ')
+  const spDn = document.createElement('button'); spDn.className = 'town3d-speed__btn'; spDn.textContent = '遅く'; spDn.setAttribute('aria-label', 'ゆっくり飛ぶ')
+  speedWrap.appendChild(spUp); speedWrap.appendChild(spDn); stage.appendChild(speedWrap)
+  let speedShown = false
+  const nudgeSpeed = (d) => { if (active) active.speedMul = Math.max(0.35, Math.min(1.7, active.speedMul + d)) }
+  let speedHold = null
+  const stopSpeedHold = () => { if (speedHold) { clearInterval(speedHold); speedHold = null } }
+  for (const [btn, step] of [[spUp, 0.12], [spDn, -0.12]]) {
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { btn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } nudgeSpeed(step); stopSpeedHold(); speedHold = setInterval(() => nudgeSpeed(step * 0.5), 70) })
+    const end = (e) => { if (e) e.stopPropagation(); stopSpeedHold() }
+    btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end); btn.addEventListener('pointerleave', end)
+  }
 
   function frame() {
     if (!active) return
@@ -3908,7 +3923,7 @@ export async function mountTown3d(parent, opts = {}) {
         active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
         camYaw = active.flyYaw
-        const cruiseS = active.cruise ? FLY.cruiseSpeed : 0
+        const cruiseS = active.cruise ? FLY.cruiseSpeed * active.speedMul : 0 // 速さは speedMul で可変（既定ゆっくり）
         dvX = Math.sin(active.flyYaw) * cpit * cruiseS
         dvY = spit * cruiseS // 機首の上下で上昇/下降
         dvZ = -Math.cos(active.flyYaw) * cpit * cruiseS
@@ -3958,8 +3973,8 @@ export async function mountTown3d(parent, opts = {}) {
       // 後方アンカーが建物にめり込む時だけ寄せる。ただし blockedAt は高さを見ない平面判定なので、上空を巡航中に
       // 後ろの建物列を跨ぐたびに寄せ判定がオンオフして“カメラが前後にドリー”＝酔いの原因になっていた。
       // 屋根より十分高い時は建物に当たらないので寄せ判定を切り、さらに寄せ距離自体をなめらかに追従させて前後酔いを断つ。
-      const camAlt = fp.y - heightAt(fp.x, fp.z)
-      const checkBlock = isWalk || camAlt < 13 // 低空/歩行でだけ当たりで寄せる（上空は素通し＝開けた俯瞰）
+      // 飛行は当たりで寄せない＝後ろの建物列を跨ぐたびの前後ドリー(酔い)を根絶。歩行だけ寄せる（一人称で壁にめり込まぬよう）。
+      const checkBlock = isWalk
       let backTgt = back0
       if (checkBlock) {
         let back = back0
@@ -4086,6 +4101,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
     const showZoom = active.mode === 'window' || active.flyP > 0.4 // 部屋の中（窓辺）でも空/地上でもズームボタンを出す
     if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
+    const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
+    if (showSpeed !== speedShown) { speedShown = showSpeed; speedWrap.classList.toggle('speed--on', showSpeed); if (!showSpeed) stopSpeedHold() }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
