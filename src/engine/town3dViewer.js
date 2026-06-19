@@ -501,6 +501,7 @@ export async function mountTown3d(parent, opts = {}) {
   let crane = null // ガントリークレーンの動く部分（トロリー＋フック）
   let tug = null // 湾を行き来するタグボート
   let ferry = null // 湾を渡る連絡船
+  let balloons = [] // 空を漂う熱気球
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
@@ -2399,6 +2400,29 @@ export async function mountTown3d(parent, opts = {}) {
     rope.position.set(x, gy + 12, z); town.add(rope)
   }
 
+  // ── 熱気球（空をゆっくり漂う）。街・湾の上空に。眺めの楽しみ。街のみ。 ──
+  if (kind !== 'yato') {
+    balloons = []
+    const stripeSets = [['#d8584a', '#f0ece0'], ['#3a8ac0', '#f0d040'], ['#e0a030', '#6fae8f']]
+    const spots = [[2, -34, 30, 42], [72, -42, 18, 38]] // [cx, cz, rad, y]
+    for (let i = 0; i < spots.length; i++) {
+      const g = new THREE.Group()
+      const cols = stripeSets[i % stripeSets.length]
+      const ec = document.createElement('canvas'); ec.width = 64; ec.height = 16; const ecx = ec.getContext('2d')
+      for (let s = 0; s < 16; s++) { ecx.fillStyle = s % 2 ? cols[0] : cols[1]; ecx.fillRect(s * 4, 0, 4, 16) }
+      const etex = new THREE.CanvasTexture(ec); etex.wrapS = etex.wrapT = THREE.RepeatWrapping
+      const envMat = new THREE.MeshToonMaterial({ map: etex, gradientMap: grad, fog: true })
+      const env = new THREE.Mesh(new THREE.SphereGeometry(4, 18, 14), envMat); env.scale.y = 1.22; env.position.y = 0.5; env.castShadow = true; g.add(env)
+      const neck = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.2, 14), envMat); neck.position.y = -4.0; g.add(neck)
+      const basket = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.3, 1.5), toon(0x8a6a48)); basket.position.y = -6.6; basket.castShadow = true; g.add(basket)
+      for (const cz2 of [-0.6, 0.6]) for (const cx2 of [-0.6, 0.6]) { const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.6, 4), new THREE.MeshBasicMaterial({ color: 0x6a6258, fog: true })); cord.position.set(cx2, -5.1, cz2); g.add(cord) }
+      if (duskAmt > 0.2) { const flame = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffb060, fog: true })); flame.position.y = -5.4; g.add(flame) } // バーナーの炎
+      g.position.set(spots[i][0], heightAt(spots[i][0], spots[i][1]) + spots[i][3], spots[i][1])
+      g.userData = { cx: spots[i][0], cz: spots[i][1], rad: spots[i][2], y: heightAt(spots[i][0], spots[i][1]) + spots[i][3], ph: i * 2.1, sp: 0.035 + i * 0.012 }
+      scene.add(g); balloons.push(g)
+    }
+  }
+
   // ── 遠くの遊園地の観覧車（谷の向こうに小さく見える郷愁のランドマーク。ゆっくり回る）。街のみ。 ──
   if (kind !== 'yato') {
     const fx = -26, fz = -66, gy = heightAt(fx, fz)
@@ -3296,6 +3320,11 @@ export async function mountTown3d(parent, opts = {}) {
       const x = u.cx + Math.cos(a) * u.rad, z = u.cz + Math.sin(a) * u.rad * 0.6
       tug.position.set(x, SEA.level + 0.2 + Math.sin(t * 0.8) * 0.1, z)
       tug.rotation.y = -a + Math.PI / 2; tug.rotation.z = Math.sin(t * 0.7) * 0.04
+    }
+    for (const g of balloons) { // 熱気球が空をゆっくり漂う
+      const u = g.userData, a = t * u.sp + u.ph
+      g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(t * 0.25 + u.ph) * 1.6, u.cz + Math.sin(a) * u.rad * 0.7)
+      g.rotation.y = a * 0.5; g.rotation.z = Math.sin(t * 0.35 + u.ph) * 0.045
     }
     if (ferry) { // 連絡船が湾を大きな楕円で渡る
       const u = ferry.userData, a = -t * 0.07 + 1.2 // タグと逆回りでゆっくり
