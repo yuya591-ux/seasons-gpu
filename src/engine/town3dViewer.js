@@ -497,6 +497,8 @@ export async function mountTown3d(parent, opts = {}) {
   let train = null // 線路を走る電車
   let crossing = null // 踏切（電車が近づくと遮断機が下り警報灯が点滅）
   let gulls = [] // 海鳥（湾の上を旋回する）
+  let crane = null // ガントリークレーンの動く部分（トロリー＋フック）
+  let tug = null // 湾を行き来するタグボート
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
@@ -1916,6 +1918,11 @@ export async function mountTown3d(parent, opts = {}) {
         const boom = new THREE.Mesh(new THREE.BoxGeometry(15, 0.5, 0.7), frameMat); boom.position.set(5.5, 12.7, 0); boom.castShadow = true; g.add(boom) // 海側へ張り出す
         const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.0, 1.3), toon(0xc24a33)); cab.position.set(0, 11.1, 0); g.add(cab)
         if (lit) { for (const bx2 of [-5.5, 0, 11]) { const wl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.3), warmLight); wl.position.set(bx2, 12.0, 0.4); g.add(wl) } const rb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff5a4a, fog: true })); rb.position.set(0, 12.9, 0); g.add(rb) } // 作業灯＋頂部の赤灯
+        // 動くトロリー＋吊りケーブル＋フック（荷役の動き）
+        const trolley = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 1.1), toon(0x9a3f34)); trolley.position.set(5.5, 12.0, 0); g.add(trolley)
+        const hcable = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1, 0.07), toon(0x33333a)); hcable.position.set(5.5, 9, 0); g.add(hcable)
+        const hook = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.9), toon(0x46423a)); hook.position.set(5.5, 6, 0); g.add(hook)
+        crane = { trolley, hcable, hook }
         colliders.push({ x: hx + 9, z: hz - 1, r: 4 })
       }
       // コンテナ（色とりどりの箱を積む）
@@ -1930,6 +1937,15 @@ export async function mountTown3d(parent, opts = {}) {
         const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.72, 2.4, 10), toon(0xc24a33)); funnel.position.set(0, 5.2, -8.2); g.add(funnel)
         for (let i = 0; i < 5; i++) { const ct = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.3, 2.5), toon(contCols[(R() * contCols.length) | 0])); ct.position.set(0, 3.75, 5 - i * 2.7); ct.castShadow = true; g.add(ct) }
         boats.push(g)
+      }
+      // タグボート（湾を行き来する曳船。小さな船体＋背の高い操舵室＋煙突）
+      {
+        tug = new THREE.Group(); tug.position.set(92, SEA.level + 0.2, -56); town.add(tug)
+        const hull = new THREE.Mesh(new THREE.CapsuleGeometry(0.9, 2.6, 4, 8), toon(0x2a4a6a)); hull.rotation.x = Math.PI / 2; hull.scale.set(1, 0.55, 1); hull.position.y = 0.3; tug.add(hull)
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.3, 3.4), toon(0x8a4030)); deck.position.y = 0.7; tug.add(deck)
+        const house = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 1.8), toon(0xeae2d0)); house.position.set(0, 1.5, 0.2); house.castShadow = true; tug.add(house)
+        const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 1.0, 8), toon(0xc24a33)); funnel.position.set(0, 2.0, -1.0); tug.add(funnel)
+        tug.userData = { cx: 92, cz: -56, rad: 13 }
       }
       spawnAvoid.push({ x: hx, z: hz, r: HARBOR.r })
     }
@@ -3182,6 +3198,18 @@ export async function mountTown3d(parent, opts = {}) {
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
     for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
+    if (crane) { // クレーンのトロリーが横行し、フックが上下する（荷役）
+      const tx2 = 5.5 + Math.sin(t * 0.22) * 7, hy = 6.2 + Math.sin(t * 0.5) * 2.6
+      crane.trolley.position.x = tx2
+      crane.hook.position.set(tx2, hy, 0)
+      crane.hcable.position.set(tx2, (12 + hy) / 2, 0); crane.hcable.scale.y = Math.max(0.2, 12 - hy)
+    }
+    if (tug) { // タグボートが湾をゆっくり巡る
+      const u = tug.userData, a = t * 0.1
+      const x = u.cx + Math.cos(a) * u.rad, z = u.cz + Math.sin(a) * u.rad * 0.6
+      tug.position.set(x, SEA.level + 0.2 + Math.sin(t * 0.8) * 0.1, z)
+      tug.rotation.y = -a + Math.PI / 2; tug.rotation.z = Math.sin(t * 0.7) * 0.04
+    }
     if (train) { // 電車が線路を走る（端まで行くと反対端から再び現れる）
       const u = train.userData
       u.x += u.speed * dt
