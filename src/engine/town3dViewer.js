@@ -2536,6 +2536,26 @@ export async function mountTown3d(parent, opts = {}) {
       const beak = addAt(g, new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 4), toon(0xd8b048)), 0, 1.22, 0.34); beak.rotation.x = Math.PI * 0.5
       town.add(g)
     }
+    // ── 朝靄（谷戸の朝・棚田とせせらぎに低くたなびく霧の薄衣）。大きく柔らかい横長スプライトを谷底に低く敷く。
+    // 谷戸の朝の情景の核。やわらかい白の薄veil＝近景の硬い造形を少し溶かし、霞(fog)と地続きの大気感を出す。冬は省略（雪で別の趣）。
+    if (weather !== 'snow') {
+      const mc = document.createElement('canvas'); mc.width = mc.height = 64
+      const mx = mc.getContext('2d')
+      const mg = mx.createRadialGradient(32, 32, 1, 32, 32, 31)
+      mg.addColorStop(0, 'rgba(255,255,255,0.55)'); mg.addColorStop(0.5, 'rgba(255,255,255,0.22)'); mg.addColorStop(1, 'rgba(255,255,255,0)')
+      mx.fillStyle = mg; mx.fillRect(0, 0, 64, 64)
+      const mistTex = new THREE.CanvasTexture(mc)
+      const mistTint = skyHorizon.clone().lerp(new THREE.Color(0xffffff), 0.55).getHex() // 朝の地平色を含む淡い白
+      const nMist = LIGHT ? 6 : 11
+      for (let i = 0; i < nMist; i++) {
+        const mxp = (R() - 0.5) * 24, mz = -43 + R() * 46
+        const gy = heightAt(mxp, mz)
+        const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistTint, transparent: true, opacity: 0.13 + R() * 0.1, depthWrite: false, fog: true }))
+        spr.position.set(mxp, gy + 1.5 + R() * 1.4, mz)
+        spr.scale.set(15 + R() * 11, 6.5 + R() * 4, 1)
+        scene.add(spr)
+      }
+    }
   }
 
   // ── 祝賀のアドバルーン（赤い気球＋下がる細い垂れ幕＋係留索）。小ぶりで本物らしく。街のみ。 ──
