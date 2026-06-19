@@ -491,6 +491,8 @@ export async function mountTown3d(parent, opts = {}) {
   let peeps = []
   let ferris = null
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
+  let teacups = null // 遊園地のコーヒーカップ（回る）
+  let swanBoats = [] // 遊園地のスワンボート（池を漂う）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
@@ -1894,6 +1896,39 @@ export async function mountTown3d(parent, opts = {}) {
         const gy = heightAt(bp[0], bp[1]); const bg = new THREE.Group(); bg.position.set(bp[0], gy, bp[1]); bg.rotation.y = bp[2]; town.add(bg)
         const seat = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.46), toon(0x8a6a48)); seat.position.y = 0.46; bg.add(seat)
         const back = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.36, 0.1), toon(0x8a6a48)); back.position.set(0, 0.72, -0.2); bg.add(back)
+      }
+      // コーヒーカップ（回る台＋色とりどりのカップ）。台が回り、各カップも逆に回る。
+      {
+        const tx = fx - 9, tz = fz + 3, gy = heightAt(tx, tz)
+        const outer = new THREE.Group(); outer.position.set(tx, gy, tz); town.add(outer)
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.8, 0.4, 18), toon(0x4a7a5e)); base.position.y = 0.2; base.receiveShadow = true; outer.add(base)
+        const spin = new THREE.Group(); spin.position.y = 0.4; outer.add(spin); teacups = spin
+        const cupCols = [0xd84a4a, 0xe0a838, 0x3a8ac0, 0x6fae8f]
+        for (let i = 0; i < 4; i++) {
+          const a = i / 4 * 6.283, cup = new THREE.Group(); cup.position.set(Math.cos(a) * 2.2, 0, Math.sin(a) * 2.2); spin.add(cup)
+          const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.7, 0.9, 14), toon(cupCols[i])); bowl.position.y = 0.6; bowl.castShadow = true; cup.add(bowl)
+          const handle = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 10, Math.PI), toon(cupCols[i])); handle.position.set(0.95, 0.6, 0); cup.add(handle)
+        }
+      }
+      // スワンボートの小池（浅い水面＋石の縁＋白鳥のボート）。FUNの南側。
+      {
+        const sx = fx - 2, sz = fz - 8, sgy = heightAt(sx, sz), pondR = 4.2, waterY = sgy - 0.3
+        const wc = document.createElement('canvas'); wc.width = wc.height = 32; const wcx = wc.getContext('2d')
+        const wg = wcx.createLinearGradient(0, 0, 0, 32); wg.addColorStop(0, '#' + new THREE.Color(0x7aa6c4).lerp(skyTop, 0.4).getHexString()); wg.addColorStop(1, '#4f748e'); wcx.fillStyle = wg; wcx.fillRect(0, 0, 32, 32)
+        const water = new THREE.Mesh(new THREE.CircleGeometry(pondR, 24), new THREE.MeshToonMaterial({ color: 0xffffff, map: new THREE.CanvasTexture(wc), gradientMap: grad, fog: true })); water.rotateX(-Math.PI / 2); water.position.set(sx, waterY, sz); town.add(water)
+        const rimGeos = []
+        for (let i = 0; i < 22; i++) { const a = i / 22 * 6.283, rr = pondR + 0.2 + (R() - 0.5) * 0.3, rx2 = sx + Math.cos(a) * rr, rz2 = sz + Math.sin(a) * rr, top = heightAt(rx2, rz2), s2 = 0.5 + R() * 0.3, seg = new THREE.BoxGeometry(s2, Math.max(0.4, top - (waterY - 0.6)), s2); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(rx2, waterY - 0.3, rz2)); rimGeos.push(seg) }
+        if (BufferGeometryUtils.mergeGeometries) { const rm = BufferGeometryUtils.mergeGeometries(rimGeos, false); if (rm) { const rim = new THREE.Mesh(rm, toon(0x9a958c)); rim.receiveShadow = true; town.add(rim) } }
+        rimGeos.forEach((g) => g.dispose())
+        for (const bp of [[sx - 1.4, sz + 0.6], [sx + 1.2, sz - 1.0], [sx + 0.2, sz + 1.5]]) {
+          const sb = new THREE.Group(); sb.position.set(bp[0], waterY + 0.1, bp[1]); sb.userData = { cx: sx, cz: sz, ph: R() * 6.28, rad: Math.hypot(bp[0] - sx, bp[1] - sz) }; town.add(sb)
+          const hull = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), toon(0xf2f0ea)); hull.scale.set(1, 0.6, 1.3); hull.position.y = 0.1; sb.add(hull)
+          const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 1.0, 6), toon(0xf2f0ea)); neck.position.set(0, 0.6, 0.6); neck.rotation.x = -0.5; sb.add(neck)
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), toon(0xf2f0ea)); head.position.set(0, 1.05, 0.85); sb.add(head)
+          const beak = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 5), toon(0xe0902e)); beak.position.set(0, 1.03, 1.0); beak.rotation.x = Math.PI / 2; sb.add(beak)
+          swanBoats.push(sb)
+        }
+        colliders.push({ x: sx, z: sz, r: pondR * 0.8 }); spawnAvoid.push({ x: sx, z: sz, r: pondR + 1 })
       }
       spawnAvoid.push({ x: fx, z: fz, r: 12 })
     }
@@ -3356,6 +3391,8 @@ export async function mountTown3d(parent, opts = {}) {
       for (const g of ferris.gondolas) g.rotation.z = -wr
     }
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
+    if (teacups) { teacups.rotation.y += dt * 0.5; for (const cup of teacups.children) cup.rotation.y -= dt * 1.1 } // 台が回り、各カップは逆に回る
+    for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
