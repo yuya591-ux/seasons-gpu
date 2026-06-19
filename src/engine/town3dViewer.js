@@ -1035,6 +1035,23 @@ export async function mountTown3d(parent, opts = {}) {
         colliders.push({ x: fx, z, r: 1.5 })
       }
     }
+    // 街路灯（中央の街道沿いに左右互い違いに並ぶ。夕夜に暖色で灯る＝夜景の足元の灯り）。
+    {
+      const litHead = duskAmt > 0.2
+      const headMat = litHead ? new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: true }) : toon(0xb8b4a0)
+      const haloMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.22, depthWrite: false, fog: true })
+      const poleMat = toon(0x44464a)
+      for (const side of [-1, 1]) {
+        for (let z = 16 + (side > 0 ? 4.5 : 0); z > -52; z -= 9) {
+          const gx = side * 4.7, gz = z, gy = heightAt(gx, gz)
+          const g = new THREE.Group(); g.position.set(gx, gy, gz); town.add(g)
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 4.2, 6), poleMat); pole.position.y = 2.1; pole.castShadow = true; g.add(pole)
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.1), poleMat); arm.position.set(-side * 0.35, 4.1, 0); g.add(arm)
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), headMat); head.position.set(-side * 0.65, 4.0, 0); g.add(head)
+          if (litHead) { const halo = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 8), haloMat); halo.position.copy(head.position); g.add(halo) }
+        }
+      }
+    }
   }
 
   // ── 駅（街の右手。人の集まる目的地。駅舎＋ホーム＋駅名標＋短い線路）。──
