@@ -8,6 +8,7 @@ export default {
   label: '夏の夕暮れ、高台の下町',
   desc: '高台から望む夕暮れの街並み。灯る窓とヒグラシ',
   status: 'ready',
+  public: false, // 評価で隔離/作り直し推奨（手続き的windowTownの抽象的な街並み）。dev=1でのみ表示。
   render: 'windowTown',
   view: 'downtown',
   intensityLabel: '街の灯り',

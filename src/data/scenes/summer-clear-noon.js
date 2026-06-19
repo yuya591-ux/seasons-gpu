@@ -8,6 +8,7 @@ export default {
   label: '夏の晴れ、真昼',
   desc: '抜けるような青空と入道雲、地平の陽炎。油蝉のジリジリ',
   status: 'ready',
+  public: false, // 評価で隔離推奨（空＋雲のみで情報量が薄いプレースホルダ気味）。dev=1でのみ表示。
   render: 'clearSky',
   intensityLabel: '陽炎', // 設定スライダー（陽炎と雲の強さ）
 

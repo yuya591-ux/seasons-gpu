@@ -5,6 +5,7 @@ export default {
   label: '夏の雨の夜、高台の下町',
   desc: '窓を流れる雨と、夜の街明かり。雨音とヒグラシ',
   status: 'ready',
+  public: false, // 評価で隔離/作り直し推奨（手続き的windowTownの抽象的な街並み）。dev=1でのみ表示。
   render: 'windowTown',
   view: 'downtown',
   glass: 'rain', // 窓を流れる雨

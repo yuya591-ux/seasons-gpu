@@ -5,6 +5,7 @@ export default {
   label: '冬の雪の夜、高台の下町',
   desc: '窓に舞う雪と、夜の街の灯り。しんとした風',
   status: 'ready',
+  public: false, // 評価で隔離/作り直し推奨（手続き的windowTownの抽象的な街並み）。dev=1でのみ表示。
   render: 'windowTown',
   view: 'downtown',
   glass: 'snow', // 窓に舞う雪
