@@ -2928,74 +2928,94 @@ export async function mountTown3d(parent, opts = {}) {
   const winRoom = new THREE.Group()
   const winRoomMats = []
   {
-    const dWall = 3.2, owW = 1.7, owH = 2.9, wallW = 8.6, wallH = 7.2, th = 0.3 // 開口/前壁の寸法（部屋の前壁＝窓のある壁）
-    const wallCol = isNight ? 0x171520 : 0x342c24 // 室内の壁（暖かい暗色。明暗を少し和らげ縁のジャギを抑える。夜は沈める）
-    const mk = (col) => { const m = new THREE.MeshBasicMaterial({ color: col, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(m); return m }
-    const wm = mk(wallCol), bm = mk(isNight ? 0x232130 : 0x40382e), sm = mk(isNight ? 0x2c2a36 : 0x52473a)
-    const panel = (w, h, x, y, mat) => { const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, th), mat); p.position.set(x, y, 0); p.renderOrder = 2; winRoom.add(p) }
-    const sideW = (wallW - owW) / 2, sideH = (wallH - owH) / 2
-    panel(wallW, sideH, 0, owH / 2 + sideH / 2, wm)   // 上の壁
-    panel(wallW, sideH, 0, -owH / 2 - sideH / 2, wm)  // 下の壁
-    panel(sideW, owH, owW / 2 + sideW / 2, 0, wm)     // 右の壁
-    panel(sideW, owH, -owW / 2 - sideW / 2, 0, wm)    // 左の壁
-    // 窓の見切り（開口の内側の浅い額縁＝明るい街への明暗の段差を一段やわらげ、縁のジャギを抑える）
-    const jamb = mk(isNight ? 0x2a2838 : 0x4a4234)
-    const jambT = 0.13
-    panel(owW + jambT * 2, jambT, 0, owH / 2 + jambT / 2, jamb); panel(owW + jambT * 2, jambT, 0, -owH / 2 - jambT / 2, jamb)
-    panel(jambT, owH, owW / 2 + jambT / 2, 0, jamb); panel(jambT, owH, -owW / 2 - jambT / 2, 0, jamb)
-    const vbar = new THREE.Mesh(new THREE.BoxGeometry(0.09, owH, 0.07), bm); vbar.position.z = 0.05; vbar.renderOrder = 2; winRoom.add(vbar) // 縦桟
-    const hbar = new THREE.Mesh(new THREE.BoxGeometry(owW, 0.09, 0.07), bm); hbar.position.z = 0.05; hbar.renderOrder = 2; winRoom.add(hbar) // 横桟
-    const sill = new THREE.Mesh(new THREE.BoxGeometry(owW + 0.5, 0.2, 0.55), sm); sill.position.set(0, -owH / 2 - 0.05, 0.3); sill.renderOrder = 2; winRoom.add(sill) // 室内側の窓台
-    // ── 部屋の気配（カーテン・上飾り・窓辺の鉢植え）＝「中が寂しい」を解消。布の襞テクスチャで縁もやわらぐ。 ──
-    const cc = document.createElement('canvas'); cc.width = 32; cc.height = 96
-    const ctx = cc.getContext('2d'); ctx.fillStyle = isNight ? '#332c3c' : '#7a5a48'; ctx.fillRect(0, 0, 32, 96)
-    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? 'rgba(255,236,210,0.10)' : 'rgba(0,0,0,0.18)'; ctx.fillRect((32 / 6) * i, 0, 32 / 6, 96) } // 縦の襞
-    const curtTex = new THREE.CanvasTexture(cc); curtTex.colorSpace = THREE.SRGBColorSpace
-    const curtMat = new THREE.MeshBasicMaterial({ map: curtTex, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(curtMat)
-    for (const cs of [-1, 1]) { const cur = new THREE.Mesh(new THREE.BoxGeometry(0.34, owH + 0.34, 0.05), curtMat); cur.position.set(cs * (owW / 2 - 0.05), 0.06, 0.18); cur.renderOrder = 3; winRoom.add(cur) } // 左右のカーテン
-    const valance = new THREE.Mesh(new THREE.BoxGeometry(owW + 0.5, 0.36, 0.06), curtMat); valance.position.set(0, owH / 2 + 0.04, 0.2); valance.renderOrder = 3; winRoom.add(valance) // 窓上のひだ飾り
-    const potMat = mk(isNight ? 0x4a3a2e : 0x9a5e3e), leafMat = mk(isNight ? 0x26361f : 0x4e7446) // 窓辺の鉢植え
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.18, 9), potMat); pot.position.set(-owW / 2 + 0.24, -owH / 2 + 0.12, 0.36); pot.renderOrder = 3; winRoom.add(pot)
-    for (let i = 0; i < 4; i++) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), leafMat); lf.position.set(-owW / 2 + 0.24 + (R() - 0.5) * 0.16, -owH / 2 + 0.3 + R() * 0.12, 0.36 + (R() - 0.5) * 0.12); lf.renderOrder = 3; winRoom.add(lf) }
-
-    // ── 部屋の中（見渡せる3Dの室内）。カメラはこの箱(局所原点=窓の中心、カメラは局所(0,1.5,3.2))の中にいる。
-    //    床・天井・両側壁・奥壁＋家具。見回す(yaw/pitch)と室内が見える。乗り出すと部屋ごと退いて街へ。 ──
+    // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
+    const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.3, SX = 3.95, BZ = 6.2, WINCY = 1.0
+    const C = (d, n) => isNight ? n : d
+    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false, transparent: true, opacity: 1, depthWrite: false }); winRoomMats.push(m); return m }
     const box = (w, h, d, x, y, z, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
-    const floorMat = mk(isNight ? 0x2b2832 : 0x9a8a5c) // 畳/床（窓の光を受けて明るめ）
-    const rwMat = mk(isNight ? 0x211e29 : 0x5a4a36)    // 室内の壁（暖色）
-    const ceilMat = mk(isNight ? 0x16131c : 0x3a3026)  // 天井（暗め）
-    const woodMat = mk(isNight ? 0x2c241d : 0x6a4a30), fabMat = mk(isNight ? 0x3a2c36 : 0x9a5a48)
-    const lampMat = mk(isNight ? 0xffd98a : 0xfff0c8), scrollMat = mk(isNight ? 0x6a6258 : 0xe8e0cc), accMat = mk(isNight ? 0x4a3a3e : 0x8a6a5a)
-    // 室内面に頂点色の陰影（窓に近いほど明るく・奥/床際ほど暗い＝平らな箱でなく光のある3D室内に見せる）
-    floorMat.vertexColors = rwMat.vertexColors = ceilMat.vertexColors = true
-    const grad = (m) => {
-      const p = m.geometry.attributes.position, c = new Float32Array(p.count * 3)
-      for (let i = 0; i < p.count; i++) { const lz = m.position.z + p.getZ(i), ly = m.position.y + p.getY(i); const b = Math.max(0.5, Math.min(1.1, (1.1 - (lz / 6.6) * 0.52) * (0.82 + Math.min(1, (ly + 2.7) / 6.4) * 0.3))); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = b }
-      m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3)); return m
-    }
-    grad(box(8.6, 0.3, 6.8, 0, -2.6, 3.0, floorMat))   // 床
-    grad(box(8.6, 0.3, 6.8, 0, 3.6, 3.0, ceilMat))     // 天井
-    grad(box(8.6, 6.8, 0.3, 0, 0.5, 6.1, rwMat))       // 奥壁
-    grad(box(0.3, 6.8, 6.8, -4.1, 0.5, 3.0, rwMat))    // 左壁
-    grad(box(0.3, 6.8, 6.8, 4.1, 0.5, 3.0, rwMat))     // 右壁
-    // 天井から下がる和紙の照明（明るい＝灯りに見える）
-    box(0.05, 1.0, 0.05, 0, 3.0, 2.2, woodMat)   // 吊り紐
-    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 12), lampMat); lamp.position.set(0, 2.35, 2.2); lamp.renderOrder = 2; winRoom.add(lamp)
-    box(0.4, 0.06, 0.4, 0, 2.62, 2.2, woodMat); box(0.4, 0.06, 0.4, 0, 2.08, 2.2, woodMat) // 上下の木枠
-    // ちゃぶ台＋座布団（右手前）＝畳に座る暮らし
-    box(1.5, 0.13, 0.95, 1.6, -2.05, 4.2, woodMat) // 卓上
-    for (const [lx, lz] of [[0.62, 0.36], [-0.62, 0.36], [0.62, -0.36], [-0.62, -0.36]]) box(0.1, 0.42, 0.1, 1.6 + lx, -2.35, 4.2 + lz, woodMat) // 脚
-    box(0.18, 0.1, 0.18, 1.45, -1.93, 4.1, accMat) // 卓上の湯のみ
-    box(0.74, 0.1, 0.74, 1.55, -2.43, 3.2, fabMat); box(0.74, 0.1, 0.74, 2.5, -2.43, 4.7, fabMat) // 座布団×2
-    // 隅の観葉植物（大きめ）
-    const cpot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.5, 10), woodMat); cpot.position.set(-3.4, -2.2, 5.3); cpot.renderOrder = 2; winRoom.add(cpot)
-    for (let i = 0; i < 7; i++) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 0), leafMat); lf.position.set(-3.4 + (R() - 0.5) * 0.7, -1.7 + R() * 0.7, 5.3 + (R() - 0.5) * 0.7); lf.renderOrder = 2; winRoom.add(lf) }
-    // 掛け軸（左壁）＋床の間風の低い棚
-    box(0.04, 1.7, 0.52, -3.93, 0.7, 2.7, scrollMat); box(0.06, 0.1, 0.62, -3.93, 1.6, 2.7, woodMat); box(0.06, 0.1, 0.62, -3.93, -0.18, 2.7, woodMat) // 掛け軸＋軸木
-    box(0.7, 0.5, 1.2, -3.7, -2.35, 2.7, woodMat) // 低い棚
-    // 右壁の小棚＋小物
-    box(0.62, 0.08, 1.3, 3.74, 0.2, 3.4, woodMat)
-    box(0.18, 0.34, 0.18, 3.7, 0.42, 3.0, accMat); box(0.16, 0.26, 0.5, 3.7, 0.38, 3.9, scrollMat) // 花瓶＋本
+    const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; winRoom.add(m); return m }
+    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
+    // テクスチャ: 畳・天井板・カレンダー・障子
+    const tatTex = cv(256, 256, (x) => { x.fillStyle = C('#9a9c5e', '#3a3c2c'); x.fillRect(0, 0, 256, 256); x.strokeStyle = 'rgba(0,0,0,0.05)'; x.lineWidth = 1; for (let y = 0; y < 256; y += 4) { x.beginPath(); x.moveTo(0, y); x.lineTo(256, y); x.stroke() } x.strokeStyle = C('#2c2a1c', '#15140d'); x.lineWidth = 8; x.strokeRect(3, 3, 122, 250); x.strokeRect(131, 3, 122, 250) })
+    tatTex.wrapS = tatTex.wrapT = THREE.RepeatWrapping; tatTex.repeat.set(2, 2)
+    const ceilTex = cv(128, 128, (x) => { x.fillStyle = C('#4a3e2c', '#211c16'); x.fillRect(0, 0, 128, 128); x.strokeStyle = 'rgba(0,0,0,0.34)'; x.lineWidth = 3; for (let i = 0; i <= 128; i += 22) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 128); x.stroke() } })
+    ceilTex.wrapS = ceilTex.wrapT = THREE.RepeatWrapping; ceilTex.repeat.set(3, 3)
+    const calTex = cv(64, 88, (x) => { x.fillStyle = '#efe9da'; x.fillRect(0, 0, 64, 88); x.fillStyle = '#b83c30'; x.fillRect(0, 0, 64, 20); x.fillStyle = 'rgba(70,58,46,0.55)'; for (let r = 0; r < 5; r++) for (let cc2 = 0; cc2 < 7; cc2++) x.fillRect(5 + cc2 * 8, 26 + r * 11, 5, 7) })
+    // 材（昭和の茶の間。暖色・飴色の木・砂壁・畳。夜は沈める）
+    const wallMat = mk(C(0x6e5d44, 0x282230)), wainsMat = mk(C(0x5a4230, 0x1f1820)) // 砂壁・腰壁(羽目板)
+    const tatMat = mk(0xffffff, tatTex), cmat = mk(0xffffff, ceilTex)
+    const woodMat = mk(C(0x7a5630, 0x2c241d)), woodDk = mk(C(0x4a3320, 0x1d1611))
+    const fabMat = mk(C(0xa8564a, 0x3a2630)), fab2 = mk(C(0x4e6a52, 0x26302a))
+    const lampMat = mk(C(0xfff0c8, 0xffdf9a)), scrollMat = mk(C(0xe8e0cc, 0x726a5c))
+    const ceramMat = mk(C(0xb6c2cc, 0x3a4048)), blackMat = mk(C(0x262420, 0x14120d)), greenMat = mk(C(0x4e7446, 0x26361f))
+    const tvMat = mk(C(0x7c6e5c, 0x2a2620)), screenMat = mk(C(0x1c2026, 0x0f1115)), mikanMat = mk(C(0xe8902e, 0x6a4520)), creamMat = mk(C(0xe6ddc6, 0x5c564c)), redMat = mk(C(0xc24a38, 0x52261e))
+    // 室内面に頂点色の陰影（窓・灯りに近いほど明るく、奥/床際ほど暗い＝平らな箱でなく光のある3D室内）
+    for (const m of [wallMat, tatMat, cmat]) m.vertexColors = true
+    const grad = (m) => { const p = m.geometry.attributes.position, c = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) { const lz = m.position.z + p.getZ(i), ly = m.position.y + p.getY(i); const b = Math.max(0.52, Math.min(1.12, (1.14 - (lz / 6.6) * 0.5) * (0.78 + Math.min(1, (ly - FY) / 4.4) * 0.34))); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = b } m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3)); return m }
+    // ── 躯体（床=畳／天井=竿縁／奥・両側=砂壁） ──
+    grad(box(8.6, 0.3, 7.4, 0, FY - 0.15, 3.1, tatMat))   // 床（畳）
+    grad(box(8.6, 0.3, 7.4, 0, CY, 3.1, cmat))            // 天井（板目）
+    grad(box(8.6, 5.6, 0.3, 0, 1.1, BZ, wallMat))         // 奥壁
+    grad(box(0.3, 5.6, 7.4, -SX, 1.1, 3.1, wallMat))      // 左壁
+    grad(box(0.3, 5.6, 7.4, SX, 1.1, 3.1, wallMat))       // 右壁
+    // ── 前壁（窓のある壁）。腰壁＋上壁＋左右壁で“ちょうど開ける高さの窓”に。 ──
+    const oT = WINCY + owH / 2, oB = WINCY - owH / 2 // 開口の上端/下端
+    grad(box(8.6, 3.6 - oT, 0.3, 0, (oT + 3.6) / 2, 0, wallMat))     // 窓の上の壁
+    box(8.6, oB - (FY - 0.4), 0.3, 0, (oB + FY - 0.4) / 2, 0, wainsMat) // 腰壁（窓の下＝羽目板）
+    grad(box((8.6 - owW) / 2, owH, 0.3, -(owW / 2 + (8.6 - owW) / 4), WINCY, 0, wallMat)) // 窓の左の壁
+    grad(box((8.6 - owW) / 2, owH, 0.3, owW / 2 + (8.6 - owW) / 4, WINCY, 0, wallMat))    // 窓の右の壁
+    box(8.6, 0.1, 0.34, 0, oB - 0.0, 0.1, woodMat) // 腰壁上の見切り（窓台のライン）
+    // 木の窓枠＋障子の桟（縦1・横1＝四枚障子風）＋窓台
+    for (const [w, h, x, y] of [[owW + 0.26, 0.12, 0, oT], [owW + 0.26, 0.12, 0, oB], [0.12, owH + 0.24, -owW / 2 - 0.07, WINCY], [0.12, owH + 0.24, owW / 2 + 0.07, WINCY]]) box(w, h, 0.12, x, y, 0.06, woodMat)
+    box(0.07, owH, 0.06, 0, WINCY, 0.05, woodMat); box(owW, 0.07, 0.06, 0, WINCY, 0.05, woodMat) // 障子の桟
+    box(owW + 0.5, 0.14, 0.42, 0, oB - 0.06, 0.2, woodMat) // 室内側の窓台
+    box(0.16, 0.12, 0.16, owW / 2 - 0.1, oB + 0.12, 0.28, greenMat) // 窓辺の小さな植木
+    // ── 天井から下がる和紙の照明（昭和の傘＋裸電球。明るい＝灯り） ──
+    box(0.05, CY - 2.5, 0.05, 0, CY - (CY - 2.5) / 2, 2.4, woodDk) // 吊りコード
+    cyl(0.42, 0.34, 0.42, 0, 2.32, 2.4, lampMat, 14)             // 和紙の傘
+    box(0.5, 0.05, 0.5, 0, 2.55, 2.4, woodDk); cyl(0.09, 0.09, 0.14, 0, 2.06, 2.4, lampMat) // 傘の天板＋電球
+    // ── 右壁＝居間の顔: ブラウン管テレビ＋木の台＋柱時計＋カレンダー ──
+    box(1.5, 0.66, 0.7, SX - 0.42, FY + 0.33, 3.0, woodMat)        // テレビ台
+    box(1.04, 0.78, 0.66, SX - 0.5, FY + 1.05, 3.0, tvMat)         // テレビ筐体
+    box(0.06, 0.58, 0.7, SX - 1.04, FY + 1.05, 3.0, screenMat)     // 画面（部屋側=-xを向く）
+    box(0.04, 0.46, 0.56, SX - 1.06, FY + 1.05, 3.0, mk(C(0x9ab4c0, 0x33414a))) // 画面のほのかな映り
+    for (const dz of [-0.18, 0.18]) cyl(0.05, 0.05, 0.05, SX - 1.02, FY + 0.78, 3.0 + dz, woodDk, 8) // つまみ
+    for (const a of [-0.5, 0.5]) { const ant = box(0.02, 0.66, 0.02, SX - 0.5, FY + 1.7, 3.0, blackMat); ant.rotation.z = a } // V字アンテナ
+    box(0.34, 0.16, 0.26, SX - 0.5, FY + 1.52, 3.1, mk(C(0x8a6a5a, 0x47393e))) // テレビ上の小物
+    const clk = cyl(0.3, 0.3, 0.06, SX - 0.06, 1.75, 2.4, creamMat, 18); clk.rotation.z = Math.PI / 2 // 丸い柱時計（-x向き）
+    box(0.02, 0.2, 0.03, SX - 0.12, 1.8, 2.4, blackMat); box(0.02, 0.03, 0.16, SX - 0.12, 1.75, 2.45, blackMat) // 時計の針
+    box(0.04, 0.7, 0.5, SX - 0.06, 0.9, 4.3, mk(0xffffff, calTex)) // カレンダー
+    // ── 左壁＝床の間: 掛け軸＋床柱＋一輪挿し、手前に茶箪笥 ──
+    box(0.06, 2.4, 1.7, -SX + 0.03, 0.7, 2.6, creamMat)           // 床の間の奥（明るい砂壁）
+    box(0.2, 4.2, 0.2, -SX + 0.5, 1.1, 1.75, woodDk)              // 床柱
+    box(0.04, 1.5, 0.5, -SX + 0.09, 0.95, 2.6, scrollMat)        // 掛け軸
+    box(0.05, 0.08, 0.62, -SX + 0.09, 1.68, 2.6, woodDk); box(0.05, 0.08, 0.62, -SX + 0.09, 0.2, 2.6, woodDk) // 軸木
+    box(0.9, 0.2, 0.7, -SX + 0.5, FY + 0.1, 2.6, woodMat)         // 床（地板）
+    cyl(0.06, 0.08, 0.3, -SX + 0.5, FY + 0.35, 2.6, ceramMat); box(0.04, 0.3, 0.04, -SX + 0.5, FY + 0.6, 2.6, greenMat); const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.08, 0), redMat); fl.position.set(-SX + 0.5, FY + 0.78, 2.6); fl.renderOrder = 2; winRoom.add(fl) // 一輪挿し＋花
+    box(1.4, 1.4, 0.56, -SX + 0.33, FY + 0.7, 4.7, woodMat); box(1.1, 1.0, 0.06, -SX + 0.62, FY + 0.78, 4.7, screenMat) // 茶箪笥＋ガラス戸
+    for (const dz of [-0.3, 0.0, 0.3]) box(0.16, 0.18, 0.16, -SX + 0.33, FY + 1.5, 4.7 + dz, ceramMat) // 箪笥上の器
+    // ── 奥壁（振り返ると）: 襖＋神棚＋黒電話 ──
+    for (let i = 0; i < 4; i++) { const fx = -3.0 + i * 2.0; box(1.94, 3.0, 0.06, fx, 0.6, BZ - 0.1, creamMat); box(0.08, 3.0, 0.09, fx - 0.98, 0.6, BZ - 0.12, woodMat); box(0.16, 0.24, 0.05, fx + 0.7, 0.6, BZ - 0.16, woodDk) } // 4枚の襖＋框＋引手
+    box(1.1, 0.1, 0.34, 1.8, 2.6, BZ - 0.22, woodMat)            // 神棚の棚
+    for (const dx of [-0.18, 0.18]) box(0.04, 0.32, 0.04, 1.8 + dx, 2.78, BZ - 0.22, redMat); box(0.5, 0.05, 0.05, 1.8, 2.96, BZ - 0.22, redMat); box(0.42, 0.05, 0.05, 1.8, 2.88, BZ - 0.22, redMat) // 小さな鳥居
+    box(0.16, 0.26, 0.1, 1.8, 2.78, BZ - 0.3, creamMat)          // 御札
+    box(0.5, 0.7, 0.42, -2.6, FY + 0.35, BZ - 0.36, woodMat)     // 電話台
+    box(0.36, 0.18, 0.3, -2.6, FY + 0.79, BZ - 0.36, blackMat); cyl(0.11, 0.11, 0.05, -2.6, FY + 0.9, BZ - 0.36, blackMat); box(0.34, 0.1, 0.12, -2.6, FY + 0.94, BZ - 0.36, blackMat) // 黒電話（台＋ダイヤル＋受話器）
+    // ── 畳に座る暮らし: ちゃぶ台（丸）＋座布団＋急須・湯呑み・みかん・新聞。季節で扇風機/こたつ ──
+    const tcx = 1.25, tcz = 3.7
+    cyl(0.88, 0.88, 0.1, tcx, FY + 0.45, tcz, woodMat, 22)        // ちゃぶ台の天板（丸）
+    for (const [dx, dz] of [[0.6, 0.6], [-0.6, 0.6], [0.6, -0.6], [-0.6, -0.6]]) box(0.08, 0.45, 0.08, tcx + dx, FY + 0.22, tcz + dz, woodDk) // 脚
+    for (const [dx, dz, m] of [[0, -1.05, fabMat], [-1.05, 0.2, fab2], [0.7, 0.95, fabMat]]) box(0.74, 0.09, 0.74, tcx + dx, FY + 0.05, tcz + dz, m) // 座布団×3
+    cyl(0.14, 0.17, 0.2, tcx - 0.25, FY + 0.6, tcz - 0.1, ceramMat); box(0.18, 0.05, 0.05, tcx - 0.42, FY + 0.66, tcz - 0.1, ceramMat) // 急須＋注ぎ口
+    for (const dx of [0.2, 0.42]) cyl(0.07, 0.06, 0.1, tcx + dx, FY + 0.55, tcz + 0.2, ceramMat) // 湯呑み×2
+    cyl(0.2, 0.18, 0.12, tcx + 0.1, FY + 0.56, tcz - 0.35, woodMat); for (let i = 0; i < 3; i++) { const mk2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), mikanMat); mk2.position.set(tcx + 0.1 + (R() - 0.5) * 0.16, FY + 0.66, tcz - 0.35 + (R() - 0.5) * 0.16); mk2.renderOrder = 2; winRoom.add(mk2) } // みかん籠
+    box(0.34, 0.03, 0.46, tcx - 0.5, FY + 0.06, tcz + 0.7, creamMat) // たたんだ新聞
+    if (season === 'winter') { box(1.95, 0.5, 1.95, tcx, FY + 0.28, tcz, fabMat) } // こたつの布団
+    else if (season === 'summer') { cyl(0.04, 0.04, 1.0, -3.0, FY + 0.5, 5.2, blackMat); const fan = cyl(0.32, 0.32, 0.1, -3.0, FY + 1.0, 5.2, ceramMat, 16); fan.rotation.z = Math.PI / 2; box(0.5, 0.1, 0.5, -3.0, FY + 0.05, 5.2, blackMat) } // 扇風機（夏）
+    // ── 窓辺のカーテン（淡い色。窓の左右） ──
+    const curtMat = mk(C(0xd8cbb0, 0x4a4450))
+    for (const cs of [-1, 1]) box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.22, curtMat)
+    box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.24, curtMat) // 上飾り
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
   }
