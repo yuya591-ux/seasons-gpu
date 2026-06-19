@@ -268,7 +268,11 @@ export async function mountTown3d(parent, opts = {}) {
   // 空気遠近の霞（調整可）: near=ここから霞み始める, far=ここで空に溶ける。手前へ寄せて遠景〜中景を
   // やわらかな大気に溶かし、「高台から街を眺める」水彩調の奥行きを出す（手前は鮮明に保つ）。
   // 雪は near を手前にし過ぎると街が真っ白に潰れる→少し奥へ（中景の階調を残す）。
-  const FOG = { near: weather === 'snow' ? 40 : 30, far: weather === 'snow' ? 146 : 132 } // 大気遠近を一段深め、中景から空気に溶け始める水彩の奥行きへ（手前は鮮明に保つ）
+  // 谷戸は谷筋が奥へ深く退く構図＝主役の棚田まで霞んで灰に沈むため、霞を一段奥へ送って手前〜中景の
+  // 水鏡・青田の色を残す（遠い里山だけ空気に溶ける）。密集した街は従来どおり手前から霞ませて水彩の奥行きに。
+  const FOG = kind === 'yato'
+    ? { near: weather === 'snow' ? 54 : 48, far: weather === 'snow' ? 176 : 168 }
+    : { near: weather === 'snow' ? 40 : 30, far: weather === 'snow' ? 146 : 132 } // 大気遠近を一段深め、中景から空気に溶け始める水彩の奥行きへ（手前は鮮明に保つ）
   scene.fog = new THREE.Fog(fogCol, FOG.near, FOG.far)
 
   // 空ドーム（上=空色, 下=地平の暖色のグラデ）
@@ -2636,7 +2640,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ── ふわふわの雲（白い球の塊＝立体的な積雲。底は平ら・上は盛り上がり、雲底は翳って立体に） ──
   const clouds = []
   const cloudMat = new THREE.MeshToonMaterial({ color: 0xfbfaf6, gradientMap: grad, fog: false })       // 陽の当たる白
-  const cloudBot = new THREE.MeshToonMaterial({ color: isNight ? 0x6a7286 : 0xd7cfc4, gradientMap: grad, fog: false }) // 影になる雲底（やや翳る＝厚みと立体）
+  const cloudBot = new THREE.MeshToonMaterial({ color: isNight ? 0x767e92 : 0xe9e4dc, gradientMap: grad, fog: false }) // 影になる雲底（やわらかな陰＝厚みは残しつつ、見上げても重い灰の天井に見せない）
   // 数を増やし高さを少し下げて、縦窓の狭い視界でも空が間延びしないように（light端末は控えめ）。
   const cloudN = LIGHT ? 10 : 16
   for (let i = 0; i < cloudN; i++) {
@@ -2650,7 +2654,7 @@ export async function mountTown3d(parent, opts = {}) {
       puff.scale.y = 0.58
       g.add(puff)
     }
-    g.position.set((R() - 0.5) * 250, 27 + R() * 24, -52 - R() * 90)
+    g.position.set((R() - 0.5) * 250, 31 + R() * 24, -52 - R() * 90)
     scene.add(g); clouds.push(g)
   }
 
