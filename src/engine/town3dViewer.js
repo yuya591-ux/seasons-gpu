@@ -2480,11 +2480,12 @@ export async function mountTown3d(parent, opts = {}) {
             const fin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 6), toon(0xc8a23c)); fin.position.set(cx2, cy + 19.8, cz2); town.add(fin) } } // 時計塔
         // 港町の家々（看板建築＝和洋折衷。煉瓦/クリームの壁＋陸屋根/寄棟。格子の町割り。メッシュ統合で軽く）
         const tWallA = facadeMat('yofu', season === 'winter' ? 0xd8d2c4 : 0xcfc3ab), tRoofT = mottleMat(isNight ? 0x4a4038 : 0x6e5a48, 150, 0.12, [1.8, 1.8]) // 看板建築=洋風の上げ下げ窓の正面
+        const taiFac = [{ x: tx + 33, z: tz - 42, r: 14 }, { x: tx + 42, z: tz + 46, r: 13 }] // 公園/学校の区画（建物を空ける）
         const twA = [], twC = [], trT = [], tlit = [], plT = [], tmM = new THREE.Matrix4()
         for (let gx = -70; gx <= 70; gx += 5.0) for (let gz = -55; gz <= 65; gz += 5.0) {
           if (gx % 15 === 0 || gz % 15 === 0) continue // 碁盤の目の街路（区画整理された港町）＝この列/行は道に空ける
           const hx = tx + gx + (R() - 0.5) * 1.8, hz = tz + gz + (R() - 0.5) * 1.8, hy = heightAt(hx, hz)
-          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || taishoCanal(hx, hz) < 5.5 || R() < 0.1) continue // 海/時計塔の足元/運河/路地は空ける
+          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || taishoCanal(hx, hz) < 5.5 || taiFac.some((f) => Math.hypot(hx - f.x, hz - f.z) < f.r) || R() < 0.1) continue // 海/時計塔の足元/運河/公園・学校/路地は空ける
           const isBrick = R() < 0.3, hw = 2.4 + R() * 1.6, hd = 2.4 + R() * 1.6, hh = 2.6 + R() * 2.4
           tmM.makeRotationY(R() < 0.5 ? 0 : Math.PI / 2).setPosition(hx, hy + hh / 2, hz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); if (!isBrick) bakeAO(bg, hh); bg.applyMatrix4(tmM); (isBrick ? twC : twA).push(bg) // 角を面取り
           const plg = new THREE.BoxGeometry(hw + 0.5, 0.55, hd + 0.5); tmM.makeRotationY(0).setPosition(hx, hy + 0.18, hz); plg.applyMatrix4(tmM); plT.push(plg) // 石の土台（接地）
@@ -2512,6 +2513,22 @@ export async function mountTown3d(parent, opts = {}) {
         { const ship = new THREE.Group(); ship.position.set(tx - 70, SEA.level + 0.2, tz - 24); ship.rotation.y = 0.3; ship.userData = { ph: R() * 6.28 }
           const hull = new THREE.Mesh(new THREE.BoxGeometry(9, 1.6, 2.8), toon(0x3a3a40)); hull.position.y = 0.4; ship.add(hull); const dk = new THREE.Mesh(new THREE.BoxGeometry(5, 1.0, 2.2), toon(0xc8b89a)); dk.position.set(-0.5, 1.4, 0); ship.add(dk)
           const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 2.6, 10), toon(0x9a4030)); funnel.position.set(-0.5, 3.0, 0); ship.add(funnel); town.add(ship); boats.push(ship) }
+        // ── 公園（噴水＋ベンチ＋並木）＝大正のハイカラな憩いの場 ──
+        { const px0 = tx + 33, pz0 = tz - 42, py0 = heightAt(px0, pz0)
+          if (py0 > SEA.level + 1) {
+            const plaza = new THREE.Mesh(new THREE.CircleGeometry(13, 26), mottleMat(season === 'winter' ? 0xc4c8c6 : 0x9a948a, 90, 0.1, [4, 4])); plaza.rotation.x = -Math.PI / 2; plaza.position.set(px0, py0 + 0.06, pz0); plaza.receiveShadow = true; town.add(plaza) // 石畳の広場
+            const basin = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.7, 16), toon(0xb8b2a4)); basin.position.set(px0, py0 + 0.35, pz0); town.add(basin); town.add(addOutline(basin))
+            const water = new THREE.Mesh(new THREE.CircleGeometry(2.9, 16), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4a5862 : 0x9fc0d0, fog: true })); water.rotation.x = -Math.PI / 2; water.position.set(px0, py0 + 0.72, pz0); town.add(water)
+            const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.3, 2.0, 8), new THREE.MeshBasicMaterial({ color: 0xddeef4, transparent: true, opacity: 0.6, fog: true })); jet.position.set(px0, py0 + 1.7, pz0); town.add(jet) // 噴水
+            for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28, bx = px0 + Math.cos(a) * 8, bz = pz0 + Math.sin(a) * 8, by = heightAt(bx, bz); const bench = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.7), toon(0x6a5a44)); bench.position.set(bx, by + 0.35, bz); bench.rotation.y = a; town.add(bench) } // ベンチ
+            for (let k = 0; k < 8; k++) { const a = R() * 6.28, rr = 10 + R() * 3.5, bx = px0 + Math.cos(a) * rr, bz = pz0 + Math.sin(a) * rr, by = heightAt(bx, bz); const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6), toon(0x6a4f38)); tr.position.set(bx, by + 0.9, bz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.6, 0), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48)); fo.position.set(bx, by + 2.4, bz); fo.castShadow = true; town.add(fo) } } } // 並木
+        // ── 学校（洋風校舎＋校庭）＝大正の学び舎 ──
+        { const sx0 = tx + 42, sz0 = tz + 46, sy0 = heightAt(sx0, sz0)
+          if (sy0 > SEA.level + 1) {
+            const sch = new THREE.Mesh(new RoundedBoxGeometry(14, 4.6, 6, 1, 0.12), facadeMat('yofu', season === 'winter' ? 0xd6cdb8 : 0xc8bb9e)); sch.position.set(sx0, sy0 + 2.3, sz0); sch.castShadow = true; sch.receiveShadow = true; town.add(sch); town.add(addOutline(sch))
+            const sroof = new THREE.Mesh(new THREE.BoxGeometry(14.5, 0.5, 6.5), tileMat(isNight ? 0x3a3030 : 0x5a4038, 3, 1, false)); sroof.position.set(sx0, sy0 + 4.85, sz0); town.add(sroof)
+            const clock = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.0, 0.4), facadeMat('yofu', 0xd0c4a8)); clock.position.set(sx0, sy0 + 5.5, sz0 - 1); town.add(clock); const cf = new THREE.Mesh(new THREE.CircleGeometry(0.6, 14), toon(0xf4efe2)); cf.position.set(sx0, sy0 + 6.2, sz0 - 1.22); town.add(cf) // 時計のある中央棟
+            const yard = new THREE.Mesh(new THREE.CircleGeometry(7, 20), mottleMat(season === 'winter' ? 0xc8ccc6 : 0xa8987c, 90, 0.1, [4, 4])); yard.rotation.x = -Math.PI / 2; yard.position.set(sx0, sy0 + 0.06, sz0 + 11); yard.receiveShadow = true; town.add(yard) } } // 校庭
         // ガス灯（暖色の街灯。夜は灯る）＋人々＋並木
         { const tgc = document.createElement('canvas'); tgc.width = tgc.height = 32; const tgx = tgc.getContext('2d'); const tgg = tgx.createRadialGradient(16, 16, 1, 16, 16, 16); tgg.addColorStop(0, 'rgba(255,200,140,0.95)'); tgg.addColorStop(1, 'rgba(255,180,120,0)'); tgx.fillStyle = tgg; tgx.fillRect(0, 0, 32, 32); const tGlow = new THREE.CanvasTexture(tgc)
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = 14 + R() * 40, lx = tx + Math.cos(a) * r2, lz = tz + Math.sin(a) * r2, ly = heightAt(lx, lz); if (ly < SEA.level + 1.2) continue
