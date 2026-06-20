@@ -4671,7 +4671,10 @@ export async function mountTown3d(parent, opts = {}) {
         // オートシネマ: 無操作が続くと、最寄りの名所をゆっくりオービット（接線方向へ機首を正し低速で周回）。
         // ただ眺めるだけで街がゆっくり巡る＝「眺めて整う」。触れた瞬間に解除して操作へ戻る。
         const idleMs = performance.now() - (active.lastInputT || 0)
-        const wantCinema = flyAmt > 0.9 && idleMs > 7000 ? 1 : 0
+        let nearLM2 = 1e9; for (const lm of CINEMA_LM) { const d2 = (lm.x - active.flyPos.x) ** 2 + (lm.z - active.flyPos.z) ** 2; if (d2 < nearLM2) nearLM2 = d2 }
+        // オートシネマは「とまって(ホバリング)名所の近くで眺めている時」だけ作動。巡航中(=移動・別エリアへの渡り)では出さない
+        // ＝飛行中に勝手に視点が切り替わらない(実機FB: 渡りの最中に定期的に視点が真後ろ等へ回ってしまう不具合の修正)。
+        const wantCinema = flyAmt > 0.9 && idleMs > 7000 && !active.cruise && nearLM2 < 175 * 175 ? 1 : 0
         active.cinema += (wantCinema - active.cinema) * Math.min(1, dt * (wantCinema ? 0.5 : 4)) // ゆっくり始まり・素早く解除
         let cineSpeed = 0
         if (active.cinema > 0.01) {
