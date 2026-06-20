@@ -150,48 +150,41 @@ export function buildUI(opts) {
 
   // ── 窓をあける/しめる＋身を乗り出す（窓辺の情景でだけ） ──
   const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop', 'town3d', 'photoWindow']
-  const windowBtn = h('button', 'iconbtn iconbtn--window', '窓をあける')
-  const leanBtn = h('button', 'iconbtn iconbtn--lean', '乗り出す')
-  const flyBtn = h('button', 'iconbtn iconbtn--fly', '空へ')       // 上下の移動: 空へ／おりる
-  const backBtn = h('button', 'iconbtn iconbtn--back', '窓辺へもどる') // 窓辺へ戻る（空/地上にいる時だけ）
-  topbar.insertBefore(leanBtn, sceneBtn)
-  topbar.insertBefore(windowBtn, leanBtn)
-  topbar.insertBefore(flyBtn, sceneBtn)  // 乗り出すの先に「空へ」（立体の街でだけ出す）
-  topbar.insertBefore(backBtn, sceneBtn) // その先に「窓辺へもどる」
+  // 主ボタンを段階化: 「次の一歩」(stageBtn)＋「もどる」(backBtn)の2つに集約。
+  // 窓をあける → 乗り出す → 空へ → おりる(歩く) と一歩ずつ前進。逆はもどるで一歩ずつ。
+  const stageBtn = h('button', 'iconbtn iconbtn--stage', '窓をあける') // 次の一歩（前進）
+  const backBtn = h('button', 'iconbtn iconbtn--back', 'もどる')        // 一歩もどる
+  topbar.insertBefore(stageBtn, sceneBtn)
+  topbar.insertBefore(backBtn, sceneBtn)
+  const modePill = h('div', 'modepill', '') // いまの居場所（空/地上）をそっと表示
+  root.appendChild(modePill)
   let windowIsOpen = false
   let leanIsOut = false
   let aloft = null // null=窓辺 / 'fly'=空を飛ぶ / 'walk'=地上を歩く
   function isRoof() {
     return currentScene.render === 'kitateraoRooftop'
   }
-  function windowLabel() {
-    // 屋上（開けた眺め）は「かすみを払う」、窓辺は「窓をあける」
-    if (isRoof()) return windowIsOpen ? 'かすみへ戻す' : 'かすみを払う'
-    return windowIsOpen ? '窓をしめる' : '窓をあける'
+  function canFly() {
+    return !!(isFlyable && isFlyable())
   }
-  function updateWindowBtn() {
-    const show = WINDOW_SCENES.includes(currentScene.render)
-    const canFly = !!(isFlyable && isFlyable())
-    const isAloft = aloft === 'fly' || aloft === 'walk'
-    // 空/地上にいる間は窓・乗り出しの操作は意味がないので隠す。
-    windowBtn.style.display = show && !isAloft ? '' : 'none'
-    // 乗り出すは屋上以外の窓辺の情景で（枠が消えて景色だけを見渡す）
-    leanBtn.style.display = show && !isRoof() && !isAloft ? '' : 'none'
-    // 「空へ」は立体の街で乗り出した先に出す。飛行中は「おりる」、歩行中は「空へ」（また飛び立つ）。
-    flyBtn.style.display = (canFly && (leanIsOut || isAloft)) ? '' : 'none'
-    backBtn.style.display = (canFly && isAloft) ? '' : 'none' // 窓辺へもどるは空/地上にいる時だけ
-    if (!show) {
-      if (windowIsOpen) { windowIsOpen = false; onToggleWindow && onToggleWindow(false) }
-      if (leanIsOut) { leanIsOut = false; onToggleLean && onToggleLean(false) }
-    }
-    if (!canFly && isAloft) { aloft = null; onToggleFly && onToggleFly(false) } // 情景が変わったら畳む
-    windowBtn.textContent = windowLabel()
-    windowBtn.classList.toggle('is-open', windowIsOpen)
-    leanBtn.textContent = leanIsOut ? 'もどる' : '乗り出す'
-    leanBtn.classList.toggle('is-open', leanIsOut)
-    // 飛行中＝下りる導線「おりる」、それ以外（窓辺/歩行）＝上がる導線「空へ」
-    flyBtn.textContent = aloft === 'fly' ? 'おりる' : '空へ'
-    flyBtn.classList.toggle('is-open', isAloft)
+  // 屋上（開けた眺め）は「かすみを払う/戻す」、窓辺は「窓をあける/しめる」
+  const openLabel = () => (isRoof() ? 'かすみを払う' : '窓をあける')
+  const closeLabel = () => (isRoof() ? 'かすみへ戻す' : '窓をしめる')
+  // 次の前進ステップのラベル（null=これ以上は進めない＝ボタンを隠す）
+  function stageLabel() {
+    if (!windowIsOpen) return openLabel()
+    if (!isRoof() && !leanIsOut && !aloft) return '乗り出す'
+    if (canFly() && !aloft) return '空へ'
+    if (aloft === 'fly') return 'おりる' // 飛行→着地して歩く
+    if (aloft === 'walk') return '空へ' // 歩行→また飛ぶ
+    return null
+  }
+  // もどる一歩のラベル（null=もどる先がない＝隠す）
+  function backLabel() {
+    if (aloft) return '窓辺へ'
+    if (leanIsOut) return 'もどる'
+    if (windowIsOpen) return closeLabel()
+    return null
   }
   // 空/地上へ出た時に一度だけ、そっと操作を伝える。静かな文言・数秒で消える。
   const walkHint = h('div', 'walk-hint', '画面をドラッグして飛ぶ　上=上昇 下=下降 左右=旋回　「とまる」で停止')
@@ -208,35 +201,41 @@ export function buildUI(opts) {
   function stopAloft() {
     if (aloft) { aloft = null; onToggleFly && onToggleFly(false) } // 空/地上から窓辺へ戻す
   }
-  windowBtn.addEventListener('click', () => {
-    windowIsOpen = !windowIsOpen
-    onToggleWindow && onToggleWindow(windowIsOpen)
-    if (!windowIsOpen && leanIsOut) { leanIsOut = false; onToggleLean && onToggleLean(false) } // 閉じたら乗り出しも戻す
-    if (!windowIsOpen) stopAloft() // 窓を閉じたら空/地上からも戻る
-    updateWindowBtn()
-    poke()
-  })
-  leanBtn.addEventListener('click', () => {
-    leanIsOut = !leanIsOut
-    onToggleLean && onToggleLean(leanIsOut)
-    if (leanIsOut) windowIsOpen = true // 乗り出すには開ける
-    else stopAloft() // 乗り出しを戻したら空/地上からも戻る
-    updateWindowBtn()
-    poke()
-  })
-  flyBtn.addEventListener('click', () => {
-    // 窓辺→空へ / 飛行→おりて歩く / 歩行→また空へ（上下の移動を1つのボタンで段階的に）
-    if (aloft === 'fly') { aloft = 'walk'; onToggleLand && onToggleLand(true) }
+  function updateWindowBtn() {
+    const show = WINDOW_SCENES.includes(currentScene.render)
+    if (!canFly() && (aloft === 'fly' || aloft === 'walk')) { aloft = null; onToggleFly && onToggleFly(false) } // 情景が変わったら畳む
+    if (!show) {
+      if (windowIsOpen) { windowIsOpen = false; onToggleWindow && onToggleWindow(false) }
+      if (leanIsOut) { leanIsOut = false; onToggleLean && onToggleLean(false) }
+    }
+    const sl = show ? stageLabel() : null
+    const bl = show ? backLabel() : null
+    stageBtn.style.display = sl ? '' : 'none'; if (sl) stageBtn.textContent = sl
+    backBtn.style.display = bl ? '' : 'none'; if (bl) backBtn.textContent = bl
+    stageBtn.classList.toggle('is-aloft', !!aloft) // 空/地上は空色寄りの強調
+    // モード表示（空/地上のときだけ、いまの居場所をそっと）
+    const mode = aloft === 'fly' ? '空を飛ぶ' : aloft === 'walk' ? '地上を歩く' : ''
+    modePill.textContent = mode
+    modePill.classList.toggle('modepill--on', !!mode)
+  }
+  function advance() {
+    if (!windowIsOpen) { windowIsOpen = true; onToggleWindow && onToggleWindow(true) }
+    else if (!isRoof() && !leanIsOut && !aloft) { leanIsOut = true; onToggleLean && onToggleLean(true) }
+    else if (canFly() && !aloft) { aloft = 'fly'; windowIsOpen = true; leanIsOut = true; onToggleFly && onToggleFly(true); showWalkHint() }
+    else if (aloft === 'fly') { aloft = 'walk'; onToggleLand && onToggleLand(true) }
     else if (aloft === 'walk') { aloft = 'fly'; onToggleLand && onToggleLand(false) }
-    else { aloft = 'fly'; windowIsOpen = true; leanIsOut = true; onToggleFly && onToggleFly(true); showWalkHint() } // 飛ぶには窓をあけ乗り出した状態から。初回だけ操作を案内
     updateWindowBtn()
     poke()
-  })
-  backBtn.addEventListener('click', () => {
-    stopAloft()
+  }
+  function regress() {
+    if (aloft) stopAloft() // 空/地上→窓辺
+    else if (leanIsOut) { leanIsOut = false; onToggleLean && onToggleLean(false) } // 乗り出し→窓辺
+    else if (windowIsOpen) { windowIsOpen = false; onToggleWindow && onToggleWindow(false) } // 窓開→窓閉
     updateWindowBtn()
     poke()
-  })
+  }
+  stageBtn.addEventListener('click', advance)
+  backBtn.addEventListener('click', regress)
   updateWindowBtn() // 初期表示（窓辺・屋上の情景でだけ出す）
 
   // ── 情景選択パネル ──
