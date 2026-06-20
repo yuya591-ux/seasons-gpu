@@ -14,16 +14,16 @@ await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTime
 await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
 await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
 const E = Math.PI / 2 // 東(+x)を向く
-const shoot = async (x, y, pit, name) => { await page.evaluate(([x, y, e, p]) => window.__town3dFlyPose(x, y, -30, e, p), [x, y, E, pit]); await page.waitForTimeout(800); await page.screenshot({ path: `scripts/_shots/${name}.png` }) }
-await shoot(185, 34, -0.05, 'edo-far')   // 渡りの途中＝霞の向こうにうっすら
-await shoot(262, 30, -0.08, 'edo-mid')   // 近づく＝天守が立ち上がる
-await shoot(305, 28, -0.10, 'edo-near')  // 目前＝城下町まで見える
-await shoot(315, 36, -0.18, 'edo-top')   // 上から見下ろし
-await shoot(238, 84, -0.44, 'edo-grand')  // 高所から城下町全景
-await shoot(232, 24, -0.03, 'edo-veil')   // 霞の帯をくぐる関門（白いベール）
-await page.evaluate(([e]) => window.__town3dFlyPose(298, 11, -13, e, -0.02), [E]); await page.waitForTimeout(800); await page.screenshot({ path: 'scripts/_shots/edo-market.png' }) // 市場・屋台・人々を低空で
-await shoot(165, 19, -0.06, 'edo-crossing')  // 渡りの低空＝帆船・島影
-await shoot(215, 21, -0.05, 'edo-crossing2')
+const shoot = async (x, y, pit, name) => { await page.evaluate(([x, y, e, p]) => window.__town3dFlyPose(x, y, -46, e, p), [x, y, E, pit]); await page.waitForTimeout(800); await page.screenshot({ path: `scripts/_shots/${name}.png` }) }
+await shoot(255, 38, -0.05, 'edo-far')   // 渡りの途中＝霞の向こうにうっすら(dEdo≈215)
+await shoot(330, 32, -0.08, 'edo-mid')   // 近づく＝天守が立ち上がる(dEdo≈140)
+await shoot(405, 28, -0.10, 'edo-near')  // 目前＝城下町まで見える(dEdo≈65)
+await shoot(420, 40, -0.20, 'edo-top')   // 上から見下ろし
+await shoot(360, 92, -0.46, 'edo-grand')  // 高所から城下町全景
+await shoot(341, 24, -0.03, 'edo-veil')   // 霞の帯をくぐる関門（白いベール, dEdo≈129）
+await page.evaluate(([e]) => window.__town3dFlyPose(430, 12, -30, e, -0.02), [E]); await page.waitForTimeout(800); await page.screenshot({ path: 'scripts/_shots/edo-market.png' }) // 市場・屋台・人々を低空で
+await shoot(210, 19, -0.06, 'edo-crossing')  // 渡りの低空＝帆船・島影
+await shoot(280, 21, -0.05, 'edo-crossing2')
 // 夜（城下の灯り）
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d-night'))
 await page.waitForTimeout(2400)
@@ -31,7 +31,7 @@ await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTi
 await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(500)
 await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
 await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
-await shoot(262, 30, -0.08, 'edo-night-mid')
-await shoot(305, 28, -0.10, 'edo-night-near')
+await shoot(330, 32, -0.08, 'edo-night-mid')
+await shoot(405, 28, -0.10, 'edo-night-near')
 console.log('edo shots done')
 await browser.close()
