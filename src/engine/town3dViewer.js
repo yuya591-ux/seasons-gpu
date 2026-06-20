@@ -691,6 +691,19 @@ export async function mountTown3d(parent, opts = {}) {
   const facadeMat = (kind, baseHex) => snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeFacade(kind, baseHex), gradientMap: grad }))
   // 壁の接地AO（頂点色で底=翳り→上=空の光）。時代の建物の箱に焼いて、平らな箱面の一様さを破り接地感を出す。
   const bakeAO = (geo, hh) => { const pos = geo.attributes.position, col = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { const tt = Math.min(1, Math.max(0, (pos.getY(i) + hh / 2) / Math.max(0.001, hh))), ao = Math.min(1, tt / 0.26), v = 0.72 + 0.28 * ao + 0.06 * tt; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v } geo.setAttribute('color', new THREE.BufferAttribute(col, 3)) }
+  // 瓦の屋根テクスチャ（横列の瓦＋軒の重なりの影＋縦の丸瓦の筋）＝単色の屋根を脱し俯瞰の質感を上げる。
+  const makeTileTex = (baseHex) => {
+    const W = 64, c = document.createElement('canvas'); c.width = c.height = W; const x = c.getContext('2d'), base = new THREE.Color(baseHex)
+    x.fillStyle = '#' + base.getHexString(); x.fillRect(0, 0, W, W)
+    for (let r = 0; r < 6; r++) { const y0 = W * r / 6, rh = W / 6
+      x.fillStyle = '#' + base.clone().offsetHSL(0, 0, (R() - 0.5) * 0.05).getHexString(); x.fillRect(0, y0, W, rh)
+      x.fillStyle = 'rgba(0,0,0,0.24)'; x.fillRect(0, y0 + rh - 2, W, 2)        // 軒の重なりの影
+      x.fillStyle = 'rgba(255,255,255,0.07)'; x.fillRect(0, y0 + 0.5, W, 1) }    // 上端のハイライト
+    for (let cc = 0; cc <= 7; cc++) { const xx = W * cc / 7; x.fillStyle = 'rgba(0,0,0,0.12)'; x.fillRect(xx - 0.5, 0, 1, W); x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(xx + 1, 0, 1, W) } // 縦の丸瓦の筋
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4
+    return t
+  }
+  const tileMat = (hex, repU, repV, dbl) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeTileTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); if (dbl) m.side = THREE.DoubleSide; return m }
   // ── 看板（canvasで店名を描く＝オフラインで鮮明・時代ごとの字体。看板/のれん/ホーロー看板を立てる） ──
   const signCache = {}
   const signMat = (text, bg, fg, vertical, fontPx) => {
@@ -2163,7 +2176,7 @@ export async function mountTown3d(parent, opts = {}) {
         const roofPalette = isNight
           ? [0x2e2f33, 0x342c24, 0x2a2520, 0x3a2c26, 0x33302c]
           : [0x717479, 0x6a5640, 0x564636, 0x7a4f3c, 0x807668] // 瓦銀鼠/茶瓦/杉皮/弁柄/灰茶
-        const roofMats = roofPalette.map((c) => { const m = toon(c); m.side = THREE.DoubleSide; return m }) // 切妻素片は片面巻き→両面で確実に塗る
+        const roofMats = roofPalette.map((c) => tileMat(c, 2, 3, true)) // 瓦の屋根テクスチャ（切妻は片面巻き→両面）
         const roofGeos = roofPalette.map(() => [])
         const nSec = 9 // 城下を9つの街区(扇形)に割り、各区で屋根の基調色をまとめる
         const gableUnit = (() => { // 切妻屋根の単位素片。ridge=ローカルX、妻行=Z、棟高=Y(0→1)
@@ -2173,9 +2186,10 @@ export async function mountTown3d(parent, opts = {}) {
           push(P.a, P.b, P.f); push(P.a, P.f, P.e) // 背スロープ(z-)
           push(P.d, P.e, P.f); push(P.d, P.f, P.c) // 前スロープ(z+)
           push(P.a, P.e, P.d); push(P.b, P.c, P.f) // 妻壁(x∓)
-          // ConeGeometry(寄棟)と統合するため index/uv 属性を揃える（非index混在だと mergeGeometries が失敗する）
+          // ConeGeometry(寄棟)と統合するため index/uv 属性を揃える（非index混在だと mergeGeometries が失敗する）。UVは瓦が軒→棟へ流れるよう割付。
           g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
-          g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(18 * 2), 2))
+          const uv = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1] // 各頂点(18)のUV: スロープは軒0→棟1
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(uv), 2))
           g.setIndex([...Array(18).keys()]); g.computeVertexNormals(); return g
         })()
         for (let ring = 0; ring < 17; ring++) {
@@ -2360,7 +2374,7 @@ export async function mountTown3d(parent, opts = {}) {
           const fire = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.8, 6), fireMat); fire.position.set(fx, kyU + 2.0, fz); town.add(fire)
           const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.8 : 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(fx, kyU + 2.0, fz); glow.scale.set(2.6, 2.6, 1); town.add(glow) } // 篝火
         // 城下（山裾に密集する侍屋敷・町家。高さ/大きさ/色を変えて作り分け、メッシュ統合で軽く）
-        const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = mottleMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 150, 0.12, [1.8, 1.8]), samRoof2 = mottleMat(isNight ? 0x383229 : 0x5a4e3a, 150, 0.12, [1.8, 1.8]) // 侍屋敷=連子窓の板壁＋瓦の濃淡
+        const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根
         const sgWA = [], sgWB = [], sgR = [], sgR2 = [], sgL = [], sgM = new THREE.Matrix4()
         for (let ring = 0; ring < 11; ring++) {
           const r2 = 22 + ring * 2.0, n = Math.round(r2 * 0.82)
