@@ -19,6 +19,7 @@ await shoot(140, 32, -0.05, 'edo-far')   // 渡りの途中＝霞の向こうに
 await shoot(205, 30, -0.08, 'edo-mid')   // 近づく＝天守が立ち上がる
 await shoot(250, 28, -0.10, 'edo-near')  // 目前＝城下町まで見える
 await shoot(262, 34, -0.18, 'edo-top')   // 上から見下ろし
+await shoot(170, 78, -0.42, 'edo-grand')  // 高所から城下町全景
 await shoot(150, 19, -0.06, 'edo-crossing')  // 渡りの低空＝帆船・島影
 await shoot(196, 21, -0.05, 'edo-crossing2')
 // 夜（城下の灯り）
