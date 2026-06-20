@@ -138,6 +138,24 @@ body {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  /* 立体の街は指の操作を全てアプリが受け取る（ブラウザのスクロール/ダブルタップ拡大/ピンチ拡大を無効化）＝iPhoneで連打しても画面が拡大しない */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 操作ボタン（＋/−ズーム・↑/↓昇降・速さ・とまる等）は連打してもダブルタップ拡大に化けないよう manipulation に。
+   長押しのホールド連続入力は活かす（touch-action:manipulation はダブルタップ拡大だけを無効化）。テキスト選択も全面抑止。 */
+.ui button,
+.town3d-cruise,
+.town3d-zoom__btn,
+.town3d-climb__btn,
+.town3d-speed__btn,
+.town3d-wide__btn,
+.iconbtn {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .town3d-stage--in {
   opacity: 1;
@@ -178,7 +196,7 @@ body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.35s ease;
-  background: radial-gradient(ellipse 120% 120% at 50% 45%, rgba(248, 250, 253, 0.96) 0%, rgba(242, 246, 250, 0.82) 60%, rgba(236, 240, 246, 0.7) 100%);
+  background: radial-gradient(ellipse 120% 120% at 50% 42%, rgba(247, 236, 214, 0.92) 0%, rgba(242, 224, 196, 0.78) 58%, rgba(232, 210, 184, 0.62) 100%);
 }
 /* 移動スティック（ぷにコン）。空/地上で画面左に触れると、触れた場所に静かに現れる */
 .town3d-stick {
@@ -394,10 +412,10 @@ body {
   position: absolute;
   inset: 0;
   z-index: 3;
-  background: radial-gradient(ellipse at 50% 45%, rgba(247, 249, 251, 0.66) 0%, rgba(235, 240, 245, 0.97) 100%);
+  background: radial-gradient(ellipse at 50% 45%, rgba(245, 231, 206, 0.6) 0%, rgba(226, 202, 172, 0.92) 100%);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.18s linear;
+  transition: opacity 0.22s linear;
 }
 /* 無操作でHUDが静かに消えるとき、飛行/窓辺の操作ボタンも一緒に消えて画面全体が見える。タップで戻る。 */
 body.idle .town3d-cruise.cruise--on,

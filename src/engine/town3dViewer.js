@@ -279,12 +279,15 @@ export async function mountTown3d(parent, opts = {}) {
     : { near: weather === 'snow' ? 40 : 30, far: weather === 'snow' ? 146 : 132 } // 大気遠近を一段深め、中景から空気に溶け始める水彩の奥行きへ（手前は鮮明に保つ）
   scene.fog = new THREE.Fog(fogCol, FOG.near, FOG.far)
 
-  // 空ドーム（上=空色, 下=地平の暖色のグラデ）
+  // 空ドーム（上=空色, 下=地平の暖色のグラデ）。飛行中は uniform を暖色へ寄せて懐かしい黄昏の空にする。
+  const skyUniTop = { value: skyTop.clone() }
+  const skyUniBot = { value: skyHorizon.clone() }
+  const skyTop0 = skyTop.clone(), skyHor0 = skyHorizon.clone() // 窓辺に戻った時に復元する基準
   {
     const skyGeo = new THREE.SphereGeometry(400, 24, 16)
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: skyTop }, bot: { value: skyHorizon } },
+      uniforms: { top: skyUniTop, bot: skyUniBot },
       vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
       fragmentShader: 'varying vec3 vP; uniform vec3 top; uniform vec3 bot; void main(){ float h=clamp(vP.y/400.0*1.4+0.15,0.0,1.0); gl_FragColor=vec4(mix(bot,top,h),1.0);} ',
     })
@@ -324,6 +327,11 @@ export async function mountTown3d(parent, opts = {}) {
   // 別世界感の演出の基準値＋時代ごとの空気の色（江戸=金茶／戦国=青墨）。飛行時に近さで混ぜる。
   const baseFogCol = scene.fog.color.clone(), baseExposure = renderer.toneMappingExposure
   const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x2a323e : 0x586374), TAISHO_FOGC = new THREE.Color(isNight ? 0x4a3640 : 0xd6a684), TMP_FOGC = new THREE.Color() // 江戸=金茶/戦国=青墨/大正=暖かなセピア薔薇（時代ごとに別世界の空気）
+  // 渡りの空気: 飛行中は霧を「冷たい白」から「懐かしい琥珀色の夕景」へ寄せる＝白いモヤの圧迫感を脱しエモい/ノスタルジックに（実機FB）
+  const FLIGHT_WARM = new THREE.Color(isNight ? 0x3a3446 : 0xe0c49a)
+  // 飛行中の空ドームの暖色（昼=黄昏の琥珀、夜=ぶどう色の宵）。霧の FLIGHT_WARM と揃えて世界全体を懐かしい色へ。
+  const SKY_WARM_TOP = new THREE.Color(isNight ? 0x2c2740 : 0x9fb0c0)
+  const SKY_WARM_BOT = new THREE.Color(isNight ? 0x3a2f3e : 0xf0cda0)
   // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
   // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
   // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
@@ -2578,12 +2586,7 @@ export async function mountTown3d(parent, opts = {}) {
           const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 9, 7), buoyW); pole.position.y = 4; pole.castShadow = true; g.add(pole)
           const bnd = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 1.6, 7), buoyR); bnd.position.y = 5.6; g.add(bnd)
           const cap = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 7), isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : buoyR); cap.position.y = 8.8; g.add(cap); town.add(g) }
-        // ── 上空から行き先が読める導線: 名所の光柱(ビーコン)＋海路に灯る光点 ──
-        const bc = document.createElement('canvas'); bc.width = 16; bc.height = 64; const bcx = bc.getContext('2d'); const bgr = bcx.createLinearGradient(0, 64, 0, 0); bgr.addColorStop(0, 'rgba(255,255,255,0.78)'); bgr.addColorStop(0.45, 'rgba(255,255,255,0.28)'); bgr.addColorStop(1, 'rgba(255,255,255,0)'); bcx.fillStyle = bgr; bcx.fillRect(0, 0, 16, 64); const beamTex = new THREE.CanvasTexture(bc)
-        const mkBeam = (cx, cz, col, base, h) => { const gy = heightAt(cx, cz) + base; const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 3.0, h, 16, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, color: col, transparent: true, opacity: isNight ? 0.42 : 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true })); beam.position.set(cx, gy + h / 2, cz); beam.renderOrder = 2; town.add(beam) }
-        mkBeam(EDO.x, EDO.z, isNight ? 0xffcf8a : 0xf2c074, 22, 70)      // 江戸＝暖かな金の光柱（天守の上に立ち昇り、城を隠さず在処を示す）
-        mkBeam(SENGOKU.x, SENGOKU.z, isNight ? 0xaec6ff : 0x9fc0ff, 18, 78) // 戦国＝涼やかな青の光柱（峰の上に立ち昇る）
-        mkBeam(TAISHO.x, TAISHO.z, isNight ? 0xffc79a : 0xf0b07a, 20, 64) // 大正＝暖かなセピアの光柱（時計塔の上に立ち昇る）
+        // ── 行き先の導線は海路の光点と澪標/鳥居/灯標に任せる（空へ伸びる光柱は目立ち過ぎ・建物とズレるため撤去。実機FB）。 ──
         // 海路に灯る光点（澪標/鳥居の足元に連なり、上空からは方角を指す一筋の線として読める）
         const gc = document.createElement('canvas'); gc.width = gc.height = 48; const gcx = gc.getContext('2d'); const ggr = gcx.createRadialGradient(24, 24, 1, 24, 24, 24); ggr.addColorStop(0, 'rgba(255,255,255,0.95)'); ggr.addColorStop(1, 'rgba(255,255,255,0)'); gcx.fillStyle = ggr; gcx.fillRect(0, 0, 48, 48); const glowTex = new THREE.CanvasTexture(gc)
         const goldMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffd6a0, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
@@ -4574,17 +4577,24 @@ export async function mountTown3d(parent, opts = {}) {
       const edoP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - EDO.x, fp.z - EDO.z) / 255)
       const senP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 255)
       const taiP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) / 255)
-      const clear = flyAmt * (0.4 + 1.9 * Math.max(edoP, senP, taiP)) // 飛ぶと少し晴れ、目的地に近いほど大きく晴れて街が広く見える
-      scene.fog.near = FOG.near * (1 + clear * 1.1); scene.fog.far = FOG.far * (1 + clear)
+      const clear = flyAmt * (0.55 + 1.9 * Math.max(edoP, senP, taiP)) // 飛ぶと少し晴れ(白いモヤの圧迫を緩める)、目的地に近いほど大きく晴れて街が広く見える
+      scene.fog.near = FOG.near * (1 + clear * 1.05); scene.fog.far = FOG.far * (1 + clear)
       TMP_FOGC.copy(baseFogCol)
+      TMP_FOGC.lerp(FLIGHT_WARM, flyAmt * 0.4) // 渡りの霧を冷たい白から懐かしい琥珀色へ＝エモい/ノスタルジックに
       if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.56) // 近づく霞を時代の色(金茶)へ＝白い空虚でなく空気のある遠景
       if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.72) // 戦国は冷たく薄暗い別世界へ
       if (taiP > 0.001) TMP_FOGC.lerp(TAISHO_FOGC, taiP * 0.58) // 大正は暖かなセピア薔薇の港町の空気へ
       scene.fog.color.copy(TMP_FOGC)
       renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.14 + taiP * 0.03) // 戦国=暗い山城/江戸=明るい城下/大正=ほの明るい港町で差別化
+      // 空ドームも飛行中は黄昏の暖色へ寄せる＝世界全体が懐かしい色になり、白いモヤの孤独感でなく心地よい郷愁に。
+      // 時代に着いたらその色が勝つよう、純粋な「渡りの空」は近接していない時(街色 prox が低い時)ほど強く効かせる。
+      const skyWarm = flyAmt * 0.5 * (1 - 0.6 * Math.max(edoP, senP, taiP))
+      skyUniTop.value.copy(skyTop0).lerp(SKY_WARM_TOP, skyWarm)
+      skyUniBot.value.copy(skyHor0).lerp(SKY_WARM_BOT, skyWarm)
     } else if (active.fogTouched) {
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
+      skyUniTop.value.copy(skyTop0); skyUniBot.value.copy(skyHor0) // 窓辺に戻ったら空の色を基準へ復元
     }
     // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
     if (flyAmt > 0.02) {
@@ -4596,7 +4606,7 @@ export async function mountTown3d(parent, opts = {}) {
       // 関門(霞の帯)を儀式のようにくぐる: 帯を広げて白に包まれる間を延ばし(pk幅0.22)、その間は自動で減速。
       const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.44) / 0.22)
       const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 230)), pk(flyAmt * Math.max(0, 1 - dSen / 230)), pk(flyAmt * Math.max(0, 1 - dTai / 230)))
-      if (veilEl) veilEl.style.opacity = (veilA * 0.82).toFixed(3)
+      if (veilEl) veilEl.style.opacity = (veilA * 0.5).toFixed(3) // 関門の白ベールは控えめに（白い圧迫感を避け、くぐる気配だけ残す）
       // 目的地で自動減速: 近づくほど・霞の帯ほどゆっくり＝行き過ぎず、街にそっと着いて巡る
       const dMin = Math.min(dEdo, dSen, dTai)
       let slow = 1
@@ -4829,8 +4839,8 @@ export async function mountTown3d(parent, opts = {}) {
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
       // 雲の芯のごく近く(9u以内)だけ軽く霞む。以前は半径15・濃さ0.82で“少し高く飛ぶと白飛び”していた→
       // 街全体を見渡せる開放感を優先し、雲に分け入った時だけ淡く霞ませる（軽い白飛びの雰囲気は残す）。
-      const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 9) * flyAmt
-      if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.4).toFixed(2) }
+      const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 6.5) * flyAmt // 雲の芯のごく近くだけ・控えめに（白いモヤの圧迫感を緩める）
+      if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.22).toFixed(2) }
       // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）＋環境音をしぼる
       const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
       if (Math.abs(altT - altTintCur) > 0.02) { altTintCur = altT; altTint.style.opacity = (altT * 0.16).toFixed(2) }
