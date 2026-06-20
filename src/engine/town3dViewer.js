@@ -2072,7 +2072,10 @@ export async function mountTown3d(parent, opts = {}) {
           push(P.a, P.b, P.f); push(P.a, P.f, P.e) // 背スロープ(z-)
           push(P.d, P.e, P.f); push(P.d, P.f, P.c) // 前スロープ(z+)
           push(P.a, P.e, P.d); push(P.b, P.c, P.f) // 妻壁(x∓)
-          g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g
+          // ConeGeometry(寄棟)と統合するため index/uv 属性を揃える（非index混在だと mergeGeometries が失敗する）
+          g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(18 * 2), 2))
+          g.setIndex([...Array(18).keys()]); g.computeVertexNormals(); return g
         })()
         for (let ring = 0; ring < 17; ring++) {
           const rr = 21 + ring * 3.8, n = Math.round(rr * 1.05)
