@@ -2060,6 +2060,27 @@ export async function mountTown3d(parent, opts = {}) {
         }
         for (let k = 0; k < 6; k++) { const ang = R() * 6.28, rr = 26 + R() * 8, px = ex + Math.cos(ang) * rr, pz = ez + Math.sin(ang) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; addPine(px, py, pz) } // 島の松
       }
+      // ── 海の渡りの演出（帆船・島影）。退屈な海にせず、瞑想的な“渡り”に（海鳥は海鳥のループへ）。──
+      {
+        const mkPine = (px, py, pz, s = 1) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.9 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.95 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.5 * s, 2.2 * s, 7), toon(season === 'autumn' ? 0x8a7a40 : season === 'winter' ? 0x9aa6a0 : 0x4e6e44)); fo.position.set(px, py + 2.6 * s, pz); town.add(fo) }
+        const addShip = (sx, sz, ry) => { // 弁才船ふうの大きな四角帆。波にゆれる（boats配列で揺らす）
+          const ship = new THREE.Group(); ship.position.set(sx, SEA.level + 0.15, sz); ship.rotation.y = ry; ship.userData = { ph: R() * 6.28 }
+          const hull = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.1, 1.9), toon(0x55402a)); hull.position.y = 0.15; ship.add(hull)
+          const prow = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 1.5), toon(0x55402a)); prow.position.set(3.0, 0.4, 0); prow.rotation.z = -0.3; ship.add(prow) // 反り上がった舳先
+          const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 1.6), toon(0x6a4a30)); cabin.position.set(-1.5, 0.95, 0); ship.add(cabin)
+          const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 5.4, 6), toon(0x4a3826)); mast.position.set(0.5, 3.0, 0); ship.add(mast)
+          const sail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.7, 3.5), toon(season === 'winter' ? 0xe6e2d8 : 0xe7dec8)); sail.position.set(0.5, 3.3, 0); ship.add(sail)
+          town.add(ship); boats.push(ship)
+        }
+        addShip(152, -46, 0.5); addShip(192, -15, -0.7); addShip(228, -42, 0.25)
+        const addIslet = (ix, iz, scl) => { // 渡りの途中の小島（岩の根＋緑＋松）
+          const my = SEA.level - 0.4
+          const mound = new THREE.Mesh(new THREE.ConeGeometry(5 * scl, 3.4 * scl, 7), toon(0x6e6a5c)); mound.position.set(ix, my + 1.6 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound))
+          const cap = new THREE.Mesh(new THREE.ConeGeometry(3.6 * scl, 1.3 * scl, 7), toon(season === 'winter' ? 0xd8dde0 : season === 'autumn' ? 0x8a7a40 : 0x5e7a48)); cap.position.set(ix, my + 3.1 * scl, iz); town.add(cap)
+          const topY = my + 3.2 * scl; mkPine(ix + 0.7 * scl, topY, iz - 0.5 * scl, 0.9 * scl); mkPine(ix - 0.8 * scl, topY - 0.3, iz + 0.6 * scl, 0.8 * scl)
+        }
+        addIslet(168, -8, 1.1); addIslet(214, -54, 0.9)
+      }
       // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
       const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
       for (let x = jStartX; x <= jEndX; x += 2) { const seg = new THREE.BoxGeometry(2.4, 2.0, 5.2); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, SEA.level + 0.4, jz)); jetGeos.push(seg) }
@@ -2262,6 +2283,7 @@ export async function mountTown3d(parent, opts = {}) {
         g.userData = { cx: 88 + R() * 16, cz: -42 + (R() - 0.5) * 56, rad: 6 + R() * 10, y: SEA.level + 9 + R() * 11, sp: (R() < 0.5 ? 1 : -1) * (0.18 + R() * 0.16), ph: R() * 6.28 }
         scene.add(g); gulls.push(g)
       }
+      for (let i = 0; i < 5; i++) { const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [1, -1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wing.position.z = s * 0.85; g.add(wing) } g.userData = { cx: 150 + R() * 95, cz: -30 + (R() - 0.5) * 44, rad: 7 + R() * 12, y: SEA.level + 12 + R() * 14, sp: (R() < 0.5 ? 1 : -1) * (0.16 + R() * 0.14), ph: R() * 6.28 }; scene.add(g); gulls.push(g) } // 渡りの海の海鳥
     }
 
     // ── 海釣りの桟橋（南の海へ伸びる木の桟橋）＋釣り人。静かな海辺の暮らし。──
