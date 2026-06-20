@@ -2190,7 +2190,8 @@ export async function mountTown3d(parent, opts = {}) {
           const sail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.7, 3.5), toon(season === 'winter' ? 0xe6e2d8 : 0xe7dec8)); sail.position.set(0.5, 3.3, 0); ship.add(sail)
           town.add(ship); boats.push(ship)
         }
-        addShip(152, -46, 0.5); addShip(192, -15, -0.7); addShip(228, -42, 0.25)
+        addShip(150, -52, 0.5); addShip(250, -28, -0.7); addShip(350, -56, 0.25); addShip(300, -40, -0.4) // 東(江戸)への長い渡りに帆船を散らす
+        addShip(54, -150, 1.7); addShip(28, -260, -1.5); addShip(50, -380, 1.6) // 北(戦国)への渡りにも帆船
         const addIslet = (ix, iz, scl) => { // 渡りの途中の緑豊かな小島（岩＋森＋松＝道中を退屈にしない）
           const my = SEA.level - 0.4
           const mound = new THREE.Mesh(new THREE.ConeGeometry(5.2 * scl, 3.4 * scl, 8), toon(0x6e6a5c)); mound.position.set(ix, my + 1.6 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound))
@@ -2517,7 +2518,9 @@ export async function mountTown3d(parent, opts = {}) {
         g.userData = { cx: 88 + R() * 16, cz: -42 + (R() - 0.5) * 56, rad: 6 + R() * 10, y: SEA.level + 9 + R() * 11, sp: (R() < 0.5 ? 1 : -1) * (0.18 + R() * 0.16), ph: R() * 6.28 }
         scene.add(g); gulls.push(g)
       }
-      for (let i = 0; i < 5; i++) { const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [1, -1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wing.position.z = s * 0.85; g.add(wing) } g.userData = { cx: 150 + R() * 95, cz: -30 + (R() - 0.5) * 44, rad: 7 + R() * 12, y: SEA.level + 12 + R() * 14, sp: (R() < 0.5 ? 1 : -1) * (0.16 + R() * 0.14), ph: R() * 6.28 }; scene.add(g); gulls.push(g) } // 渡りの海の海鳥
+      const mkGull = (cx, cz) => { const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [1, -1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wing.position.z = s * 0.85; g.add(wing) } g.userData = { cx, cz, rad: 7 + R() * 12, y: SEA.level + 12 + R() * 16, sp: (R() < 0.5 ? 1 : -1) * (0.16 + R() * 0.14), ph: R() * 6.28 }; scene.add(g); gulls.push(g) }
+      for (let i = 0; i < 6; i++) mkGull(150 + R() * 260, -44 + (R() - 0.5) * 50) // 東(江戸)への長い渡りの海鳥
+      for (let i = 0; i < 5; i++) mkGull(36 + (R() - 0.5) * 50, -150 - R() * 270) // 北(戦国)への渡りの海鳥
     }
 
     // ── 海釣りの桟橋（南の海へ伸びる木の桟橋）＋釣り人。静かな海辺の暮らし。──
