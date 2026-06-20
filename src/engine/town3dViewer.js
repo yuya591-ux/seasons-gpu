@@ -2007,7 +2007,8 @@ export async function mountTown3d(parent, opts = {}) {
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
-        const moat = new THREE.Mesh(new THREE.RingGeometry(13.5, 18, 44), new THREE.MeshBasicMaterial({ color: isNight ? 0x18242f : 0x2b4658, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.12, ez); town.add(moat) // 堀（城を巡る水の輪）
+        const moat = new THREE.Mesh(new THREE.RingGeometry(13, 18.5, 48), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x44545f : 0xeaf2f6, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.1, ez); town.add(moat) // 堀（さざ波の水面＝海と同じ水テクスチャ）
+        for (const rr of [13, 18.5]) { const bank = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.35, 6, 40), toon(season === 'winter' ? 0x8e8b82 : 0x847d70)); bank.rotation.x = -Math.PI / 2; bank.position.set(ex, gy + 0.2, ez); town.add(bank) } // 石垣の護岸（内外の縁）
         const baseH = 7.5
         const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), toon(season === 'winter' ? 0x908d84 : 0x8b8478)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台）
         for (const f of [0.26, 0.52, 0.78]) { const r = 12.5 + (9.5 - 12.5) * f; const cs = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.05, r + 0.12, 0.16, 4), toon(0x6f6b62)); cs.rotation.y = Math.PI / 4; cs.position.set(ex, gy + baseH * f, ez); town.add(cs) } // 石の段（横の石組み）
@@ -2057,6 +2058,21 @@ export async function mountTown3d(parent, opts = {}) {
             const bridge = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 3.4), toon(season === 'winter' ? 0xb8b2a6 : 0x9a8a72)); bridge.position.set(ex - 15.5, gyg + 0.3, gz); bridge.castShadow = true; town.add(bridge); town.add(addOutline(bridge)) // 堀に架かる土橋（大手門→石垣の軸線）
             for (const s of [-1, 1]) for (let bx = -3; bx <= 3; bx += 2) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.7, 0.18), toon(0x6a4a30)); post.position.set(ex - 15.5 + bx, gyg + 0.7, gz + s * 1.6); town.add(post) } // 橋の欄干
           }
+        }
+        // ── 二の丸御殿（城内の御殿。低く広がる入母屋の屋根）──
+        { const palMat = toon(season === 'winter' ? 0xe8e4da : 0xe0d8c6), palRoof = toon(isNight ? 0x33373e : 0x49515b)
+          const pa = 0.7, pcx = ex + Math.cos(pa) * 19.5, pcz = ez + Math.sin(pa) * 19.5, pgy = heightAt(pcx, pcz)
+          for (const [dx, dz, ww, wd] of [[0, 0, 7, 5], [5.2, 1.0, 4, 6.5], [-3.2, 1.6, 5.5, 3.6]]) {
+            const wh = 1.8, body = new THREE.Mesh(new THREE.BoxGeometry(ww, wh, wd), palMat); body.position.set(pcx + dx, pgy + wh / 2, pcz + dz); body.castShadow = true; town.add(body); town.add(addOutline(body))
+            const md = Math.max(ww, wd), roof = new THREE.Mesh(new THREE.ConeGeometry(md * 0.62, 1.5, 4), palRoof); roof.rotation.y = Math.PI / 4; roof.scale.set(ww / md, 1, wd / md); roof.position.set(pcx + dx, pgy + wh + 0.65, pcz + dz); roof.castShadow = true; town.add(roof); town.add(addOutline(roof))
+          }
+          addPine(pcx + 4.5, pgy, pcz - 4); addPine(pcx - 5, pgy, pcz - 3) // 御殿前の松
+        }
+        // ── 船着場（島の港。木の桟橋＋係留の小舟）──
+        { const da = 2.5, sdx = Math.cos(da), sdz = Math.sin(da)
+          for (let r = 35; r <= 41; r += 1.5) { const px = ex + sdx * r, pz = ez + sdz * r; const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 2.2, 6), toon(0x5a4632)); pile.position.set(px, SEA.level + 0.3, pz); town.add(pile) } // 杭
+          const deck = new THREE.Mesh(new THREE.BoxGeometry(9, 0.3, 2.4), toon(0x6a4f38)); deck.position.set(ex + sdx * 38, SEA.level + 1.4, ez + sdz * 38); deck.rotation.y = -da; deck.castShadow = true; town.add(deck); town.add(addOutline(deck)) // 桟橋の床
+          for (const off of [-2.2, 2.2]) { const bx = ex + sdx * 40 - sdz * off, bz = ez + sdz * 40 + sdx * off; const boat = new THREE.Group(); boat.position.set(bx, SEA.level + 0.15, bz); boat.rotation.y = -da; boat.userData = { ph: R() * 6.28 }; const hull = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 1.2), toon(0x55402a)); hull.position.y = 0.1; boat.add(hull); town.add(boat); boats.push(boat) } // 係留の小舟
         }
         for (let k = 0; k < 6; k++) { const ang = R() * 6.28, rr = 26 + R() * 8, px = ex + Math.cos(ang) * rr, pz = ez + Math.sin(ang) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; addPine(px, py, pz) } // 島の松
       }
