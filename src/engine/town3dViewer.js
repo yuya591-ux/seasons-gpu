@@ -3140,24 +3140,34 @@ export async function mountTown3d(parent, opts = {}) {
   const cloudBot = mkCloud(isNight ? 0x767e92 : (SNOWY ? 0xe6e9ee : 0xe9e4dc)) // 影になる雲底（やわらかな陰。雪天は淡い冷灰でほぼ均一＝明るい空に溶ける）
   // 雲は高い空に置く（街を見渡す巡航高度の上）。低いと飛んで街を見渡す時に雲が邪魔になる（実機FB）。
   // 高くしても窓辺で見上げれば見え、ぐっと高く飛べば雲に分け入れる＝双方の良いとこ取り。light端末は控えめ。
-  const cloudN = LIGHT ? 10 : 16
-  for (let i = 0; i < cloudN; i++) {
+  // 積雲を全世界(現代＋江戸/戦国/大正の空＋渡りの空)に散らす。地域でほのかに色を変える(戦国=冷/大正=暖)。
+  const cumN = LIGHT ? 16 : 26
+  for (let i = 0; i < cumN; i++) {
     const g = new THREE.Group()
-    const n = 6 + ((R() * 5) | 0) // 6〜10房＝もこもこの積雲
+    const n = 5 + ((R() * 4) | 0) // 5〜8房＝もこもこの積雲
+    const region = i % 5
+    let cx, cz, topMat = cloudMat
+    if (region === 0) { cx = (R() - 0.5) * 260; cz = -40 - R() * 120 }                                                          // 現代の空
+    else if (region === 1) { cx = EDO.x + (R() - 0.5) * 250; cz = EDO.z + (R() - 0.5) * 210 }                                    // 江戸の空
+    else if (region === 2) { cx = SENGOKU.x + (R() - 0.5) * 200; cz = SENGOKU.z + (R() - 0.5) * 200; topMat = mkCloud(isNight ? 0x6c7488 : 0xdfe2ea) } // 戦国＝冷たく重い雲
+    else if (region === 3) { cx = TAISHO.x + (R() - 0.5) * 220; cz = TAISHO.z + (R() - 0.5) * 200; topMat = mkCloud(isNight ? 0x8a7a82 : 0xf4e7d6) } // 大正＝暖かなセピアの雲
+    else { cx = (R() - 0.5) * 940; cz = -150 - R() * 360 }                                                                       // 渡りの空（広く低く）
     for (let j = 0; j < n; j++) {
-      const s = 4 + R() * 7
-      const up = Math.pow(R(), 0.6) // 上ほど房が多い＝盛り上がる頂・底は平ら
-      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), up < 0.25 ? cloudBot : cloudMat)
-      puff.position.set((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11)
-      puff.scale.y = 0.58
-      g.add(puff)
+      const s = 4 + R() * 7, up = Math.pow(R(), 0.6) // 上ほど房が多い＝盛り上がる頂・底は平ら
+      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), up < 0.25 ? cloudBot : topMat)
+      puff.position.set((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11); puff.scale.y = 0.58; g.add(puff)
     }
-    // 二層構成で「飛行の邪魔をしない」と「窓辺の空に雲がある」を両立（実機FB）:
-    // 7割は高い空の積雲（街を見渡す巡航高度の上＝俯瞰を遮らない／ぐっと高く飛べば雲に分け入れる）、
-    // 3割は遠い地平の雲（飛べる街より奥に低く浮かぶ＝窓辺の遠景の空に雲が見え、巡航の邪魔にならない）。
-    if (i < cloudN * 0.7) g.position.set((R() - 0.5) * 250, 58 + R() * 28, -52 - R() * 86)
-    else g.position.set((R() - 0.5) * 230, 30 + R() * 16, -126 - R() * 52)
+    g.position.set(cx, 54 + R() * 34, cz)
     scene.add(g); clouds.push(g)
+  }
+  // 巻雲（cirrus）＝高い空の薄い刷毛のような筋雲（晴天/夕。雨雪では出さない）。平たく細長く淡い＝空に高さと多様さ。
+  if (!SNOWY && weather !== 'rain') {
+    const ciN = LIGHT ? 6 : 11, ciMat = mkCloud(isNight ? 0x8088a0 : 0xf4f1ea)
+    for (let i = 0; i < ciN; i++) {
+      const g = new THREE.Group(), n = 4 + ((R() * 4) | 0)
+      for (let j = 0; j < n; j++) { const s = 5 + R() * 9, wisp = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), ciMat); wisp.position.set((R() - 0.5) * 40, 0, (R() - 0.5) * 6); wisp.scale.set(1.7, 0.16, 0.5); g.add(wisp) }
+      g.position.set((R() - 0.5) * 920, 98 + R() * 20, -120 - R() * 340); g.rotation.y = R() * 3; scene.add(g); clouds.push(g)
+    }
   }
 
   // ── 渡る鳥（はばたきながら空を弧で渡る。数羽） ──
