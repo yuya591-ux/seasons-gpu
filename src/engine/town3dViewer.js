@@ -2174,6 +2174,7 @@ export async function mountTown3d(parent, opts = {}) {
         const wallA = [], wallB = [], wall3 = [], litG = [], plE = [], tmpM = new THREE.Matrix4(), rotM = new THREE.Matrix4()
         const avenues = [0.4, 1.18, 1.96, 2.74, 3.6, 4.38, 5.16, 5.94] // 放射の大通り（8本＝入り組んだ街路網に）
         const ringRoads = [40, 66, 92] // 同心円の環状道路（街区を区切る）
+        const edoFac = [{ x: ex - 52, z: ez + 44, r: 14 }, { x: ex - 26, z: ez - 58, r: 10 }] // 庭園/寺子屋の区画（建物を空ける）
         const roofPalette = isNight
           ? [0x2e2f33, 0x342c24, 0x2a2520, 0x3a2c26, 0x33302c]
           : [0x717479, 0x6a5640, 0x564636, 0x7a4f3c, 0x807668] // 瓦銀鼠/茶瓦/杉皮/弁柄/灰茶
@@ -2202,7 +2203,7 @@ export async function mountTown3d(parent, opts = {}) {
             let onAve = false; for (const av of avenues) { let d = Math.abs(a - av); if (d > Math.PI) d = 6.2832 - d; if (d < 0.13) { onAve = true; break } }
             if (onAve || onRing || k % 13 === 0) continue // 大通り＋環状道路＋路地の隙間
             const jit = (R() - 0.5) * 1.8, hx = ex + Math.cos(a) * (rr + jit), hz = ez + Math.sin(a) * (rr + jit), hy = heightAt(hx, hz)
-            if (hy < SEA.level + 1.0 || edoStream(hx, hz) < 6) continue // 海・汀・小川には建てない
+            if (hy < SEA.level + 1.0 || edoStream(hx, hz) < 6 || edoFac.some((f) => Math.hypot(hx - f.x, hz - f.z) < f.r)) continue // 海・汀・小川・庭園/寺子屋には建てない
             const tt = R(), two = tt < 0.32, kura = tt > 0.88, oodana = tt > 0.74 && tt <= 0.88 // 2階町家/土蔵/大店
             const hw = oodana ? 3.6 + R() * 1.8 : 2.1 + R() * 1.3
             const hd = oodana ? 2.8 + R() * 1.3 : kura ? hw : 1.7 + R() * 1.0
@@ -2306,6 +2307,21 @@ export async function mountTown3d(parent, opts = {}) {
             const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 2.0 * s, 6), toon(0x6a4f38)); tr.position.set(tx2, ty2 + 1.0 * s, tz2); town.add(tr)
             const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.7 * s, 0), toon(season === 'autumn' ? 0xb06a30 : season === 'winter' ? 0x6e7a72 : 0x4e6e42)); fo.position.set(tx2, ty2 + 2.6 * s, tz2); fo.castShadow = true; town.add(fo) }
           for (let i = 0; i < 6; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 1.4), toon(0x9a948a)); st.position.set(hx0 + (i - 5) * 1.0, heightAt(hx0 + (i - 5) * 2.4, hz0 + 8 + i * 1.6) + 0.15, hz0 + 8 + i * 1.6); town.add(st) } } // 参道の石段
+        // ── 大名庭園（池＋太鼓橋＋石灯籠＋桜松）＝城下の憩いの場（公園） ──
+        { const gx0 = ex - 52, gz0 = ez + 44, gy0 = heightAt(gx0, gz0)
+          if (gy0 > SEA.level + 1) {
+            const pond = new THREE.Mesh(new THREE.CircleGeometry(8, 22), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x3a4a52 : 0x8aacba, fog: true })); pond.rotation.x = -Math.PI / 2; pond.position.set(gx0, gy0 + 0.14, gz0); town.add(pond)
+            const bank = new THREE.Mesh(new THREE.TorusGeometry(8, 0.32, 6, 26), toon(0x8a8278)); bank.rotation.x = -Math.PI / 2; bank.position.set(gx0, gy0 + 0.22, gz0); town.add(bank)
+            const bridge = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.3, 6, 10, Math.PI), toon(season === 'winter' ? 0xb04438 : 0xc0392b)); bridge.position.set(gx0, gy0 + 0.4, gz0); bridge.rotation.set(0, 0.6, 0); town.add(bridge); town.add(addOutline(bridge)) // 太鼓橋
+            for (let k = 0; k < 5; k++) { const a = k / 5 * 6.28, lx = gx0 + Math.cos(a) * 10, lz = gz0 + Math.sin(a) * 10, ly = heightAt(lx, lz); const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 1.3, 6), toon(0x9a948a)); post.position.set(lx, ly + 0.65, lz); town.add(post); const cap = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.5, 6), toon(0x8a8278)); cap.position.set(lx, ly + 1.5, lz); town.add(cap) } // 石灯籠
+            for (let k = 0; k < 8; k++) { const a = R() * 6.28, rr = 10 + R() * 4, px = gx0 + Math.cos(a) * rr, pz = gz0 + Math.sin(a) * rr, py = heightAt(px, pz); const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.8, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.6, 0), toon(season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x4e6e44)); fo.position.set(px, py + 2.2, pz); fo.castShadow = true; town.add(fo) } } }
+        // ── 寺子屋（手習いの学び舎＋幟）＝城下の学校 ──
+        { const sx0 = ex - 26, sz0 = ez - 58, sy0 = heightAt(sx0, sz0)
+          if (sy0 > SEA.level + 1) {
+            const hall = new THREE.Mesh(new RoundedBoxGeometry(8, 3.0, 5.4, 1, 0.12), facadeMat('machiya', 0xd8cfb8)); hall.position.set(sx0, sy0 + 1.5, sz0); hall.castShadow = true; hall.receiveShadow = true; town.add(hall); town.add(addOutline(hall))
+            const hroof = new THREE.Mesh(new THREE.ConeGeometry(6.4, 2.0, 4), tileMat(season === 'winter' ? 0xb8bcc0 : 0x564636, 2, 2, false)); hroof.rotation.y = Math.PI / 4; hroof.position.set(sx0, sy0 + 4.0, sz0); hroof.castShadow = true; town.add(hroof); town.add(addOutline(hroof))
+            const fence = new THREE.Mesh(new THREE.BoxGeometry(14, 1.0, 0.2), toon(0x8a6a48)); fence.position.set(sx0, sy0 + 0.5, sz0 + 6); town.add(fence) // 庭の塀
+            const nob = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 3.2), signMat('手習所', '#e6dcc4', '#3a2a1a', true)); nob.position.set(sx0 - 5.2, sy0 + 2.6, sz0 + 4); town.add(nob); const npole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.4, 5), toon(0x6a5440)); npole.position.set(sx0 - 5.7, sy0 + 2.2, sz0 + 4); town.add(npole) } } // 幟
         // ── 城下の暮らしの作り込み（町なかの庭木・堀の小舟・井戸）＝近づくほど良い街に ──
         { const gC = season === 'spring' ? 0x7faa56 : season === 'autumn' ? 0xb88a3e : season === 'winter' ? 0xcdd6d2 : 0x5e7e46
           for (let k = 0; k < 15; k++) { const a = R() * 6.28; if (angGap(a) < 0.34) continue; const rr = 25 + R() * 36, px = ex + Math.cos(a) * rr, pz = ez + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.7 + R() * 0.5 // 家々の間の庭木
@@ -3717,8 +3733,8 @@ export async function mountTown3d(parent, opts = {}) {
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
     climb: 0,                     // （旧）上昇/下降入力。スキームAでは未使用
     cruise: true,                 // スキームA: 自動巡航中か（とまる/すすむトグル）。とまる=その場でホバリング
-    zoom: 1,                      // カメラの引き具合（ピンチ/ズームボタンで0.4=寄り〜3.0=引き）。カメラ距離に掛ける
-    zoomTarget: 1,                // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
+    zoom: 1.56,                   // カメラの引き具合（ピンチ/ズームボタンで0.4=寄り〜3.0=引き）。初期値は「縮小ボタン2回ぶん」引いた値＝窓辺の既定を少し引き気味に
+    zoomTarget: 1.56,             // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
     speedMul: 0.55,               // 飛行速度の倍率（既定はゆっくりめ。速く/遅くボタンで0.35〜1.7に調整）
     wide: false,                  // 視界を広げるモード（広角＋カメラを引いて高くから広い思案で操作）
     climb: 0,                     // 上昇/下降ボタン（+1=上昇 / -1=下降 / 0=なし。向きを変えず高さだけ変える）
