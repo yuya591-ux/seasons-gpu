@@ -502,9 +502,29 @@ body.idle .town3d-climb.climb--on {
   z-index: 1;
   pointer-events: none;
   mix-blend-mode: multiply;
-  opacity: 0.34;
+  opacity: 0.4;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 170px 170px;
+}
+/* 紙目2層め: 粗い斑(にじみ)をソフトライトで重ね、絵具が紙に染みた有機的なムラを足す＝水彩の深み */
+.town3d-paper2 {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.013' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23b)'/%3E%3C/svg%3E");
+  background-size: 560px 560px;
+}
+/* 縁のにじみ: 画面の四隅へ向けて紙色がふわりと滲む＝水彩を一枚の絵として縁取る（ノスタルジー） */
+.town3d-bleed {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  background: radial-gradient(128% 116% at 50% 46%, transparent 56%, rgba(250, 244, 230, 0.5));
 }
 
 /* 情景切替のなめらかな暗転（情景の空色へ一瞬沈み、静かに戻る） */

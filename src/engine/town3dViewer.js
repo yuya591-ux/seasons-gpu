@@ -2265,8 +2265,8 @@ export async function mountTown3d(parent, opts = {}) {
           const pts = new THREE.Points(g, m); pts.frustumCulled = false; town.add(pts)
           return { pts, g, m, ph, y0: SEA.level + 4, yH: 46 }
         }
-        edoFx = mkFx(EDO.x, EDO.z, 160, 200, isNight ? 0xffe0a0 : 0xf2bcce, isNight ? 1.7 : 1.3) // 江戸: 夜=蛍/昼=桜の花びら
-        senFx = mkFx(SENGOKU.x, SENGOKU.z, 130, 110, isNight ? 0xffb060 : 0xd8b89a, 1.5)          // 戦国: 篝火の火の粉（昇る）
+        edoFx = mkFx(EDO.x, EDO.z, 160, 200, isNight ? 0xffe0a0 : 0xf2bcce, isNight ? 2.5 : 2.1) // 江戸: 夜=蛍/昼=桜の花びら（大きくゆっくり＝ノスタルジー）
+        senFx = mkFx(SENGOKU.x, SENGOKU.z, 130, 110, isNight ? 0xffb060 : 0xd8b89a, 2.2)          // 戦国: 篝火の火の粉（昇る）
         const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mcx = mc.getContext('2d'); const mg = mcx.createRadialGradient(32, 32, 1, 32, 32, 32); mg.addColorStop(0, 'rgba(255,255,255,0.8)'); mg.addColorStop(1, 'rgba(255,255,255,0)'); mcx.fillStyle = mg; mcx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
         const mistMat = new THREE.SpriteMaterial({ map: mistTex, color: 0xeef2f6, transparent: true, opacity: 0.42, depthWrite: false, fog: true })
         const band = (cx, cz, axis) => { for (let i = 0; i < 10; i++) { const o = (i - 4.5) * 11, sp = new THREE.Sprite(mistMat); axis === 'x' ? sp.position.set(cx, SEA.level + 7 + R() * 14, cz + o) : sp.position.set(cx + o, SEA.level + 7 + R() * 14, cz); sp.scale.set(30, 22, 1); town.add(sp) } }
@@ -3505,6 +3505,8 @@ export async function mountTown3d(parent, opts = {}) {
   const paper = document.createElement('div')
   paper.className = 'town3d-paper'
   stage.appendChild(paper)
+  const paper2 = document.createElement('div'); paper2.className = 'town3d-paper2'; stage.appendChild(paper2) // 紙目2層め（粗いにじみ）
+  const bleed = document.createElement('div'); bleed.className = 'town3d-bleed'; stage.appendChild(bleed) // 縁のにじみ（一枚の絵として縁取る）
   const glass = document.createElement('div'); glass.className = 'town3d-glass'; stage.appendChild(glass)
   const cross = document.createElement('div'); cross.className = 'town3d-cross'; stage.appendChild(cross)
   const sill = document.createElement('div'); sill.className = 'town3d-sill'; stage.appendChild(sill)
@@ -4225,9 +4227,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
     if (flyAmt > 0.02) {
       const fp = active.flyPos, dEdo = Math.hypot(fp.x - EDO.x, fp.z - EDO.z), dSen = Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z)
-      const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (2.0 + (i % 5) * 0.5); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.6 + fx.ph[i]) * dt * 1.4) } p.needsUpdate = true; fx.m.opacity = Math.min(0.78, prox * 0.95) }
-      updFx(edoFx, flyAmt * Math.max(0, 1 - dEdo / 130), isNight ? 0.55 : -1.4) // 夜の蛍はゆらり昇る/昼の桜は散る
-      updFx(senFx, flyAmt * Math.max(0, 1 - dSen / 130), 1.6) // 火の粉は昇る
+      const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (1.2 + (i % 5) * 0.32); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.45 + fx.ph[i]) * dt * 0.9) } p.needsUpdate = true; fx.m.opacity = Math.min(0.8, prox * 0.95) }
+      updFx(edoFx, flyAmt * Math.max(0, 1 - dEdo / 130), isNight ? 0.38 : -0.95) // 夜の蛍はゆらり昇る/昼の桜はゆっくり散る
+      updFx(senFx, flyAmt * Math.max(0, 1 - dSen / 130), 1.05) // 火の粉はゆっくり昇る
       const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.42) / 0.16)
       const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 190)), pk(flyAmt * Math.max(0, 1 - dSen / 190)))
       if (veilEl) veilEl.style.opacity = (veilA * 0.78).toFixed(3)
