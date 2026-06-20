@@ -2171,7 +2171,7 @@ export async function mountTown3d(parent, opts = {}) {
         const angGap = (a) => { let d = Math.abs(a - Math.PI); if (d > Math.PI) d = 6.2832 - d; return d } // 西の参道(ang≈π)からの角度差
         // 広大な城下町: 町家(平屋/2階)・土蔵・大店を高さ/大きさ/色を変えて密に。放射の大通りで街区を割る。メッシュ統合で軽量。
         // 屋根は街区(扇形セクタ)ごとに色をまとめ＝俯瞰の市松を脱し「瓦の町並みの塊」に。町家は街路に平行な切妻、土蔵/大店は寄棟。
-        const wallA = [], wallB = [], wall3 = [], litG = [], tmpM = new THREE.Matrix4(), rotM = new THREE.Matrix4()
+        const wallA = [], wallB = [], wall3 = [], litG = [], plE = [], tmpM = new THREE.Matrix4(), rotM = new THREE.Matrix4()
         const avenues = [0.4, 1.7, 3.0, 4.4, 5.6] // 放射の大通り（この方角は広く空けて街路に）
         const roofPalette = isNight
           ? [0x2e2f33, 0x342c24, 0x2a2520, 0x3a2c26, 0x33302c]
@@ -2206,6 +2206,7 @@ export async function mountTown3d(parent, opts = {}) {
             const hd = oodana ? 2.8 + R() * 1.3 : kura ? hw : 1.7 + R() * 1.0
             const hh = two ? 3.0 + R() * 1.3 : kura ? 2.9 + R() * 0.7 : oodana ? 2.2 + R() * 0.5 : 1.3 + R() * 0.6
             tmpM.makeRotationY(a).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); if (!kura) bakeAO(bg, hh); bg.applyMatrix4(tmpM); (kura ? wallB : R() < 0.16 ? wall3 : wallA).push(bg)
+            const plg = new THREE.BoxGeometry(hw + 0.5, 0.55, hd + 0.5); tmpM.makeRotationY(a).setPosition(hx, hy + 0.18, hz); plg.applyMatrix4(tmpM); plE.push(plg) // 石の土台（接地）
             const sec = Math.floor((((a % 6.2832) + 6.2832) % 6.2832) / (6.2832 / nSec))
             let ci = (sec * 2 + (sec % 2)) % roofPalette.length; if (R() < 0.22) ci = (ci + 1) % roofPalette.length; if (kura) ci = 2 // 街区基調＋時々隣色で揺らぐ。土蔵は杉皮
             const rh = two ? 1.6 : kura ? 1.0 : oodana ? 1.3 : 1.0
@@ -2219,7 +2220,8 @@ export async function mountTown3d(parent, opts = {}) {
         }
         const wallBMat = mottleMat(season === 'winter' ? 0xeae6dc : 0xe2ddd0, 170, 0.1, [1.2, 1.2]), wall3Mat = facadeMat('machiya', season === 'winter' ? 0xb8b0a2 : 0x9a8a70) // 土蔵=漆喰のまま/板壁の町家=格子窓の正面
         tWall.vertexColors = true; wall3Mat.vertexColors = true // 壁の接地AO（頂点色）を効かせる
-        for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        const plinthMat = mottleMat(season === 'winter' ? 0xbcc0c2 : 0x8c867c, 120, 0.12, [2, 1]) // 石の土台
+        for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [plE, plinthMat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         roofGeos.forEach((geos, i) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, roofMats[i]); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } })
         gableUnit.dispose()
         // 城下のランドマーク（街並みに目印を：五重塔・火の見櫓）
