@@ -12,8 +12,10 @@ export function createAudio(opts) {
   let ctx = null
   let master = null
   let openFilter = null // 窓のあけ具合で外音を澄ませる/こもらせるローパス（閉=ガラス越し／開=外気が澄む）
+  let muffleGain = null // 窓を閉じると外音の音量も下げる防音ゲイン（ローパスだけでは虫の高域が抜けて静かにならないため）
   let windowOpenAmt = 0
   let layers = [] // ループ中のレイヤー {layerGain, stopped, panner, basePan}
+  let layer_lfos = [] // swellレイヤーの満ち引きLFO（情景切替で停止する）
   let lookPan = 0 // 見回しに連動する音場の左右オフセット（右を向くと音は左へ＝視覚と一致）
   let timers = [] // ループ継ぎ足し・ランダム再生のタイマー
   let currentScene = null
@@ -100,13 +102,16 @@ export function createAudio(opts) {
     ctx = new AC()
     master = ctx.createGain()
     master.gain.value = 0.0001 // 無音から始めてフェードイン
-    // 窓のあけ具合で外音のこもり/澄みを切り替えるローパス（master→openFilter→destination）。
+    // 窓のあけ具合で外音のこもり/澄み＋音量を切り替える（master→openFilter→muffleGain→destination）。
+    // 閉=ガラス越しに低くこもり音量も落ちる(防音)／開=高域まで澄んで音量も戻る。
     if (ctx.createBiquadFilter) {
       openFilter = ctx.createBiquadFilter()
       openFilter.type = 'lowpass'
-      openFilter.frequency.value = windowOpenAmt > 0.5 ? 20000 : 5200 // 閉=ガラス越しのこもり／開=澄む
-      openFilter.Q.value = 0.6
-      master.connect(openFilter).connect(ctx.destination)
+      openFilter.frequency.value = windowOpenAmt > 0.5 ? 20000 : 900 // 閉=ガラス越しに大きくこもる(虫の高域も抑える)／開=澄む
+      openFilter.Q.value = 0.5
+      muffleGain = ctx.createGain()
+      muffleGain.gain.value = windowOpenAmt > 0.5 ? 1 : 0.4 // 閉=しっかり防音で小さく／開=外気の音が戻る
+      master.connect(openFilter).connect(muffleGain).connect(ctx.destination)
     } else {
       master.connect(ctx.destination)
     }
@@ -130,19 +135,33 @@ export function createAudio(opts) {
   }
 
   // 継ぎ目レスな無限ループ: 同じ素材を末尾と先頭で xf 秒だけ重ね、クロスフェードして繋ぐ。
-  function startLoop(buffer, gainVal, pan, myGen) {
+  // swell=true のレイヤーは、ごくゆっくり音量が膨らみ・退き・時に静まる（虫の鳴き交わしの「間」＝
+  // ずっと同じ壁の違和感を消し、静かになる瞬間をつくる）。layerGainは音場/高度しぼり用に残し、別段の swellGain で揺らす。
+  function startLoop(buffer, gainVal, pan, myGen, swell) {
     const dur = buffer.duration
     const xf = Math.min(0.8, dur * 0.25)
     const layerGain = ctx.createGain()
     layerGain.gain.setValueAtTime(0.0001, now())
     layerGain.gain.linearRampToValueAtTime(Math.max(0.0001, gainVal), now() + 1.4) // レイヤーのフェードイン
+    // swell の揺らぎ段（layerGain → swellGain → panner/master）。素のレイヤーは layerGain を直結。
+    let tail = layerGain
+    if (swell && ctx.createOscillator) {
+      const swellGain = ctx.createGain(); swellGain.gain.value = 0.6 // 平均を下げ、満ち引きの余地をつくる
+      layerGain.connect(swellGain); tail = swellGain
+      try {
+        // 互いに割り切れない2つの遅いLFOを重ねて準ランダムな満ち引きに（機械的な周期に聞こえない）。
+        const l1 = ctx.createOscillator(); l1.frequency.value = 0.035; const g1 = ctx.createGain(); g1.gain.value = 0.24; l1.connect(g1).connect(swellGain.gain); l1.start()
+        const l2 = ctx.createOscillator(); l2.frequency.value = 0.052; const g2 = ctx.createGain(); g2.gain.value = 0.16; l2.connect(g2).connect(swellGain.gain); l2.start() // 合わせて約0.2〜1.0倍に満ち引き＝時に静まる
+        layer_lfos.push(l1, l2)
+      } catch { /* LFO非対応なら素の音量で鳴る */ }
+    }
     let panner = null
     if (ctx.createStereoPanner) {
       panner = ctx.createStereoPanner()
       panner.pan.value = Math.max(-1, Math.min(1, pan + lookPan)) // 生成時点の見回しを反映
-      layerGain.connect(panner).connect(master)
+      tail.connect(panner).connect(master)
     } else {
-      layerGain.connect(master)
+      tail.connect(master)
     }
     const layer = { layerGain, stopped: false, panner, basePan: pan, baseGain: gainVal }
     layers.push(layer)
@@ -252,6 +271,8 @@ export function createAudio(opts) {
       })
     }
     layers = []
+    layer_lfos.forEach((o) => { try { o.stop() } catch { /* 無視 */ } })
+    layer_lfos = []
     timers.forEach((id) => clearTimeout(id))
     timers = []
   }
@@ -286,7 +307,7 @@ export function createAudio(opts) {
               ? (li / Math.max(1, loops.length - 1) - 0.5) * 0.5
               : 0
         li++
-        startLoop(buffer, def.gain != null ? def.gain : 1, pan, myGen)
+        startLoop(buffer, def.gain != null ? def.gain : 1, pan, myGen, !!def.swell)
       } else if (def.interval) {
         scheduleInterval(def, buffer, myGen)
       } else {
@@ -327,44 +348,46 @@ export function createAudio(opts) {
   }
 
   // ── 生成的なBGMの下地（素材ゼロ・合成パッド）。CC0/オフライン原則と完全整合。
-  // 3つの正弦波でつくる和音を、ゆっくり動くローパスに通し、環境音の下にごく薄く敷く。
-  // 音量・音色・和音を「場面（部屋/窓辺/飛び始め/巡航/速度/山/海/各時代の近さ）」で滑らかに変える。
-  // 和音は全て A マイナー・ペンタトニック（A C D E G）の中から選ぶので、どの場面へ移っても濁らない。
-  // master 経由なので音量/ミュート/おやすみに自動追従。値は終始控えめ（自然音を邪魔しない）。
+  // 【作り直しの要点（実機FB「終始ぶーぶぶぶの電子ノイズで不快」）】
+  //  ・低音ドローンを廃止＝和音を中高域(165〜660Hz)へ。スマホのスピーカーは低音(80〜220Hz)を歪ませ
+  //    「うなり/ぶーぶー」になる。中高域の純正弦なら柔らかいパッドとして澄んで鳴る。
+  //  ・三角波をやめ全て正弦波（倍音の刺さりを排除）。ローパスも高め(柔らかいが曇らない)。
+  //  ・カットオフのLFO(うねり)を廃止＝脈打つ「ワウ」感を消す。揺らぎは音量のごく微かな呼吸のみ。
+  //  ・部屋では完全に無音（gain 0）＝室内は自然音だけ。空へ出てそっと滲み出る。
+  // 和音は全て A マイナー・ペンタトニック（A C D E G）内＝どの場面へ移っても濁らない。
+  // master 経由なので音量/ミュート/おやすみに自動追従。ピークでもごく小さく自然音を邪魔しない。
   let bedNodes = null
-  const bedState = { gain: 0, cut: 680, voice: [110, 164.8, 220] } // 今の目標値（細かな変化を無視する基準）
-  // 場面ごとの和音の声部（Hz）。全て A マイナー・ペンタトニック内。
+  const bedState = { gain: 0, cut: 1500, voice: [220, 329.6, 440] } // 今の目標値（細かな変化を無視する基準）
+  // 場面ごとの和音の声部（Hz）。全て中高域の A マイナー・ペンタトニック内（低音ドローンにしない）。
   const VOICE = {
-    home: [110, 164.8, 220],    // A2 E3 A3＝開いた五度。穏やかで素直な基調
-    sea: [164.8, 220, 329.6],   // E3 A3 E4＝高く広い。海上の開放感
-    mountain: [110, 130.8, 164.8], // A2 C3 E3＝低いマイナー三和音。山の荘厳さ
-    edo: [110, 146.8, 220],     // A2 D3 A3＝温かなsus。箏のような和の響き
-    sengoku: [82.4, 110, 130.8], // E2 A2 C3＝低く翳る。戦国の張りつめた静けさ
-    taisho: [130.8, 196, 261.6], // C3 G3 C4＝明るくほのかに切ない。大正の港の郷愁
-    room: [110, 164.8, 220],    // 部屋＝基調と同じだが極小音量で温もりだけ
+    home: [220, 329.6, 440],    // A3 E4 A4＝開いた五度。穏やかで素直な基調
+    sea: [329.6, 440, 659.3],   // E4 A4 E5＝高く広い。海上の開放感
+    mountain: [220, 261.6, 329.6], // A3 C4 E4＝マイナーの色。山の静けさ
+    edo: [220, 293.7, 440],     // A3 D4 A4＝温かなsus。箏のような和の響き
+    sengoku: [164.8, 220, 261.6], // E3 A3 C4＝やや低く翳る。戦国の張りつめた静けさ
+    taisho: [261.6, 392, 523.3], // C4 G4 C5＝明るくほのかに切ない。大正の港の郷愁
   }
   function startMusicBed() {
     if (!ctx || bedNodes || !ctx.createBiquadFilter) return
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = bedState.cut; lp.Q.value = 0.4
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = bedState.cut; lp.Q.value = 0.3
     const bedGain = ctx.createGain(); bedGain.gain.value = 0.0001
     lp.connect(bedGain).connect(master)
     const oscs = []
+    const vmix = [0.5, 0.6, 0.42] // 各声部の音量比（中声部を芯に・上声部は控えめ＝柔らかいパッド）
     for (let i = 0; i < 3; i++) {
-      const o = ctx.createOscillator(); o.type = i === 2 ? 'triangle' : 'sine'
+      const o = ctx.createOscillator(); o.type = 'sine' // 全て正弦＝倍音の刺さりなし
       o.frequency.value = bedState.voice[i]
-      o.detune.value = (i - 1) * 4 // ごく僅かに広げて厚みを出す
-      const og = ctx.createGain(); og.gain.value = i === 2 ? 0.5 : 0.85 // 上声部は控えめに
+      o.detune.value = (i - 1) * 3 // ごく僅かなデチューン＝ゆっくりしたうねりで生命感（中高域なので濁らない）
+      const og = ctx.createGain(); og.gain.value = vmix[i]
       o.connect(og).connect(lp)
       try { o.start() } catch { /* 無視 */ }
       oscs.push(o)
     }
     bedNodes = { lp, bedGain, oscs }
-    // ゆっくりした揺らぎ＝同じ和音でも生きて呼吸する（ループ感を消す）。
+    // ごくゆっくりした音量の呼吸だけ（カットオフのうねりは廃止＝脈打つワウ感を出さない）。
     try {
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.045
-      const lfoG = ctx.createGain(); lfoG.gain.value = 140; lfo.connect(lfoG).connect(lp.frequency); lfo.start()
-      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.067
-      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.006; lfo2.connect(lfo2G).connect(bedGain.gain); lfo2.start() // bedGain(目標0.02〜0.05)へ±0.006だけ加算＝そっと膨らみ縮む呼吸
+      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.05
+      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.004; lfo2.connect(lfo2G).connect(bedGain.gain); lfo2.start() // ±0.004だけ膨らみ縮む静かな呼吸
     } catch { /* LFO非対応でも下地は鳴る */ }
   }
   // 場面（ctx）からBGMの目標（音量・音色・和音）を決め、数秒かけて滑らかに移す。
@@ -379,32 +402,32 @@ export function createAudio(opts) {
       const fly = Math.max(0, Math.min(1, c.flyAmt || 0))
       const spd = Math.max(0, Math.min(1, c.speed || 0))
       const eMax = Math.max(c.edoP || 0, c.senP || 0, c.taiP || 0)
-      // 和音の選択: 時代の近さが勝てばその時代、次に地形(海/山)、なければ基調。部屋は room。
-      if (c.mode === 'window' && fly < 0.2) voice = VOICE.room
-      else if (eMax > 0.2) voice = (c.edoP >= c.senP && c.edoP >= c.taiP) ? VOICE.edo : (c.senP >= c.taiP ? VOICE.sengoku : VOICE.taisho)
+      // 和音の選択: 時代の近さが勝てばその時代、次に地形(海/山)、なければ基調。
+      if (eMax > 0.2) voice = (c.edoP >= c.senP && c.edoP >= c.taiP) ? VOICE.edo : (c.senP >= c.taiP ? VOICE.sengoku : VOICE.taisho)
       else if (c.terrain === 'sea') voice = VOICE.sea
       else if (c.terrain === 'mountain') voice = VOICE.mountain
       else voice = VOICE.home
-      // 音量: 部屋はほの温もりだけ→飛ぶと少し前へ→速度と時代の近さで僅かに満ちる（終始ごく控えめ）。
-      if (c.mode === 'window' && fly < 0.2) gain = 0.010
-      else if (c.mode === 'walk') gain = 0.016
-      else gain = 0.022 + spd * 0.013 + eMax * 0.018 + fly * 0.004
-      gain = Math.min(0.058, gain)
-      // 音色（明るさ）: 海/速度で開け、山/戦国で翳り、大正は華やぎ、夜は全体に落ち着ける。
-      cut = 700 + spd * 460 + eMax * 120
-      if (voice === VOICE.sea) cut += 460
-      else if (voice === VOICE.mountain) cut = 500
-      else if (voice === VOICE.sengoku) cut = 470
-      else if (voice === VOICE.taisho) cut = 980
-      else if (voice === VOICE.edo) cut = 780
-      if (c.night) cut *= 0.82
+      // 音量: 部屋＝無音(自然音だけ)。空へ出てから fly でそっと滲み出し、速度と時代の近さで僅かに満ちる。
+      // 中高域は同じ振幅でも大きく聞こえる(等ラウドネス)ので、低音時代よりピークを下げる。
+      if (c.mode === 'window' && fly < 0.2) gain = 0.0001 // 部屋では鳴らさない
+      else if (c.mode === 'walk') gain = 0.012 * fly
+      else gain = (0.013 + spd * 0.009 + eMax * 0.012) * Math.min(1, fly * 1.3)
+      gain = Math.min(0.036, gain)
+      // 音色（明るさ）: 海/速度で開け、山/戦国で翳り、大正は華やぎ、夜は全体に落ち着ける。高めの帯で柔らかく。
+      cut = 1400 + spd * 600 + eMax * 300
+      if (voice === VOICE.sea) cut += 500
+      else if (voice === VOICE.mountain) cut = 1150
+      else if (voice === VOICE.sengoku) cut = 1050
+      else if (voice === VOICE.taisho) cut = 2200
+      else if (voice === VOICE.edo) cut = 1650
+      if (c.night) cut *= 0.86
     }
     // 細かな変化は無視（無駄なスケジューリングを抑える）。
-    if (Math.abs(gain - bedState.gain) > 0.0015) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.6) } catch { /* 無視 */ } }
-    if (Math.abs(cut - bedState.cut) > 18) { bedState.cut = cut; try { bedNodes.lp.frequency.setTargetAtTime(cut, t, 2.2) } catch { /* 無視 */ } }
+    if (Math.abs(gain - bedState.gain) > 0.0012) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.8) } catch { /* 無視 */ } }
+    if (Math.abs(cut - bedState.cut) > 24) { bedState.cut = cut; try { bedNodes.lp.frequency.setTargetAtTime(cut, t, 2.4) } catch { /* 無視 */ } }
     if (voice !== bedState.voice) {
       bedState.voice = voice
-      for (let i = 0; i < 3; i++) { try { bedNodes.oscs[i].frequency.setTargetAtTime(voice[i], t, 3.4) } catch { /* 無視 */ } } // 和音はゆっくり滑らせて移す＝場面が静かに移ろう
+      for (let i = 0; i < 3; i++) { try { bedNodes.oscs[i].frequency.setTargetAtTime(voice[i], t, 3.6) } catch { /* 無視 */ } } // 和音はゆっくり滑らせて移す＝場面が静かに移ろう
     }
   }
 
@@ -493,13 +516,23 @@ export function createAudio(opts) {
     setWindowOpen(open) {
       windowOpenAmt = open ? 1 : 0
       if (!openFilter || !ctx) return
-      const f = open ? 20000 : 5200
+      const f = open ? 20000 : 900 // 閉=ガラス越しに大きくこもる（虫の高域も抑える）／開=澄む
       try {
         openFilter.frequency.cancelScheduledValues(now())
         openFilter.frequency.setValueAtTime(openFilter.frequency.value, now())
         openFilter.frequency.exponentialRampToValueAtTime(f, now() + 0.9) // 窓のease(約1.15s)に寄り添う
       } catch {
         openFilter.frequency.value = f
+      }
+      if (muffleGain) { // 閉じると音量も落として「防音されている」手応えを出す（開けると外気の音が戻る）
+        const g = open ? 1 : 0.4
+        try {
+          muffleGain.gain.cancelScheduledValues(now())
+          muffleGain.gain.setValueAtTime(muffleGain.gain.value, now())
+          muffleGain.gain.linearRampToValueAtTime(g, now() + 0.9)
+        } catch {
+          muffleGain.gain.value = g
+        }
       }
     },
     /** 飛行速度(0..1)で風を膨らませる（速いほど風切りが強まり高くなる＝飛んでいる手応え）。 */

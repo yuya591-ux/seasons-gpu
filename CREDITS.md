@@ -57,6 +57,15 @@
 - 草むらのコオロギ（*Gryllidae*）の合唱。2014年9月、TASCAM DR-07 で録音。秋の夜長の気配に。
 - 変更点：Ogg→MP3 へ変換しループ再生。ヒグラシ・風（既存）と重ねる。CC BY-SA 素材は同ライセンス継承。
 
+### 情景「北寺尾の窓辺、立体の街（夜）」 — `public/audio/kitaterao-window-3d-night/`
+
+| レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
+| --- | --- | --- | --- | --- |
+| 鈴虫 | `suzumushi.mp3` | "Suzumushi 06z3286" / Cory (ISAKA Yoji) | CC BY-SA 3.0 — https://creativecommons.org/licenses/by-sa/3.0/ | https://commons.wikimedia.org/wiki/File:Suzumushi_06z3286.ogg |
+
+- 鈴虫（*Meloimorpha japonica*）の澄んだ「リーンリーン」。2006年9月、兵庫・JR山陰本線 餘部駅で録音。夏の夜の鳴き交わしに。
+- 変更点：Ogg→MP3 へ変換、フェード調整しループ再生。コオロギ（既存 `autumn-dusk-corner-room/crickets.mp3` を再利用）・夜風と重ね、各々ゆっくり満ち引き（swell）させて鳴き交わし・静寂の間をつくる。元は多重ライセンス（CC BY 2.1 JP / CC BY-SA 3.0 / BSD / GFDL）から CC BY-SA 3.0 を選択。同ライセンス継承。
+
 ### 情景「夏の夕暮れ、高台の下町」 — `public/audio/summer-dusk-downtown/`
 
 | レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
