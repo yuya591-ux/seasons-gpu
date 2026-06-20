@@ -243,15 +243,25 @@ body {
 .town3d-cruise:active {
   background: rgba(72, 116, 158, 0.6);
 }
-/* ズームボタン（右下に＋/−を縦に。空/地上でだけ出る＝ピンチに頼らず確実に寄れる/引ける） */
-.town3d-zoom {
+/* 操作トレイ（左下＝左親指の届く一角に飛行の補助操作をまとめる）。空いた面はドラッグ操舵へ透過。 */
+.town3d-pad {
   position: absolute;
-  right: max(1.1rem, calc(env(safe-area-inset-right) + 0.6rem));
-  bottom: max(2.4rem, calc(env(safe-area-inset-bottom) + 1.8rem));
+  left: max(1.0rem, calc(env(safe-area-inset-left) + 0.55rem));
+  bottom: max(2.0rem, calc(env(safe-area-inset-bottom) + 1.5rem));
   z-index: 4;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  align-items: flex-start;
+  gap: 0.5rem;
+  pointer-events: none; /* 空白は操舵ドラッグへ透過。ボタンだけが受け取る */
+}
+/* ズームボタン（＋/−を横に。トレイ内・空/地上でだけ出る＝ピンチに頼らず確実に寄れる/引ける） */
+.town3d-zoom {
+  position: static;
+  order: 3;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
@@ -280,15 +290,13 @@ body {
 .town3d-zoom__btn:active {
   background: rgba(72, 116, 158, 0.6);
 }
-/* 上昇/下降ボタン（右・ズームの上）。向きを変えず高さだけ変える。 */
+/* 上昇/下降ボタン（トレイ最下段＝一番押しやすい所）。向きを変えず高さだけ変える。 */
 .town3d-climb {
-  position: absolute;
-  right: max(1.1rem, calc(env(safe-area-inset-right) + 0.6rem));
-  bottom: max(9.4rem, calc(env(safe-area-inset-bottom) + 8.8rem));
-  z-index: 4;
+  position: static;
+  order: 4;
   display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
+  flex-direction: row;
+  gap: 0.5rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
@@ -317,15 +325,13 @@ body {
 .town3d-climb__btn:active {
   background: rgba(72, 116, 158, 0.6);
 }
-/* 速度ボタン（左下に速く/遅くを縦に。飛行のときだけ） */
+/* 速度ボタン（トレイ内に速く/遅くを横に。飛行のときだけ） */
 .town3d-speed {
-  position: absolute;
-  left: max(1.1rem, calc(env(safe-area-inset-left) + 0.6rem));
-  bottom: max(5.8rem, calc(env(safe-area-inset-bottom) + 5.2rem));
-  z-index: 4;
+  position: static;
+  order: 2;
   display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
+  flex-direction: row;
+  gap: 0.5rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
@@ -352,12 +358,10 @@ body {
 .town3d-speed__btn:active {
   background: rgba(72, 116, 158, 0.6);
 }
-/* 視界を広げるモード（広角＋引き）。速度ボタンの上に置く。 */
+/* 視界を広げるモード（広角＋引き）。トレイ最上段。 */
 .town3d-wide {
-  position: absolute;
-  left: max(1.1rem, calc(env(safe-area-inset-left) + 0.6rem));
-  bottom: max(12.7rem, calc(env(safe-area-inset-bottom) + 12.1rem));
-  z-index: 4;
+  position: static;
+  order: 1;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
@@ -601,18 +605,31 @@ body.idle .topbar button {
 }
 
 /* HUD（左下: 情景名・音） */
+/* 情景名トースト（上中央にそっと現れ、数秒で消える。常時表示しない＝画面を一枚の絵に保つ） */
 .hud {
   position: fixed;
-  left: max(1.2rem, env(safe-area-inset-left));
-  bottom: max(1.2rem, env(safe-area-inset-bottom));
+  top: max(3.6rem, calc(env(safe-area-inset-top) + 3.2rem));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.6rem;
+  opacity: 0; /* 既定は隠す。情景切替時に hud--show で現れる */
+  pointer-events: none;
+}
+.hud.hud--show {
+  opacity: 1;
 }
 .hud__scene {
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(20, 16, 26, 0.32);
+  backdrop-filter: blur(6px);
   /* どんな明るさの景色でも読めるよう、濃いめの影で縁取る */
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 0, 0, 0.4);
 }
@@ -1112,6 +1129,26 @@ body.idle .topbar button {
   .axis,
   .setrow {
     margin: 0.5rem 0;
+  }
+  /* 飛行の操作トレイは短い高さに収まるよう小ぶり・隙間を詰める（左親指の一角は維持） */
+  .town3d-pad {
+    gap: 0.32rem;
+    bottom: max(1.1rem, calc(env(safe-area-inset-bottom) + 0.7rem));
+  }
+  .town3d-zoom,
+  .town3d-speed,
+  .town3d-climb {
+    gap: 0.4rem;
+  }
+  .town3d-zoom__btn,
+  .town3d-climb__btn {
+    width: 42px;
+    height: 42px;
+  }
+  .town3d-speed__btn,
+  .town3d-wide__btn {
+    height: 40px;
+    min-width: 52px;
   }
 }
 

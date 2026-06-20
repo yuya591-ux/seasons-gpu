@@ -3957,12 +3957,14 @@ export async function mountTown3d(parent, opts = {}) {
     cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ'
   })
 
+  // ── 操作トレイ（左下＝左親指の一角に飛行の補助操作を集約。バラけたボタンを一塊に） ──
+  const pad = document.createElement('div'); pad.className = 'town3d-pad'; stage.appendChild(pad)
   // ── ズームボタン（＋寄る／−引く）。ピンチが効きにくい/不安なので、確実に効く明示ボタンを併置（地図/航空アプリ流儀）。
   // zoom は小さいほど寄り(0.4)・大きいほど引き(3.0)。＋で寄る＝zoomTargetを下げる、−で引く＝上げる。frameでzoomが滑らかに追従。
   const zoomWrap = document.createElement('div'); zoomWrap.className = 'town3d-zoom'
   const zoomIn = document.createElement('button'); zoomIn.className = 'town3d-zoom__btn'; zoomIn.textContent = '＋'; zoomIn.setAttribute('aria-label', '寄る')
   const zoomOut = document.createElement('button'); zoomOut.className = 'town3d-zoom__btn'; zoomOut.textContent = '−'; zoomOut.setAttribute('aria-label', '引く')
-  zoomWrap.appendChild(zoomIn); zoomWrap.appendChild(zoomOut); stage.appendChild(zoomWrap)
+  zoomWrap.appendChild(zoomIn); zoomWrap.appendChild(zoomOut); pad.appendChild(zoomWrap)
   let zoomShown = false
   const nudgeZoom = (factor) => { if (!active) return; active.zoomTarget = Math.max(0.4, Math.min(3.0, active.zoomTarget * factor)) }
   let zoomHold = null
@@ -3985,7 +3987,7 @@ export async function mountTown3d(parent, opts = {}) {
   const speedWrap = document.createElement('div'); speedWrap.className = 'town3d-speed'
   const spUp = document.createElement('button'); spUp.className = 'town3d-speed__btn'; spUp.textContent = '速く'; spUp.setAttribute('aria-label', '速く飛ぶ')
   const spDn = document.createElement('button'); spDn.className = 'town3d-speed__btn'; spDn.textContent = '遅く'; spDn.setAttribute('aria-label', 'ゆっくり飛ぶ')
-  speedWrap.appendChild(spUp); speedWrap.appendChild(spDn); stage.appendChild(speedWrap)
+  speedWrap.appendChild(spUp); speedWrap.appendChild(spDn); pad.appendChild(speedWrap)
   let speedShown = false
   const nudgeSpeed = (d) => { if (active) active.speedMul = Math.max(0.35, Math.min(1.7, active.speedMul + d)) }
   let speedHold = null
@@ -3998,14 +4000,14 @@ export async function mountTown3d(parent, opts = {}) {
   // 視界を広げるモード（広角＋引き＝広い思案で操る）。トグル式。
   const wideWrap = document.createElement('div'); wideWrap.className = 'town3d-wide'
   const wideBtn = document.createElement('button'); wideBtn.className = 'town3d-wide__btn'; wideBtn.textContent = '広く'; wideBtn.setAttribute('aria-label', '視界を広げる')
-  wideWrap.appendChild(wideBtn); stage.appendChild(wideWrap)
+  wideWrap.appendChild(wideBtn); pad.appendChild(wideWrap)
   let wideShown = false
   wideBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (active) { active.wide = !active.wide; wideBtn.textContent = active.wide ? '標準' : '広く'; wideWrap.classList.toggle('wide--active', active.wide) } })
   // 上昇/下降（右・ズームの上）。向きを変えずに高さだけ＝毎回上を向かなくてよい。押している間だけ昇降。
   const climbWrap = document.createElement('div'); climbWrap.className = 'town3d-climb'
   const climbUp = document.createElement('button'); climbUp.className = 'town3d-climb__btn'; climbUp.textContent = '↑'; climbUp.setAttribute('aria-label', '上昇')
   const climbDn = document.createElement('button'); climbDn.className = 'town3d-climb__btn'; climbDn.textContent = '↓'; climbDn.setAttribute('aria-label', '下降')
-  climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); stage.appendChild(climbWrap)
+  climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); pad.appendChild(climbWrap)
   let climbShown = false
   for (const [cbtn, dir] of [[climbUp, 1], [climbDn, -1]]) {
     const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir }

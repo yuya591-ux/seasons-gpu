@@ -104,12 +104,14 @@ export function buildUI(opts) {
     }
   }
 
-  // ── HUD（情景名・音） ──
+  // ── 情景名トースト（情景を替えた時だけそっと現れ、数秒で静かに消える＝常時表示の主張を抑える） ──
   const hud = h('div', 'hud')
   const sceneName = h('p', 'hud__scene', currentScene.label)
   sceneName.setAttribute('aria-live', 'polite') // 情景の切替を支援技術へ伝える
   sceneName.setAttribute('role', 'status')
-  const audioRow = h('div', 'hud__audio')
+  hud.appendChild(sceneName)
+  root.appendChild(hud)
+  // 音(♪/音量)は設定パネルへ集約。ここで生成し、設定パネル構築時に差し込む。
   const muteBtn = h('button', 'iconbtn', settings.muted ? '♪̸' : '♪')
   muteBtn.setAttribute('aria-label', '音のオン・オフ')
   const vol = h('input', 'slider slider--vol')
@@ -119,12 +121,6 @@ export function buildUI(opts) {
   vol.max = '1'
   vol.step = '0.01'
   vol.value = String(settings.volume)
-  audioRow.appendChild(muteBtn)
-  audioRow.appendChild(vol)
-  hud.appendChild(sceneName)
-  hud.appendChild(audioRow)
-  root.appendChild(hud)
-
   muteBtn.addEventListener('click', () => {
     settings.muted = !settings.muted
     muteBtn.textContent = settings.muted ? '♪̸' : '♪'
@@ -135,6 +131,14 @@ export function buildUI(opts) {
     onVolume(parseFloat(vol.value))
     poke()
   })
+  // トースト表示（情景切替時に呼ぶ）。表示→数秒後に静かに消える。
+  let sceneToastT = null
+  const showSceneToast = () => {
+    hud.classList.add('hud--show')
+    if (sceneToastT) clearTimeout(sceneToastT)
+    sceneToastT = setTimeout(() => hud.classList.remove('hud--show'), 3400)
+  }
+  showSceneToast() // 起動情景を一度知らせる
 
   // ── 右上のボタン（情景・設定を開く） ──
   const topbar = h('div', 'topbar')
@@ -497,6 +501,7 @@ export function buildUI(opts) {
       if (scene && scene.id !== currentScene.id) {
         currentScene = scene
         sceneName.textContent = scene.label
+        showSceneToast()
         if (intensityLabelEl) intensityLabelEl.textContent = scene.intensityLabel || '強さ'
         onApplyScene(scene)
         markCurrent()
@@ -532,6 +537,15 @@ export function buildUI(opts) {
     const close = h('button', 'iconbtn', '×')
     head.appendChild(close)
     el.appendChild(head)
+
+    // 音（♪オンオフ＋音量）。常時表示のスライダーを設定へ集約＝画面はただ眺める一枚に。
+    const audioSetRow = h('div', 'setrow')
+    audioSetRow.appendChild(h('span', 'setrow__label', '音'))
+    const audioCtrls = h('div', 'hud__audio')
+    audioCtrls.appendChild(muteBtn)
+    audioCtrls.appendChild(vol)
+    audioSetRow.appendChild(audioCtrls)
+    el.appendChild(audioSetRow)
 
     const intensityRow = makeSlider(
       currentScene.intensityLabel || '強さ',
@@ -699,6 +713,7 @@ export function buildUI(opts) {
   return {
     setSceneLabel(text) {
       sceneName.textContent = text
+      showSceneToast()
     },
     // 情景を替えたら窓は閉じた状態から（ボタン表示と描画のズレを防ぐ）。通知はしない。
     resetWindow() {
