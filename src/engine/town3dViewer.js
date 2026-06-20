@@ -545,7 +545,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
   const ISLAND = { x: 98, z: -40, r: 8 }
   const EDO = { x: 285, z: -30, r: 88 } // 海の向こうの広い島（江戸の城下町）。飛んで渡ると霞の向こうに天守＋広大な城下が現れる
-  const SENGOKU = { x: 120, z: -195, r: 34 } // 北の海の果ての戦国の山城（時代の異なる第2の目的地。Edoとは遠く海で隔て共視界に入れない）
+  const SENGOKU = { x: 120, z: -195, r: 44 } // 北の海の果ての戦国の山城（高く大きな峰＋山裾の城下。Edoとは遠く海で隔て共視界に入れない）
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -594,7 +594,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (edd < EDO.r) { const t = Math.max(0, (edd - 68) / (EDO.r - 68)); h = Math.max(h, 5.5 - t * t * 16) } // 広い平場(城下)＝縁だけ汀へ落ちる
     // 北の海に立つ戦国の山城＝海から高く立ち上がる峰
     const snd = Math.hypot(x - SENGOKU.x, z - SENGOKU.z)
-    if (snd < SENGOKU.r) h = Math.max(h, 26 - Math.pow(snd / SENGOKU.r, 1.7) * 30)
+    if (snd < SENGOKU.r) h = Math.max(h, 34 - Math.pow(snd / SENGOKU.r, 1.7) * 38) // 高く大きな峰（裾に城下が広がる）
     return h
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
@@ -2141,11 +2141,24 @@ export async function mountTown3d(parent, opts = {}) {
           const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.26, 0.34, 8), toon(0x2a2620)); bowl.position.set(fx, kyU + 1.55, fz); town.add(bowl)
           const fire = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.8, 6), fireMat); fire.position.set(fx, kyU + 2.0, fz); town.add(fire)
           const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.8 : 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(fx, kyU + 2.0, fz); glow.scale.set(2.6, 2.6, 1); town.add(glow) } // 篝火
-        const samWall = toon(season === 'winter' ? 0xd0cabe : 0xbfb09a), samRoof = toon(season === 'winter' ? (isNight ? 0x8a9098 : 0xb8bcc0) : (isNight ? 0x3a342e : 0x5e5244))
-        for (let k = 0; k < 8; k++) { const a = k / 8 * 6.2832 + 0.25, r2 = 20 + (k % 2) * 3.5, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue
-          const hw = 3 + R() * 1.2, hh = 1.8, body = new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hw * 0.8), samWall); body.position.set(px, py + hh / 2, pz); body.rotation.y = a; body.castShadow = true; town.add(body)
-          const rf = new THREE.Mesh(new THREE.ConeGeometry(hw * 0.7, 1.1, 4), samRoof); rf.rotation.y = a + Math.PI / 4; rf.position.set(px, py + hh + 0.5, pz); town.add(rf)
-          if (isNight) { const ox = Math.cos(a), oz = Math.sin(a), lw = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.06), new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true })); lw.position.set(px + ox * 1.1, py + hh * 0.5, pz + oz * 1.1); lw.lookAt(px + ox * 3, py + hh * 0.5, pz + oz * 3); town.add(lw) } } // 城下の侍屋敷（夜は灯り窓）
+        // 城下（山裾に密集する侍屋敷・町家。メッシュ統合で軽く＝山麓に広がる城下）
+        const samWall = toon(season === 'winter' ? 0xd0cabe : 0xbfb09a), samWall2 = toon(season === 'winter' ? 0xe6e2d8 : 0xa89a82), samRoof = toon(season === 'winter' ? (isNight ? 0x8a9098 : 0xb8bcc0) : (isNight ? 0x3a342e : 0x5e5244))
+        const sgWA = [], sgWB = [], sgR = [], sgL = [], sgM = new THREE.Matrix4()
+        for (let ring = 0; ring < 10; ring++) {
+          const r2 = 22 + ring * 2.2, n = Math.round(r2 * 0.72)
+          for (let k = 0; k < n; k++) {
+            const a = (k / n) * 6.2832 + ring * 0.6
+            if (k % 9 === 0) continue // 山道の隙間
+            const px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2)
+            if (py < SEA.level + 0.8) continue
+            const white = R() < 0.3, hw = 2.0 + R() * 1.2, hd = 1.6 + R() * 0.9, hh = 1.3 + R() * 0.7
+            sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(sgM); (white ? sgWB : sgWA).push(bg)
+            sgM.makeRotationY(a + Math.PI / 4).setPosition(px, py + hh + 0.4, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.64, 0.85, 4); rg.applyMatrix4(sgM); sgR.push(rg)
+            if (isNight && R() < 0.5) { sgM.makeRotationY(a).setPosition(px + Math.cos(a) * hw * 0.45, py + hh * 0.5, pz + Math.sin(a) * hw * 0.45); const lg = new THREE.BoxGeometry(0.5, 0.45, 0.12); lg.applyMatrix4(sgM); sgL.push(lg) }
+          }
+        }
+        const sgLit = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true })
+        for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.5 + R() * 0.35), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
