@@ -261,6 +261,7 @@ export async function mountTown3d(parent, opts = {}) {
   const onFoot = typeof opts.onFoot === 'function' ? opts.onFoot : () => {} // 歩行で一歩ごとに伝える（足音）
   const onBirdFlush = typeof opts.onBirdFlush === 'function' ? opts.onBirdFlush : () => {} // 鳥が驚いて飛び立つ（羽音）
   const onAltitude = typeof opts.onAltitude === 'function' ? opts.onAltitude : () => {} // 飛行高度(0..1)を外へ伝える（高空で環境音をしぼる）
+  const onScene = typeof opts.onScene === 'function' ? opts.onScene : () => {} // 場面（部屋/窓/飛行/歩行・速度・高度・地形・時代の近さ）を外へ伝える（BGMの下地）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -4315,14 +4316,30 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 操作トレイ（左下＝左親指の一角に飛行の補助操作を集約。バラけたボタンを一塊に） ──
   const pad = document.createElement('div'); pad.className = 'town3d-pad'; stage.appendChild(pad)
+  // ── 操作レベルのゲージ（iPhoneの音量表示のように、今どのくらいの位置かを縦バーで示す）。
+  // ボタンを押すと現れ、少し経つと静かに消える。淡い帯＝心地よく眺められる「おすすめ範囲」。
+  // band=[下端,上端]（0..1）。set(v)で塗りの高さを更新、show()で表示してから自動で消す。
+  const mkGauge = (wrap, band) => {
+    const g = document.createElement('div'); g.className = 'town3d-gauge'
+    const bd = document.createElement('div'); bd.className = 'town3d-gauge__band'
+    bd.style.bottom = (band[0] * 100).toFixed(1) + '%'; bd.style.height = ((band[1] - band[0]) * 100).toFixed(1) + '%'
+    const fill = document.createElement('div'); fill.className = 'town3d-gauge__fill'
+    g.appendChild(bd); g.appendChild(fill); wrap.appendChild(g)
+    let hideT = null, cur = -1
+    return {
+      set(v) { v = Math.max(0, Math.min(1, v)); if (Math.abs(v - cur) < 0.004) return; cur = v; fill.style.transform = 'scaleY(' + v.toFixed(3) + ')' },
+      show() { g.classList.add('gauge--show'); if (hideT) clearTimeout(hideT); hideT = setTimeout(() => g.classList.remove('gauge--show'), 1500) },
+    }
+  }
   // ── ズームボタン（＋寄る／−引く）。ピンチが効きにくい/不安なので、確実に効く明示ボタンを併置（地図/航空アプリ流儀）。
   // zoom は小さいほど寄り(0.4)・大きいほど引き(3.0)。＋で寄る＝zoomTargetを下げる、−で引く＝上げる。frameでzoomが滑らかに追従。
   const zoomWrap = document.createElement('div'); zoomWrap.className = 'town3d-zoom'
   const zoomIn = document.createElement('button'); zoomIn.className = 'town3d-zoom__btn'; zoomIn.textContent = '＋'; zoomIn.setAttribute('aria-label', '寄る')
   const zoomOut = document.createElement('button'); zoomOut.className = 'town3d-zoom__btn'; zoomOut.textContent = '−'; zoomOut.setAttribute('aria-label', '引く')
   zoomWrap.appendChild(zoomIn); zoomWrap.appendChild(zoomOut); pad.appendChild(zoomWrap)
+  const zoomGauge = mkGauge(zoomWrap, [0.31, 0.73]) // ＋寄るで上がる。おすすめ＝寄り過ぎ/引き過ぎない中庸
   let zoomShown = false
-  const nudgeZoom = (factor) => { if (!active) return; active.zoomTarget = Math.max(0.4, Math.min(3.0, active.zoomTarget * factor)) }
+  const nudgeZoom = (factor) => { if (!active) return; active.zoomTarget = Math.max(0.4, Math.min(3.0, active.zoomTarget * factor)); zoomGauge.show() }
   let zoomHold = null
   const stopZoomHold = () => { if (zoomHold) { clearInterval(zoomHold); zoomHold = null } }
   // ＋寄る／−引く。タップで一段、押しっぱなし(長押し)で連続ズーム、連打でも各タップが効く（確実な寄り引き）。
@@ -4344,8 +4361,9 @@ export async function mountTown3d(parent, opts = {}) {
   const spUp = document.createElement('button'); spUp.className = 'town3d-speed__btn'; spUp.textContent = '速く'; spUp.setAttribute('aria-label', '速く飛ぶ')
   const spDn = document.createElement('button'); spDn.className = 'town3d-speed__btn'; spDn.textContent = '遅く'; spDn.setAttribute('aria-label', 'ゆっくり飛ぶ')
   speedWrap.appendChild(spUp); speedWrap.appendChild(spDn); pad.appendChild(speedWrap)
+  const speedGauge = mkGauge(speedWrap, [0.26, 0.74]) // 速くで上がる。おすすめ＝ゆったり〜小気味よい間
   let speedShown = false
-  const nudgeSpeed = (d) => { if (active) active.speedMul = Math.max(0.35, Math.min(1.7, active.speedMul + d)) }
+  const nudgeSpeed = (d) => { if (active) { active.speedMul = Math.max(0.35, Math.min(1.7, active.speedMul + d)); speedGauge.show() } }
   let speedHold = null
   const stopSpeedHold = () => { if (speedHold) { clearInterval(speedHold); speedHold = null } }
   for (const [btn, step] of [[spUp, 0.12], [spDn, -0.12]]) {
@@ -4364,9 +4382,10 @@ export async function mountTown3d(parent, opts = {}) {
   const climbUp = document.createElement('button'); climbUp.className = 'town3d-climb__btn'; climbUp.textContent = '↑'; climbUp.setAttribute('aria-label', '上昇')
   const climbDn = document.createElement('button'); climbDn.className = 'town3d-climb__btn'; climbDn.textContent = '↓'; climbDn.setAttribute('aria-label', '下降')
   climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); pad.appendChild(climbWrap)
+  const altGauge = mkGauge(climbWrap, [0.12, 0.65]) // ↑上昇で上がる＝今の高さ。おすすめ＝街を見渡せる低〜中空
   let climbShown = false
   for (const [cbtn, dir] of [[climbUp, 1], [climbDn, -1]]) {
-    const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir }
+    const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir; altGauge.show() }
     const cend = (e) => { if (e) e.stopPropagation(); if (active) active.climb = 0 }
     cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cend); cbtn.addEventListener('pointercancel', cend); cbtn.addEventListener('pointerleave', cend)
   }
@@ -4912,6 +4931,21 @@ export async function mountTown3d(parent, opts = {}) {
     if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) active.climb = 0 }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
+    // 操作ゲージの塗りを今の値で更新（＋寄る/速く/上昇で上がる向き）。高さは見渡せる実用域(汀〜90)で正規化。
+    zoomGauge.set((3.0 - active.zoomTarget) / 2.6)
+    speedGauge.set((active.speedMul - 0.35) / 1.35)
+    altGauge.set((active.flyPos.y - bound.yFloor) / (90 - bound.yFloor))
+    if (active.climb !== 0) altGauge.show() // 昇降ボタンを押している間はゲージを出し続ける
+    // BGMの下地へ「場面」を伝える（部屋/窓/飛行/歩行・速度・高度・地形・各時代の近さ）。setMusicBed側で滑らかに移す。
+    {
+      const fp = active.flyPos
+      const eP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - EDO.x, fp.z - EDO.z) / 255) // 江戸の近さ＝和の響きが満ちる
+      const sP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 255) // 戦国の近さ＝低く翳る
+      const tP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) / 255) // 大正の近さ＝港の郷愁
+      let terrain = 'land'
+      if (flyAmt > 0.3) { const gh = heightAt(fp.x, fp.z); if (gh < SEA.level - 2) terrain = 'sea'; else if (gh > 20) terrain = 'mountain' } // 海上＝開放/山上＝荘厳
+      onScene({ mode: active.mode, flyAmt, speed: windSpeed01, terrain, edoP: eP, senP: sP, taiP: tP, night: isNight })
+    }
 
     // ── 3Dの室内窓枠の見え隠れ。部屋の中（窓辺）で見え、乗り出すと素早く退いて街へ。空/地上では消す。
     // 世界固定の3D枠なので、カメラの室内視差(roomParallax)＋回転で「近い枠と遠い景色が視差で分離」して、

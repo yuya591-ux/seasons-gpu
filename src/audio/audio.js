@@ -326,6 +326,88 @@ export function createAudio(opts) {
     try { src.start() } catch { /* 無視 */ }
   }
 
+  // ── 生成的なBGMの下地（素材ゼロ・合成パッド）。CC0/オフライン原則と完全整合。
+  // 3つの正弦波でつくる和音を、ゆっくり動くローパスに通し、環境音の下にごく薄く敷く。
+  // 音量・音色・和音を「場面（部屋/窓辺/飛び始め/巡航/速度/山/海/各時代の近さ）」で滑らかに変える。
+  // 和音は全て A マイナー・ペンタトニック（A C D E G）の中から選ぶので、どの場面へ移っても濁らない。
+  // master 経由なので音量/ミュート/おやすみに自動追従。値は終始控えめ（自然音を邪魔しない）。
+  let bedNodes = null
+  const bedState = { gain: 0, cut: 680, voice: [110, 164.8, 220] } // 今の目標値（細かな変化を無視する基準）
+  // 場面ごとの和音の声部（Hz）。全て A マイナー・ペンタトニック内。
+  const VOICE = {
+    home: [110, 164.8, 220],    // A2 E3 A3＝開いた五度。穏やかで素直な基調
+    sea: [164.8, 220, 329.6],   // E3 A3 E4＝高く広い。海上の開放感
+    mountain: [110, 130.8, 164.8], // A2 C3 E3＝低いマイナー三和音。山の荘厳さ
+    edo: [110, 146.8, 220],     // A2 D3 A3＝温かなsus。箏のような和の響き
+    sengoku: [82.4, 110, 130.8], // E2 A2 C3＝低く翳る。戦国の張りつめた静けさ
+    taisho: [130.8, 196, 261.6], // C3 G3 C4＝明るくほのかに切ない。大正の港の郷愁
+    room: [110, 164.8, 220],    // 部屋＝基調と同じだが極小音量で温もりだけ
+  }
+  function startMusicBed() {
+    if (!ctx || bedNodes || !ctx.createBiquadFilter) return
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = bedState.cut; lp.Q.value = 0.4
+    const bedGain = ctx.createGain(); bedGain.gain.value = 0.0001
+    lp.connect(bedGain).connect(master)
+    const oscs = []
+    for (let i = 0; i < 3; i++) {
+      const o = ctx.createOscillator(); o.type = i === 2 ? 'triangle' : 'sine'
+      o.frequency.value = bedState.voice[i]
+      o.detune.value = (i - 1) * 4 // ごく僅かに広げて厚みを出す
+      const og = ctx.createGain(); og.gain.value = i === 2 ? 0.5 : 0.85 // 上声部は控えめに
+      o.connect(og).connect(lp)
+      try { o.start() } catch { /* 無視 */ }
+      oscs.push(o)
+    }
+    bedNodes = { lp, bedGain, oscs }
+    // ゆっくりした揺らぎ＝同じ和音でも生きて呼吸する（ループ感を消す）。
+    try {
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.045
+      const lfoG = ctx.createGain(); lfoG.gain.value = 140; lfo.connect(lfoG).connect(lp.frequency); lfo.start()
+      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.067
+      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.006; lfo2.connect(lfo2G).connect(bedGain.gain); lfo2.start() // bedGain(目標0.02〜0.05)へ±0.006だけ加算＝そっと膨らみ縮む呼吸
+    } catch { /* LFO非対応でも下地は鳴る */ }
+  }
+  // 場面（ctx）からBGMの目標（音量・音色・和音）を決め、数秒かけて滑らかに移す。
+  // ctx = { off?, mode:'window'|'fly'|'walk', flyAmt, speed, altitude, terrain:'sea'|'mountain'|'land', edoP, senP, taiP, night }
+  function setMusicBed(c) {
+    if (!ctx || !bedNodes) return
+    const t = now()
+    let gain, cut, voice
+    if (!c || c.off || muted) {
+      gain = 0.0001; cut = bedState.cut; voice = bedState.voice // 3Dを離れる/消音中は静かに引く
+    } else {
+      const fly = Math.max(0, Math.min(1, c.flyAmt || 0))
+      const spd = Math.max(0, Math.min(1, c.speed || 0))
+      const eMax = Math.max(c.edoP || 0, c.senP || 0, c.taiP || 0)
+      // 和音の選択: 時代の近さが勝てばその時代、次に地形(海/山)、なければ基調。部屋は room。
+      if (c.mode === 'window' && fly < 0.2) voice = VOICE.room
+      else if (eMax > 0.2) voice = (c.edoP >= c.senP && c.edoP >= c.taiP) ? VOICE.edo : (c.senP >= c.taiP ? VOICE.sengoku : VOICE.taisho)
+      else if (c.terrain === 'sea') voice = VOICE.sea
+      else if (c.terrain === 'mountain') voice = VOICE.mountain
+      else voice = VOICE.home
+      // 音量: 部屋はほの温もりだけ→飛ぶと少し前へ→速度と時代の近さで僅かに満ちる（終始ごく控えめ）。
+      if (c.mode === 'window' && fly < 0.2) gain = 0.010
+      else if (c.mode === 'walk') gain = 0.016
+      else gain = 0.022 + spd * 0.013 + eMax * 0.018 + fly * 0.004
+      gain = Math.min(0.058, gain)
+      // 音色（明るさ）: 海/速度で開け、山/戦国で翳り、大正は華やぎ、夜は全体に落ち着ける。
+      cut = 700 + spd * 460 + eMax * 120
+      if (voice === VOICE.sea) cut += 460
+      else if (voice === VOICE.mountain) cut = 500
+      else if (voice === VOICE.sengoku) cut = 470
+      else if (voice === VOICE.taisho) cut = 980
+      else if (voice === VOICE.edo) cut = 780
+      if (c.night) cut *= 0.82
+    }
+    // 細かな変化は無視（無駄なスケジューリングを抑える）。
+    if (Math.abs(gain - bedState.gain) > 0.0015) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.6) } catch { /* 無視 */ } }
+    if (Math.abs(cut - bedState.cut) > 18) { bedState.cut = cut; try { bedNodes.lp.frequency.setTargetAtTime(cut, t, 2.2) } catch { /* 無視 */ } }
+    if (voice !== bedState.voice) {
+      bedState.voice = voice
+      for (let i = 0; i < 3; i++) { try { bedNodes.oscs[i].frequency.setTargetAtTime(voice[i], t, 3.4) } catch { /* 無視 */ } } // 和音はゆっくり滑らせて移す＝場面が静かに移ろう
+    }
+  }
+
   // ── イベント連動の合成音（素材ゼロ）。現実に音のある現象だけ鳴らす（花火・流れ星）。
   // 気球/飛行機雲/雲影/宵の灯り/オーロラ/虹は現実に無音なので鳴らさない。
   function boom(at, amp) {
@@ -378,10 +460,14 @@ export function createAudio(opts) {
       if (ctx.state === 'suspended') await ctx.resume()
       started = true
       startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
+      startMusicBed() // 生成的なBGMの下地を用意（3Dの街で場面に応じて静かに鳴る。setMusicBedが音量を上げるまでは無音）
       if (currentScene) await playScene(currentScene, false)
     },
     /** 画面の現象に音を結ぶ（花火の遠い破裂・流れ星のきらめき）。無音の現象は鳴らさない。 */
     playEvent,
+    /** 3Dの街の場面（部屋/窓辺/飛び始め/巡航/速度/山/海/各時代の近さ）でBGMの下地を静かに変える。
+     *  3Dを離れる時は {off:true} で静かに引く。素材ゼロの合成パッドなのでオフライン/CC0原則と整合。 */
+    setMusicBed,
     /** 情景を切り替える（音もクロスフェードで差し替える）。 */
     async setScene(scene) {
       currentScene = scene
@@ -484,6 +570,7 @@ export function createAudio(opts) {
       }
     },
     getLookPan() { return lookPan }, // 検証/連携用
+    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/') } }, // 検証用: BGM下地の状態
     isStarted() {
       return started
     },

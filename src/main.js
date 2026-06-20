@@ -112,6 +112,7 @@ function start() {
     setScene(next.id)
     recordVisit(next.id) // 通い帳: この窓辺に座った記録
     audio.setScene(next)
+    if (next.render !== 'town3d') audio.setMusicBed({ off: true }) // 3Dの街以外ではBGMの下地を静かに引く（3Dではエンジンのonsceneが鳴らす）
     // 情景を替えたら窓は閉じた状態から始める（ボタンと描画のズレを防ぐ）
     renderer.setWindowOpen(false)
     audio.setWindowOpen(false) // 音も閉じた（こもった）状態へ戻す
@@ -164,6 +165,7 @@ function start() {
           onFoot: () => { if (!sleepFading) audio.footstep() }, // 散策の足音
           onBirdFlush: () => { if (!sleepFading) audio.birdFlush() }, // 鳥が驚いて飛び立つ羽音
           onAltitude: (v) => audio.setAltitudeDuck(v), // 高空で街の環境音をしぼる（風だけの静けさへ）
+          onScene: (c) => { if (!sleepFading) audio.setMusicBed(c) }, // 場面に応じて生成BGMの下地を静かに変える
 
 
 

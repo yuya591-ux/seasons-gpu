@@ -376,6 +376,47 @@ body {
 .town3d-speed__btn:active {
   background: rgba(72, 116, 158, 0.6);
 }
+/* 操作レベルのゲージ（iPhoneの音量表示のような縦バー）。各操作の右に並び、押した時だけ静かに現れる。
+   塗り＝今の値（＋寄る/速く/上昇で上がる）。淡い帯＝心地よく眺められる「おすすめ範囲」。 */
+.town3d-gauge {
+  position: relative;
+  align-self: center;
+  width: 7px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(20, 16, 26, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.town3d-gauge.gauge--show {
+  opacity: 1;
+  transform: translateX(0);
+}
+.town3d-gauge__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* bottom / height は JS が「おすすめ範囲」をインラインで設定 */
+  background: rgba(255, 244, 222, 0.22);
+}
+.town3d-gauge__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  transform-origin: bottom center;
+  transform: scaleY(0);
+  border-radius: 999px;
+  /* 黄昏の暖色＝アプリの懐かしいトーンに合わせる */
+  background: linear-gradient(to top, rgba(224, 178, 120, 0.95), rgba(244, 214, 170, 0.95));
+  transition: transform 0.12s ease-out;
+}
 /* 視界を広げるモード（広角＋引き）。トレイ最上段。 */
 .town3d-wide {
   position: static;
