@@ -2145,6 +2145,17 @@ export async function mountTown3d(parent, opts = {}) {
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.5 + R() * 0.35), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
+      // ── 行き先の気配（飛び立つと方角がそれとなく分かる導線）。東=城下町への澪標／北=山城への鳥居の海路 ──
+      {
+        for (let mx = 110; mx <= 246; mx += 26) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 14, 6), toon(0x6a4f38)); pole.position.set(mx, SEA.level + 5, -30); pole.castShadow = true; town.add(pole); const cage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), toon(0x5a4632)); cage.position.set(mx, SEA.level + 11.5, -30); town.add(cage); town.add(addOutline(cage)); const flag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 2.0), toon(0xc24a33)); flag.position.set(mx, SEA.level + 9.4, -28.9); town.add(flag); if (isNight) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcf8a, fog: true })); lamp.position.set(mx, SEA.level + 11.5, -30); town.add(lamp) } } // 澪標（東＝江戸への海路。空からも見える高さ）
+        const redM = toon(season === 'winter' ? 0xb04438 : 0xc0392b)
+        for (let tz = -70; tz >= -166; tz -= 26) { const s = 2.3, g = new THREE.Group(); g.position.set(120, SEA.level, tz)
+          for (const px of [-1.6 * s, 1.6 * s]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * s, 0.32 * s, 5.4 * s, 7), redM); pil.position.set(px, 2.7 * s, 0); pil.castShadow = true; g.add(pil) }
+          const kasagi = new THREE.Mesh(new THREE.BoxGeometry(4.8 * s, 0.5 * s, 0.6 * s), redM); kasagi.position.set(0, 5.4 * s, 0); kasagi.castShadow = true; g.add(kasagi)
+          const nuki = new THREE.Mesh(new THREE.BoxGeometry(4.0 * s, 0.34 * s, 0.4 * s), redM); nuki.position.set(0, 4.3 * s, 0); g.add(nuki)
+          town.add(g)
+        } // 鳥居の海路（北＝戦国の山城へ。大きな朱の鳥居が海に連なる＝空からも方角が分かる）
+      }
       // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
       const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
       for (let x = jStartX; x <= jEndX; x += 2) { const seg = new THREE.BoxGeometry(2.4, 2.0, 5.2); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, SEA.level + 0.4, jz)); jetGeos.push(seg) }
