@@ -348,6 +348,16 @@ body {
   background: rgba(72, 116, 158, 0.72);
   border-color: rgba(255, 255, 255, 0.85);
 }
+/* 霞の帯をくぐる白いベール（別世界へ踏み込む瞬間）。JSが近さで opacity を上下。 */
+.town3d-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: radial-gradient(ellipse at 50% 45%, rgba(247, 249, 251, 0.66) 0%, rgba(235, 240, 245, 0.97) 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s linear;
+}
 /* 無操作でHUDが静かに消えるとき、飛行/窓辺の操作ボタンも一緒に消えて画面全体が見える。タップで戻る。 */
 body.idle .town3d-cruise.cruise--on,
 body.idle .town3d-zoom.zoom--on,

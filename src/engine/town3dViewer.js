@@ -506,6 +506,7 @@ export async function mountTown3d(parent, opts = {}) {
   let koinobori = [] // 春の鯉のぼり（風になびく）
   let swanBoats = [] // 遊園地のスワンボート（池を漂う）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
+  let edoFx = null, senFx = null, veilEl = null // 別世界の演出（時代の舞う粒子＋霞の帯の白いベール）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
@@ -2176,6 +2177,23 @@ export async function mountTown3d(parent, opts = {}) {
           town.add(g)
         } // 鳥居の海路（北＝戦国の山城へ。大きな朱の鳥居が海に連なる＝空からも方角が分かる）
       }
+      // ── 別世界の演出: 時代の気配（舞う粒子）＋霞の帯（くぐると世界が変わる関門）──
+      {
+        const mkFx = (cx, cz, count, spread, col, sz) => {
+          const g = new THREE.BufferGeometry(), pos = new Float32Array(count * 3), ph = new Float32Array(count)
+          for (let i = 0; i < count; i++) { pos[i * 3] = cx + (R() - 0.5) * spread; pos[i * 3 + 1] = SEA.level + 4 + R() * 46; pos[i * 3 + 2] = cz + (R() - 0.5) * spread; ph[i] = R() * 6.28 }
+          g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+          const m = new THREE.PointsMaterial({ color: col, size: sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true })
+          const pts = new THREE.Points(g, m); pts.frustumCulled = false; town.add(pts)
+          return { pts, g, m, ph, y0: SEA.level + 4, yH: 46 }
+        }
+        edoFx = mkFx(EDO.x, EDO.z, 160, 200, isNight ? 0xffe0a0 : 0xf2bcce, isNight ? 1.7 : 1.3) // 江戸: 夜=蛍/昼=桜の花びら
+        senFx = mkFx(SENGOKU.x, SENGOKU.z, 130, 110, isNight ? 0xffb060 : 0xd8b89a, 1.5)          // 戦国: 篝火の火の粉（昇る）
+        const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mcx = mc.getContext('2d'); const mg = mcx.createRadialGradient(32, 32, 1, 32, 32, 32); mg.addColorStop(0, 'rgba(255,255,255,0.8)'); mg.addColorStop(1, 'rgba(255,255,255,0)'); mcx.fillStyle = mg; mcx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
+        const mistMat = new THREE.SpriteMaterial({ map: mistTex, color: 0xeef2f6, transparent: true, opacity: 0.42, depthWrite: false, fog: true })
+        const band = (cx, cz, axis) => { for (let i = 0; i < 10; i++) { const o = (i - 4.5) * 11, sp = new THREE.Sprite(mistMat); axis === 'x' ? sp.position.set(cx, SEA.level + 7 + R() * 14, cz + o) : sp.position.set(cx + o, SEA.level + 7 + R() * 14, cz); sp.scale.set(30, 22, 1); town.add(sp) } }
+        band(168, EDO.z, 'x'); band(SENGOKU.x, -150, 'z') // 江戸/戦国の関門（接近路の手前に漂う霧のかたまり）
+      }
       // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
       const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
       for (let x = jStartX; x <= jEndX; x += 2) { const seg = new THREE.BoxGeometry(2.4, 2.0, 5.2); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, SEA.level + 0.4, jz)); jetGeos.push(seg) }
@@ -3838,6 +3856,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
   const speedVig = document.createElement('div'); speedVig.className = 'town3d-speedvig'; stage.appendChild(speedVig)
+  veilEl = document.createElement('div'); veilEl.className = 'town3d-veil'; stage.appendChild(veilEl) // 霞の帯をくぐる白いベール
   let speedVigCur = -1
   // 雲を抜けるとき視界が白くかすむ（雲の中に入った手応え＝高度の実感）。
   const cloudHaze = document.createElement('div'); cloudHaze.className = 'town3d-cloudhaze'; stage.appendChild(cloudHaze)
@@ -4113,6 +4132,16 @@ export async function mountTown3d(parent, opts = {}) {
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
     }
+    // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
+    if (flyAmt > 0.02) {
+      const fp = active.flyPos, dEdo = Math.hypot(fp.x - EDO.x, fp.z - EDO.z), dSen = Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z)
+      const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (2.0 + (i % 5) * 0.5); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.6 + fx.ph[i]) * dt * 1.4) } p.needsUpdate = true; fx.m.opacity = Math.min(0.78, prox * 0.95) }
+      updFx(edoFx, flyAmt * Math.max(0, 1 - dEdo / 130), isNight ? 0.55 : -1.4) // 夜の蛍はゆらり昇る/昼の桜は散る
+      updFx(senFx, flyAmt * Math.max(0, 1 - dSen / 130), 1.6) // 火の粉は昇る
+      const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.42) / 0.16)
+      const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 190)), pk(flyAmt * Math.max(0, 1 - dSen / 190)))
+      if (veilEl) veilEl.style.opacity = (veilA * 0.78).toFixed(3)
+    } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0 }
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
     active.zoom += (active.zoomTarget - active.zoom) * 0.16 // ズームを目標へ滑らかに追従（ボタン/ピンチ共通＝確実に効き、急変で酔わない）
 
