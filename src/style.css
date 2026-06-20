@@ -321,7 +321,7 @@ body {
 .town3d-speed {
   position: absolute;
   left: max(1.1rem, calc(env(safe-area-inset-left) + 0.6rem));
-  bottom: max(2.4rem, calc(env(safe-area-inset-bottom) + 1.8rem));
+  bottom: max(5.8rem, calc(env(safe-area-inset-bottom) + 5.2rem));
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -356,7 +356,7 @@ body {
 .town3d-wide {
   position: absolute;
   left: max(1.1rem, calc(env(safe-area-inset-left) + 0.6rem));
-  bottom: max(9.3rem, calc(env(safe-area-inset-bottom) + 8.7rem));
+  bottom: max(12.7rem, calc(env(safe-area-inset-bottom) + 12.1rem));
   z-index: 4;
   opacity: 0;
   pointer-events: none;

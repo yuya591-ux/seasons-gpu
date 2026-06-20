@@ -158,7 +158,7 @@ export function setTown3dFly(on) {
       const len = Math.hypot(dx, dy, dz) || 1
       dx /= len; dy /= len; dz /= len
       active.flyYaw = active.flyYawTarget = Math.atan2(dx, -dz)      // 0=奥(-z)を向く
-      active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy))); active.flyPitchTarget = 0.05 // 見下ろしから地続きに飛び立ち、機首はすぐ水平＋わずか上向きへ（勝手に降下しない）
+      active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy))); active.flyPitchTarget = 0 // 飛び立ちは見下ろしから滑らかに水平へ。以後はドラッグで向けた角度を保持（固定）
       active.camReady = false // 引いたカメラ位置を次フレームでスナップ初期化
     } else if (active.mode === 'walk') {
       active.flyPitchTarget = 0.18 // 歩きから飛び立つ＝視線を少し上げてふわりと
@@ -2091,7 +2091,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         for (let k = 0; k < 30; k++) { const a2 = R() * 6.28, r2 = 24 + R() * 42, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkPerson(px, py, pz, kimono[k % kimono.length]) } // 通りの人々
-        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(kimono[(j * 2 + 1) % kimono.length])); wb.position.y = 0.4; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); wh.position.y = 0.95; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang: av + (R() - 0.5) * 0.12, r0: 24 + j * 5, r1: 54 + R() * 8, sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人
+        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(kimono[(j * 2 + 1) % kimono.length])); wb.position.y = 0.4; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); wh.position.y = 0.95; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
         // 大手門（西の参道。鏡柱＋冠木＋渡櫓＋築地塀＋松並木）
         { const gx = ex - 19, gz = ez, gyg = heightAt(gx, gz)
@@ -2156,9 +2156,11 @@ export async function mountTown3d(parent, opts = {}) {
       // ── 北の海の果ての戦国の山城（時代の異なる第2の目的地。Edoとは遠く海で隔て共視界に入れない）──
       {
         const sx = SENGOKU.x, sz = SENGOKU.z, peak = heightAt(sx, sz)
-        const mtnH = peak - SEA.level + 5, coneY = (rr) => peak - Math.min(1, rr / (SENGOKU.r * 0.95)) * mtnH
-        const mtn = new THREE.Mesh(new THREE.ConeGeometry(SENGOKU.r * 0.95, mtnH, 7), toon(season === 'winter' ? 0xc4c8cc : 0x6e6658)); mtn.position.set(sx, SEA.level - 5 + mtnH / 2, sz); mtn.castShadow = true; mtn.receiveShadow = true; town.add(mtn); town.add(addOutline(mtn)) // 岩の峰
-        const skirt = new THREE.Mesh(new THREE.ConeGeometry(SENGOKU.r * 0.98, mtnH * 0.55, 7), toon(season === 'autumn' ? 0x7a6a3a : season === 'winter' ? 0xc8ccce : 0x4a5e3a)); skirt.position.set(sx, SEA.level - 5 + mtnH * 0.275, sz); town.add(skirt) // 裾の森
+        // 山は「平らな山頂(本丸)＋なめらかな24面の斜面」に。配置はこの面に合わせ、わずかに沈めて浮きを防ぐ。
+        const mtnH = peak - SEA.level + 5, baseR = SENGOKU.r * 0.95, topR = 7.5
+        const coneY = (rr) => peak - Math.min(1, Math.max(0, (rr - topR) / (baseR - topR))) * mtnH - 0.25
+        const mtn = new THREE.Mesh(new THREE.CylinderGeometry(topR, baseR, mtnH, 24), toon(season === 'winter' ? 0xc4c8cc : 0x6e6658)); mtn.position.set(sx, SEA.level - 5 + mtnH / 2, sz); mtn.castShadow = true; mtn.receiveShadow = true; town.add(mtn); town.add(addOutline(mtn)) // 岩の峰（丸い山）
+        const skirt = new THREE.Mesh(new THREE.CylinderGeometry(topR + 15, baseR + 0.4, mtnH * 0.58, 24), toon(season === 'autumn' ? 0x7a6a3a : season === 'winter' ? 0xc8ccce : 0x4a5e3a)); skirt.position.set(sx, SEA.level - 5 + mtnH * 0.29, sz); town.add(skirt) // 裾の森
         for (const [cr, dy] of [[12, 8], [8, 3.5]]) { const kuruwa = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1, cr, 2.2, 6), toon(0x86807a)); kuruwa.rotation.y = Math.PI / 6; kuruwa.position.set(sx, peak - dy, sz); kuruwa.castShadow = true; town.add(kuruwa); town.add(addOutline(kuruwa)) } // 曲輪（石垣の段）
         const sWall = toon(season === 'winter' ? 0x6e665c : 0x4a3f30), sRoof = toon(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x232730 : 0x34383f)) // 黒い板張り＋黒瓦（冬は雪化粧）
         let yb = peak; const st = [[5.6, 3.6], [4.3, 3.0], [3.1, 2.6]]
@@ -2207,7 +2209,7 @@ export async function mountTown3d(parent, opts = {}) {
         for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgR2, samRoof2], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
           for (let k = 0; k < 22; k++) { const a = R() * 6.28, r2 = 24 + R() * 14, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 0.8) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) }
-          for (let j = 0; j < 10; j++) { const av = R() * 6.28, wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: sx, cz: sz, ang: av, r0: 23 + R() * 4, r1: 33 + R() * 5, sp: 0.05 + R() * 0.04, ph: R() * 2 }) } } // 山裾の人々＋行き交う人
+          for (let j = 0; j < 10; j++) { const av = R() * 6.28, r0 = 23 + R() * 4, r1 = 33 + R() * 5, wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: sx, cz: sz, ang: av, r0, r1, y0: coneY(r0), y1: coneY(r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } } // 山裾の人々＋行き交う人
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.5 + R() * 0.35), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
@@ -4203,7 +4205,7 @@ export async function mountTown3d(parent, opts = {}) {
         if (Math.hypot(fp.x - w.cx, fp.z - w.cz) > 150) continue
         const tt = (t * w.sp + w.ph) % 2, f = tt < 1 ? tt : 2 - tt, r = w.r0 + (w.r1 - w.r0) * f
         const px = w.cx + Math.cos(w.ang) * r, pz = w.cz + Math.sin(w.ang) * r
-        w.g.position.set(px, heightAt(px, pz), pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0)
+        w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0)
         w.g.children[0].position.y = 0.4 + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
       }
     } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0 }
@@ -4264,7 +4266,6 @@ export async function mountTown3d(parent, opts = {}) {
         // 飛行＝スキームA: ドラッグで操った進路(flyYaw/flyPitch)へ機首が向き、自動でゆっくり前進（巡航）。
         // 機首の上下がそのまま上昇/下降。とまる中は前進0＝その場でホバリング。一本指・スティック/昇降ボタン無し。
         active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.steerEase
-        if (steerId === null) active.flyPitchTarget += (0 - active.flyPitchTarget) * 0.03 // 操舵していない間は機首を水平へ戻す＝放っておくと勝手に降下するストレスを解消
         active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.steerEase
         active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
