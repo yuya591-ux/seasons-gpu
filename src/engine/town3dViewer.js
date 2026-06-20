@@ -2256,6 +2256,17 @@ export async function mountTown3d(parent, opts = {}) {
           const nuki = new THREE.Mesh(new THREE.BoxGeometry(4.0 * s, 0.34 * s, 0.4 * s), redM); nuki.position.set(0, 4.3 * s, 0); g.add(nuki)
           town.add(g)
         } // 鳥居の海路（北＝戦国の山城へ。大きな朱の鳥居が海に連なる＝空からも方角が分かる）
+        // ── 上空から行き先が読める導線: 名所の光柱(ビーコン)＋海路に灯る光点 ──
+        const bc = document.createElement('canvas'); bc.width = 16; bc.height = 64; const bcx = bc.getContext('2d'); const bgr = bcx.createLinearGradient(0, 64, 0, 0); bgr.addColorStop(0, 'rgba(255,255,255,0.78)'); bgr.addColorStop(0.45, 'rgba(255,255,255,0.28)'); bgr.addColorStop(1, 'rgba(255,255,255,0)'); bcx.fillStyle = bgr; bcx.fillRect(0, 0, 16, 64); const beamTex = new THREE.CanvasTexture(bc)
+        const mkBeam = (cx, cz, col, base, h) => { const gy = heightAt(cx, cz) + base; const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 3.0, h, 16, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, color: col, transparent: true, opacity: isNight ? 0.42 : 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true })); beam.position.set(cx, gy + h / 2, cz); beam.renderOrder = 2; town.add(beam) }
+        mkBeam(EDO.x, EDO.z, isNight ? 0xffcf8a : 0xf2c074, 22, 70)      // 江戸＝暖かな金の光柱（天守の上に立ち昇り、城を隠さず在処を示す）
+        mkBeam(SENGOKU.x, SENGOKU.z, isNight ? 0xaec6ff : 0x9fc0ff, 18, 78) // 戦国＝涼やかな青の光柱（峰の上に立ち昇る）
+        // 海路に灯る光点（澪標/鳥居の足元に連なり、上空からは方角を指す一筋の線として読める）
+        const gc = document.createElement('canvas'); gc.width = gc.height = 48; const gcx = gc.getContext('2d'); const ggr = gcx.createRadialGradient(24, 24, 1, 24, 24, 24); ggr.addColorStop(0, 'rgba(255,255,255,0.95)'); ggr.addColorStop(1, 'rgba(255,255,255,0)'); gcx.fillStyle = ggr; gcx.fillRect(0, 0, 48, 48); const glowTex = new THREE.CanvasTexture(gc)
+        const goldMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffd6a0, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
+        const redMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffae9c, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
+        for (let mx = 104; mx <= 250; mx += 12) { const sp = new THREE.Sprite(goldMat); sp.position.set(mx, SEA.level + 1.4, -30); sp.scale.set(5.4, 5.4, 1); town.add(sp) }       // 東＝江戸への海路の光点
+        for (let tz = -62; tz >= -288; tz -= 12) { const sp = new THREE.Sprite(redMat); sp.position.set(120, SEA.level + 1.4, tz); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 北＝戦国への海路の光点
       }
       // ── 別世界の演出: 時代の気配（舞う粒子）＋霞の帯（くぐると世界が変わる関門）──
       {
