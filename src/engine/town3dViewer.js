@@ -2164,6 +2164,19 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832; if (angGap(a) < 0.5 || Math.abs(a - 0.7) < 0.5) continue; const rr = 20.5 + (k % 2) * 1.2, px = ex + Math.cos(a) * rr, pz = ez + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.9 + R() * 0.3
             const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.75 * s, pz); town.add(tr)
             const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 0), toon(folC)); fo.position.set(px, py + 2.1 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立
+        // ── 城下の暮らしの作り込み（町なかの庭木・堀の小舟・井戸）＝近づくほど良い街に ──
+        { const gC = season === 'spring' ? 0x7faa56 : season === 'autumn' ? 0xb88a3e : season === 'winter' ? 0xcdd6d2 : 0x5e7e46
+          for (let k = 0; k < 15; k++) { const a = R() * 6.28; if (angGap(a) < 0.34) continue; const rr = 25 + R() * 36, px = ex + Math.cos(a) * rr, pz = ez + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.7 + R() * 0.5 // 家々の間の庭木
+            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.3 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.65 * s, pz); town.add(tr)
+            const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2 * s, 0), toon(gC)); fo.position.set(px, py + 1.75 * s, pz); fo.castShadow = true; town.add(fo) }
+          for (let k = 0; k < 3; k++) { const a = (k / 3) * 6.28 + 0.5, br = 15.8, bx = ex + Math.cos(a) * br, bz = ez + Math.sin(a) * br // 堀に浮かぶ係留の小舟
+            const boat = new THREE.Group(); const hull = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.36, 0.85), toon(0x5a4632)); hull.position.y = 0.18; boat.add(hull); const inside = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.16, 0.55), toon(0x6e5640)); inside.position.y = 0.32; boat.add(inside)
+            boat.position.set(bx, gy + 0.16, bz); boat.rotation.y = a + Math.PI / 2; boat.rotation.z = (R() - 0.5) * 0.05; town.add(boat) }
+          for (const [wa, wr] of [[1.3, 30], [4.3, 27]]) { const wx = ex + Math.cos(wa) * wr, wz = ez + Math.sin(wa) * wr, wy = heightAt(wx, wz); if (wy < SEA.level + 1.5) continue // 井戸（井筒＋四本柱の小屋根）
+            const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.78, 0.9, 8), toon(0x8b8478)); ring.position.set(wx, wy + 0.45, wz); ring.castShadow = true; town.add(ring); town.add(addOutline(ring))
+            for (const [dx, dz] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 5), toon(0x5a4632)); post.position.set(wx + dx, wy + 1.25, wz + dz); town.add(post) }
+            const wroof = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.66, 4), tRoof); wroof.rotation.y = Math.PI / 4; wroof.position.set(wx, wy + 2.4, wz); town.add(wroof); town.add(addOutline(wroof)) }
+        }
       }
       // ── 海の渡りの演出（帆船・島影）。退屈な海にせず、瞑想的な“渡り”に（海鳥は海鳥のループへ）。──
       {
