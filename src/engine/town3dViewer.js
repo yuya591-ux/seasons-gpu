@@ -3405,6 +3405,7 @@ export async function mountTown3d(parent, opts = {}) {
     flyPos: new THREE.Vector3(),  // 移動の中心点（“自分”）。引いたカメラはこの後ろ上から望む
     flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // flyYaw=進路の向き（左スティックで旋回）／flyPitch=高さ角（右ドラッグ上下）
     cinema: 0, lastInputT: 0,      // オートシネマ: 無操作で最寄り名所をゆっくりオービット（操作で即復帰）
+    arrivalSlow: 1,                // 目的地で自動減速する係数（霞の帯/城下でゆっくり）
     lookYawOff: 0, lookYawOffTarget: 0, lookDragging: false, // 見回しの横オフセット（右ドラッグ。進路は変えず、離すと0へ戻る）
     turnSmooth: 0,                // 旋回入力のスムージング値（手ブレを均し、急旋回を抑える＝快適な曲がり）
     vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
@@ -4246,9 +4247,15 @@ export async function mountTown3d(parent, opts = {}) {
       const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (1.2 + (i % 5) * 0.32); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.45 + fx.ph[i]) * dt * 0.9) } p.needsUpdate = true; fx.m.opacity = Math.min(0.8, prox * 0.95) }
       updFx(edoFx, flyAmt * Math.max(0, 1 - dEdo / 130), isNight ? 0.38 : -0.95) // 夜の蛍はゆらり昇る/昼の桜はゆっくり散る
       updFx(senFx, flyAmt * Math.max(0, 1 - dSen / 130), 1.05) // 火の粉はゆっくり昇る
-      const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.42) / 0.16)
+      // 関門(霞の帯)を儀式のようにくぐる: 帯を広げて白に包まれる間を延ばし(pk幅0.22)、その間は自動で減速。
+      const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.44) / 0.22)
       const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 190)), pk(flyAmt * Math.max(0, 1 - dSen / 190)))
-      if (veilEl) veilEl.style.opacity = (veilA * 0.78).toFixed(3)
+      if (veilEl) veilEl.style.opacity = (veilA * 0.82).toFixed(3)
+      // 目的地で自動減速: 近づくほど・霞の帯ほどゆっくり＝行き過ぎず、城下にそっと着いて巡る
+      const dMin = Math.min(dEdo, dSen)
+      let slow = 1
+      if (dMin < 170) { const approach = Math.max(0, Math.min(1, (170 - dMin) / 100)), band = Math.max(0, 1 - Math.abs(dMin - 110) / 48); slow = Math.max(0.36, 1 - approach * 0.4 - band * 0.22) }
+      active.arrivalSlow = slow
       // 城下を行き交う人（近くの城下だけ動かす＝大通り/山道をゆっくり往復し、歩みに合わせて上下）
       for (const w of cityWalkers) {
         if (Math.hypot(fp.x - w.cx, fp.z - w.cz) > 150) continue
@@ -4257,7 +4264,7 @@ export async function mountTown3d(parent, opts = {}) {
         w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0)
         w.g.children[0].position.y = 0.4 + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
       }
-    } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0 }
+    } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0; active.arrivalSlow = 1 }
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
     active.zoom += (active.zoomTarget - active.zoom) * 0.16 // ズームを目標へ滑らかに追従（ボタン/ピンチ共通＝確実に効き、急変で酔わない）
 
@@ -4335,7 +4342,7 @@ export async function mountTown3d(parent, opts = {}) {
         active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
         camYaw = active.flyYaw
-        const cruiseS = (active.cruise ? FLY.cruiseSpeed * active.speedMul : 0) + cineSpeed // 速さは speedMul で可変（既定ゆっくり）＋シネマの周回
+        const cruiseS = (active.cruise ? FLY.cruiseSpeed * active.speedMul * (active.arrivalSlow || 1) : 0) + cineSpeed // 速さは speedMul で可変＋目的地で自動減速＋シネマの周回
         // 進むのは水平方向だけ＝見下ろし/見上げの角度に関係なく一定速度で前進（見下ろしても降下しない）。
         dvX = Math.sin(active.flyYaw) * cruiseS
         dvY = (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。カメラの見る角度(flyPitch)は保持され移動には影響しない＝好きな角度で街を見下ろし続けられる
