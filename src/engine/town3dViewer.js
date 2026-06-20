@@ -3288,6 +3288,7 @@ export async function mountTown3d(parent, opts = {}) {
     zoom: 1,                      // カメラの引き具合（ピンチ/ズームボタンで0.4=寄り〜3.0=引き）。カメラ距離に掛ける
     zoomTarget: 1,                // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
     speedMul: 0.55,               // 飛行速度の倍率（既定はゆっくりめ。速く/遅くボタンで0.35〜1.7に調整）
+    wide: false,                  // 視界を広げるモード（広角＋カメラを引いて高くから広い思案で操作）
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
@@ -3878,6 +3879,12 @@ export async function mountTown3d(parent, opts = {}) {
     const end = (e) => { if (e) e.stopPropagation(); stopSpeedHold() }
     btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end); btn.addEventListener('pointerleave', end)
   }
+  // 視界を広げるモード（広角＋引き＝広い思案で操る）。トグル式。
+  const wideWrap = document.createElement('div'); wideWrap.className = 'town3d-wide'
+  const wideBtn = document.createElement('button'); wideBtn.className = 'town3d-wide__btn'; wideBtn.textContent = '広く'; wideBtn.setAttribute('aria-label', '視界を広げる')
+  wideWrap.appendChild(wideBtn); stage.appendChild(wideWrap)
+  let wideShown = false
+  wideBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (active) { active.wide = !active.wide; wideBtn.textContent = active.wide ? '標準' : '広く'; wideWrap.classList.toggle('wide--active', active.wide) } })
 
   function frame() {
     if (!active) return
@@ -4178,8 +4185,8 @@ export async function mountTown3d(parent, opts = {}) {
 
       // 引いた三人称カメラ：focus の後ろ上から望む。ピンチのズーム(active.zoom)で引き具合を可変。後ろが建物/地面なら寄せてのめり込みを防ぐ。
       const fp = active.flyPos
-      const back0 = (isWalk ? FLY.walkBack : FLY.camBack) * active.zoom
-      const upOff = (isWalk ? FLY.walkUp : FLY.camUp) * (0.5 + 0.5 * active.zoom) // 引くほど少し高い位置から見渡す
+      const back0 = (isWalk ? FLY.walkBack : FLY.camBack) * active.zoom * (active.wide && !isWalk ? 1.5 : 1) // 広角モードはさらに引く
+      const upOff = (isWalk ? FLY.walkUp : FLY.camUp) * (0.5 + 0.5 * active.zoom) * (active.wide && !isWalk ? 1.35 : 1) // 引くほど少し高い位置から見渡す（広角は更に高く）
       const ahead = isWalk ? FLY.walkAhead : FLY.camAhead
       // 後方アンカーが建物にめり込む時だけ寄せる。ただし blockedAt は高さを見ない平面判定なので、上空を巡航中に
       // 後ろの建物列を跨ぐたびに寄せ判定がオンオフして“カメラが前後にドリー”＝酔いの原因になっていた。
@@ -4214,7 +4221,7 @@ export async function mountTown3d(parent, opts = {}) {
       lookX = lerp(look.x, aLookX, flyAmt); lookY = lerp(look.y, aLookY, flyAmt); lookZ = lerp(look.z, aLookZ, flyAmt)
       upX = lerp(0, TMP_UP2.x, flyAmt); upY = lerp(1, TMP_UP2.y, flyAmt); upZ = lerp(0, TMP_UP2.z, flyAmt)
       const speedMag = Math.hypot(active.vel.x, active.vel.y, active.vel.z)
-      const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain)
+      const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain) + (active.wide && !isWalk ? 26 : 0) // 広角モードで視界を広げる
       fov = lerp(winFov, aloftFov, flyAmt)
       windSpeed01 = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt // 飛行の速さ＝風の膨らみ
 
@@ -4314,6 +4321,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
     const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
     if (showSpeed !== speedShown) { speedShown = showSpeed; speedWrap.classList.toggle('speed--on', showSpeed); if (!showSpeed) stopSpeedHold() }
+    if (showSpeed !== wideShown) { wideShown = showSpeed; wideWrap.classList.toggle('wide--on', showSpeed) }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 
