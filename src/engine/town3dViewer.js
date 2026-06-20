@@ -2997,21 +2997,21 @@ export async function mountTown3d(parent, opts = {}) {
     box(RW, oB - (FY - 0.4), 0.3, 0, (oB + FY - 0.4) / 2, 0, wainsMat) // 腰壁（窓の下＝羽目板）
     grad(box((RW - owW) / 2, owH, 0.3, -(owW / 2 + (RW - owW) / 4), WINCY, 0, wallMat)) // 窓の左の壁
     grad(box((RW - owW) / 2, owH, 0.3, owW / 2 + (RW - owW) / 4, WINCY, 0, wallMat))    // 窓の右の壁
-    box(RW, 0.1, 0.34, 0, oB - 0.0, 0.1, woodMat) // 腰壁上の見切り（窓台のライン）
+    box(owW + 0.6, 0.1, 0.22, 0, oB - 0.06, 0.28, woodMat) // 窓台（腰壁の上の見切り。室内側へ出し、下桟とは高さをずらして重ねない）
     // アルミサッシの窓枠＋引き違いの召し合わせ（団地/マンションの掃き出し窓）＋窓台
     const alMat = mk(C(0x9ea29e, 0x44484c)) // アルミサッシ（明るすぎる細桟はチカチカするので鈍い銀灰に）
-    // 窓の角のチカチカの真因＝4本の桟が同じzで角で重なりZファイティング。横桟=奥(0.05)/縦桟=手前(0.08)へ前後をずらし、
-    // 角で縦桟が横桟を確実に覆う＝重なりの深度取り合いを解消する。
-    box(owW + 0.2, 0.1, 0.1, 0, oT, 0.05, alMat); box(owW + 0.2, 0.1, 0.1, 0, oB, 0.05, alMat)                 // 上下の横桟（奥）
-    box(0.1, owH + 0.2, 0.1, -owW / 2 - 0.05, WINCY, 0.08, alMat); box(0.1, owH + 0.2, 0.1, owW / 2 + 0.05, WINCY, 0.08, alMat) // 左右の縦桟（手前）
-    box(0.06, owH, 0.06, 0, WINCY, 0.083, alMat) // 中央の召し合わせ（さらに手前）
-    box(0.14, 0.06, 0.08, 0.1, WINCY - 0.06, 0.08, alMat) // クレセント錠
+    // チカチカの真因＝桟が壁の厚み(z=-0.15..0.15)に埋もれて壁面/窓台とZファイティング。
+    // → 全ての桟を壁の室内面(z=0.15)より十分手前へ出す。横桟<縦桟<召し合わせ の順で前後を段付け＝角は手前の桟が確実に覆う。
+    box(owW + 0.2, 0.1, 0.1, 0, oT, 0.25, alMat); box(owW + 0.2, 0.1, 0.1, 0, oB + 0.06, 0.25, alMat)             // 上下の横桟（壁より手前・窓台の上）
+    box(0.1, owH + 0.2, 0.1, -owW / 2 - 0.05, WINCY, 0.29, alMat); box(0.1, owH + 0.2, 0.1, owW / 2 + 0.05, WINCY, 0.29, alMat) // 左右の縦桟（さらに手前）
+    box(0.06, owH, 0.06, 0, WINCY, 0.32, alMat) // 中央の召し合わせ（最前）
+    box(0.14, 0.06, 0.08, 0.1, WINCY - 0.06, 0.31, alMat) // クレセント錠
     // 引き違いのガラス障子（2枚）。閉=開口を覆う／窓をあけると右の障子が左へすべって右半分が開く（実際の窓の開閉）。
     // ガラスは“ごく淡い映り込み”だけ（景色を曇らせない）。斜めの細い光の筋を1本＋極薄の地色。端はパネルを枠の内側に隠す。
     const glassTex = cv(64, 64, (x) => { x.fillStyle = 'rgba(210,222,234,0.02)'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,0.12)'; x.lineWidth = 3.5; x.beginPath(); x.moveTo(12, 64); x.lineTo(46, 0); x.stroke(); x.strokeStyle = 'rgba(255,255,255,0.06)'; x.lineWidth = 2; x.beginPath(); x.moveTo(40, 64); x.lineTo(56, 0); x.stroke() })
     const glassMat = new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, opacity: 1, depthWrite: false, fog: false }); winRoomMats.push(glassMat)
-    const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); lpane.position.set(-owW / 4, WINCY, 0.03); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定）
-    const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); rpane.position.set(owW / 4, WINCY, 0.07); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
+    const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); lpane.position.set(-owW / 4, WINCY, 0.18); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定・壁より手前/桟より奥）
+    const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); rpane.position.set(owW / 4, WINCY, 0.20); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
     winSashR = rpane; winSashX0 = owW / 4; winSashX1 = -owW / 4
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
@@ -3097,8 +3097,8 @@ export async function mountTown3d(parent, opts = {}) {
     else if (season === 'summer') { cyl(0.04, 0.04, 1.0, -3.0, FY + 0.5, 5.2, blackMat); const fan = cyl(0.32, 0.32, 0.1, -3.0, FY + 1.0, 5.2, ceramMat, 16); fan.rotation.z = Math.PI / 2; box(0.5, 0.1, 0.5, -3.0, FY + 0.05, 5.2, blackMat) } // 扇風機（夏）
     // ── 窓辺のカーテン（淡い色。窓の左右） ──
     const curtMat = mk(C(0xd8cbb0, 0x4a4450))
-    for (const cs of [-1, 1]) { const ct = box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.22, curtMat); ct.userData.cs = cs; ct.userData.x0 = cs * (owW / 2 + 0.18); winCurtains.push(ct) }
-    box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.24, curtMat) // 上飾り
+    for (const cs of [-1, 1]) { const ct = box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.42, curtMat); ct.userData.cs = cs; ct.userData.x0 = cs * (owW / 2 + 0.18); winCurtains.push(ct) } // 窓枠より手前に吊る（桟と重ねない）
+    box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.44, curtMat) // 上飾り
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
   }
@@ -4164,7 +4164,7 @@ export async function mountTown3d(parent, opts = {}) {
     // lean>0.16で非表示＝カメラがベランダの手すり/窓枠へ達する前に室内ごと消す（貫通して見えるのを防ぐ）。空/地上でも非表示。
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
-    if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.22 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
+    if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.42 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
     if (winRoom.visible && winPendulum) winPendulum.rotation.x = Math.sin(t * 2.0) * 0.16 // 柱時計の振り子が静かに時を刻む
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
