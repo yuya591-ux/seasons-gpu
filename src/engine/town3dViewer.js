@@ -72,7 +72,7 @@ const FLY = {
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
   // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上の島・大橋を越えるxMaxまで）。
-  bound: { x: 86, xMax: 420, zMin: -240, zMax: 42, yMax: 122, yFloor: 4.5 }, // xMax=東の広い城下町の島(x≈285,r88)／zMin=北の海の戦国の山城(z≈-195)まで飛べる
+  bound: { x: 86, xMax: 420, zMin: -325, zMax: 42, yMax: 122, yFloor: 4.5 }, // xMax=東の広い城下町の島(x≈285,r88)／zMin=北の遠い戦国の山城(z≈-265)まで飛べる
   // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
   yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
@@ -320,6 +320,9 @@ export async function mountTown3d(parent, opts = {}) {
   // CG的な締まりを出さない線形トーン（NoToneMapping）＝フィルミックな圧縮を排し、平坦な手描き/セル調に。
   renderer.toneMapping = THREE.NoToneMapping
   renderer.toneMappingExposure = isNight ? 1.25 : 1.0
+  // 別世界感の演出の基準値＋時代ごとの空気の色（江戸=金茶／戦国=青墨）。飛行時に近さで混ぜる。
+  const baseFogCol = scene.fog.color.clone(), baseExposure = renderer.toneMappingExposure
+  const EDO_FOGC = new THREE.Color(isNight ? 0x6a5a3e : 0xd9b582), SEN_FOGC = new THREE.Color(isNight ? 0x3a4452 : 0x8693a4), TMP_FOGC = new THREE.Color()
   // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
   // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
   // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
@@ -545,7 +548,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
   const ISLAND = { x: 98, z: -40, r: 8 }
   const EDO = { x: 285, z: -30, r: 88 } // 海の向こうの広い島（江戸の城下町）。飛んで渡ると霞の向こうに天守＋広大な城下が現れる
-  const SENGOKU = { x: 120, z: -195, r: 44 } // 北の海の果ての戦国の山城（高く大きな峰＋山裾の城下。Edoとは遠く海で隔て共視界に入れない）
+  const SENGOKU = { x: 120, z: -265, r: 44 } // 北の海の果ての戦国の山城（高く大きな峰＋山裾の城下。Edoと充分に離し、霧を晴らしても共視界に入れない）
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -2003,11 +2006,11 @@ export async function mountTown3d(parent, opts = {}) {
       wg.addColorStop(1, '#' + new THREE.Color(0x1f4d6c).lerp(skyHorizon, 0.06).getHexString())
       wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
       for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
-      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(21, 21); seaTex = wtex
-      const seaGeo = new THREE.PlaneGeometry(360, 316); seaGeo.rotateX(-Math.PI / 2)
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(21, 25); seaTex = wtex
+      const seaGeo = new THREE.PlaneGeometry(360, 384); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       const seaMesh = new THREE.Mesh(seaGeo, new THREE.MeshBasicMaterial({ map: wtex, fog: true }))
-      seaMesh.position.set(245, SEA.level, -86); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈65..425・z≈-244..72 を広く覆う（東=広い城下町の島／北=戦国の山城への渡りの海）
+      seaMesh.position.set(245, SEA.level, -120); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈65..425・z≈-312..72 を広く覆う（東=広い城下町の島／北=遠い戦国の山城への渡りの海）
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
@@ -2166,7 +2169,7 @@ export async function mountTown3d(parent, opts = {}) {
       {
         for (let mx = 110; mx <= 190; mx += 26) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 14, 6), toon(0x6a4f38)); pole.position.set(mx, SEA.level + 5, -30); pole.castShadow = true; town.add(pole); const cage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), toon(0x5a4632)); cage.position.set(mx, SEA.level + 11.5, -30); town.add(cage); town.add(addOutline(cage)); const flag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 2.0), toon(0xc24a33)); flag.position.set(mx, SEA.level + 9.4, -28.9); town.add(flag); if (isNight) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcf8a, fog: true })); lamp.position.set(mx, SEA.level + 11.5, -30); town.add(lamp) } } // 澪標（東＝江戸への海路。島の汀の手前まで）
         const redM = toon(season === 'winter' ? 0xb04438 : 0xc0392b)
-        for (let tz = -70; tz >= -166; tz -= 26) { const s = 2.3, g = new THREE.Group(); g.position.set(120, SEA.level, tz)
+        for (let tz = -70; tz >= -220; tz -= 26) { const s = 2.3, g = new THREE.Group(); g.position.set(120, SEA.level, tz)
           for (const px of [-1.6 * s, 1.6 * s]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * s, 0.32 * s, 5.4 * s, 7), redM); pil.position.set(px, 2.7 * s, 0); pil.castShadow = true; g.add(pil) }
           const kasagi = new THREE.Mesh(new THREE.BoxGeometry(4.8 * s, 0.5 * s, 0.6 * s), redM); kasagi.position.set(0, 5.4 * s, 0); kasagi.castShadow = true; g.add(kasagi)
           const nuki = new THREE.Mesh(new THREE.BoxGeometry(4.0 * s, 0.34 * s, 0.4 * s), redM); nuki.position.set(0, 4.3 * s, 0); g.add(nuki)
@@ -4093,6 +4096,23 @@ export async function mountTown3d(parent, opts = {}) {
     const wo = easeInOut(active.winOpenP)
     const lean = easeInOut(active.leanP)
     const flyAmt = easeInOut(active.flyP) // 0=窓 / 1=空（カメラ位置・視線・画角をこの量で混ぜる）
+    // 別世界感: 飛ぶほど霧を晴らして遠くの街を壮大に見せ、目的地に近いほどその時代の空気（色・露出）へ移す。
+    if (flyAmt > 0.02) {
+      active.fogTouched = true
+      const fp = active.flyPos
+      const edoP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - EDO.x, fp.z - EDO.z) / 190)
+      const senP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 190)
+      const clear = flyAmt * (0.5 + 0.5 * Math.max(edoP, senP)) // 飛ぶほど＋目的地に近いほど霧を晴らす
+      scene.fog.near = FOG.near * (1 + clear * 0.9); scene.fog.far = FOG.far * (1 + clear)
+      TMP_FOGC.copy(baseFogCol)
+      if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.55)
+      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.55)
+      scene.fog.color.copy(TMP_FOGC)
+      renderer.toneMappingExposure = baseExposure * (1 + edoP * 0.1 - senP * 0.08)
+    } else if (active.fogTouched) {
+      active.fogTouched = false
+      scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
+    }
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
     active.zoom += (active.zoomTarget - active.zoom) * 0.16 // ズームを目標へ滑らかに追従（ボタン/ピンチ共通＝確実に効き、急変で酔わない）
 

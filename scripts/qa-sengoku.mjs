@@ -14,9 +14,9 @@ await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTime
 await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
 await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
 const shoot = async (z, y, pit, name) => { await page.evaluate(([z, y, p]) => window.__town3dFlyPose(120, y, z, 0, p), [z, y, pit]); await page.waitForTimeout(800); await page.screenshot({ path: `scripts/_shots/${name}.png` }) }
-await shoot(-95, 38, -0.05, 'sengoku-far')
-await shoot(-150, 40, -0.10, 'sengoku-mid')
-await shoot(-172, 36, -0.13, 'sengoku-near')
-await shoot(-176, 48, -0.26, 'sengoku-top')
+await shoot(-150, 42, -0.04, 'sengoku-far')
+await shoot(-218, 44, -0.10, 'sengoku-mid')
+await shoot(-246, 38, -0.13, 'sengoku-near')
+await shoot(-250, 52, -0.26, 'sengoku-top')
 console.log('sengoku shots done')
 await browser.close()
