@@ -1350,13 +1350,15 @@ export async function mountTown3d(parent, opts = {}) {
     const top = new THREE.Mesh(new THREE.BoxGeometry(8, 0.7, 1.1), red); top.position.set(x, gy + 7.4, z); top.castShadow = true; town.add(top)
     const top2 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.45, 0.8), red); top2.position.set(x, gy + 6.3, z); town.add(top2)
   }
-  // ── 商店街（小さな店が並ぶ一角＋色とりどりの庇） ──
+  // ── 商店街（小さな店が並ぶ一角＋色とりどりの庇＋店名の看板） ──
+  const shopNames = ['八百屋', '魚屋', '酒店', '喫茶', '薬局', '花屋', '本屋'], shopBg = [0x4a8a5a, 0x3a6a9a, 0xb24a3a, 0x6a4a3a, 0x3a8a7a, 0xc04a7a, 0x6a5a3a]
   for (let i = 0; i < 7; i++) {
     const x = -34 + i * 5.2, z = -10, gy = heightAt(x, z)
     const b = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.6, 4.4), toon(wallCols[i % wallCols.length]))
     b.position.set(x, gy + 1.8, z); b.castShadow = true; b.receiveShadow = true; town.add(b)
     const aw = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.35, 1.5), toon([0xc23a2c, 0x3a6a9a, 0x3e8a4a, 0xd8a030][i % 4]))
     aw.position.set(x, gy + 2.5, z + 2.4); town.add(aw)
+    mkSignH(x, gy + 3.4, z + 2.3, 0, shopNames[i], shopBg[i % shopBg.length], 0xf4efe2) // 店名の看板
   }
 
   // ── 自動販売機（街角に灯る。昼夜とも光る前面＝平成の郷愁） ──
