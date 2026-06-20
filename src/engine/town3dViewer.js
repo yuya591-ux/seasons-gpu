@@ -2008,18 +2008,22 @@ export async function mountTown3d(parent, opts = {}) {
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
         const moat = new THREE.Mesh(new THREE.RingGeometry(13.5, 18, 44), new THREE.MeshBasicMaterial({ color: isNight ? 0x18242f : 0x2b4658, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.12, ez); town.add(moat) // 堀（城を巡る水の輪）
-        const baseH = 9
-        const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 13, baseH, 4), toon(season === 'winter' ? 0x908d84 : 0x8b8478)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台）
-        const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(isNight ? 0x29303a : 0x3a434e), trimC = toon(0x4a4a4a)
-        let yb = gy + baseH
-        const tiers = [[7.4, 4.8], [6.3, 4.2], [5.3, 3.8], [4.3, 3.4], [3.3, 3.0]] // [壁幅, 壁高] 下から上へ
+        const baseH = 7.5
+        const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), toon(season === 'winter' ? 0x908d84 : 0x8b8478)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台）
+        for (const f of [0.26, 0.52, 0.78]) { const r = 12.5 + (9.5 - 12.5) * f; const cs = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.05, r + 0.12, 0.16, 4), toon(0x6f6b62)); cs.rotation.y = Math.PI / 4; cs.position.set(ex, gy + baseH * f, ez); town.add(cs) } // 石の段（横の石組み）
+        const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(isNight ? 0x29303a : 0x3a434e), winC = toon(isNight ? 0x20242a : 0x2e3138)
+        let yb = gy + baseH, topBase = yb, topW = 3.4
+        const tiers = [[7.4, 4.6], [6.3, 4.0], [5.3, 3.6], [4.3, 3.2], [3.4, 3.0]] // [壁幅, 壁高] 下から上へ
         for (let i = 0; i < tiers.length; i++) {
-          const w = tiers[i][0], h = tiers[i][1]
+          const w = tiers[i][0], h = tiers[i][1], rw = (w + 1.8) * 0.72, rh = 2.2
+          if (i === tiers.length - 1) { topBase = yb; topW = w }
           const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), wallC); wall.position.set(ex, yb + h / 2, ez); wall.castShadow = true; town.add(wall); town.add(addOutline(wall)) // 白漆喰の壁
-          const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.05, 0.42, w + 0.05), trimC); band.position.set(ex, yb + h * 0.6, ez); town.add(band) // 連子窓のヒント
-          const rh = 2.3, roof = new THREE.Mesh(new THREE.ConeGeometry((w + 1.7) * 0.72, rh, 4), roofC); roof.rotation.y = Math.PI / 4; roof.position.set(ex, yb + h + rh / 2 - 0.15, ez); roof.castShadow = true; town.add(roof); town.add(addOutline(roof)) // 黒瓦の屋根（軒が張る）
+          for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { const nx = Math.sin(a), nz = Math.cos(a); for (const s of [-1, 1]) { const win = new THREE.Mesh(new THREE.BoxGeometry(0.85, h * 0.4, 0.06), winC); win.position.set(ex + nx * (w / 2 + 0.04) + Math.cos(a) * s * w * 0.24, yb + h * 0.52, ez + nz * (w / 2 + 0.04) - Math.sin(a) * s * w * 0.24); win.rotation.y = a; town.add(win) } } // 連子窓（各面2つ）
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(rw, rh, 4), roofC); roof.rotation.y = Math.PI / 4; roof.position.set(ex, yb + h + rh / 2 - 0.15, ez); roof.castShadow = true; town.add(roof); town.add(addOutline(roof)) // 黒瓦の屋根（軒が張る）
+          if (i < 3) for (const sgn of [1, -1]) { const gb = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.26, w * 0.26, 0.42, 3), wallC); gb.rotation.set(Math.PI / 2, 0, Math.PI / 2); gb.position.set(ex, yb + h + 0.5, ez + sgn * rw * 0.58); gb.castShadow = true; town.add(gb); town.add(addOutline(gb)) } // 千鳥破風（前後の妻）
           yb += h + rh - 1.0
         }
+        { const br = topW / 2 + 0.45, ry0 = topBase + 1.3; for (const [ax, az, ry] of [[0, br, 0], [0, -br, 0], [br, 0, Math.PI / 2], [-br, 0, Math.PI / 2]]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(br * 2 + 0.2, 0.34, 0.1), toon(0x6a4a30)); rail.position.set(ex + ax, ry0, ez + az); rail.rotation.y = ry; town.add(rail) } } // 最上階の高欄（望楼の廻縁）
         for (const sgn of [-1, 1]) { const shachi = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.1, 6), toon(0xc8a23c)); shachi.position.set(ex + sgn * 1.3, yb + 0.2, ez); shachi.rotation.z = sgn * -0.32; town.add(shachi) } // 鯱（金）
         const tRoof = toon(isNight ? 0x4a4038 : 0x6f5f4d), tWall = toon(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9) // 城下の町家
         for (let k = 0; k < 16; k++) {
