@@ -555,6 +555,10 @@ export async function mountTown3d(parent, opts = {}) {
   const SENGOKU = { x: 120, z: -486, r: 44 } // 北の海の果ての戦国の山城。海(x>82)から立ち上がる峰。江戸とも別方角・遠距離で隔て、近づくほど広く霞から立ち上がる
   const TAISHO = { x: -490, z: -30, r: 80 } // 西の海の向こうの大正の港町（赤レンガ倉庫/洋館/時計塔/桟橋）。江戸(東)/戦国(北)と別方角・遠距離
   const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }, { x: TAISHO.x, z: TAISHO.z }] // オートシネマで周回する名所（現代の街/江戸/戦国/大正の中心）
+  // 江戸の島を蛇行する小川の川筋。中心線からの横距離を返す（小さいほど川。堀の内/島の外は川なし）。heightAtの掘り込みと建物除外で共用。
+  const edoStream = (x, z) => { const dx = x - EDO.x, dz = z - EDO.z, edd = Math.hypot(dx, dz); if (edd < 23 || edd > EDO.r - 6) return 999; let da = Math.atan2(dz, dx) - (1.15 + Math.sin(edd * 0.085) * 0.34); da = Math.atan2(Math.sin(da), Math.cos(da)); return Math.abs(da) * edd }
+  // 大正の島の運河（港から内陸へまっすぐ引かれた水路）。中心線(z=tz+18)からの距離。
+  const taishoCanal = (x, z) => { const dx = x - TAISHO.x; if (dx < -TAISHO.r + 6 || dx > 30) return 999; return Math.abs(z - (TAISHO.z + 17)) }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -603,13 +607,20 @@ export async function mountTown3d(parent, opts = {}) {
     if (isd < ISLAND.r) h = Math.max(h, 2.2 - Math.pow(isd / ISLAND.r, 2) * 14)
     // 海の向こうの島（城下町）＝海から立ち上がる台地。中央(edd<20)は天守を載せる平場、外周は汀へ落ちる。
     const edd = Math.hypot(x - EDO.x, z - EDO.z)
-    if (edd < EDO.r) { const t = Math.max(0, (edd - 68) / (EDO.r - 68)); h = Math.max(h, 5.5 - t * t * 16) } // 広い平場(城下)＝縁だけ汀へ落ちる
+    if (edd < EDO.r) { const t = Math.max(0, (edd - 68) / (EDO.r - 68)); let base = 5.5 - t * t * 16
+      const undul = Math.min(1, Math.max(0, (edd - 18) / 28)) // 城の周り(edd<18)は平ら、外周ほど丘の起伏
+      base += (Math.sin((x - EDO.x) * 0.062) * 1.4 + Math.cos((z - EDO.z) * 0.054) * 1.1 + Math.sin((x + z) * 0.04) * 0.7) * undul
+      const sd = edoStream(x, z); base -= Math.min(1, Math.max(0, (5.2 - sd) / 2.6)) * 2.4 // 蛇行する小川を平底に掘り込む（中央2.6は平らな河床、縁で立ち上がる）
+      h = Math.max(h, base) } // 起伏する平場＋小川（のっぺりした台地を脱す）
     // 北の海に立つ戦国の山城＝海から高く立ち上がる峰
     const snd = Math.hypot(x - SENGOKU.x, z - SENGOKU.z)
     if (snd < SENGOKU.r) h = Math.max(h, 34 - Math.pow(snd / SENGOKU.r, 1.7) * 38) // 高く大きな峰（裾に城下が広がる）
     // 西の海に浮かぶ大正の港町＝海から立ち上がる低い平らな島（港は汀に。縁だけ海へ落ちる）
     const tsd = Math.hypot(x - TAISHO.x, z - TAISHO.z)
-    if (tsd < TAISHO.r) { const t = Math.max(0, (tsd - 56) / (TAISHO.r - 56)); h = Math.max(h, 4.5 - t * t * 15) }
+    if (tsd < TAISHO.r) { const t = Math.max(0, (tsd - 56) / (TAISHO.r - 56)); let base = 4.5 - t * t * 15
+      base += (Math.sin((x - TAISHO.x) * 0.05) * 0.9 + Math.cos((z - TAISHO.z) * 0.06) * 0.8) * Math.min(1, tsd / 20) // ゆるやかな起伏（港町は控えめ）
+      const cd = taishoCanal(x, z); base -= Math.min(1, Math.max(0, (4.6 - cd) / 2.4)) * 2.6 // 運河を平底に掘り込む（中央2.2は平らな水路床）
+      h = Math.max(h, base) }
     return h
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
@@ -2062,6 +2073,18 @@ export async function mountTown3d(parent, opts = {}) {
         for (let i = 0; i < 7; i++) { const rr = 16 + i * 7, rx = ex + Math.cos(Math.PI) * rr, rz = ez + Math.sin(Math.PI) * rr, ry = heightAt(rx, rz); if (ry < SEA.level + 1) continue; const road = new THREE.Mesh(new THREE.BoxGeometry(7.1, 0.16, 4.4), toon(season === 'winter' ? 0xc8ccc6 : 0x7e7050)); road.position.set(rx, ry + 0.06, rz); road.receiveShadow = true; town.add(road) }
         // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
         for (let k = 0; k < 18; k++) { const a = (k / 18) * 6.2832 + R() * 0.25, rr = 83 + R() * 5, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
+        // ── 城下を蛇行する小川（平底の河床＋河川敷の草＋木の橋）＝平らな台地に水辺の自然 ──
+        { const wmat = new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4e5c66 : 0x9fbcca, fog: true })
+          const grassC = season === 'winter' ? 0xb8c0b6 : season === 'autumn' ? 0x9a8a52 : 0x6e8a48
+          let prev = null
+          for (let s = 0; s <= 26; s++) { const edd = 24 + s * ((EDO.r - 14 - 24) / 26), ang = 1.15 + Math.sin(edd * 0.085) * 0.34, px = ex + Math.cos(ang) * edd, pz = ez + Math.sin(ang) * edd, py = heightAt(px, pz)
+            const w = new THREE.Mesh(new THREE.PlaneGeometry(5.0, 4.6), wmat); w.rotation.x = -Math.PI / 2; if (prev) w.rotation.z = Math.atan2(pz - prev.z, px - prev.x); w.position.set(px, py + 0.28, pz); town.add(w) // 水面（平らな河床に沿う）
+            if (s % 2 === 0) for (const side of [-1, 1]) { const gx = px + Math.cos(ang + Math.PI / 2) * 3.4 * side, gz = pz + Math.sin(ang + Math.PI / 2) * 3.4 * side, gyy = heightAt(gx, gz); const gr = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + R() * 0.4, 0), toon(grassC)); gr.position.set(gx, gyy + 0.18, gz); gr.scale.y = 0.5; town.add(gr) } // 河川敷の草むら
+            prev = { x: px, z: pz } }
+          { const bang = 1.15 + Math.sin(50 * 0.085) * 0.34, bx = ex + Math.cos(bang) * 50, bz = ez + Math.sin(bang) * 50, bbank = heightAt(bx + Math.cos(bang + Math.PI / 2) * 4.5, bz + Math.sin(bang + Math.PI / 2) * 4.5)
+            const br = new THREE.Mesh(new THREE.BoxGeometry(9, 0.34, 2.3), toon(0x7a6248)); br.position.set(bx, bbank + 0.5, bz); br.rotation.y = bang; br.castShadow = true; town.add(br); town.add(addOutline(br))
+            for (const rl of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(9, 0.5, 0.12), toon(0x6a5440)); rail.position.set(bx + Math.cos(bang + Math.PI / 2) * 1.05 * rl, bbank + 0.95, bz + Math.sin(bang + Math.PI / 2) * 1.05 * rl); rail.rotation.y = bang; town.add(rail) } } // 木の橋＋欄干
+        }
         const moat = new THREE.Mesh(new THREE.RingGeometry(13, 18.5, 48), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x44545f : 0xeaf2f6, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.1, ez); town.add(moat) // 堀（さざ波の水面＝海と同じ水テクスチャ）
         for (const rr of [13, 18.5]) { const bank = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.35, 6, 40), toon(season === 'winter' ? 0x8e8b82 : 0x847d70)); bank.rotation.x = -Math.PI / 2; bank.position.set(ex, gy + 0.2, ez); town.add(bank) } // 石垣の護岸（内外の縁）
         const baseH = 7.5
@@ -2116,7 +2139,7 @@ export async function mountTown3d(parent, opts = {}) {
             let onAve = false; for (const av of avenues) { let d = Math.abs(a - av); if (d > Math.PI) d = 6.2832 - d; if (d < 0.15) { onAve = true; break } }
             if (onAve || k % 11 === 0) continue // 大通り＋路地の隙間
             const jit = (R() - 0.5) * 1.8, hx = ex + Math.cos(a) * (rr + jit), hz = ez + Math.sin(a) * (rr + jit), hy = heightAt(hx, hz)
-            if (hy < SEA.level + 1.0) continue // 海・汀には建てない
+            if (hy < SEA.level + 1.0 || edoStream(hx, hz) < 6) continue // 海・汀・小川には建てない
             const tt = R(), two = tt < 0.32, kura = tt > 0.88, oodana = tt > 0.74 && tt <= 0.88 // 2階町家/土蔵/大店
             const hw = oodana ? 3.6 + R() * 1.8 : 2.1 + R() * 1.3
             const hd = oodana ? 2.8 + R() * 1.3 : kura ? hw : 1.7 + R() * 1.0
@@ -2259,6 +2282,10 @@ export async function mountTown3d(parent, opts = {}) {
         const coneY = (rr) => { for (let i = 1; i < prof.length; i++) { if (rr <= prof[i][0]) { const a = prof[i - 1], b = prof[i]; return a[1] + (b[1] - a[1]) * (rr - a[0]) / (b[0] - a[0]) - 0.45 } } return prof[prof.length - 1][1] - 0.45 }
         const mtn = new THREE.Mesh(new THREE.LatheGeometry(prof.map((p) => new THREE.Vector2(Math.max(0.02, p[0]), p[1])), 30), toon(season === 'winter' ? 0xcdd0d2 : season === 'autumn' ? 0x8a7c52 : 0x707a56)); mtn.position.set(sx, 0, sz); mtn.castShadow = true; mtn.receiveShadow = true; town.add(mtn); town.add(addOutline(mtn)) // 岩の峰（緑がかった山肌）
         const skirt = new THREE.Mesh(new THREE.LatheGeometry(prof.slice(2).map((p) => new THREE.Vector2(Math.max(0.02, p[0] - 1.2), p[1] + 0.5)), 30), toon(season === 'autumn' ? 0x7a6a3a : season === 'winter' ? 0xc8ccce : 0x4a5e3a)); skirt.position.set(sx, 0, sz); town.add(skirt) // 裾の森
+        // 山裾の前山・岩礁（一つの円錐でなく、海から小さな尾根や岩が連なる＝単調を脱す自然な山裾）
+        for (let k = 0; k < 9; k++) { const a = (k / 9) * 6.2832 + 0.3, rr = SENGOKU.r * (0.92 + R() * 0.5), hx = sx + Math.cos(a) * rr, hz = sz + Math.sin(a) * rr, hh = 6 + R() * 12
+          const hill = new THREE.Mesh(new THREE.ConeGeometry(7 + R() * 5, hh, 6 + (k % 2)), toon(season === 'winter' ? 0xc4c8c4 : season === 'autumn' ? 0x7e7044 : 0x5e6a48)); hill.position.set(hx, SEA.level - 1 + hh / 2, hz); hill.rotation.y = R() * 3; hill.castShadow = true; hill.receiveShadow = true; town.add(hill); town.add(addOutline(hill)) // 前山
+          for (let j = 0; j < 2; j++) { const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 + R() * 1.6, 0), toon(0x76706a)); rk.position.set(hx + (R() - 0.5) * 10, SEA.level + 0.3 + R(), hz + (R() - 0.5) * 10); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.6; town.add(rk) } } // 海の岩礁
         for (const cr of [12, 8]) { const kuruwa = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1, cr, 2.2, 6), toon(0x86807a)); kuruwa.rotation.y = Math.PI / 6; kuruwa.position.set(sx, coneY(cr) + 0.7, sz); kuruwa.castShadow = true; town.add(kuruwa); town.add(addOutline(kuruwa)) } // 曲輪（石垣の段＝斜面に沿う）
         const sWall = mottleMat(season === 'winter' ? 0x6e665c : 0x4a3f30, 150, 0.16, [1.4, 1.4]), sRoof = mottleMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x232730 : 0x34383f), 150, 0.12, [1.8, 1.8]) // 黒い板張りの木目＋黒瓦の濃淡（冬は雪化粧）
         let yb = peak; const st = [[5.6, 3.6], [4.3, 3.0], [3.1, 2.6]]
@@ -2319,6 +2346,14 @@ export async function mountTown3d(parent, opts = {}) {
         { const isz = TAISHO.r * 2 + 6, gI = new THREE.PlaneGeometry(isz, isz, 50, 50); gI.rotateX(-Math.PI / 2); const pos = gI.attributes.position
           for (let i = 0; i < pos.count; i++) { const lx = pos.getX(i), lz = pos.getZ(i); pos.setY(i, heightAt(tx + lx, tz + lz) - gy) }
           gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xc9c8c2 : 0x9c948a, 220, 0.16, [7, 7])); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
+        // ── 運河（港から内陸へ引かれた石積みの水路＋石橋）＝大正の港町の水辺 ──
+        { const cz0 = tz + 17, cwmat = new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x4a5862 : 0x86a6b6, fog: true }), stone = mottleMat(0x9a948a, 150, 0.12, [2, 1])
+          for (let cx0 = -TAISHO.r + 8; cx0 <= 28; cx0 += 5) { const px = tx + cx0, cy = heightAt(px, cz0)
+            const w = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 4.2), cwmat); w.rotation.x = -Math.PI / 2; w.position.set(px, cy + 0.28, cz0); town.add(w) // 水面
+            for (const side of [-1, 1]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.2, 0.7), stone); wall.position.set(px, cy + 1.0, cz0 + 2.6 * side); wall.castShadow = true; town.add(wall) } } // 石積みの護岸
+          { const bx = tx + 4, bbank = heightAt(bx, cz0 + 4.5); const br = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 7.0), stone); br.position.set(bx, bbank + 0.5, cz0); br.castShadow = true; town.add(br); town.add(addOutline(br))
+            for (const rl of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 7.0), toon(0x6a6258)); rail.position.set(bx + 1.2 * rl, bbank + 1.0, cz0); town.add(rail) } } // 石橋＋欄干
+        }
         const brick = mottleMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 180, 0.16, [2.6, 1.4]) // 赤煉瓦の濃淡
         const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
         // 赤レンガ倉庫（港の象徴。海側に長い煉瓦倉庫が並ぶ）
@@ -2339,7 +2374,7 @@ export async function mountTown3d(parent, opts = {}) {
         const twA = [], twC = [], trT = [], tlit = [], tmM = new THREE.Matrix4()
         for (let gx = -32; gx <= 42; gx += 5.0) for (let gz = -14; gz <= 40; gz += 5.0) {
           const hx = tx + gx + (R() - 0.5) * 2.2, hz = tz + gz + (R() - 0.5) * 2.2, hy = heightAt(hx, hz)
-          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || R() < 0.12) continue // 海/時計塔の足元/路地は空ける
+          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || taishoCanal(hx, hz) < 5.5 || R() < 0.12) continue // 海/時計塔の足元/運河/路地は空ける
           const isBrick = R() < 0.3, hw = 2.4 + R() * 1.6, hd = 2.4 + R() * 1.6, hh = 2.6 + R() * 2.4
           tmM.makeRotationY(R() < 0.5 ? 0 : Math.PI / 2).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(tmM); (isBrick ? twC : twA).push(bg)
           if (R() < 0.4) { const rg = new THREE.BoxGeometry(hw + 0.3, 0.4, hd + 0.3); tmM.makeTranslation(hx, hy + hh + 0.2, hz); rg.applyMatrix4(tmM); trT.push(rg) } // 陸屋根(洋風)
