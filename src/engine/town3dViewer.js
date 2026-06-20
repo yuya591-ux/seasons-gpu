@@ -323,7 +323,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.toneMappingExposure = isNight ? 1.25 : 1.0
   // 別世界感の演出の基準値＋時代ごとの空気の色（江戸=金茶／戦国=青墨）。飛行時に近さで混ぜる。
   const baseFogCol = scene.fog.color.clone(), baseExposure = renderer.toneMappingExposure
-  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x323b48 : 0x6f7c8c), TMP_FOGC = new THREE.Color() // 深めの色＝遠景が白く飛ばず時代の空気が立つ
+  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x2a323e : 0x586374), TMP_FOGC = new THREE.Color() // 江戸=明るい金茶/戦国=冷たく暗い青墨（時代ごとに別世界の空気）
   // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
   // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
   // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
@@ -509,6 +509,7 @@ export async function mountTown3d(parent, opts = {}) {
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   let edoFx = null, senFx = null, veilEl = null // 別世界の演出（時代の舞う粒子＋霞の帯の白いベール）
   let cityWalkers = [] // 城下を行き交う人（大通り/山道をゆっくり往復＝動く生気）
+  let islandFlocks = [] // 道中の小島で羽を休める鳥（飛行で近づくと一斉に舞い立つ）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
@@ -2184,6 +2185,19 @@ export async function mountTown3d(parent, opts = {}) {
         }
         addIslet(150, -20, 1.4); addIslet(200, -46, 1.0); addIslet(236, -6, 1.1) // 東(江戸)への島々
         addIslet(118, -118, 1.4); addIslet(96, -182, 1.0); addIslet(146, -240, 1.1) // 北(戦国)への島々
+        // 道中の小島で羽を休める鳥（飛んで近づくと一斉に舞い立つ＝旅の途中の一瞬の生気）
+        const mkIslandFlock = (cx, cz) => {
+          const bmat = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3a4e : 0x3a3a40, fog: true }), birds = []
+          for (let i = 0; i < 9; i++) {
+            const b = new THREE.Group()
+            for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.26), bmat); w.position.x = s * 0.38; w.userData.side = s; b.add(w) }
+            const bx = cx + (R() - 0.5) * 8, bz = cz + (R() - 0.5) * 8, by = heightAt(bx, bz) + 0.5 + R() * 3
+            b.position.set(bx, by, bz); b.userData = { ph: R() * 6.28 }; town.add(b)
+            birds.push({ g: b, bx, by, bz, vx: 0, vy: 0, vz: 0 })
+          }
+          islandFlocks.push({ birds, cx, cz, state: 'perched', t: 0 })
+        }
+        mkIslandFlock(150, -20); mkIslandFlock(118, -118) // 東(江戸)/北(戦国)それぞれの道中の小島
       }
       // ── 北の海の果ての戦国の山城（時代の異なる第2の目的地。Edoとは遠く海で隔て共視界に入れない）──
       {
@@ -4234,9 +4248,9 @@ export async function mountTown3d(parent, opts = {}) {
       scene.fog.near = FOG.near * (1 + clear * 1.1); scene.fog.far = FOG.far * (1 + clear)
       TMP_FOGC.copy(baseFogCol)
       if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.5)
-      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.5)
+      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.66) // 戦国は時代の空気を強めに＝冷たく薄暗い別世界へ
       scene.fog.color.copy(TMP_FOGC)
-      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.07) // 近づくと少し締めて城を立たせる（白飛び防止）
+      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.14) // 戦国は更に締めて薄暮の山城の翳りを出す（江戸=明るい城下／戦国=暗い山城で差別化）
     } else if (active.fogTouched) {
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
@@ -4263,6 +4277,26 @@ export async function mountTown3d(parent, opts = {}) {
         const px = w.cx + Math.cos(w.ang) * r, pz = w.cz + Math.sin(w.ang) * r
         w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0)
         w.g.children[0].position.y = 0.4 + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
+      }
+      // 道中の小島の鳥: 近づくと一斉に舞い立ち、機が離れるとまた枝へ戻る
+      for (const fl of islandFlocks) {
+        const d = Math.hypot(fp.x - fl.cx, fp.z - fl.cz)
+        if (fl.state === 'perched') {
+          if (d < 34 && flyAmt > 0.5) { // 飛んで近づいた瞬間＝驚いて飛び立つ
+            fl.state = 'flying'; fl.t = 0
+            const aw = Math.atan2(fl.cz - fp.z, fl.cx - fp.x) // 機から島の向こう側へ逃げる
+            for (const bd of fl.birds) { const a = aw + (R() - 0.5) * 1.7, sp = 7 + R() * 6; bd.vx = Math.cos(a) * sp; bd.vz = Math.sin(a) * sp; bd.vy = 4 + R() * 4 }
+          }
+        } else {
+          fl.t += dt
+          for (const bd of fl.birds) {
+            bd.g.position.x += bd.vx * dt; bd.g.position.y += bd.vy * dt; bd.g.position.z += bd.vz * dt
+            bd.vy = Math.max(2.0, bd.vy - 1.3 * dt) // 上昇のあと水平へ抜けて去る
+            const fp2 = Math.sin(t * 12 + bd.g.userData.ph) * 0.6; bd.g.children.forEach((w) => { w.rotation.z = w.userData.side * fp2 }) // 羽ばたき
+            bd.g.rotation.y = Math.atan2(bd.vx, bd.vz)
+          }
+          if (fl.t > 7 && d > 60) { for (const bd of fl.birds) { bd.g.position.set(bd.bx, bd.by, bd.bz); bd.vx = bd.vy = bd.vz = 0; bd.g.rotation.y = 0; bd.g.children.forEach((w) => { w.rotation.z = 0 }) } fl.state = 'perched' } // 機が去ったらまた枝で羽を休める
+        }
       }
     } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0; active.arrivalSlow = 1 }
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
