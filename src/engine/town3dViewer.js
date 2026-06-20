@@ -2025,16 +2025,34 @@ export async function mountTown3d(parent, opts = {}) {
         }
         { const br = topW / 2 + 0.45, ry0 = topBase + 1.3; for (const [ax, az, ry] of [[0, br, 0], [0, -br, 0], [br, 0, Math.PI / 2], [-br, 0, Math.PI / 2]]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(br * 2 + 0.2, 0.34, 0.1), toon(0x6a4a30)); rail.position.set(ex + ax, ry0, ez + az); rail.rotation.y = ry; town.add(rail) } } // 最上階の高欄（望楼の廻縁）
         for (const sgn of [-1, 1]) { const shachi = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.1, 6), toon(0xc8a23c)); shachi.position.set(ex + sgn * 1.3, yb + 0.2, ez); shachi.rotation.z = sgn * -0.32; town.add(shachi) } // 鯱（金）
-        const tRoof = toon(isNight ? 0x4a4038 : 0x6f5f4d), tWall = toon(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9) // 城下の町家
-        for (let k = 0; k < 16; k++) {
-          const ang = (k / 16) * 6.2832 + 0.4, rr = 23 + R() * 11
-          const hx = ex + Math.cos(ang) * rr, hz = ez + Math.sin(ang) * rr * 0.72, hy = heightAt(hx, hz)
-          if (hy < SEA.level + 1.2) continue // 海・汀には建てない
-          const hw = 2.4 + R() * 1.6, hh = 1.7 + R() * 0.7, ry = R() * 6.28
-          const body = new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hw * 0.78), tWall); body.position.set(hx, hy + hh / 2, hz); body.rotation.y = ry; body.castShadow = true; town.add(body)
-          const rf = new THREE.Mesh(new THREE.ConeGeometry(hw * 0.74, 1.0, 4), tRoof); rf.rotation.y = ry + Math.PI / 4; rf.position.set(hx, hy + hh + 0.42, hz); town.add(rf)
+        // ── 城下の町家（堀の外。環状に整列）。西(ang≈π)に大手門への参道を空ける ──
+        const tRoof = toon(isNight ? 0x47403a : 0x6f5f4d), tWall = toon(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9)
+        const angGap = (a) => { let d = Math.abs(a - Math.PI); if (d > Math.PI) d = 6.2832 - d; return d } // 西の参道(ang≈π)からの角度差
+        for (const rr of [24, 29.5]) {
+          const n = Math.round(rr * 0.62)
+          for (let k = 0; k < n; k++) {
+            const ang = (k / n) * 6.2832
+            if (angGap(ang) < 0.5) continue // 西の参道は空ける
+            const hx = ex + Math.cos(ang) * rr, hz = ez + Math.sin(ang) * rr, hy = heightAt(hx, hz)
+            if (hy < SEA.level + 1.2) continue // 海・汀には建てない
+            const hw = 2.6 + R() * 1.0, hd = 2.0 + R() * 0.6, hh = 1.6 + R() * 0.5
+            const body = new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hd), tWall); body.position.set(hx, hy + hh / 2, hz); body.rotation.y = ang; body.castShadow = true; town.add(body)
+            const rf = new THREE.Mesh(new THREE.ConeGeometry(hw * 0.64, 0.9, 4), tRoof); rf.rotation.y = ang + Math.PI / 4; rf.position.set(hx, hy + hh + 0.38, hz); town.add(rf)
+          }
         }
-        for (let k = 0; k < 7; k++) { const ang = R() * 6.28, rr = 28 + R() * 8, px = ex + Math.cos(ang) * rr, pz = ez + Math.sin(ang) * rr * 0.72, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.7, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) } // 松
+        const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
+        // 大手門（西の参道。鏡柱＋冠木＋渡櫓＋築地塀＋松並木）
+        { const gx = ex - 19, gz = ez, gyg = heightAt(gx, gz)
+          if (gyg > SEA.level + 0.5) {
+            for (const s of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.7, 3.4, 0.7), toon(0x5a4632)); post.position.set(gx, gyg + 1.7, gz + s * 2.0); post.castShadow = true; town.add(post); town.add(addOutline(post)) } // 鏡柱
+            const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 4.7), toon(0x5a4632)); lintel.position.set(gx, gyg + 3.5, gz); town.add(lintel) // 冠木
+            const yagura = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.2, 5.2), wallC); yagura.position.set(gx, gyg + 4.9, gz); yagura.castShadow = true; town.add(yagura); town.add(addOutline(yagura)) // 渡櫓
+            const groof = new THREE.Mesh(new THREE.ConeGeometry(4.2, 1.6, 4), roofC); groof.rotation.y = Math.PI / 4; groof.position.set(gx, gyg + 6.5, gz); groof.scale.x = 0.55; town.add(groof); town.add(addOutline(groof)) // 門の屋根
+            for (const s of [-1, 1]) { const dei = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.7, 7), toon(season === 'winter' ? 0xcfc8ba : 0xc4baa6)); dei.position.set(gx, gyg + 0.85, gz + s * 6.6); town.add(dei); town.add(addOutline(dei)); const cap = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.28, 7), roofC); cap.position.set(gx, gyg + 1.8, gz + s * 6.6); town.add(cap) } // 築地塀＋瓦の笠
+            for (let k = 0; k < 5; k++) { const px = gx - 1 - k * 2.6; for (const s of [-1, 1]) { const pz = gz + s * 3.6, py = heightAt(px, pz); if (py < SEA.level + 1.0) continue; addPine(px, py, pz) } } // 参道の松並木
+          }
+        }
+        for (let k = 0; k < 6; k++) { const ang = R() * 6.28, rr = 26 + R() * 8, px = ex + Math.cos(ang) * rr, pz = ez + Math.sin(ang) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; addPine(px, py, pz) } // 島の松
       }
       // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
       const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
