@@ -21,6 +21,7 @@ await shoot(305, 28, -0.10, 'edo-near')  // 目前＝城下町まで見える
 await shoot(315, 36, -0.18, 'edo-top')   // 上から見下ろし
 await shoot(238, 84, -0.44, 'edo-grand')  // 高所から城下町全景
 await shoot(232, 24, -0.03, 'edo-veil')   // 霞の帯をくぐる関門（白いベール）
+await page.evaluate(([e]) => window.__town3dFlyPose(298, 11, -13, e, -0.02), [E]); await page.waitForTimeout(800); await page.screenshot({ path: 'scripts/_shots/edo-market.png' }) // 市場・屋台・人々を低空で
 await shoot(165, 19, -0.06, 'edo-crossing')  // 渡りの低空＝帆船・島影
 await shoot(215, 21, -0.05, 'edo-crossing2')
 // 夜（城下の灯り）

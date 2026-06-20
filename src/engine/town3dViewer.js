@@ -2068,6 +2068,22 @@ export async function mountTown3d(parent, opts = {}) {
           if (ty > SEA.level + 1) { let py = ty; for (let i = 0; i < 5; i++) { const w = 4.0 - i * 0.55, h = 2.1 - i * 0.1; const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), toon(season === 'winter' ? 0xe2ddd0 : 0xcabfa8)); body.position.set(tx, py + h / 2, tz); body.castShadow = true; town.add(body); const roof = new THREE.Mesh(new THREE.ConeGeometry((w + 1.5) * 0.72, 1.0, 4), tRoof); roof.rotation.y = Math.PI / 4; roof.position.set(tx, py + h + 0.4, tz); town.add(roof); town.add(addOutline(roof)); py += h + 0.7 } const fin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6), toon(0xc8a23c)); fin.position.set(tx, py + 1.1, tz); town.add(fin) } } // 五重塔
         { const fx = ex + Math.cos(4.7) * 42, fz = ez + Math.sin(4.7) * 42, fy = heightAt(fx, fz)
           if (fy > SEA.level + 1) { for (const [ddx, ddz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7, 5), toon(0x5a4632)); leg.position.set(fx + ddx * 0.9, fy + 3.5, fz + ddz * 0.9); leg.rotation.set(ddz * 0.05, 0, -ddx * 0.05); town.add(leg) } const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.4, 2.4), toon(0x6a5238)); cab.position.set(fx, fy + 7.4, fz); cab.castShadow = true; town.add(cab); town.add(addOutline(cab)); const cr = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.0, 4), tRoof); cr.rotation.y = Math.PI / 4; cr.position.set(fx, fy + 8.6, fz); town.add(cr) } } // 火の見櫓
+        // ── 城下の賑わい（市場・屋台・提灯・人々）＝街に生気を ──
+        const kimono = [0xb0432e, 0x3a5a7a, 0x55703f, 0xc89a34, 0x84548a, 0x5a5a5e, 0xa85a40]
+        const mkPerson = (px, py, pz, col) => { const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(col)); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) }
+        { const ma = Math.PI - 0.6, mr = 31, mcx = ex + Math.cos(ma) * mr, mcz = ez + Math.sin(ma) * mr, mgy = heightAt(mcx, mcz)
+          if (mgy > SEA.level + 1) {
+            for (let s = 0; s < 9; s++) { const a2 = (s / 9) * 6.2832, sx2 = mcx + Math.cos(a2) * 5.5, sz2 = mcz + Math.sin(a2) * 5.5, sgy = heightAt(sx2, sz2); if (sgy < SEA.level + 1) continue
+              const counter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.85, 1.1), toon(0x8a6a48)); counter.position.set(sx2, sgy + 0.42, sz2); counter.rotation.y = a2; counter.castShadow = true; town.add(counter)
+              const awn = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.12, 1.7), toon(s % 2 ? 0xc24a33 : 0x40608a)); awn.position.set(sx2, sgy + 1.75, sz2); awn.rotation.y = a2; town.add(awn); town.add(addOutline(awn))
+              for (const pp of [-1.0, 1.0]) { const c2 = Math.cos(a2), s4 = Math.sin(a2); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 4), toon(0x5a4632)); pole.position.set(sx2 - s4 * pp, sgy + 0.9, sz2 + c2 * pp); town.add(pole) }
+              mkPerson(sx2 + Math.cos(a2) * 1.6, sgy, sz2 + Math.sin(a2) * 1.6, kimono[s % kimono.length]) // 売り子
+            }
+            for (let s = 0; s < 9; s++) { const a2 = (s / 9) * 6.2832 + 0.35, lx = mcx + Math.cos(a2) * 4, lz = mcz + Math.sin(a2) * 4; const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 8), isNight ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : toon(0xd8504a)); lan.position.set(lx, mgy + 3.4, lz); town.add(lan) } // 提灯（市場の上）
+            for (let k = 0; k < 7; k++) mkPerson(mcx + (R() - 0.5) * 8, mgy, mcz + (R() - 0.5) * 8, kimono[k % kimono.length]) // 買い物客
+          }
+        }
+        for (let k = 0; k < 30; k++) { const a2 = R() * 6.28, r2 = 24 + R() * 42, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkPerson(px, py, pz, kimono[k % kimono.length]) } // 通りの人々
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
         // 大手門（西の参道。鏡柱＋冠木＋渡櫓＋築地塀＋松並木）
         { const gx = ex - 19, gz = ez, gyg = heightAt(gx, gz)
