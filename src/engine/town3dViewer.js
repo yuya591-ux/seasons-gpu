@@ -689,6 +689,8 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const facadeMat = (kind, baseHex) => snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeFacade(kind, baseHex), gradientMap: grad }))
+  // 壁の接地AO（頂点色で底=翳り→上=空の光）。時代の建物の箱に焼いて、平らな箱面の一様さを破り接地感を出す。
+  const bakeAO = (geo, hh) => { const pos = geo.attributes.position, col = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { const tt = Math.min(1, Math.max(0, (pos.getY(i) + hh / 2) / Math.max(0.001, hh))), ao = Math.min(1, tt / 0.26), v = 0.72 + 0.28 * ao + 0.06 * tt; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v } geo.setAttribute('color', new THREE.BufferAttribute(col, 3)) }
   // ── 看板（canvasで店名を描く＝オフラインで鮮明・時代ごとの字体。看板/のれん/ホーロー看板を立てる） ──
   const signCache = {}
   const signMat = (text, bg, fg, vertical, fontPx) => {
@@ -2189,7 +2191,7 @@ export async function mountTown3d(parent, opts = {}) {
             const hw = oodana ? 3.6 + R() * 1.8 : 2.1 + R() * 1.3
             const hd = oodana ? 2.8 + R() * 1.3 : kura ? hw : 1.7 + R() * 1.0
             const hh = two ? 3.0 + R() * 1.3 : kura ? 2.9 + R() * 0.7 : oodana ? 2.2 + R() * 0.5 : 1.3 + R() * 0.6
-            tmpM.makeRotationY(a).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(tmpM); (kura ? wallB : R() < 0.16 ? wall3 : wallA).push(bg)
+            tmpM.makeRotationY(a).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); if (!kura) bakeAO(bg, hh); bg.applyMatrix4(tmpM); (kura ? wallB : R() < 0.16 ? wall3 : wallA).push(bg)
             const sec = Math.floor((((a % 6.2832) + 6.2832) % 6.2832) / (6.2832 / nSec))
             let ci = (sec * 2 + (sec % 2)) % roofPalette.length; if (R() < 0.22) ci = (ci + 1) % roofPalette.length; if (kura) ci = 2 // 街区基調＋時々隣色で揺らぐ。土蔵は杉皮
             const rh = two ? 1.6 : kura ? 1.0 : oodana ? 1.3 : 1.0
@@ -2202,6 +2204,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         const wallBMat = mottleMat(season === 'winter' ? 0xeae6dc : 0xe2ddd0, 170, 0.1, [1.2, 1.2]), wall3Mat = facadeMat('machiya', season === 'winter' ? 0xb8b0a2 : 0x9a8a70) // 土蔵=漆喰のまま/板壁の町家=格子窓の正面
+        tWall.vertexColors = true; wall3Mat.vertexColors = true // 壁の接地AO（頂点色）を効かせる
         for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         roofGeos.forEach((geos, i) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, roofMats[i]); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } })
         gableUnit.dispose()
@@ -2369,13 +2372,14 @@ export async function mountTown3d(parent, opts = {}) {
             const tt = R(), two = tt < 0.24, big = tt > 0.82, white = R() < 0.25
             const hw = big ? 3.0 + R() * 1.4 : 1.9 + R() * 1.1, hd = big ? 2.4 + R() * 1.0 : 1.5 + R() * 0.9
             const hh = two ? 2.6 + R() * 1.0 : big ? 2.0 + R() * 0.5 : 1.2 + R() * 0.6
-            sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(sgM); (white ? sgWB : sgWA).push(bg)
+            sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new THREE.BoxGeometry(hw, hh, hd); bakeAO(bg, hh); bg.applyMatrix4(sgM); (white ? sgWB : sgWA).push(bg)
             const rh = two ? 1.3 : 0.85
             sgM.makeRotationY(a + Math.PI / 4).setPosition(px, py + hh + rh / 2 - 0.05, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.64, rh, 4); rg.applyMatrix4(sgM); (R() < 0.4 ? sgR2 : sgR).push(rg)
             if (isNight && R() < 0.5) { sgM.makeRotationY(a).setPosition(px + Math.cos(a) * hw * 0.45, py + hh * (two ? 0.6 : 0.45), pz + Math.sin(a) * hw * 0.45); const lg = new THREE.BoxGeometry(0.5, 0.45, 0.12); lg.applyMatrix4(sgM); sgL.push(lg) }
           }
         }
         const sgLit = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true })
+        samWall.vertexColors = true; samWall2.vertexColors = true // 壁の接地AO
         for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgR2, samRoof2], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
           for (let k = 0; k < 22; k++) { const a = R() * 6.28, r2 = 24 + R() * 14, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 0.8) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) }
@@ -2421,12 +2425,13 @@ export async function mountTown3d(parent, opts = {}) {
           const hx = tx + gx + (R() - 0.5) * 2.2, hz = tz + gz + (R() - 0.5) * 2.2, hy = heightAt(hx, hz)
           if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || taishoCanal(hx, hz) < 5.5 || R() < 0.12) continue // 海/時計塔の足元/運河/路地は空ける
           const isBrick = R() < 0.3, hw = 2.4 + R() * 1.6, hd = 2.4 + R() * 1.6, hh = 2.6 + R() * 2.4
-          tmM.makeRotationY(R() < 0.5 ? 0 : Math.PI / 2).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(tmM); (isBrick ? twC : twA).push(bg)
+          tmM.makeRotationY(R() < 0.5 ? 0 : Math.PI / 2).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); if (!isBrick) bakeAO(bg, hh); bg.applyMatrix4(tmM); (isBrick ? twC : twA).push(bg)
           if (R() < 0.4) { const rg = new THREE.BoxGeometry(hw + 0.3, 0.4, hd + 0.3); tmM.makeTranslation(hx, hy + hh + 0.2, hz); rg.applyMatrix4(tmM); trT.push(rg) } // 陸屋根(洋風)
           else { tmM.makeRotationY(Math.PI / 4).setPosition(hx, hy + hh + 0.5, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.7, 1.4, 4); rg.applyMatrix4(tmM); trT.push(rg) } // 寄棟
           if (isNight && R() < 0.5) { const lg = new THREE.BoxGeometry(0.12, 0.6, 0.6); tmM.makeTranslation(hx + hw / 2 + 0.02, hy + hh * 0.5, hz); lg.applyMatrix4(tmM); tlit.push(lg) }
         }
         const tlitMat = new THREE.MeshBasicMaterial({ color: 0xffd99a, fog: true })
+        tWallA.vertexColors = true // 壁の接地AO（煉瓦twCは別メッシュ共有のため掛けない）
         for (const [geos, mat] of [[twA, tWallA], [twC, brick], [trT, tRoofT], [tlit, tlitMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== tlitMat; mesh.receiveShadow = mat !== tlitMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         // 桟橋（海へ突き出す木の桟橋）
         for (const po of [-34, -18]) { const px0 = tx - 46, pz0 = tz + po
