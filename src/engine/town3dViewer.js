@@ -553,7 +553,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
   const ISLAND = { x: 98, z: -40, r: 8 }
   const EDO = { x: 470, z: -46, r: 112 } // 海の向こうの広い島（江戸の城下町）。広く拡大。現代の街から大きく離し共視界に入らない
-  const SENGOKU = { x: 120, z: -486, r: 44 } // 北の海の果ての戦国の山城。海(x>82)から立ち上がる峰。江戸とも別方角・遠距離で隔て、近づくほど広く霞から立ち上がる
+  const SENGOKU = { x: 120, z: -486, r: 54 } // 北の海の果ての戦国の山城。山裾の城下を広げ拡大。海(x>82)から立ち上がる峰。江戸/大正と別方角・遠距離
   const TAISHO = { x: -490, z: -30, r: 100 } // 西の海の向こうの大正の港町（赤レンガ倉庫/洋館/時計塔/桟橋）。広く拡大。江戸/戦国と別方角・遠距離
   const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }, { x: TAISHO.x, z: TAISHO.z }] // オートシネマで周回する名所（現代の街/江戸/戦国/大正の中心）
   // 江戸の島を蛇行する小川の川筋。中心線からの横距離を返す（小さいほど川。堀の内/島の外は川なし）。heightAtの掘り込みと建物除外で共用。
@@ -2391,8 +2391,8 @@ export async function mountTown3d(parent, opts = {}) {
         // 城下（山裾に密集する侍屋敷・町家。高さ/大きさ/色を変えて作り分け、メッシュ統合で軽く）
         const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根
         const sgWA = [], sgWB = [], sgR = [], sgR2 = [], sgL = [], sgM = new THREE.Matrix4()
-        for (let ring = 0; ring < 11; ring++) {
-          const r2 = 22 + ring * 2.0, n = Math.round(r2 * 0.82)
+        for (let ring = 0; ring < 15; ring++) {
+          const r2 = 22 + ring * 2.4, n = Math.round(r2 * 0.82)
           for (let k = 0; k < n; k++) {
             const a = (k / n) * 6.2832 + ring * 0.6
             if (k % 8 === 0) continue // 山道の隙間
