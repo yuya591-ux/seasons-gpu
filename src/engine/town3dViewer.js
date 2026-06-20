@@ -2019,7 +2019,13 @@ export async function mountTown3d(parent, opts = {}) {
         // 島の地面（heightAtに沿う土・草の地面。これが無いと建物/人が宙に浮く）。縁は海面下へ落ちて海に隠れる。
         { const isz = (EDO.r + 6) * 2, gI = new THREE.PlaneGeometry(isz, isz, 54, 54); gI.rotateX(-Math.PI / 2); const gp = gI.attributes.position
           for (let i = 0; i < gp.count; i++) gp.setY(i, heightAt(ex + gp.getX(i), ez + gp.getZ(i)) - 0.06)
-          gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xd8ddd6 : 0x9a8c6e, 200, 0.13, [9, 9])); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
+          gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xd6dcd4 : season === 'autumn' ? 0x9a8a56 : 0x8e8158, 230, 0.22, [6, 6])); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
+        // 城下の田畑・草地（地面に緑/黄の区画を点在＝のっぺりした砂色を脱す）
+        { const fieldCols = season === 'autumn' ? [0xb89a4a, 0x9a8848, 0x8a7a40] : season === 'winter' ? [0xd8dcd6, 0xc8ccc4, 0xb8b0a0] : season === 'spring' ? [0x8aa84e, 0x7a9a44, 0x9ab058] : [0x6e8a48, 0x7e9450, 0x5e7a40]
+          for (let k = 0; k < 26; k++) { const a = R() * 6.28, rr = 28 + R() * 38, fx = ex + Math.cos(a) * rr, fz = ez + Math.sin(a) * rr, fy = heightAt(fx, fz); if (fy < SEA.level + 2) continue
+            const fld = new THREE.Mesh(new THREE.CircleGeometry(2.5 + R() * 3.5, 7), toon(fieldCols[k % fieldCols.length])); fld.rotation.x = -Math.PI / 2; fld.rotation.z = R() * 6.28; fld.position.set(fx, fy + 0.04, fz); fld.receiveShadow = true; town.add(fld) } }
+        // 参道(大手門→城)の土の道＝街の芯
+        for (let i = 0; i < 7; i++) { const rr = 16 + i * 7, rx = ex + Math.cos(Math.PI) * rr, rz = ez + Math.sin(Math.PI) * rr, ry = heightAt(rx, rz); if (ry < SEA.level + 1) continue; const road = new THREE.Mesh(new THREE.BoxGeometry(7.1, 0.16, 4.4), toon(season === 'winter' ? 0xc8ccc6 : 0x7e7050)); road.position.set(rx, ry + 0.06, rz); road.receiveShadow = true; town.add(road) }
         // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
         for (let k = 0; k < 18; k++) { const a = (k / 18) * 6.2832 + R() * 0.25, rr = 83 + R() * 5, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
         const moat = new THREE.Mesh(new THREE.RingGeometry(13, 18.5, 48), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x44545f : 0xeaf2f6, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.1, ez); town.add(moat) // 堀（さざ波の水面＝海と同じ水テクスチャ）
