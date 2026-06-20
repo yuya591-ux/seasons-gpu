@@ -2640,9 +2640,14 @@ export async function mountTown3d(parent, opts = {}) {
             const spire = new THREE.Mesh(new THREE.ConeGeometry(2.7, 4.2, 6), toon(0x6fae9c)); spire.position.set(cx2, cy + 17.2, cz2); spire.castShadow = true; town.add(spire); town.add(addOutline(spire))
             const fin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 6), toon(0xc8a23c)); fin.position.set(cx2, cy + 19.8, cz2); town.add(fin) } } // 時計塔
         // 港町の家々（看板建築＝和洋折衷。煉瓦/クリームの壁＋陸屋根/寄棟。格子の町割り。メッシュ統合で軽く）
-        const tWallA = facadeMat('yofu', season === 'winter' ? 0xd8d2c4 : 0xcfc3ab), tRoofT = mottleMat(isNight ? 0x4a4038 : 0x6e5a48, 150, 0.12, [1.8, 1.8]) // 看板建築=洋風の上げ下げ窓の正面
+        // 壁色のパレット（大正ハイカラ＝クリーム/淡い若草/淡い黄土/淡い青鼠）。建物ごとに振り分けて単調なクリーム一色を脱す。
+        const tWallPal = season === 'winter' ? [0xd8d2c4, 0xd2d6cc, 0xdcd4c0, 0xcdd2d4] : [0xcfc3ab, 0xb9c0a6, 0xd6c49a, 0xb7c1c4]
+        const tWallMats = tWallPal.map((c) => { const m = facadeMat('yofu', c); m.vertexColors = true; return m }) // 接地AO（頂点色）を効かせる
+        // 屋根色のパレット（瓦の赤茶/いぶし茶/スレート青鼠）。俯瞰で一色だった屋根に多様さを。
+        const tRoofPal = isNight ? [0x4a3832, 0x423a32, 0x3e444a] : [0x9a5642, 0x6e5a48, 0x5d666e]
+        const tRoofMats = tRoofPal.map((c) => mottleMat(c, 150, 0.12, [1.8, 1.8]))
         const taiFac = [{ x: tx + 33, z: tz - 42, r: 14 }, { x: tx + 42, z: tz + 46, r: 13 }] // 公園/学校の区画（建物を空ける）
-        const twA = [], twC = [], trT = [], tlit = [], plT = [], tmM = new THREE.Matrix4()
+        const twBuckets = tWallPal.map(() => []), trBuckets = tRoofPal.map(() => []), twC = [], tlit = [], plT = [], tmM = new THREE.Matrix4()
         // 港町の町並み＝完全な碁盤の目の均一さを脱す: 主要街路は残しつつ、街区内は密に詰め、
         // 中心(時計塔)ほど高い看板建築、外周は低い住宅、合間に長屋（横長の連棟）を混ぜ、高さ・大きさ・向きを散らす。
         for (let gx = -76; gx <= 76; gx += 3.7) for (let gz = -60; gz <= 70; gz += 3.7) {
@@ -2657,16 +2662,17 @@ export async function mountTown3d(parent, opts = {}) {
           if (longya) { hw = 2.2 + R() * 0.7; hd = 5.2 + R() * 3.0; hh = 1.9 + R() * 0.4 } // 長屋（横長の連棟）
           else if (tall) { hw = 2.5 + R() * 0.9; hd = 2.5 + R() * 0.9; hh = 4.4 + central * 2.6 + R() * 1.6 } // 看板建築（中心ほど高い）
           else { hw = 2.1 + R() * 1.3; hd = 2.1 + R() * 1.3; hh = 2.2 + central * 1.3 + R() * 1.7 } // 住宅
-          tmM.makeRotationY(ang).setPosition(hx, hy + hh / 2, hz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); if (!isBrick) bakeAO(bg, hh); bg.applyMatrix4(tmM); (isBrick ? twC : twA).push(bg)
+          tmM.makeRotationY(ang).setPosition(hx, hy + hh / 2, hz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); if (!isBrick) bakeAO(bg, hh); bg.applyMatrix4(tmM); if (isBrick) twC.push(bg); else twBuckets[(R() * twBuckets.length) | 0].push(bg) // 壁色を振り分け（単調なクリーム一色を脱す）
           const plg = new THREE.BoxGeometry(hw + 0.5, 0.55, hd + 0.5); tmM.makeRotationY(ang).setPosition(hx, hy + 0.18, hz); plg.applyMatrix4(tmM); plT.push(plg) // 石の土台（接地）
-          if (tall || R() < 0.42) { const rg = new THREE.BoxGeometry(hw + 0.3, 0.4, hd + 0.3); tmM.makeRotationY(ang).setPosition(hx, hy + hh + 0.2, hz); rg.applyMatrix4(tmM); trT.push(rg) } // 陸屋根(洋風・看板建築)
-          else { tmM.makeRotationY(ang + Math.PI / 4).setPosition(hx, hy + hh + 0.5, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.7, 1.4, 4); rg.applyMatrix4(tmM); trT.push(rg) } // 寄棟
+          const ri = (R() * trBuckets.length) | 0 // 屋根色を振り分け
+          if (tall || R() < 0.42) { const rg = new THREE.BoxGeometry(hw + 0.3, 0.4, hd + 0.3); tmM.makeRotationY(ang).setPosition(hx, hy + hh + 0.2, hz); rg.applyMatrix4(tmM); trBuckets[ri].push(rg) } // 陸屋根(洋風・看板建築)
+          else { tmM.makeRotationY(ang + Math.PI / 4).setPosition(hx, hy + hh + 0.5, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.7, 1.4, 4); rg.applyMatrix4(tmM); trBuckets[ri].push(rg) } // 寄棟
           if (isNight && R() < 0.5) { const lg = new THREE.BoxGeometry(0.12, 0.6, 0.6); tmM.makeTranslation(hx + hw / 2 + 0.02, hy + hh * 0.5, hz); lg.applyMatrix4(tmM); tlit.push(lg) }
         }
         const tlitMat = new THREE.MeshBasicMaterial({ color: 0xffd99a, fog: true })
-        tWallA.vertexColors = true // 壁の接地AO（煉瓦twCは別メッシュ共有のため掛けない）
         const plinthMatT = mottleMat(season === 'winter' ? 0xbcc0c2 : 0x908a80, 120, 0.12, [2, 1]) // 港町の石畳の土台
-        for (const [geos, mat] of [[twA, tWallA], [twC, brick], [trT, tRoofT], [plT, plinthMatT], [tlit, tlitMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== tlitMat; mesh.receiveShadow = mat !== tlitMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        const tMerge = [...twBuckets.map((g, i) => [g, tWallMats[i]]), ...trBuckets.map((g, i) => [g, tRoofMats[i]]), [twC, brick], [plT, plinthMatT], [tlit, tlitMat]]
+        for (const [geos, mat] of tMerge) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== tlitMat; mesh.receiveShadow = mat !== tlitMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         // ── 港町の街路（碁盤の目の道＝区画整理された大正の町。石畳の道）。地形に沿わせ統合で軽量。 ──
         { const paveMat = mottleMat(season === 'winter' ? 0xc4c8c6 : 0x8e8a84, 100, 0.1, [3, 1]), roadGeos = [], rM = new THREE.Matrix4()
           const seg = (x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, py = heightAt(px, pz); if (py < SEA.level + 0.6 || taishoCanal(px, pz) < 4) return; const bg = new THREE.BoxGeometry(w, 0.16, len + 0.9); rM.makeRotationY(Math.atan2(dx, dz)).setPosition(px, py + 0.09, pz); bg.applyMatrix4(rM); roadGeos.push(bg) }
