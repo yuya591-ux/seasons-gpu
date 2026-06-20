@@ -322,7 +322,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.toneMappingExposure = isNight ? 1.25 : 1.0
   // 別世界感の演出の基準値＋時代ごとの空気の色（江戸=金茶／戦国=青墨）。飛行時に近さで混ぜる。
   const baseFogCol = scene.fog.color.clone(), baseExposure = renderer.toneMappingExposure
-  const EDO_FOGC = new THREE.Color(isNight ? 0x6a5a3e : 0xd9b582), SEN_FOGC = new THREE.Color(isNight ? 0x3a4452 : 0x8693a4), TMP_FOGC = new THREE.Color()
+  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x323b48 : 0x6f7c8c), TMP_FOGC = new THREE.Color() // 深めの色＝遠景が白く飛ばず時代の空気が立つ
   // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
   // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
   // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
@@ -4181,13 +4181,13 @@ export async function mountTown3d(parent, opts = {}) {
       const fp = active.flyPos
       const edoP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - EDO.x, fp.z - EDO.z) / 190)
       const senP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 190)
-      const clear = flyAmt * (0.5 + 0.5 * Math.max(edoP, senP)) // 飛ぶほど＋目的地に近いほど霧を晴らす
-      scene.fog.near = FOG.near * (1 + clear * 0.9); scene.fog.far = FOG.far * (1 + clear)
+      const clear = flyAmt * (0.45 + 1.2 * Math.max(edoP, senP)) // 目的地に近いほど霧を強く晴らす＝城がくっきり立つ（白飛び解消）
+      scene.fog.near = FOG.near * (1 + clear * 1.1); scene.fog.far = FOG.far * (1 + clear)
       TMP_FOGC.copy(baseFogCol)
-      if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.55)
-      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.55)
+      if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.5)
+      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.5)
       scene.fog.color.copy(TMP_FOGC)
-      renderer.toneMappingExposure = baseExposure * (1 + edoP * 0.1 - senP * 0.08)
+      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.07) // 近づくと少し締めて城を立たせる（白飛び防止）
     } else if (active.fogTouched) {
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
