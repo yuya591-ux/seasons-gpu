@@ -510,6 +510,7 @@ export async function mountTown3d(parent, opts = {}) {
   let edoFx = null, senFx = null, taiFx = null, veilEl = null // 別世界の演出（時代の舞う粒子＋霞の帯の白いベール）
   let cityWalkers = [] // 城下を行き交う人（大通り/山道をゆっくり往復＝動く生気）
   let islandFlocks = [] // 道中の小島で羽を休める鳥（飛行で近づくと一斉に舞い立つ）
+  let critters = [] // 舞う蝶/蜻蛉（frameでふわふわ）＝街/季節ごとの生きもの
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
@@ -680,6 +681,16 @@ export async function mountTown3d(parent, opts = {}) {
     const back = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.96, 0.08), toon(board)); back.position.set(px, py, pz); back.rotation.y = ry; back.position.x -= Math.sin(ry) * 0.05; back.position.z -= Math.cos(ry) * 0.05
     town.add(back); town.add(panel); return panel
   }
+  // ── 生きもの（街/時代/季節で最適化・水彩のやさしい色）──
+  const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.22, 7), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) }
+  const mkDragonfly = (cx, cy, cz) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 5), toon(0x4a6a5a)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.16), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.55, side: THREE.DoubleSide, fog: true })); w.position.set(0, 0.05, s * 0.18); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) }
+  // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーンで佇む。
+  const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 3, 6), toon(col)); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25 * sc, 7, 6), toon(col)); head.position.set(0.58 * sc, 0.96 * sc, 0); g.add(head)
+    for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.7 * sc, 5), toon(col)); leg.position.set(lx * sc, 0.35 * sc, lz * sc); g.add(leg) }
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), toon(col)); tail.position.set(-0.55 * sc, 0.8 * sc, 0); tail.rotation.z = 0.7; g.add(tail)
+    town.add(g); return g }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
@@ -2406,6 +2417,16 @@ export async function mountTown3d(parent, opts = {}) {
           const tfolC = season === 'spring' ? 0x88aa55 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48
           for (let k = 0; k < 12; k++) { const a = R() * 6.28, r2 = 16 + R() * 42, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.7 + R() * 0.5; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3 * s, 0), toon(tfolC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } }
         for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832 + R() * 0.25, rr = TAISHO.r - 5 + R() * 5, rx = tx + Math.cos(a) * rr, rz = tz + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.2, 0), toon(0x7c766a)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.6; town.add(rk) } // 汀の磯
+      }
+      // ── 生きもの（街/時代/季節で最適化）。蝶/蜻蛉はふわふわ舞い、犬猫馬は街に佇む＝生気と不自然さの解消 ──
+      { const flyOK = season === 'spring' || season === 'summer', dartOK = season === 'summer' && weather !== 'rain'
+        const flyCols = season === 'spring' ? [0xf6d0e0, 0xfaf0c0, 0xf2f2ee, 0xeed8a8] : [0xf2ead0, 0xe8e2c0, 0xf6e8b0, 0xeec8a0]
+        for (const [cx, cz, kind] of [[0, 0, 'home'], [EDO.x, EDO.z, 'edo'], [SENGOKU.x, SENGOKU.z, 'sengoku'], [TAISHO.x, TAISHO.z, 'taisho']]) {
+          if (flyOK && !isNight) for (let k = 0; k < 5; k++) { const a = R() * 6.28, r = 14 + R() * 34, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkButterfly(px, py + 2.2 + R() * 2, pz, flyCols[k % flyCols.length]) } // 蝶（春夏の昼）
+          if (dartOK && kind !== 'sengoku') for (let k = 0; k < 3; k++) { const a = R() * 6.28, r = 16 + R() * 22, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkDragonfly(px, py + 1.6, pz) } // 蜻蛉（夏・水辺）
+          const animals = kind === 'sengoku' ? [[0x5a4030, 1.1]] : kind === 'edo' ? [[0x5a4030, 1.1], [0xc8c0b4, 0.55], [0x6a6258, 0.5]] : kind === 'taisho' ? [[0xc8c0b4, 0.55], [0x4a4038, 0.5], [0xddd6c8, 0.55]] : [[0xc8c0b4, 0.55], [0x5a5a5e, 0.5], [0x8a7a5a, 0.55]] // 戦国=馬/江戸=馬犬猫/大正=犬猫/現代=犬猫
+          for (const [col, sc] of animals) { const a = R() * 6.28, r = 12 + R() * 26, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; mkQuad(px, py, pz, R() * 6.28, col, sc) }
+        }
       }
       // ── 行き先の気配（飛び立つと方角がそれとなく分かる導線）。東=城下町への澪標／北=山城への鳥居の海路 ──
       {
@@ -4280,6 +4301,9 @@ export async function mountTown3d(parent, opts = {}) {
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
     for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
+    for (const c of critters) { const a = t * 0.55 + c.ph // 蝶/蜻蛉がふわふわ舞う
+      if (c.type === 'fly') { c.g.position.set(c.cx + Math.cos(a) * c.rad, c.cy + Math.sin(a * 1.7) * 0.7, c.cz + Math.sin(a * 0.8) * c.rad); c.g.rotation.y = a; const f = Math.sin(t * 9 + c.ph) * 1.2; c.g.children.forEach((w) => { w.rotation.y = w.userData.side * f }) }
+      else { c.g.position.set(c.cx + Math.cos(a * 1.5) * c.rad, c.cy + Math.sin(a * 2.2) * 0.4, c.cz + Math.sin(a * 1.2) * c.rad); c.g.rotation.y = a * 1.5 + Math.PI / 2 } }
     if (crane) { // クレーンのトロリーが横行し、フックが上下する（荷役）
       const tx2 = 5.5 + Math.sin(t * 0.22) * 7, hy = 6.2 + Math.sin(t * 0.5) * 2.6
       crane.trolley.position.x = tx2
