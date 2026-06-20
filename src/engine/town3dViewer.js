@@ -2020,6 +2020,8 @@ export async function mountTown3d(parent, opts = {}) {
         { const isz = (EDO.r + 6) * 2, gI = new THREE.PlaneGeometry(isz, isz, 54, 54); gI.rotateX(-Math.PI / 2); const gp = gI.attributes.position
           for (let i = 0; i < gp.count; i++) gp.setY(i, heightAt(ex + gp.getX(i), ez + gp.getZ(i)) - 0.06)
           gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xd8ddd6 : 0x9a8c6e, 200, 0.13, [9, 9])); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
+        // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
+        for (let k = 0; k < 18; k++) { const a = (k / 18) * 6.2832 + R() * 0.25, rr = 83 + R() * 5, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
         const moat = new THREE.Mesh(new THREE.RingGeometry(13, 18.5, 48), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x44545f : 0xeaf2f6, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.1, ez); town.add(moat) // 堀（さざ波の水面＝海と同じ水テクスチャ）
         for (const rr of [13, 18.5]) { const bank = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.35, 6, 40), toon(season === 'winter' ? 0x8e8b82 : 0x847d70)); bank.rotation.x = -Math.PI / 2; bank.position.set(ex, gy + 0.2, ez); town.add(bank) } // 石垣の護岸（内外の縁）
         const baseH = 7.5
@@ -2140,13 +2142,16 @@ export async function mountTown3d(parent, opts = {}) {
           town.add(ship); boats.push(ship)
         }
         addShip(152, -46, 0.5); addShip(192, -15, -0.7); addShip(228, -42, 0.25)
-        const addIslet = (ix, iz, scl) => { // 渡りの途中の小島（岩の根＋緑＋松）
+        const addIslet = (ix, iz, scl) => { // 渡りの途中の緑豊かな小島（岩＋森＋松＝道中を退屈にしない）
           const my = SEA.level - 0.4
-          const mound = new THREE.Mesh(new THREE.ConeGeometry(5 * scl, 3.4 * scl, 7), toon(0x6e6a5c)); mound.position.set(ix, my + 1.6 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound))
-          const cap = new THREE.Mesh(new THREE.ConeGeometry(3.6 * scl, 1.3 * scl, 7), toon(season === 'winter' ? 0xd8dde0 : season === 'autumn' ? 0x8a7a40 : 0x5e7a48)); cap.position.set(ix, my + 3.1 * scl, iz); town.add(cap)
-          const topY = my + 3.2 * scl; mkPine(ix + 0.7 * scl, topY, iz - 0.5 * scl, 0.9 * scl); mkPine(ix - 0.8 * scl, topY - 0.3, iz + 0.6 * scl, 0.8 * scl)
+          const mound = new THREE.Mesh(new THREE.ConeGeometry(5.2 * scl, 3.4 * scl, 8), toon(0x6e6a5c)); mound.position.set(ix, my + 1.6 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound))
+          const cap = new THREE.Mesh(new THREE.ConeGeometry(4.4 * scl, 1.7 * scl, 8), toon(season === 'winter' ? 0xd8dde0 : season === 'autumn' ? 0x8a7a40 : 0x4e6e3e)); cap.position.set(ix, my + 3.1 * scl, iz); town.add(cap) // 緑の頂（広め＝緑豊か）
+          const topY = my + 3.4 * scl
+          for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.2832, rr = (0.3 + R() * 0.7) * 3.4 * scl; mkPine(ix + Math.cos(a) * rr, topY - rr * 0.22, iz + Math.sin(a) * rr, (0.7 + R() * 0.5) * scl) } // 森
+          for (let i = 0; i < 3; i++) { const a = R() * 6.28, rk = new THREE.Mesh(new THREE.IcosahedronGeometry((0.6 + R() * 0.6) * scl, 0), toon(0x7c766a)); rk.position.set(ix + Math.cos(a) * 4.6 * scl, my + 0.5, iz + Math.sin(a) * 4.6 * scl); rk.rotation.set(R() * 3, R() * 3, R() * 3); town.add(rk) } // 岩
         }
-        addIslet(168, -8, 1.1); addIslet(214, -54, 0.9)
+        addIslet(150, -20, 1.4); addIslet(200, -46, 1.0); addIslet(236, -6, 1.1) // 東(江戸)への島々
+        addIslet(118, -118, 1.4); addIslet(96, -182, 1.0); addIslet(146, -240, 1.1) // 北(戦国)への島々
       }
       // ── 北の海の果ての戦国の山城（時代の異なる第2の目的地。Edoとは遠く海で隔て共視界に入れない）──
       {
