@@ -2131,8 +2131,6 @@ export async function mountTown3d(parent, opts = {}) {
         { const fieldCols = season === 'autumn' ? [0xb89a4a, 0x9a8848, 0x8a7a40] : season === 'winter' ? [0xd8dcd6, 0xc8ccc4, 0xb8b0a0] : season === 'spring' ? [0x8aa84e, 0x7a9a44, 0x9ab058] : [0x6e8a48, 0x7e9450, 0x5e7a40]
           for (let k = 0; k < 26; k++) { const a = R() * 6.28, rr = 28 + R() * 38, fx = ex + Math.cos(a) * rr, fz = ez + Math.sin(a) * rr, fy = heightAt(fx, fz); if (fy < SEA.level + 2) continue
             const fld = new THREE.Mesh(new THREE.CircleGeometry(2.5 + R() * 3.5, 7), toon(fieldCols[k % fieldCols.length])); fld.rotation.x = -Math.PI / 2; fld.rotation.z = R() * 6.28; fld.position.set(fx, fy + 0.04, fz); fld.receiveShadow = true; town.add(fld) } }
-        // 参道(大手門→城)の土の道＝街の芯
-        for (let i = 0; i < 7; i++) { const rr = 16 + i * 7, rx = ex + Math.cos(Math.PI) * rr, rz = ez + Math.sin(Math.PI) * rr, ry = heightAt(rx, rz); if (ry < SEA.level + 1) continue; const road = new THREE.Mesh(new THREE.BoxGeometry(7.1, 0.16, 4.4), toon(season === 'winter' ? 0xc8ccc6 : 0x7e7050)); road.position.set(rx, ry + 0.06, rz); road.receiveShadow = true; town.add(road) }
         // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
         for (let k = 0; k < 26; k++) { const a = (k / 26) * 6.2832 + R() * 0.2, rr = 106 + R() * 5, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
         // ── 城下を蛇行する小川（平底の河床＋河川敷の草＋木の橋）＝平らな台地に水辺の自然 ──
@@ -2174,7 +2172,8 @@ export async function mountTown3d(parent, opts = {}) {
         // 広大な城下町: 町家(平屋/2階)・土蔵・大店を高さ/大きさ/色を変えて密に。放射の大通りで街区を割る。メッシュ統合で軽量。
         // 屋根は街区(扇形セクタ)ごとに色をまとめ＝俯瞰の市松を脱し「瓦の町並みの塊」に。町家は街路に平行な切妻、土蔵/大店は寄棟。
         const wallA = [], wallB = [], wall3 = [], litG = [], plE = [], tmpM = new THREE.Matrix4(), rotM = new THREE.Matrix4()
-        const avenues = [0.4, 1.7, 3.0, 4.4, 5.6] // 放射の大通り（この方角は広く空けて街路に）
+        const avenues = [0.4, 1.18, 1.96, 2.74, 3.6, 4.38, 5.16, 5.94] // 放射の大通り（8本＝入り組んだ街路網に）
+        const ringRoads = [40, 66, 92] // 同心円の環状道路（街区を区切る）
         const roofPalette = isNight
           ? [0x2e2f33, 0x342c24, 0x2a2520, 0x3a2c26, 0x33302c]
           : [0x717479, 0x6a5640, 0x564636, 0x7a4f3c, 0x807668] // 瓦銀鼠/茶瓦/杉皮/弁柄/灰茶
@@ -2196,11 +2195,12 @@ export async function mountTown3d(parent, opts = {}) {
         })()
         for (let ring = 0; ring < 24; ring++) {
           const rr = 21 + ring * 3.95, n = Math.round(rr * 1.05)
+          const onRing = ringRoads.some((rr0) => Math.abs(rr - rr0) < 2.8) // 環状道路のリングは建てない
           for (let k = 0; k < n; k++) {
             const a = (k / n) * 6.2832 + ring * 0.45
             if (angGap(a) < 0.3) continue // 大手門の参道
-            let onAve = false; for (const av of avenues) { let d = Math.abs(a - av); if (d > Math.PI) d = 6.2832 - d; if (d < 0.15) { onAve = true; break } }
-            if (onAve || k % 11 === 0) continue // 大通り＋路地の隙間
+            let onAve = false; for (const av of avenues) { let d = Math.abs(a - av); if (d > Math.PI) d = 6.2832 - d; if (d < 0.13) { onAve = true; break } }
+            if (onAve || onRing || k % 13 === 0) continue // 大通り＋環状道路＋路地の隙間
             const jit = (R() - 0.5) * 1.8, hx = ex + Math.cos(a) * (rr + jit), hz = ez + Math.sin(a) * (rr + jit), hy = heightAt(hx, hz)
             if (hy < SEA.level + 1.0 || edoStream(hx, hz) < 6) continue // 海・汀・小川には建てない
             const tt = R(), two = tt < 0.32, kura = tt > 0.88, oodana = tt > 0.74 && tt <= 0.88 // 2階町家/土蔵/大店
@@ -2224,6 +2224,14 @@ export async function mountTown3d(parent, opts = {}) {
         tWall.vertexColors = true; wall3Mat.vertexColors = true // 壁の接地AO（頂点色）を効かせる
         const plinthMat = mottleMat(season === 'winter' ? 0xbcc0c2 : 0x8c867c, 120, 0.12, [2, 1]) // 石の土台
         for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [plE, plinthMat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        // ── 城下の街路網（放射の大通り8本＋大手門参道＋環状道路3本）＝入り組んだ道。地形に沿う土の道。統合で軽量。 ──
+        { const roadMat = toon(season === 'winter' ? 0xc8ccc6 : 0x7e7050), roadGeos = [], rM = new THREE.Matrix4()
+          const seg = (x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, py = heightAt(px, pz); if (py < SEA.level + 0.6) return; const bg = new THREE.BoxGeometry(w, 0.16, len + 0.9); rM.makeRotationY(Math.atan2(dx, dz)).setPosition(px, py + 0.09, pz); bg.applyMatrix4(rM); roadGeos.push(bg) }
+          const road = (x0, z0, x1, z1, w) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w) }
+          for (const av of [...avenues, Math.PI]) road(ex + Math.cos(av) * 18, ez + Math.sin(av) * 18, ex + Math.cos(av) * 104, ez + Math.sin(av) * 104, av === Math.PI ? 5.2 : 4.0) // 放射の大通り（参道は太め）
+          for (const rr0 of ringRoads) { let prev = null; for (let s = 0; s <= 56; s++) { const a = s / 56 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev) road(prev.x, prev.z, px, pz, 3.8); prev = { x: px, z: pz } } } // 環状道路
+          if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, roadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
+        }
         roofGeos.forEach((geos, i) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, roofMats[i]); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } })
         gableUnit.dispose()
         // 城下のランドマーク（街並みに目印を：五重塔・火の見櫓）
