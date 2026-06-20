@@ -2016,6 +2016,10 @@ export async function mountTown3d(parent, opts = {}) {
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
+        // 島の地面（heightAtに沿う土・草の地面。これが無いと建物/人が宙に浮く）。縁は海面下へ落ちて海に隠れる。
+        { const isz = (EDO.r + 6) * 2, gI = new THREE.PlaneGeometry(isz, isz, 54, 54); gI.rotateX(-Math.PI / 2); const gp = gI.attributes.position
+          for (let i = 0; i < gp.count; i++) gp.setY(i, heightAt(ex + gp.getX(i), ez + gp.getZ(i)) - 0.06)
+          gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xd8ddd6 : 0x9a8c6e, 200, 0.13, [9, 9])); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
         const moat = new THREE.Mesh(new THREE.RingGeometry(13, 18.5, 48), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x44545f : 0xeaf2f6, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.1, ez); town.add(moat) // 堀（さざ波の水面＝海と同じ水テクスチャ）
         for (const rr of [13, 18.5]) { const bank = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.35, 6, 40), toon(season === 'winter' ? 0x8e8b82 : 0x847d70)); bank.rotation.x = -Math.PI / 2; bank.position.set(ex, gy + 0.2, ez); town.add(bank) } // 石垣の護岸（内外の縁）
         const baseH = 7.5
