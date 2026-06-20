@@ -2012,7 +2012,7 @@ export async function mountTown3d(parent, opts = {}) {
         const baseH = 7.5
         const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), toon(season === 'winter' ? 0x908d84 : 0x8b8478)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台）
         for (const f of [0.26, 0.52, 0.78]) { const r = 12.5 + (9.5 - 12.5) * f; const cs = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.05, r + 0.12, 0.16, 4), toon(0x6f6b62)); cs.rotation.y = Math.PI / 4; cs.position.set(ex, gy + baseH * f, ez); town.add(cs) } // 石の段（横の石組み）
-        const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(isNight ? 0x29303a : 0x3a434e)
+        const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(season === 'winter' ? (isNight ? 0x6e7782 : 0x9aa3ab) : (isNight ? 0x29303a : 0x3a434e)) // 冬は屋根に雪化粧
         const litMat = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true }) // 夜に灯る障子/窓の暖色
         const winC = isNight ? litMat : toon(0x2e3138) // 連子窓（夜は灯る）
         let yb = gy + baseH, topBase = yb, topW = 3.4
@@ -2029,7 +2029,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const br = topW / 2 + 0.45, ry0 = topBase + 1.3; for (const [ax, az, ry] of [[0, br, 0], [0, -br, 0], [br, 0, Math.PI / 2], [-br, 0, Math.PI / 2]]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(br * 2 + 0.2, 0.34, 0.1), toon(0x6a4a30)); rail.position.set(ex + ax, ry0, ez + az); rail.rotation.y = ry; town.add(rail) } } // 最上階の高欄（望楼の廻縁）
         for (const sgn of [-1, 1]) { const shachi = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.1, 6), toon(0xc8a23c)); shachi.position.set(ex + sgn * 1.3, yb + 0.2, ez); shachi.rotation.z = sgn * -0.32; town.add(shachi) } // 鯱（金）
         // ── 城下の町家（堀の外。環状に整列）。西(ang≈π)に大手門への参道を空ける ──
-        const tRoof = toon(isNight ? 0x47403a : 0x6f5f4d), tWall = toon(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9)
+        const tRoof = toon(season === 'winter' ? (isNight ? 0x8a9098 : 0xb8bcc0) : (isNight ? 0x47403a : 0x6f5f4d)), tWall = toon(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9)
         const angGap = (a) => { let d = Math.abs(a - Math.PI); if (d > Math.PI) d = 6.2832 - d; return d } // 西の参道(ang≈π)からの角度差
         for (const rr of [24, 29.5]) {
           const n = Math.round(rr * 0.62)
@@ -2060,7 +2060,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         // ── 二の丸御殿（城内の御殿。低く広がる入母屋の屋根）──
-        { const palMat = toon(season === 'winter' ? 0xe8e4da : 0xe0d8c6), palRoof = toon(isNight ? 0x33373e : 0x49515b)
+        { const palMat = toon(season === 'winter' ? 0xe8e4da : 0xe0d8c6), palRoof = toon(season === 'winter' ? (isNight ? 0x70787f : 0x9aa0a6) : (isNight ? 0x33373e : 0x49515b))
           const pa = 0.7, pcx = ex + Math.cos(pa) * 19.5, pcz = ez + Math.sin(pa) * 19.5, pgy = heightAt(pcx, pcz)
           for (const [dx, dz, ww, wd] of [[0, 0, 7, 5], [5.2, 1.0, 4, 6.5], [-3.2, 1.6, 5.5, 3.6]]) {
             const wh = 1.8, body = new THREE.Mesh(new THREE.BoxGeometry(ww, wh, wd), palMat); body.position.set(pcx + dx, pgy + wh / 2, pcz + dz); body.castShadow = true; town.add(body); town.add(addOutline(body))
@@ -2075,6 +2075,11 @@ export async function mountTown3d(parent, opts = {}) {
           for (const off of [-2.2, 2.2]) { const bx = ex + sdx * 40 - sdz * off, bz = ez + sdz * 40 + sdx * off; const boat = new THREE.Group(); boat.position.set(bx, SEA.level + 0.15, bz); boat.rotation.y = -da; boat.userData = { ph: R() * 6.28 }; const hull = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 1.2), toon(0x55402a)); hull.position.y = 0.1; boat.add(hull); town.add(boat); boats.push(boat) } // 係留の小舟
         }
         for (let k = 0; k < 6; k++) { const ang = R() * 6.28, rr = 26 + R() * 8, px = ex + Math.cos(ang) * rr, pz = ez + Math.sin(ang) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; addPine(px, py, pz) } // 島の松
+        // ── 四季の木立（春＝桜／秋＝紅葉／冬＝雪化粧／夏＝緑。堀の外をぐるり囲む）──
+        { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
+          for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832; if (angGap(a) < 0.5 || Math.abs(a - 0.7) < 0.5) continue; const rr = 20.5 + (k % 2) * 1.2, px = ex + Math.cos(a) * rr, pz = ez + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.9 + R() * 0.3
+            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.75 * s, pz); town.add(tr)
+            const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 0), toon(folC)); fo.position.set(px, py + 2.1 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立
       }
       // ── 海の渡りの演出（帆船・島影）。退屈な海にせず、瞑想的な“渡り”に（海鳥は海鳥のループへ）。──
       {
