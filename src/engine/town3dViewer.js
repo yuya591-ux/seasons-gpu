@@ -158,7 +158,7 @@ export function setTown3dFly(on) {
       const len = Math.hypot(dx, dy, dz) || 1
       dx /= len; dy /= len; dz /= len
       active.flyYaw = active.flyYawTarget = Math.atan2(dx, -dz)      // 0=奥(-z)を向く
-      active.flyPitch = active.flyPitchTarget = Math.asin(Math.max(-1, Math.min(1, dy))) // いまの見下ろしから地続きに
+      active.flyPitch = Math.asin(Math.max(-1, Math.min(1, dy))); active.flyPitchTarget = 0.05 // 見下ろしから地続きに飛び立ち、機首はすぐ水平＋わずか上向きへ（勝手に降下しない）
       active.camReady = false // 引いたカメラ位置を次フレームでスナップ初期化
     } else if (active.mode === 'walk') {
       active.flyPitchTarget = 0.18 // 歩きから飛び立つ＝視線を少し上げてふわりと
@@ -4199,6 +4199,7 @@ export async function mountTown3d(parent, opts = {}) {
         // 飛行＝スキームA: ドラッグで操った進路(flyYaw/flyPitch)へ機首が向き、自動でゆっくり前進（巡航）。
         // 機首の上下がそのまま上昇/下降。とまる中は前進0＝その場でホバリング。一本指・スティック/昇降ボタン無し。
         active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.steerEase
+        if (steerId === null) active.flyPitchTarget += (0 - active.flyPitchTarget) * 0.03 // 操舵していない間は機首を水平へ戻す＝放っておくと勝手に降下するストレスを解消
         active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.steerEase
         active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
