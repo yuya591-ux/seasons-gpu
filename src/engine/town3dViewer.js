@@ -507,6 +507,7 @@ export async function mountTown3d(parent, opts = {}) {
   let swanBoats = [] // 遊園地のスワンボート（池を漂う）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
   let edoFx = null, senFx = null, veilEl = null // 別世界の演出（時代の舞う粒子＋霞の帯の白いベール）
+  let cityWalkers = [] // 城下を行き交う人（大通り/山道をゆっくり往復＝動く生気）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
@@ -2084,6 +2085,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         for (let k = 0; k < 30; k++) { const a2 = R() * 6.28, r2 = 24 + R() * 42, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkPerson(px, py, pz, kimono[k % kimono.length]) } // 通りの人々
+        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(kimono[(j * 2 + 1) % kimono.length])); wb.position.y = 0.4; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); wh.position.y = 0.95; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang: av + (R() - 0.5) * 0.12, r0: 24 + j * 5, r1: 54 + R() * 8, sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
         // 大手門（西の参道。鏡柱＋冠木＋渡櫓＋築地塀＋松並木）
         { const gx = ex - 19, gz = ez, gyg = heightAt(gx, gz)
@@ -2195,7 +2197,8 @@ export async function mountTown3d(parent, opts = {}) {
         const sgLit = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true })
         for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgR2, samRoof2], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
-          for (let k = 0; k < 22; k++) { const a = R() * 6.28, r2 = 24 + R() * 14, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 0.8) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } } // 山裾の人々
+          for (let k = 0; k < 22; k++) { const a = R() * 6.28, r2 = 24 + R() * 14, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 0.8) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) }
+          for (let j = 0; j < 10; j++) { const av = R() * 6.28, wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: sx, cz: sz, ang: av, r0: 23 + R() * 4, r1: 33 + R() * 5, sp: 0.05 + R() * 0.04, ph: R() * 2 }) } } // 山裾の人々＋行き交う人
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.5 + R() * 0.35), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
@@ -4174,6 +4177,14 @@ export async function mountTown3d(parent, opts = {}) {
       const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.42) / 0.16)
       const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 190)), pk(flyAmt * Math.max(0, 1 - dSen / 190)))
       if (veilEl) veilEl.style.opacity = (veilA * 0.78).toFixed(3)
+      // 城下を行き交う人（近くの城下だけ動かす＝大通り/山道をゆっくり往復し、歩みに合わせて上下）
+      for (const w of cityWalkers) {
+        if (Math.hypot(fp.x - w.cx, fp.z - w.cz) > 150) continue
+        const tt = (t * w.sp + w.ph) % 2, f = tt < 1 ? tt : 2 - tt, r = w.r0 + (w.r1 - w.r0) * f
+        const px = w.cx + Math.cos(w.ang) * r, pz = w.cz + Math.sin(w.ang) * r
+        w.g.position.set(px, heightAt(px, pz), pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0)
+        w.g.children[0].position.y = 0.4 + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
+      }
     } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0 }
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
     active.zoom += (active.zoomTarget - active.zoom) * 0.16 // ズームを目標へ滑らかに追従（ボタン/ピンチ共通＝確実に効き、急変で酔わない）
