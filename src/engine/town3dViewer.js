@@ -2053,8 +2053,24 @@ export async function mountTown3d(parent, opts = {}) {
         const tRoof = toon(season === 'winter' ? (isNight ? 0x8a9098 : 0xb8bcc0) : (isNight ? 0x47403a : 0x6f5f4d)), tWall = toon(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9)
         const angGap = (a) => { let d = Math.abs(a - Math.PI); if (d > Math.PI) d = 6.2832 - d; return d } // 西の参道(ang≈π)からの角度差
         // 広大な城下町: 町家(平屋/2階)・土蔵・大店を高さ/大きさ/色を変えて密に。放射の大通りで街区を割る。メッシュ統合で軽量。
-        const wallA = [], wallB = [], wall3 = [], roofA = [], roofB = [], litG = [], tmpM = new THREE.Matrix4()
+        // 屋根は街区(扇形セクタ)ごとに色をまとめ＝俯瞰の市松を脱し「瓦の町並みの塊」に。町家は街路に平行な切妻、土蔵/大店は寄棟。
+        const wallA = [], wallB = [], wall3 = [], litG = [], tmpM = new THREE.Matrix4(), rotM = new THREE.Matrix4()
         const avenues = [0.4, 1.7, 3.0, 4.4, 5.6] // 放射の大通り（この方角は広く空けて街路に）
+        const roofPalette = isNight
+          ? [0x2e2f33, 0x342c24, 0x2a2520, 0x3a2c26, 0x33302c]
+          : [0x717479, 0x6a5640, 0x564636, 0x7a4f3c, 0x807668] // 瓦銀鼠/茶瓦/杉皮/弁柄/灰茶
+        const roofMats = roofPalette.map((c) => { const m = toon(c); m.side = THREE.DoubleSide; return m }) // 切妻素片は片面巻き→両面で確実に塗る
+        const roofGeos = roofPalette.map(() => [])
+        const nSec = 9 // 城下を9つの街区(扇形)に割り、各区で屋根の基調色をまとめる
+        const gableUnit = (() => { // 切妻屋根の単位素片。ridge=ローカルX、妻行=Z、棟高=Y(0→1)
+          const g = new THREE.BufferGeometry()
+          const P = { a: [-0.5, 0, -0.5], b: [0.5, 0, -0.5], c: [0.5, 0, 0.5], d: [-0.5, 0, 0.5], e: [-0.5, 1, 0], f: [0.5, 1, 0] }
+          const v = [], push = (...pts) => pts.forEach((p) => v.push(p[0], p[1], p[2]))
+          push(P.a, P.b, P.f); push(P.a, P.f, P.e) // 背スロープ(z-)
+          push(P.d, P.e, P.f); push(P.d, P.f, P.c) // 前スロープ(z+)
+          push(P.a, P.e, P.d); push(P.b, P.c, P.f) // 妻壁(x∓)
+          g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g
+        })()
         for (let ring = 0; ring < 17; ring++) {
           const rr = 21 + ring * 3.8, n = Math.round(rr * 1.05)
           for (let k = 0; k < n; k++) {
@@ -2069,13 +2085,21 @@ export async function mountTown3d(parent, opts = {}) {
             const hd = oodana ? 2.8 + R() * 1.3 : kura ? hw : 1.7 + R() * 1.0
             const hh = two ? 3.0 + R() * 1.3 : kura ? 2.9 + R() * 0.7 : oodana ? 2.2 + R() * 0.5 : 1.3 + R() * 0.6
             tmpM.makeRotationY(a).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(tmpM); (kura ? wallB : R() < 0.16 ? wall3 : wallA).push(bg)
-            const rh = two ? 1.5 : kura ? 1.05 : oodana ? 1.2 : 0.9
-            tmpM.makeRotationY(a + Math.PI / 4).setPosition(hx, hy + hh + rh / 2 - 0.05, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.64, rh, 4); rg.applyMatrix4(tmpM); (kura || R() < 0.28 ? roofB : roofA).push(rg)
+            const sec = Math.floor((((a % 6.2832) + 6.2832) % 6.2832) / (6.2832 / nSec))
+            let ci = (sec * 2 + (sec % 2)) % roofPalette.length; if (R() < 0.22) ci = (ci + 1) % roofPalette.length; if (kura) ci = 2 // 街区基調＋時々隣色で揺らぐ。土蔵は杉皮
+            const rh = two ? 1.6 : kura ? 1.0 : oodana ? 1.3 : 1.0
+            if (kura || oodana) { // 土蔵・大店は寄棟（四角錐）
+              tmpM.makeRotationY(a + Math.PI / 4).setPosition(hx, hy + hh + rh / 2 - 0.05, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.64, rh, 4); rg.applyMatrix4(tmpM); roofGeos[ci].push(rg)
+            } else { // 町家は街路に平行な切妻（ridgeを接線方向 a+π/2 へ・庇が両側に出る平入り）
+              const rg = gableUnit.clone(); tmpM.makeScale(hw * 1.04, rh, hd * 1.14); rotM.makeRotationY(a + Math.PI / 2); tmpM.premultiply(rotM); tmpM.setPosition(hx, hy + hh - 0.05, hz); rg.applyMatrix4(tmpM); roofGeos[ci].push(rg)
+            }
             if (isNight && R() < 0.5) { tmpM.makeRotationY(a).setPosition(hx + Math.cos(a) * (hw * 0.45), hy + hh * (two ? 0.62 : 0.45), hz + Math.sin(a) * (hw * 0.45)); const lg = new THREE.BoxGeometry(0.5, 0.5, 0.12); lg.applyMatrix4(tmpM); litG.push(lg) }
           }
         }
-        const wallBMat = toon(season === 'winter' ? 0xeae6dc : 0xe2ddd0), wall3Mat = toon(season === 'winter' ? 0xb8b0a2 : 0x9a8a70), roofBMat = toon(isNight ? 0x3a342c : 0x57493a)
-        for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [roofA, tRoof], [roofB, roofBMat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        const wallBMat = toon(season === 'winter' ? 0xeae6dc : 0xe2ddd0), wall3Mat = toon(season === 'winter' ? 0xb8b0a2 : 0x9a8a70)
+        for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        roofGeos.forEach((geos, i) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, roofMats[i]); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } })
+        gableUnit.dispose()
         // 城下のランドマーク（街並みに目印を：五重塔・火の見櫓）
         { const tx = ex + Math.cos(2.2) * 48, tz = ez + Math.sin(2.2) * 48, ty = heightAt(tx, tz)
           if (ty > SEA.level + 1) { let py = ty; for (let i = 0; i < 5; i++) { const w = 4.0 - i * 0.55, h = 2.1 - i * 0.1; const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), toon(season === 'winter' ? 0xe2ddd0 : 0xcabfa8)); body.position.set(tx, py + h / 2, tz); body.castShadow = true; town.add(body); const roof = new THREE.Mesh(new THREE.ConeGeometry((w + 1.5) * 0.72, 1.0, 4), tRoof); roof.rotation.y = Math.PI / 4; roof.position.set(tx, py + h + 0.4, tz); town.add(roof); town.add(addOutline(roof)); py += h + 0.7 } const fin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6), toon(0xc8a23c)); fin.position.set(tx, py + 1.1, tz); town.add(fin) } } // 五重塔
