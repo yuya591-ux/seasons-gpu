@@ -18,5 +18,6 @@ await shoot(-215, 44, -0.04, 'sengoku-far')
 await shoot(-286, 46, -0.10, 'sengoku-mid')
 await shoot(-312, 40, -0.13, 'sengoku-near')
 await shoot(-316, 56, -0.26, 'sengoku-top')
+await page.evaluate(() => window.__town3dFlyPose(150, 16, -298, -1.1, -0.08)); await page.waitForTimeout(800); await page.screenshot({ path: 'scripts/_shots/sengoku-slope.png' }) // 山裾の城下を低空で（接地確認）
 console.log('sengoku shots done')
 await browser.close()

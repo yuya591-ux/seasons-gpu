@@ -2157,11 +2157,12 @@ export async function mountTown3d(parent, opts = {}) {
       {
         const sx = SENGOKU.x, sz = SENGOKU.z, peak = heightAt(sx, sz)
         // 山は「平らな山頂(本丸)＋なめらかな24面の斜面」に。配置はこの面に合わせ、わずかに沈めて浮きを防ぐ。
-        const mtnH = peak - SEA.level + 5, baseR = SENGOKU.r * 0.95, topR = 7.5
-        const coneY = (rr) => peak - Math.min(1, Math.max(0, (rr - topR) / (baseR - topR))) * mtnH - 0.25
-        const mtn = new THREE.Mesh(new THREE.CylinderGeometry(topR, baseR, mtnH, 24), toon(season === 'winter' ? 0xc4c8cc : 0x6e6658)); mtn.position.set(sx, SEA.level - 5 + mtnH / 2, sz); mtn.castShadow = true; mtn.receiveShadow = true; town.add(mtn); town.add(addOutline(mtn)) // 岩の峰（丸い山）
-        const skirt = new THREE.Mesh(new THREE.CylinderGeometry(topR + 15, baseR + 0.4, mtnH * 0.58, 24), toon(season === 'autumn' ? 0x7a6a3a : season === 'winter' ? 0xc8ccce : 0x4a5e3a)); skirt.position.set(sx, SEA.level - 5 + mtnH * 0.29, sz); town.add(skirt) // 裾の森
-        for (const [cr, dy] of [[12, 8], [8, 3.5]]) { const kuruwa = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1, cr, 2.2, 6), toon(0x86807a)); kuruwa.rotation.y = Math.PI / 6; kuruwa.position.set(sx, peak - dy, sz); kuruwa.castShadow = true; town.add(kuruwa); town.add(addOutline(kuruwa)) } // 曲輪（石垣の段）
+        // 本物の稜線: 緩い裾野(城下)＋険しい山頂(城)のプロファイルをLatheで回転＝配置面と完全一致＝何も浮かない。
+        const prof = [[0, peak], [6, peak - 4], [12, peak - 9.5], [19, peak - 15.5], [28, peak - 21.5], [40, peak - 27.5], [52, peak - 31.5], [60, peak - 35], [66, peak - 47]]
+        const coneY = (rr) => { for (let i = 1; i < prof.length; i++) { if (rr <= prof[i][0]) { const a = prof[i - 1], b = prof[i]; return a[1] + (b[1] - a[1]) * (rr - a[0]) / (b[0] - a[0]) - 0.45 } } return prof[prof.length - 1][1] - 0.45 }
+        const mtn = new THREE.Mesh(new THREE.LatheGeometry(prof.map((p) => new THREE.Vector2(Math.max(0.02, p[0]), p[1])), 30), toon(season === 'winter' ? 0xcdd0d2 : season === 'autumn' ? 0x8a7c52 : 0x707a56)); mtn.position.set(sx, 0, sz); mtn.castShadow = true; mtn.receiveShadow = true; town.add(mtn); town.add(addOutline(mtn)) // 岩の峰（緑がかった山肌）
+        const skirt = new THREE.Mesh(new THREE.LatheGeometry(prof.slice(2).map((p) => new THREE.Vector2(Math.max(0.02, p[0] - 1.2), p[1] + 0.5)), 30), toon(season === 'autumn' ? 0x7a6a3a : season === 'winter' ? 0xc8ccce : 0x4a5e3a)); skirt.position.set(sx, 0, sz); town.add(skirt) // 裾の森
+        for (const cr of [12, 8]) { const kuruwa = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1, cr, 2.2, 6), toon(0x86807a)); kuruwa.rotation.y = Math.PI / 6; kuruwa.position.set(sx, coneY(cr) + 0.7, sz); kuruwa.castShadow = true; town.add(kuruwa); town.add(addOutline(kuruwa)) } // 曲輪（石垣の段＝斜面に沿う）
         const sWall = toon(season === 'winter' ? 0x6e665c : 0x4a3f30), sRoof = toon(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x232730 : 0x34383f)) // 黒い板張り＋黒瓦（冬は雪化粧）
         let yb = peak; const st = [[5.6, 3.6], [4.3, 3.0], [3.1, 2.6]]
         for (let i = 0; i < st.length; i++) {
@@ -2176,11 +2177,11 @@ export async function mountTown3d(parent, opts = {}) {
         for (let k = 0; k < 7; k++) { const a = k / 7 * 6.2832, r2 = 11, fx = sx + Math.cos(a) * r2, fz = sz + Math.sin(a) * r2, fy = coneY(r2); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.2, 5), toon(0x3a2e20)); pole.position.set(fx, fy + 2.1, fz); town.add(pole); const flag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.7, 0.95), toon(k % 2 ? 0xa83228 : 0x2a3a6a)); flag.position.set(fx, fy + 3.3, fz + 0.5); town.add(flag) } // 旗指物（戦国の幟）
         for (let k = 0; k < 9; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.45 + R() * 0.4), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 0.5) continue; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 2.2, 6), toon(0x5a4434)); tr.position.set(px, py + 1.1, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2.6, 7), toon(season === 'autumn' ? 0x8a6a32 : season === 'winter' ? 0xb8c0c4 : 0x44603a)); fo.position.set(px, py + 3.0, pz); town.add(fo) } // 山の松
         // ── 戦国M2: 木柵・篝火・城下の侍屋敷・夜灯り・四季 ──
-        const palMat = toon(0x4a3a28), kyL = peak - 6.9 // 下の曲輪の天端
+        const palMat = toon(0x4a3a28), kyL = coneY(11.5) + 0.9 // 下の曲輪の天端（斜面に沿う）
         for (let k = 0; k < 30; k++) { const a = k / 30 * 6.2832, px = sx + Math.cos(a) * 11.5, pz = sz + Math.sin(a) * 11.5; const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 1.5, 4), palMat); stake.position.set(px, kyL + 0.75, pz); town.add(stake) } // 木柵（乱杭）
         { const rail = new THREE.Mesh(new THREE.TorusGeometry(11.5, 0.07, 4, 36), palMat); rail.rotation.x = Math.PI / 2; rail.position.set(sx, kyL + 1.05, sz); town.add(rail) } // 柵の横木
         const ec = document.createElement('canvas'); ec.width = ec.height = 32; const ecx = ec.getContext('2d'); const eg = ecx.createRadialGradient(16, 16, 1, 16, 16, 16); eg.addColorStop(0, 'rgba(255,184,96,0.95)'); eg.addColorStop(1, 'rgba(255,150,60,0)'); ecx.fillStyle = eg; ecx.fillRect(0, 0, 32, 32); const emberTex = new THREE.CanvasTexture(ec)
-        const fireMat = new THREE.MeshBasicMaterial({ color: isNight ? 0xffb24a : 0xe06a2a, fog: true }), kyU = peak - 2.4 // 上の曲輪（天守の足元）
+        const fireMat = new THREE.MeshBasicMaterial({ color: isNight ? 0xffb24a : 0xe06a2a, fog: true }), kyU = coneY(6.5) + 0.9 // 上の曲輪（天守の足元・斜面に沿う）
         for (let k = 0; k < 4; k++) { const a = k / 4 * 6.2832 + 0.4, r2 = 6.5, fx = sx + Math.cos(a) * r2, fz = sz + Math.sin(a) * r2
           const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.5, 5), toon(0x3a2e20)); post.position.set(fx, kyU + 0.75, fz); town.add(post)
           const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.26, 0.34, 8), toon(0x2a2620)); bowl.position.set(fx, kyU + 1.55, fz); town.add(bowl)
