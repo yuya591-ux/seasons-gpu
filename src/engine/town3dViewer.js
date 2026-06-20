@@ -645,6 +645,30 @@ export async function mountTown3d(parent, opts = {}) {
     m.map.repeat.set(rep[0], rep[1])
     return snowify(m)
   }
+  // ── 看板（canvasで店名を描く＝オフラインで鮮明・時代ごとの字体。看板/のれん/ホーロー看板を立てる） ──
+  const signCache = {}
+  const signMat = (text, bg, fg, vertical, fontPx) => {
+    const key = text + '|' + bg + '|' + fg + '|' + (vertical ? 'v' : 'h')
+    if (signCache[key]) return signCache[key]
+    const chars = [...text], c = document.createElement('canvas'), x = c.getContext('2d')
+    if (vertical) { c.width = 44; c.height = 40 * Math.max(1, chars.length) + 8; x.fillStyle = bg; x.fillRect(0, 0, c.width, c.height); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `bold ${fontPx || 30}px "Yu Mincho","Hiragino Mincho ProN",serif`; chars.forEach((ch, i) => x.fillText(ch, c.width / 2, 40 * i + 24)) }
+    else { c.width = 132; c.height = 52; x.fillStyle = bg; x.fillRect(0, 0, 132, 52); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `bold ${fontPx || 28}px "Yu Gothic","Hiragino Sans",sans-serif`; x.fillText(text, 66, 28) }
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4
+    const m = new THREE.MeshBasicMaterial({ map: t, fog: true }); signCache[key] = m; return m
+  }
+  // 縦看板（江戸/戦国の木の掛看板）: 板＋縦書きの屋号。x,zの位置・ry向き・高さ・板色。
+  const mkSignV = (px, py, pz, ry, text, board = 0xe6d8b8, ink = 0x3a2a1a) => {
+    const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = ry
+    const h = 0.5 * [...text].length + 0.5, panel = new THREE.Mesh(new THREE.PlaneGeometry(0.7, h), signMat(text, '#' + new THREE.Color(board).getHexString(), '#' + new THREE.Color(ink).getHexString(), true)); panel.position.y = h / 2; g.add(panel)
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.8, h + 0.1, 0.08), toon(board)); back.position.set(0, h / 2, -0.05); g.add(back)
+    town.add(g); return g
+  }
+  // 横看板（大正/現代のホーロー/木の横看板）: 板＋横書きの店名。
+  const mkSignH = (px, py, pz, ry, text, board = 0xdfe4e2, ink = 0x2a3a44) => {
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.86), signMat(text, '#' + new THREE.Color(board).getHexString(), '#' + new THREE.Color(ink).getHexString(), false)); panel.position.set(px, py, pz); panel.rotation.y = ry
+    const back = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.96, 0.08), toon(board)); back.position.set(px, py, pz); back.rotation.y = ry; back.position.x -= Math.sin(ry) * 0.05; back.position.z -= Math.cos(ry) * 0.05
+    town.add(back); town.add(panel); return panel
+  }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
@@ -2134,6 +2158,9 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         for (let k = 0; k < 30; k++) { const a2 = R() * 6.28, r2 = 24 + R() * 42, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkPerson(px, py, pz, kimono[k % kimono.length]) } // 通りの人々
+        { const yago = ['魚', '酒', '米', '茶', '薬', '呉服', '両替', '蕎麦', '飯', '宿', '油', '炭', '団子', '塩'] // 城下の店の屋号（縦書きの木の掛看板）
+          for (let k = 0; k < 13; k++) { const a2 = (k / 13) * 6.28 + 0.3; if (angGap(a2) < 0.34) continue; const r2 = 22 + R() * 9, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue
+            mkSignV(px, py + 1.4, pz, a2 + Math.PI / 2 + (R() - 0.5) * 0.4, yago[k % yago.length], season === 'winter' ? 0xeae0cc : 0xe6d8b8, 0x3a2a1a) } } // 城下の店の看板
         for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(kimono[(j * 2 + 1) % kimono.length])); wb.position.y = 0.4; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); wh.position.y = 0.95; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
         // 大手門（西の参道。鏡柱＋冠木＋渡櫓＋築地塀＋松並木）
@@ -2280,7 +2307,9 @@ export async function mountTown3d(parent, opts = {}) {
         for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgR2, samRoof2], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
           for (let k = 0; k < 22; k++) { const a = R() * 6.28, r2 = 24 + R() * 14, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 0.8) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) }
-          for (let j = 0; j < 10; j++) { const av = R() * 6.28, r0 = 23 + R() * 4, r1 = 33 + R() * 5, wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: sx, cz: sz, ang: av, r0, r1, y0: coneY(r0), y1: coneY(r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } } // 山裾の人々＋行き交う人
+          for (let j = 0; j < 10; j++) { const av = R() * 6.28, r0 = 23 + R() * 4, r1 = 33 + R() * 5, wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); town.add(wg); cityWalkers.push({ g: wg, cx: sx, cz: sz, ang: av, r0, r1, y0: coneY(r0), y1: coneY(r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) }
+          const sgmei = ['酒', '鍛冶', '旅籠', '飯', '馬', '薬'] // 山裾の城下の店（質素な木の掛看板）
+          for (let k = 0; k < 6; k++) { const a = (k / 6) * 6.28 + 0.4, r2 = 25 + R() * 9, px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; mkSignV(px, py + 1.1, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, sgmei[k], 0xcfc3a8, 0x2e2418) } } // 城下の店の看板
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.5 + R() * 0.35), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
@@ -2335,6 +2364,10 @@ export async function mountTown3d(parent, opts = {}) {
             if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.4, 2.4, 1); town.add(gl) } }
           const tKim = [0x8a3a32, 0x3a4a6a, 0x556040, 0x7a5a34, 0x6a4a5a, 0x40443a] // 大正の人々（着物＋洋装の中間色）
           for (let k = 0; k < 20; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) }
+          // 大正の店の看板（横書きのホーロー/洋風看板。和洋折衷の店名）
+          const tenmei = [['カフエー', 0x9a3a34], ['珈琲', 0x4a3a2a], ['寫眞館', 0x3a4a5a], ['洋食', 0xb24a3a], ['郵便局', 0xc04030], ['銀行', 0x4a5a4a], ['時計店', 0x3a4a44], ['理髪', 0x3a5a6a], ['書肆', 0x6a4a3a], ['牛乳', 0xcfc4aa], ['商會', 0x7a5a3a]]
+          for (let k = 0; k < 11; k++) { const a = (k / 11) * 6.28 + 0.2, r2 = 12 + R() * 30, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.4 || Math.hypot(px - (tx + 6), pz - (tz - 4)) < 6) continue
+            const [nm, bg] = tenmei[k % tenmei.length]; mkSignH(px, py + 3.0, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, nm, bg, 0xf2ece0) } // 大正の店の看板
           const tfolC = season === 'spring' ? 0x88aa55 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48
           for (let k = 0; k < 12; k++) { const a = R() * 6.28, r2 = 16 + R() * 42, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.7 + R() * 0.5; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3 * s, 0), toon(tfolC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } }
         for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832 + R() * 0.25, rr = TAISHO.r - 5 + R() * 5, rx = tx + Math.cos(a) * rr, rz = tz + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.2, 0), toon(0x7c766a)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.6; town.add(rk) } // 汀の磯
