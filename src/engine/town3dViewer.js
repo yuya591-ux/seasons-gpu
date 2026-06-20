@@ -743,7 +743,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
-    const g = new THREE.PlaneGeometry(280, 300, 96, 104) // 川の谷を滑らかに出すため分割を上げる
+    const g = new THREE.PlaneGeometry(320, 340, 110, 116) // 最初の街を拡大（川の谷を滑らかに出すため分割を上げる）
     g.rotateX(-Math.PI / 2)
     const pos = g.attributes.position
     for (let i = 0; i < pos.count; i++) {
@@ -1035,11 +1035,11 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
   // 格子からの揺らぎを大きめに取り、区画の大きさも独立に振って、見下ろしの「市松の屋根」を崩す。
-  for (let zi = -13; zi <= 2; zi++) {
-    for (let xi = -9; xi <= 9; xi++) {
+  for (let zi = -16; zi <= 4; zi++) {
+    for (let xi = -13; xi <= 9; xi++) {
       if (Math.abs(xi) < 1.6 && zi > -3) continue // 手前中央は道（街を見通す抜け）
       if (R() < 0.12) continue // 空地・駐車場・庭で時々抜く（碁盤の規則性を崩す）
-      if (zi < -11 && R() < 0.42) continue // 最奥の列は疎に（遠景の点描・性能の余裕を残す）
+      if (zi < -13 && R() < 0.42) continue // 最奥の列は疎に（遠景の点描・性能の余裕を残す）
       const x = xi * 9 + (R() - 0.5) * 5.4 // 格子からの揺らぎを大きく（隣と不揃いに寄る＝密集の自然さ）
       const z = zi * 9 + (R() - 0.5) * 5.4
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は空ける
