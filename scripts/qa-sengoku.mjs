@@ -13,7 +13,7 @@ await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTi
 await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(500)
 await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
 await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
-const shoot = async (z, y, pit, name) => { await page.evaluate(([z, y, p]) => window.__town3dFlyPose(36, y, z, 0, p), [z, y, pit]); await page.waitForTimeout(800); await page.screenshot({ path: `scripts/_shots/${name}.png` }) }
+const shoot = async (z, y, pit, name) => { await page.evaluate(([z, y, p]) => window.__town3dFlyPose(120, y, z, 0, p), [z, y, pit]); await page.waitForTimeout(800); await page.screenshot({ path: `scripts/_shots/${name}.png` }) }
 await shoot(-271, 44, -0.04, 'sengoku-far')   // dSen≈215
 await shoot(-346, 46, -0.10, 'sengoku-mid')   // dSen≈140
 await shoot(-421, 40, -0.13, 'sengoku-near')  // dSen≈65
