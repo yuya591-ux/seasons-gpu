@@ -73,7 +73,7 @@ const FLY = {
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
   // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上の島・大橋を越えるxMaxまで）。
-  bound: { x: 86, xMax: 580, zMin: -590, zMax: 42, yMax: 122, yFloor: 4.5 }, // xMax=東の広い城下町の島(x≈470,r88)／zMin=北の遠い戦国の山城(z≈-486)まで飛べる（拠点を大きく離し広域リベールを可能に）
+  bound: { x: 580, xMax: 580, zMin: -590, zMax: 42, yMax: 122, yFloor: 4.5 }, // x=西の大正の港町(x≈-490)／xMax=東の城下町(x≈470)／zMin=北の戦国の山城(z≈-486)まで飛べる（3拠点を別方角・遠距離に）
   // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
   yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
@@ -323,7 +323,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.toneMappingExposure = isNight ? 1.25 : 1.0
   // 別世界感の演出の基準値＋時代ごとの空気の色（江戸=金茶／戦国=青墨）。飛行時に近さで混ぜる。
   const baseFogCol = scene.fog.color.clone(), baseExposure = renderer.toneMappingExposure
-  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x2a323e : 0x586374), TMP_FOGC = new THREE.Color() // 江戸=明るい金茶/戦国=冷たく暗い青墨（時代ごとに別世界の空気）
+  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x2a323e : 0x586374), TAISHO_FOGC = new THREE.Color(isNight ? 0x4a3640 : 0xd6a684), TMP_FOGC = new THREE.Color() // 江戸=金茶/戦国=青墨/大正=暖かなセピア薔薇（時代ごとに別世界の空気）
   // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
   // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
   // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
@@ -507,7 +507,7 @@ export async function mountTown3d(parent, opts = {}) {
   let koinobori = [] // 春の鯉のぼり（風になびく）
   let swanBoats = [] // 遊園地のスワンボート（池を漂う）
   let boats = [] // 海に浮かぶ小舟（ゆるく揺れる）
-  let edoFx = null, senFx = null, veilEl = null // 別世界の演出（時代の舞う粒子＋霞の帯の白いベール）
+  let edoFx = null, senFx = null, taiFx = null, veilEl = null // 別世界の演出（時代の舞う粒子＋霞の帯の白いベール）
   let cityWalkers = [] // 城下を行き交う人（大通り/山道をゆっくり往復＝動く生気）
   let islandFlocks = [] // 道中の小島で羽を休める鳥（飛行で近づくと一斉に舞い立つ）
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
@@ -546,14 +546,15 @@ export async function mountTown3d(parent, opts = {}) {
   const FUN = { x: -26, z: -66, r: 13 }
   // 海（街の東の縁が湾へ下る）。x>coast で地形を海底へ下げ、shore より沖は水面。飛んで海まで行ける。
   // 海面は谷底より低く取る＝谷を水没させず、東の縁だけが汀へ落ちる（丘が海へ落ちる入江状の海岸線）。
-  const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5 }
+  const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5, westCoast: -150, westShore: -172 } // 東岸(x>64)に加え西岸(x<-150)も海へ落とす＝西の海の向こうに大正の港町
   // 臨海の港（埋立地の平らな工業の岸）。倉庫・煙突・クレーン・ガスタンク＝鶴見の臨海らしさ。
   const HARBOR = { x: 74, z: -64, r: 11, padY: SEA.level + 2 }
   // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
   const ISLAND = { x: 98, z: -40, r: 8 }
   const EDO = { x: 470, z: -46, r: 88 } // 海の向こうの広い島（江戸の城下町）。現代の街から大きく離し、霞の向こうから広範囲で見えても現代と共視界に入らない
   const SENGOKU = { x: 120, z: -486, r: 44 } // 北の海の果ての戦国の山城。海(x>82)から立ち上がる峰。江戸とも別方角・遠距離で隔て、近づくほど広く霞から立ち上がる
-  const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }] // オートシネマで周回する名所（現代の街/江戸/戦国の中心）
+  const TAISHO = { x: -490, z: -30, r: 80 } // 西の海の向こうの大正の港町（赤レンガ倉庫/洋館/時計塔/桟橋）。江戸(東)/戦国(北)と別方角・遠距離
+  const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }, { x: TAISHO.x, z: TAISHO.z }] // オートシネマで周回する名所（現代の街/江戸/戦国/大正の中心）
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -591,6 +592,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 海への傾斜（東の縁 x>coast で海底へ向けて下げる＝丘が汀へ落ちる）。
     const sb = Math.min(1, Math.max(0, (x - SEA.coast) / (SEA.shore - SEA.coast)))
     if (sb > 0) h += (SEA.floor - h) * (sb * sb)
+    // 西の海への傾斜（西の縁 x<westCoast で海底へ。西の海の向こうの大正の港町への渡り）
+    const wb = Math.min(1, Math.max(0, (SEA.westCoast - x) / (SEA.westCoast - SEA.westShore)))
+    if (wb > 0) h += (SEA.floor - h) * (wb * wb)
     // 臨海の港の埋立地＝平らな岸（海面より少し上の盤）。縁はなだらかに均す。
     const hd = Math.hypot(x - HARBOR.x, z - HARBOR.z)
     if (hd < HARBOR.r) h += (HARBOR.padY - h) * Math.min(1, (HARBOR.r - hd) / 4)
@@ -603,6 +607,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 北の海に立つ戦国の山城＝海から高く立ち上がる峰
     const snd = Math.hypot(x - SENGOKU.x, z - SENGOKU.z)
     if (snd < SENGOKU.r) h = Math.max(h, 34 - Math.pow(snd / SENGOKU.r, 1.7) * 38) // 高く大きな峰（裾に城下が広がる）
+    // 西の海に浮かぶ大正の港町＝海から立ち上がる低い平らな島（港は汀に。縁だけ海へ落ちる）
+    const tsd = Math.hypot(x - TAISHO.x, z - TAISHO.z)
+    if (tsd < TAISHO.r) { const t = Math.max(0, (tsd - 56) / (TAISHO.r - 56)); h = Math.max(h, 4.5 - t * t * 15) }
     return h
   }
   // 地面・道のベタ塗りを避ける、水彩のような淡いムラのテクスチャ（手描きの手触り＝のっぺり感の解消）。
@@ -2011,11 +2018,11 @@ export async function mountTown3d(parent, opts = {}) {
       wg.addColorStop(1, '#' + new THREE.Color(0x1f4d6c).lerp(skyHorizon, 0.06).getHexString())
       wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
       for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
-      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(44, 44); seaTex = wtex
-      const seaGeo = new THREE.PlaneGeometry(720, 720); seaGeo.rotateX(-Math.PI / 2)
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(74, 46); seaTex = wtex
+      const seaGeo = new THREE.PlaneGeometry(1220, 760); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       const seaMesh = new THREE.Mesh(seaGeo, new THREE.MeshBasicMaterial({ map: wtex, fog: true }))
-      seaMesh.position.set(235, SEA.level, -255); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-125..595・z≈-615..105 を広く覆う（東=広い城下町の島(x470)／北=遠い戦国の山城(z-486)への渡りの海）
+      seaMesh.position.set(15, SEA.level, -255); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-595..625・z≈-635..125 を広く覆う（西=大正の港町(x-490)／東=城下町(x470)／北=戦国の山城(z-486)への渡りの海）
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
@@ -2277,6 +2284,61 @@ export async function mountTown3d(parent, opts = {}) {
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = SENGOKU.r * (0.5 + R() * 0.35), px = sx + Math.cos(a) * r2, pz = sz + Math.sin(a) * r2, py = coneY(r2); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
+      // ── 西の海の向こうの大正の港町（赤レンガ倉庫・時計塔・看板建築・桟橋・蒸気船・ガス灯）。海を渡るとやがて霞から現れる ──
+      {
+        const tx = TAISHO.x, tz = TAISHO.z, gy = heightAt(tx, tz)
+        { const isz = TAISHO.r * 2 + 6, gI = new THREE.PlaneGeometry(isz, isz, 50, 50); gI.rotateX(-Math.PI / 2); const pos = gI.attributes.position
+          for (let i = 0; i < pos.count; i++) { const lx = pos.getX(i), lz = pos.getZ(i); pos.setY(i, heightAt(tx + lx, tz + lz) - gy) }
+          gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xc9c8c2 : 0x9c948a, 220, 0.16, [7, 7])); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
+        const brick = mottleMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 180, 0.16, [2.6, 1.4]) // 赤煉瓦の濃淡
+        const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
+        // 赤レンガ倉庫（港の象徴。海側に長い煉瓦倉庫が並ぶ）
+        for (let i = 0; i < 4; i++) { const wx = tx - 44 + i * 6.0, wz = tz - 30 + (i % 2) * 3, wy = heightAt(wx, wz); if (wy < SEA.level + 1) continue
+          const ww = 4.8, wd = 12, wh = 5.2 + (i % 2) * 1.0
+          const body = new THREE.Mesh(new THREE.BoxGeometry(ww, wh, wd), brick); body.position.set(wx, wy + wh / 2, wz); body.castShadow = true; body.receiveShadow = true; town.add(body); town.add(addOutline(body))
+          const roof = new THREE.Mesh(new THREE.BoxGeometry(ww + 0.5, 0.5, wd + 0.5), slate); roof.position.set(wx, wy + wh + 0.25, wz); town.add(roof)
+          for (let w = 0; w < 4; w++) { const win = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.0, 0.62), isNight ? new THREE.MeshBasicMaterial({ color: 0xffdca0, fog: true }) : toon(0xe8e2d4)); win.position.set(wx - ww / 2 - 0.04, wy + 1.7, wz - wd / 2 + 1.8 + w * 2.7); town.add(win) } }
+        // 時計塔（港町のランドマーク。赤煉瓦＋白い時計＋緑青の尖塔）
+        { const cx2 = tx + 6, cz2 = tz - 4, cy = heightAt(cx2, cz2)
+          if (cy > SEA.level + 1) { const tower = new THREE.Mesh(new THREE.BoxGeometry(4.2, 16, 4.2), brick); tower.position.set(cx2, cy + 8, cz2); tower.castShadow = true; town.add(tower); town.add(addOutline(tower))
+            const band = new THREE.Mesh(new THREE.BoxGeometry(4.7, 1.1, 4.7), toon(0xe6ddc8)); band.position.set(cx2, cy + 14.4, cz2); town.add(band)
+            for (const [fx2, fz2] of [[2.36, 0], [-2.36, 0], [0, 2.36], [0, -2.36]]) { const face = new THREE.Mesh(new THREE.CircleGeometry(0.72, 16), isNight ? new THREE.MeshBasicMaterial({ color: 0xfff2cc, fog: true }) : toon(0xf4efe2)); face.position.set(cx2 + fx2, cy + 14.4, cz2 + fz2); face.lookAt(cx2 + fx2 * 2, cy + 14.4, cz2 + fz2 * 2); town.add(face) }
+            const spire = new THREE.Mesh(new THREE.ConeGeometry(2.7, 4.2, 6), toon(0x6fae9c)); spire.position.set(cx2, cy + 17.2, cz2); spire.castShadow = true; town.add(spire); town.add(addOutline(spire))
+            const fin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 6), toon(0xc8a23c)); fin.position.set(cx2, cy + 19.8, cz2); town.add(fin) } } // 時計塔
+        // 港町の家々（看板建築＝和洋折衷。煉瓦/クリームの壁＋陸屋根/寄棟。格子の町割り。メッシュ統合で軽く）
+        const tWallA = mottleMat(season === 'winter' ? 0xd8d2c4 : 0xcfc3ab, 170, 0.12, [1.4, 1.4]), tRoofT = mottleMat(isNight ? 0x4a4038 : 0x6e5a48, 150, 0.12, [1.8, 1.8])
+        const twA = [], twC = [], trT = [], tlit = [], tmM = new THREE.Matrix4()
+        for (let gx = -32; gx <= 42; gx += 5.0) for (let gz = -14; gz <= 40; gz += 5.0) {
+          const hx = tx + gx + (R() - 0.5) * 2.2, hz = tz + gz + (R() - 0.5) * 2.2, hy = heightAt(hx, hz)
+          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || R() < 0.12) continue // 海/時計塔の足元/路地は空ける
+          const isBrick = R() < 0.3, hw = 2.4 + R() * 1.6, hd = 2.4 + R() * 1.6, hh = 2.6 + R() * 2.4
+          tmM.makeRotationY(R() < 0.5 ? 0 : Math.PI / 2).setPosition(hx, hy + hh / 2, hz); const bg = new THREE.BoxGeometry(hw, hh, hd); bg.applyMatrix4(tmM); (isBrick ? twC : twA).push(bg)
+          if (R() < 0.4) { const rg = new THREE.BoxGeometry(hw + 0.3, 0.4, hd + 0.3); tmM.makeTranslation(hx, hy + hh + 0.2, hz); rg.applyMatrix4(tmM); trT.push(rg) } // 陸屋根(洋風)
+          else { tmM.makeRotationY(Math.PI / 4).setPosition(hx, hy + hh + 0.5, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.7, 1.4, 4); rg.applyMatrix4(tmM); trT.push(rg) } // 寄棟
+          if (isNight && R() < 0.5) { const lg = new THREE.BoxGeometry(0.12, 0.6, 0.6); tmM.makeTranslation(hx + hw / 2 + 0.02, hy + hh * 0.5, hz); lg.applyMatrix4(tmM); tlit.push(lg) }
+        }
+        const tlitMat = new THREE.MeshBasicMaterial({ color: 0xffd99a, fog: true })
+        for (const [geos, mat] of [[twA, tWallA], [twC, brick], [trT, tRoofT], [tlit, tlitMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== tlitMat; mesh.receiveShadow = mat !== tlitMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        // 桟橋（海へ突き出す木の桟橋）
+        for (const po of [-34, -18]) { const px0 = tx - 46, pz0 = tz + po
+          const deck = new THREE.Mesh(new THREE.BoxGeometry(20, 0.4, 2.4), toon(0x6e5640)); deck.position.set(px0 - 6, SEA.level + 0.7, pz0); deck.castShadow = true; town.add(deck)
+          for (let p = 0; p < 5; p++) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 2.4, 5), toon(0x4a3a28)); leg.position.set(px0 - 14 + p * 4, SEA.level - 0.3, pz0 + (p % 2 ? 1 : -1)); town.add(leg) } }
+        // 蒸気船（黒い船体＋煙突＝大正の港。波にゆれる）
+        { const ship = new THREE.Group(); ship.position.set(tx - 70, SEA.level + 0.2, tz - 24); ship.rotation.y = 0.3; ship.userData = { ph: R() * 6.28 }
+          const hull = new THREE.Mesh(new THREE.BoxGeometry(9, 1.6, 2.8), toon(0x3a3a40)); hull.position.y = 0.4; ship.add(hull); const dk = new THREE.Mesh(new THREE.BoxGeometry(5, 1.0, 2.2), toon(0xc8b89a)); dk.position.set(-0.5, 1.4, 0); ship.add(dk)
+          const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 2.6, 10), toon(0x9a4030)); funnel.position.set(-0.5, 3.0, 0); ship.add(funnel); town.add(ship); boats.push(ship) }
+        // ガス灯（暖色の街灯。夜は灯る）＋人々＋並木
+        { const tgc = document.createElement('canvas'); tgc.width = tgc.height = 32; const tgx = tgc.getContext('2d'); const tgg = tgx.createRadialGradient(16, 16, 1, 16, 16, 16); tgg.addColorStop(0, 'rgba(255,200,140,0.95)'); tgg.addColorStop(1, 'rgba(255,180,120,0)'); tgx.fillStyle = tgg; tgx.fillRect(0, 0, 32, 32); const tGlow = new THREE.CanvasTexture(tgc)
+          for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = 14 + R() * 40, lx = tx + Math.cos(a) * r2, lz = tz + Math.sin(a) * r2, ly = heightAt(lx, lz); if (ly < SEA.level + 1.2) continue
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.0, 6), toon(0x3a3e42)); pole.position.set(lx, ly + 1.5, lz); town.add(pole)
+            const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 8), isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : toon(0xf0e4c8)); lamp.position.set(lx, ly + 3.1, lz); town.add(lamp)
+            if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.4, 2.4, 1); town.add(gl) } }
+          const tKim = [0x8a3a32, 0x3a4a6a, 0x556040, 0x7a5a34, 0x6a4a5a, 0x40443a] // 大正の人々（着物＋洋装の中間色）
+          for (let k = 0; k < 20; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) }
+          const tfolC = season === 'spring' ? 0x88aa55 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48
+          for (let k = 0; k < 12; k++) { const a = R() * 6.28, r2 = 16 + R() * 42, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; const s = 0.7 + R() * 0.5; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3 * s, 0), toon(tfolC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } }
+        for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832 + R() * 0.25, rr = TAISHO.r - 5 + R() * 5, rx = tx + Math.cos(a) * rr, rz = tz + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.2, 0), toon(0x7c766a)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.6; town.add(rk) } // 汀の磯
+      }
       // ── 行き先の気配（飛び立つと方角がそれとなく分かる導線）。東=城下町への澪標／北=山城への鳥居の海路 ──
       {
         for (let mx = 110; mx <= 400; mx += 30) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 14, 6), toon(0x6a4f38)); pole.position.set(mx, SEA.level + 5, -44); pole.castShadow = true; town.add(pole); const cage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), toon(0x5a4632)); cage.position.set(mx, SEA.level + 11.5, -44); town.add(cage); town.add(addOutline(cage)); const flag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 2.0), toon(0xc24a33)); flag.position.set(mx, SEA.level + 9.4, -42.9); town.add(flag); if (isNight) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcf8a, fog: true })); lamp.position.set(mx, SEA.level + 11.5, -44); town.add(lamp) } } // 澪標（東＝江戸への海路。島の汀の手前まで）
@@ -2287,17 +2349,26 @@ export async function mountTown3d(parent, opts = {}) {
           const nuki = new THREE.Mesh(new THREE.BoxGeometry(4.0 * s, 0.34 * s, 0.4 * s), redM); nuki.position.set(0, 4.3 * s, 0); g.add(nuki)
           town.add(g)
         } // 鳥居の海路（北＝戦国の山城へ。大きな朱の鳥居が海に連なる＝空からも方角が分かる）
+        // 灯標の海路（西＝大正の港町へ。白い航路標識が点々と続く）
+        const buoyW = toon(0xe4ddd0), buoyR = toon(0xb24a3a)
+        for (let mx = -180; mx >= -410; mx -= 32) { const g = new THREE.Group(); g.position.set(mx, SEA.level, -30)
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 9, 7), buoyW); pole.position.y = 4; pole.castShadow = true; g.add(pole)
+          const bnd = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 1.6, 7), buoyR); bnd.position.y = 5.6; g.add(bnd)
+          const cap = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 7), isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : buoyR); cap.position.y = 8.8; g.add(cap); town.add(g) }
         // ── 上空から行き先が読める導線: 名所の光柱(ビーコン)＋海路に灯る光点 ──
         const bc = document.createElement('canvas'); bc.width = 16; bc.height = 64; const bcx = bc.getContext('2d'); const bgr = bcx.createLinearGradient(0, 64, 0, 0); bgr.addColorStop(0, 'rgba(255,255,255,0.78)'); bgr.addColorStop(0.45, 'rgba(255,255,255,0.28)'); bgr.addColorStop(1, 'rgba(255,255,255,0)'); bcx.fillStyle = bgr; bcx.fillRect(0, 0, 16, 64); const beamTex = new THREE.CanvasTexture(bc)
         const mkBeam = (cx, cz, col, base, h) => { const gy = heightAt(cx, cz) + base; const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 3.0, h, 16, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, color: col, transparent: true, opacity: isNight ? 0.42 : 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true })); beam.position.set(cx, gy + h / 2, cz); beam.renderOrder = 2; town.add(beam) }
         mkBeam(EDO.x, EDO.z, isNight ? 0xffcf8a : 0xf2c074, 22, 70)      // 江戸＝暖かな金の光柱（天守の上に立ち昇り、城を隠さず在処を示す）
         mkBeam(SENGOKU.x, SENGOKU.z, isNight ? 0xaec6ff : 0x9fc0ff, 18, 78) // 戦国＝涼やかな青の光柱（峰の上に立ち昇る）
+        mkBeam(TAISHO.x, TAISHO.z, isNight ? 0xffc79a : 0xf0b07a, 20, 64) // 大正＝暖かなセピアの光柱（時計塔の上に立ち昇る）
         // 海路に灯る光点（澪標/鳥居の足元に連なり、上空からは方角を指す一筋の線として読める）
         const gc = document.createElement('canvas'); gc.width = gc.height = 48; const gcx = gc.getContext('2d'); const ggr = gcx.createRadialGradient(24, 24, 1, 24, 24, 24); ggr.addColorStop(0, 'rgba(255,255,255,0.95)'); ggr.addColorStop(1, 'rgba(255,255,255,0)'); gcx.fillStyle = ggr; gcx.fillRect(0, 0, 48, 48); const glowTex = new THREE.CanvasTexture(gc)
         const goldMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffd6a0, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
         const redMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffae9c, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
         for (let mx = 100; mx <= 410; mx += 13) { const sp = new THREE.Sprite(goldMat); sp.position.set(mx, SEA.level + 1.4, -44); sp.scale.set(5.4, 5.4, 1); town.add(sp) }       // 東＝江戸への海路の光点
         for (let tz = -140; tz >= -440; tz -= 13) { const sp = new THREE.Sprite(redMat); sp.position.set(120, SEA.level + 1.4, tz); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 北＝戦国への海路の光点
+        const taiMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffcc9c, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
+        for (let mx = -170; mx >= -420; mx -= 13) { const sp = new THREE.Sprite(taiMat); sp.position.set(mx, SEA.level + 1.4, -30); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 西＝大正への海路の光点
       }
       // ── 別世界の演出: 時代の気配（舞う粒子）＋霞の帯（くぐると世界が変わる関門）──
       {
@@ -2311,10 +2382,11 @@ export async function mountTown3d(parent, opts = {}) {
         }
         edoFx = mkFx(EDO.x, EDO.z, 160, 200, isNight ? 0xffe0a0 : 0xf2bcce, isNight ? 2.5 : 2.1) // 江戸: 夜=蛍/昼=桜の花びら（大きくゆっくり＝ノスタルジー）
         senFx = mkFx(SENGOKU.x, SENGOKU.z, 130, 110, isNight ? 0xffb060 : 0xd8b89a, 2.2)          // 戦国: 篝火の火の粉（昇る）
+        taiFx = mkFx(TAISHO.x, TAISHO.z, 150, 170, isNight ? 0xffd2a0 : 0xf0c2a4, 2.3)             // 大正: 夜=ガス灯の灯の粉/昼=潮風に舞う花びら
         const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mcx = mc.getContext('2d'); const mg = mcx.createRadialGradient(32, 32, 1, 32, 32, 32); mg.addColorStop(0, 'rgba(255,255,255,0.8)'); mg.addColorStop(1, 'rgba(255,255,255,0)'); mcx.fillStyle = mg; mcx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
         const mistMat = new THREE.SpriteMaterial({ map: mistTex, color: 0xeef2f6, transparent: true, opacity: 0.42, depthWrite: false, fog: true })
         const band = (cx, cz, axis) => { for (let i = 0; i < 10; i++) { const o = (i - 4.5) * 11, sp = new THREE.Sprite(mistMat); axis === 'x' ? sp.position.set(cx, SEA.level + 7 + R() * 14, cz + o) : sp.position.set(cx + o, SEA.level + 7 + R() * 14, cz); sp.scale.set(30, 22, 1); town.add(sp) } }
-        band(341, EDO.z, 'x'); band(SENGOKU.x, -357, 'z') // 江戸/戦国の関門（接近路 dEdo/dSen≈129 に漂う霧のかたまり＝くぐると別世界）
+        band(341, EDO.z, 'x'); band(SENGOKU.x, -357, 'z'); band(TAISHO.x + 129, TAISHO.z, 'x') // 江戸/戦国/大正の関門（接近路 d≈129 に漂う霧のかたまり＝くぐると別世界）
       }
       // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
       const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
@@ -4265,29 +4337,32 @@ export async function mountTown3d(parent, opts = {}) {
       // 拠点は現代から470/486・互いに618離れているので、この広い晴らしでも現代や別の時代と共視界に入らない。
       const edoP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - EDO.x, fp.z - EDO.z) / 255)
       const senP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 255)
-      const clear = flyAmt * (0.4 + 1.9 * Math.max(edoP, senP)) // 飛ぶと少し晴れ、目的地に近いほど大きく晴れて城下町が広く見える
+      const taiP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) / 255)
+      const clear = flyAmt * (0.4 + 1.9 * Math.max(edoP, senP, taiP)) // 飛ぶと少し晴れ、目的地に近いほど大きく晴れて街が広く見える
       scene.fog.near = FOG.near * (1 + clear * 1.1); scene.fog.far = FOG.far * (1 + clear)
       TMP_FOGC.copy(baseFogCol)
       if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.56) // 近づく霞を時代の色(金茶)へ＝白い空虚でなく空気のある遠景
-      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.72) // 戦国は時代の空気を強めに＝冷たく薄暗い別世界へ
+      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.72) // 戦国は冷たく薄暗い別世界へ
+      if (taiP > 0.001) TMP_FOGC.lerp(TAISHO_FOGC, taiP * 0.58) // 大正は暖かなセピア薔薇の港町の空気へ
       scene.fog.color.copy(TMP_FOGC)
-      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.14) // 戦国は更に締めて薄暮の山城の翳りを出す（江戸=明るい城下／戦国=暗い山城で差別化）
+      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.14 + taiP * 0.03) // 戦国=暗い山城/江戸=明るい城下/大正=ほの明るい港町で差別化
     } else if (active.fogTouched) {
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
     }
     // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
     if (flyAmt > 0.02) {
-      const fp = active.flyPos, dEdo = Math.hypot(fp.x - EDO.x, fp.z - EDO.z), dSen = Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z)
+      const fp = active.flyPos, dEdo = Math.hypot(fp.x - EDO.x, fp.z - EDO.z), dSen = Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z), dTai = Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z)
       const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (1.2 + (i % 5) * 0.32); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.45 + fx.ph[i]) * dt * 0.9) } p.needsUpdate = true; fx.m.opacity = Math.min(0.8, prox * 0.95) }
       updFx(edoFx, flyAmt * Math.max(0, 1 - dEdo / 130), isNight ? 0.38 : -0.95) // 夜の蛍はゆらり昇る/昼の桜はゆっくり散る
       updFx(senFx, flyAmt * Math.max(0, 1 - dSen / 130), 1.05) // 火の粉はゆっくり昇る
+      updFx(taiFx, flyAmt * Math.max(0, 1 - dTai / 130), isNight ? 0.42 : -0.7) // 大正: 夜の灯の粉は昇る/昼の花びらは散る
       // 関門(霞の帯)を儀式のようにくぐる: 帯を広げて白に包まれる間を延ばし(pk幅0.22)、その間は自動で減速。
       const pk = (p) => Math.max(0, 1 - Math.abs(p - 0.44) / 0.22)
-      const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 230)), pk(flyAmt * Math.max(0, 1 - dSen / 230)))
+      const veilA = Math.max(pk(flyAmt * Math.max(0, 1 - dEdo / 230)), pk(flyAmt * Math.max(0, 1 - dSen / 230)), pk(flyAmt * Math.max(0, 1 - dTai / 230)))
       if (veilEl) veilEl.style.opacity = (veilA * 0.82).toFixed(3)
-      // 目的地で自動減速: 近づくほど・霞の帯ほどゆっくり＝行き過ぎず、城下にそっと着いて巡る
-      const dMin = Math.min(dEdo, dSen)
+      // 目的地で自動減速: 近づくほど・霞の帯ほどゆっくり＝行き過ぎず、街にそっと着いて巡る
+      const dMin = Math.min(dEdo, dSen, dTai)
       let slow = 1
       if (dMin < 200) { const approach = Math.max(0, Math.min(1, (200 - dMin) / 120)), band = Math.max(0, 1 - Math.abs(dMin - 129) / 52); slow = Math.max(0.36, 1 - approach * 0.4 - band * 0.22) }
       active.arrivalSlow = slow
@@ -4319,7 +4394,7 @@ export async function mountTown3d(parent, opts = {}) {
           if (fl.t > 7 && d > 60) { for (const bd of fl.birds) { bd.g.position.set(bd.bx, bd.by, bd.bz); bd.vx = bd.vy = bd.vz = 0; bd.g.rotation.y = 0; bd.g.children.forEach((w) => { w.rotation.z = 0 }) } fl.state = 'perched' } // 機が去ったらまた枝で羽を休める
         }
       }
-    } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0; active.arrivalSlow = 1 }
+    } else if (veilEl && veilEl.style.opacity !== '0') { veilEl.style.opacity = '0'; if (edoFx) edoFx.m.opacity = 0; if (senFx) senFx.m.opacity = 0; if (taiFx) taiFx.m.opacity = 0; active.arrivalSlow = 1 }
     active.winOpen = wo; active.lean = lean // 外部参照（見回し幅の算出など）用に実値を保持
     active.zoom += (active.zoomTarget - active.zoom) * 0.16 // ズームを目標へ滑らかに追従（ボタン/ピンチ共通＝確実に効き、急変で酔わない）
 
