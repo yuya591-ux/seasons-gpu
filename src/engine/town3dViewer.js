@@ -4271,9 +4271,10 @@ export async function mountTown3d(parent, opts = {}) {
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
         camYaw = active.flyYaw
         const cruiseS = active.cruise ? FLY.cruiseSpeed * active.speedMul : 0 // 速さは speedMul で可変（既定ゆっくり）
-        dvX = Math.sin(active.flyYaw) * cpit * cruiseS
-        dvY = spit * cruiseS + (active.climb || 0) * FLY.climbSpeed // 機首の上下＋上昇/下降ボタン（向きを変えず高さだけ）
-        dvZ = -Math.cos(active.flyYaw) * cpit * cruiseS
+        // 進むのは水平方向だけ＝見下ろし/見上げの角度に関係なく一定速度で前進（見下ろしても降下しない）。
+        dvX = Math.sin(active.flyYaw) * cruiseS
+        dvY = (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。カメラの見る角度(flyPitch)は保持され移動には影響しない＝好きな角度で街を見下ろし続けられる
+        dvZ = -Math.cos(active.flyYaw) * cruiseS
       }
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
       const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit // カメラの向き
