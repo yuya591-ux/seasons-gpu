@@ -3359,6 +3359,7 @@ export async function mountTown3d(parent, opts = {}) {
     zoomTarget: 1,                // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
     speedMul: 0.55,               // 飛行速度の倍率（既定はゆっくりめ。速く/遅くボタンで0.35〜1.7に調整）
     wide: false,                  // 視界を広げるモード（広角＋カメラを引いて高くから広い思案で操作）
+    climb: 0,                     // 上昇/下降ボタン（+1=上昇 / -1=下降 / 0=なし。向きを変えず高さだけ変える）
     bankCur: 0,                   // 旋回バンク（ロール）の現在値（飛行の傾き）
     camPos: new THREE.Vector3(),  // 引いたカメラの実位置（遅れ追従でわずかに揺らぐ）
     camReady: false,              // camPos 初期化済みか（飛び立ち/着地でスナップ）
@@ -3956,6 +3957,17 @@ export async function mountTown3d(parent, opts = {}) {
   wideWrap.appendChild(wideBtn); stage.appendChild(wideWrap)
   let wideShown = false
   wideBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (active) { active.wide = !active.wide; wideBtn.textContent = active.wide ? '標準' : '広く'; wideWrap.classList.toggle('wide--active', active.wide) } })
+  // 上昇/下降（右・ズームの上）。向きを変えずに高さだけ＝毎回上を向かなくてよい。押している間だけ昇降。
+  const climbWrap = document.createElement('div'); climbWrap.className = 'town3d-climb'
+  const climbUp = document.createElement('button'); climbUp.className = 'town3d-climb__btn'; climbUp.textContent = '↑'; climbUp.setAttribute('aria-label', '上昇')
+  const climbDn = document.createElement('button'); climbDn.className = 'town3d-climb__btn'; climbDn.textContent = '↓'; climbDn.setAttribute('aria-label', '下降')
+  climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); stage.appendChild(climbWrap)
+  let climbShown = false
+  for (const [cbtn, dir] of [[climbUp, 1], [climbDn, -1]]) {
+    const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir }
+    const cend = (e) => { if (e) e.stopPropagation(); if (active) active.climb = 0 }
+    cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cend); cbtn.addEventListener('pointercancel', cend); cbtn.addEventListener('pointerleave', cend)
+  }
 
   function frame() {
     if (!active) return
@@ -4250,7 +4262,7 @@ export async function mountTown3d(parent, opts = {}) {
         camYaw = active.flyYaw
         const cruiseS = active.cruise ? FLY.cruiseSpeed * active.speedMul : 0 // 速さは speedMul で可変（既定ゆっくり）
         dvX = Math.sin(active.flyYaw) * cpit * cruiseS
-        dvY = spit * cruiseS // 機首の上下で上昇/下降
+        dvY = spit * cruiseS + (active.climb || 0) * FLY.climbSpeed // 機首の上下＋上昇/下降ボタン（向きを変えず高さだけ）
         dvZ = -Math.cos(active.flyYaw) * cpit * cruiseS
       }
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
@@ -4429,6 +4441,7 @@ export async function mountTown3d(parent, opts = {}) {
     const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
     if (showSpeed !== speedShown) { speedShown = showSpeed; speedWrap.classList.toggle('speed--on', showSpeed); if (!showSpeed) stopSpeedHold() }
     if (showSpeed !== wideShown) { wideShown = showSpeed; wideWrap.classList.toggle('wide--on', showSpeed) }
+    if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) active.climb = 0 }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
 

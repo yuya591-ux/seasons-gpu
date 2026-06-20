@@ -280,6 +280,43 @@ body {
 .town3d-zoom__btn:active {
   background: rgba(72, 116, 158, 0.6);
 }
+/* 上昇/下降ボタン（右・ズームの上）。向きを変えず高さだけ変える。 */
+.town3d-climb {
+  position: absolute;
+  right: max(1.1rem, calc(env(safe-area-inset-right) + 0.6rem));
+  bottom: max(9.4rem, calc(env(safe-area-inset-bottom) + 8.8rem));
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.town3d-climb.climb--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.town3d-climb__btn {
+  appearance: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(20, 16, 26, 0.46);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.town3d-climb__btn:active {
+  background: rgba(72, 116, 158, 0.6);
+}
 /* 速度ボタン（左下に速く/遅くを縦に。飛行のときだけ） */
 .town3d-speed {
   position: absolute;
@@ -362,7 +399,8 @@ body {
 body.idle .town3d-cruise.cruise--on,
 body.idle .town3d-zoom.zoom--on,
 body.idle .town3d-speed.speed--on,
-body.idle .town3d-wide.wide--on {
+body.idle .town3d-wide.wide--on,
+body.idle .town3d-climb.climb--on {
   opacity: 0;
   pointer-events: none;
 }
