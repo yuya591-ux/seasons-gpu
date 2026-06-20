@@ -47,6 +47,7 @@ const FLY = {
   moveEase: 2.8,    // 速度の追従(1/s)。小さいほど重い加速／離すと惰性で滑空して停止
   // ── スキームA: オート巡航＋ドラッグ操舵（一本指） ──
   cruiseSpeed: 7.5, // 自動巡航の速さ(u/s)。ゆっくり前進
+  cinemaSpeed: 5.0, // オートシネマ周回の速さ(u/s)。超低速で名所を巡る
   steerEase: 0.13,  // ドラッグで操った進路(向き)へ機首が向く滑らかさ
   steerYaw: 2.4,    // 横ドラッグ→旋回の効き（画面幅いっぱいのドラッグでこのrad）
   steerPitch: 2.2,  // 縦ドラッグ→上昇下降(機首上下)の効き
@@ -551,6 +552,7 @@ export async function mountTown3d(parent, opts = {}) {
   const ISLAND = { x: 98, z: -40, r: 8 }
   const EDO = { x: 340, z: -30, r: 88 } // 海の向こうの広い島（江戸の城下町）。現代の街から充分に離した独立の塊
   const SENGOKU = { x: 120, z: -330, r: 44 } // 北の海の果ての戦国の山城（高く大きな峰＋山裾の城下。現代/江戸と充分に離した独立の塊）
+  const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }] // オートシネマで周回する名所（現代の街/江戸/戦国の中心）
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
@@ -3391,6 +3393,7 @@ export async function mountTown3d(parent, opts = {}) {
     flyP: 0,                      // 窓⇄外の混ざり具合 0=窓 / 1=外（これをイージングして滑らかに出入り）
     flyPos: new THREE.Vector3(),  // 移動の中心点（“自分”）。引いたカメラはこの後ろ上から望む
     flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // flyYaw=進路の向き（左スティックで旋回）／flyPitch=高さ角（右ドラッグ上下）
+    cinema: 0, lastInputT: 0,      // オートシネマ: 無操作で最寄り名所をゆっくりオービット（操作で即復帰）
     lookYawOff: 0, lookYawOffTarget: 0, lookDragging: false, // 見回しの横オフセット（右ドラッグ。進路は変えず、離すと0へ戻る）
     turnSmooth: 0,                // 旋回入力のスムージング値（手ブレを均し、急旋回を抑える＝快適な曲がり）
     vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
@@ -4298,6 +4301,22 @@ export async function mountTown3d(parent, opts = {}) {
         dvX = Math.sin(active.flyYaw) * throttle * FLY.walkSpeed
         dvZ = -Math.cos(active.flyYaw) * throttle * FLY.walkSpeed
       } else {
+        // オートシネマ: 無操作が続くと、最寄りの名所をゆっくりオービット（接線方向へ機首を正し低速で周回）。
+        // ただ眺めるだけで街がゆっくり巡る＝「眺めて整う」。触れた瞬間に解除して操作へ戻る。
+        const idleMs = performance.now() - (active.lastInputT || 0)
+        const wantCinema = flyAmt > 0.9 && idleMs > 7000 ? 1 : 0
+        active.cinema += (wantCinema - active.cinema) * Math.min(1, dt * (wantCinema ? 0.5 : 4)) // ゆっくり始まり・素早く解除
+        let cineSpeed = 0
+        if (active.cinema > 0.01) {
+          let best = CINEMA_LM[0], bd = 1e9
+          for (const lm of CINEMA_LM) { const d = (lm.x - active.flyPos.x) ** 2 + (lm.z - active.flyPos.z) ** 2; if (d < bd) { bd = d; best = lm } }
+          active.cineLM = best
+          const rx = active.flyPos.x - best.x, rz = active.flyPos.z - best.z, r = Math.max(28, Math.hypot(rx, rz))
+          const tangYaw = Math.atan2(-rz / r, rx / r) // 名所を中心に反時計回りの接線へ機首を向ける
+          let d = tangYaw - active.flyYawTarget; d = Math.atan2(Math.sin(d), Math.cos(d))
+          active.flyYawTarget += d * Math.min(1, dt * 0.5) * active.cinema
+          cineSpeed = FLY.cinemaSpeed * active.cinema
+        }
         // 飛行＝スキームA: ドラッグで操った進路(flyYaw/flyPitch)へ機首が向き、自動でゆっくり前進（巡航）。
         // 機首の上下がそのまま上昇/下降。とまる中は前進0＝その場でホバリング。一本指・スティック/昇降ボタン無し。
         active.flyYaw += (active.flyYawTarget - active.flyYaw) * FLY.steerEase
@@ -4305,7 +4324,7 @@ export async function mountTown3d(parent, opts = {}) {
         active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
         camYaw = active.flyYaw
-        const cruiseS = active.cruise ? FLY.cruiseSpeed * active.speedMul : 0 // 速さは speedMul で可変（既定ゆっくり）
+        const cruiseS = (active.cruise ? FLY.cruiseSpeed * active.speedMul : 0) + cineSpeed // 速さは speedMul で可変（既定ゆっくり）＋シネマの周回
         // 進むのは水平方向だけ＝見下ろし/見上げの角度に関係なく一定速度で前進（見下ろしても降下しない）。
         dvX = Math.sin(active.flyYaw) * cruiseS
         dvY = (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。カメラの見る角度(flyPitch)は保持され移動には影響しない＝好きな角度で街を見下ろし続けられる
@@ -4379,7 +4398,12 @@ export async function mountTown3d(parent, opts = {}) {
       if (!active.camReady) { active.camPos.set(dcx, dcy, dcz); active.camReady = true } // 飛び立ち/着地直後はスナップ
       else { active.camPos.x += (dcx - active.camPos.x) * FLY.camLag; active.camPos.y += (dcy - active.camPos.y) * FLY.camLag; active.camPos.z += (dcz - active.camPos.z) * FLY.camLag }
 
-      const aLookX = fp.x + fwdX * ahead, aLookY = fp.y + fwdY * ahead + Math.sin(t * 0.5) * 0.04, aLookZ = fp.z + fwdZ * ahead
+      let aLookX = fp.x + fwdX * ahead, aLookY = fp.y + fwdY * ahead + Math.sin(t * 0.5) * 0.04, aLookZ = fp.z + fwdZ * ahead
+      // オートシネマ: 接線に沿って機体は流れつつ、視線は名所の中心へ向ける＝名所を画面に保つオービット
+      if (!isWalk && active.cinema > 0.01 && active.cineLM) {
+        const cm = active.cinema * 0.92, lx = active.cineLM.x, lz = active.cineLM.z, ly = heightAt(lx, lz) + 15
+        aLookX += (lx - aLookX) * cm; aLookY += (ly - aLookY) * cm; aLookZ += (lz - aLookZ) * cm
+      }
       TMP_DIR.set(fwdX, fwdY, fwdZ); TMP_UP2.set(0, 1, 0).applyAxisAngle(TMP_DIR, active.bankCur) // バンクした上ベクトル
 
       camX = lerp(ex, active.camPos.x, flyAmt); camY = lerp(ey, active.camPos.y, flyAmt); camZ = lerp(ez, active.camPos.z, flyAmt)
@@ -4388,6 +4412,7 @@ export async function mountTown3d(parent, opts = {}) {
       const speedMag = Math.hypot(active.vel.x, active.vel.y, active.vel.z)
       const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain) + (active.wide && !isWalk ? 26 : 0) // 広角モードで視界を広げる
       fov = lerp(winFov, aloftFov, flyAmt)
+      if (!isWalk && active.cinema > 0.01) fov += Math.sin(t * 0.16) * 2.6 * active.cinema // オートシネマの呼吸する画角（ゆっくり広→狭）
       windSpeed01 = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt // 飛行の速さ＝風の膨らみ
 
       // 浮遊感: ホバリングはゆっくり上下に漂い、速いとかすかに揺れる。歩行は頭が弾む。
@@ -4591,6 +4616,7 @@ export async function mountTown3d(parent, opts = {}) {
   let pinchD0 = 0, pinchZoom0 = 1
   const onDown = (e) => {
     if (!active) return
+    active.lastInputT = performance.now(); active.cinema = 0 // 触れたらオートシネマは即解除
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.size === 2) { // 2本指＝ピンチでズーム開始。単指の操舵/移動は解除する。
       const p = [...pointers.values()]
@@ -4615,7 +4641,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   const onMove = (e) => {
     if (!active) return
-    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.has(e.pointerId)) { active.lastInputT = performance.now(); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }) }
     if (pointers.size >= 2) { // ピンチ＝ズーム（指を開く=寄り／閉じる=引き）。止まっても飛んでも自在に引ける。
       const p = [...pointers.values()]
       const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
@@ -4640,7 +4666,11 @@ export async function mountTown3d(parent, opts = {}) {
     if (e.pointerId === stickId) { stickId = null; hideStick() }
     if (e.pointerId === lookId) { lookId = null; if (active) active.lookDragging = false }
   }
+  // どんな操作（ボタンのタップ含む）でもオートシネマの無操作タイマーを更新（ボタンはstopPropagationするのでcaptureで拾う）
+  const markInput = () => { if (active) { active.lastInputT = performance.now(); if (active.cinema > 0) active.cinema = 0 } }
+  active.lastInputT = performance.now()
   dom.addEventListener('pointerdown', onDown)
+  window.addEventListener('pointerdown', markInput, true)
   window.addEventListener('pointermove', onMove)
   window.addEventListener('pointerup', onUp)
   window.addEventListener('pointercancel', onUp)
@@ -4648,6 +4678,7 @@ export async function mountTown3d(parent, opts = {}) {
   const baseDispose = active.dispose
   active.dispose = () => {
     dom.removeEventListener('pointerdown', onDown)
+    window.removeEventListener('pointerdown', markInput, true)
     window.removeEventListener('pointermove', onMove)
     window.removeEventListener('pointerup', onUp)
     window.removeEventListener('pointercancel', onUp)
