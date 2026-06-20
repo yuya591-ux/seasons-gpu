@@ -2011,7 +2011,9 @@ export async function mountTown3d(parent, opts = {}) {
         const baseH = 7.5
         const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), toon(season === 'winter' ? 0x908d84 : 0x8b8478)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台）
         for (const f of [0.26, 0.52, 0.78]) { const r = 12.5 + (9.5 - 12.5) * f; const cs = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.05, r + 0.12, 0.16, 4), toon(0x6f6b62)); cs.rotation.y = Math.PI / 4; cs.position.set(ex, gy + baseH * f, ez); town.add(cs) } // 石の段（横の石組み）
-        const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(isNight ? 0x29303a : 0x3a434e), winC = toon(isNight ? 0x20242a : 0x2e3138)
+        const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(isNight ? 0x29303a : 0x3a434e)
+        const litMat = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true }) // 夜に灯る障子/窓の暖色
+        const winC = isNight ? litMat : toon(0x2e3138) // 連子窓（夜は灯る）
         let yb = gy + baseH, topBase = yb, topW = 3.4
         const tiers = [[7.4, 4.6], [6.3, 4.0], [5.3, 3.6], [4.3, 3.2], [3.4, 3.0]] // [壁幅, 壁高] 下から上へ
         for (let i = 0; i < tiers.length; i++) {
@@ -2038,6 +2040,7 @@ export async function mountTown3d(parent, opts = {}) {
             const hw = 2.6 + R() * 1.0, hd = 2.0 + R() * 0.6, hh = 1.6 + R() * 0.5
             const body = new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hd), tWall); body.position.set(hx, hy + hh / 2, hz); body.rotation.y = ang; body.castShadow = true; town.add(body)
             const rf = new THREE.Mesh(new THREE.ConeGeometry(hw * 0.64, 0.9, 4), tRoof); rf.rotation.y = ang + Math.PI / 4; rf.position.set(hx, hy + hh + 0.38, hz); town.add(rf)
+            if (isNight && R() < 0.7) { const ox = Math.cos(ang), oz = Math.sin(ang), lw = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.06), litMat); lw.position.set(hx + ox * 1.05, hy + hh * 0.45, hz + oz * 1.05); lw.lookAt(hx + ox * 3, hy + hh * 0.45, hz + oz * 3); town.add(lw) } // 夜の灯り窓
           }
         }
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
@@ -2049,6 +2052,7 @@ export async function mountTown3d(parent, opts = {}) {
             const yagura = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.2, 5.2), wallC); yagura.position.set(gx, gyg + 4.9, gz); yagura.castShadow = true; town.add(yagura); town.add(addOutline(yagura)) // 渡櫓
             const groof = new THREE.Mesh(new THREE.ConeGeometry(4.2, 1.6, 4), roofC); groof.rotation.y = Math.PI / 4; groof.position.set(gx, gyg + 6.5, gz); groof.scale.x = 0.55; town.add(groof); town.add(addOutline(groof)) // 門の屋根
             for (const s of [-1, 1]) { const dei = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.7, 7), toon(season === 'winter' ? 0xcfc8ba : 0xc4baa6)); dei.position.set(gx, gyg + 0.85, gz + s * 6.6); town.add(dei); town.add(addOutline(dei)); const cap = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.28, 7), roofC); cap.position.set(gx, gyg + 1.8, gz + s * 6.6); town.add(cap) } // 築地塀＋瓦の笠
+            for (const s of [-1, 1]) { const lx = gx - 1.6, lz = gz + s * 2.7, ly = heightAt(lx, lz); const pole = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.3, 0.45), toon(0x8a8378)); pole.position.set(lx, ly + 0.65, lz); town.add(pole); const fire = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), isNight ? litMat : toon(0xe2d3a6)); fire.position.set(lx, ly + 1.45, lz); town.add(fire); const lcap = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.38, 4), toon(0x5a5048)); lcap.rotation.y = Math.PI / 4; lcap.position.set(lx, ly + 1.82, lz); town.add(lcap) } // 灯籠（夜に灯る）
             for (let k = 0; k < 5; k++) { const px = gx - 1 - k * 2.6; for (const s of [-1, 1]) { const pz = gz + s * 3.6, py = heightAt(px, pz); if (py < SEA.level + 1.0) continue; addPine(px, py, pz) } } // 参道の松並木
           }
         }

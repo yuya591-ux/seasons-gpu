@@ -19,5 +19,14 @@ await shoot(140, 32, -0.05, 'edo-far')   // 渡りの途中＝霞の向こうに
 await shoot(205, 30, -0.08, 'edo-mid')   // 近づく＝天守が立ち上がる
 await shoot(250, 28, -0.10, 'edo-near')  // 目前＝城下町まで見える
 await shoot(262, 34, -0.18, 'edo-top')   // 上から見下ろし
+// 夜（城下の灯り）
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d-night'))
+await page.waitForTimeout(2400)
+await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTimeout(400)
+await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(500)
+await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
+await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
+await shoot(205, 30, -0.08, 'edo-night-mid')
+await shoot(250, 28, -0.10, 'edo-night-near')
 console.log('edo shots done')
 await browser.close()
