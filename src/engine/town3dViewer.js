@@ -3914,8 +3914,14 @@ export async function mountTown3d(parent, opts = {}) {
     const ceilTex = cv(128, 128, (x) => { x.fillStyle = C('#4a3e2c', '#211c16'); x.fillRect(0, 0, 128, 128); x.strokeStyle = 'rgba(0,0,0,0.34)'; x.lineWidth = 3; for (let i = 0; i <= 128; i += 22) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 128); x.stroke() } })
     ceilTex.wrapS = ceilTex.wrapT = THREE.RepeatWrapping; ceilTex.repeat.set(3, 3)
     const calTex = cv(64, 88, (x) => { x.fillStyle = '#efe9da'; x.fillRect(0, 0, 64, 88); x.fillStyle = '#b83c30'; x.fillRect(0, 0, 64, 20); x.fillStyle = 'rgba(70,58,46,0.55)'; for (let r = 0; r < 5; r++) for (let cc2 = 0; cc2 < 7; cc2++) x.fillRect(5 + cc2 * 8, 26 + r * 11, 5, 7) })
+    // 砂壁の粒（白基調に細かな明暗の砂目＝乗算でうっすら凹凸感。のっぺりを脱す）
+    const sandTex = cv(128, 128, (x) => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 128, 128); for (let i = 0; i < 2400; i++) { const a = 0.04 + R() * 0.07, s = 1 + R() * 1.6; x.fillStyle = R() < 0.5 ? `rgba(54,44,32,${a})` : `rgba(255,250,238,${a})`; x.fillRect(R() * 128, R() * 128, s, s) } })
+    sandTex.wrapS = sandTex.wrapT = THREE.RepeatWrapping; sandTex.repeat.set(2.6, 2.6)
+    // 腰壁の板目（横の継ぎ目＋うっすら縦の木目）
+    const plankTex = cv(64, 64, (x) => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(18,12,7,0.5)'; x.lineWidth = 2; for (let gy = 0; gy <= 64; gy += 16) { x.beginPath(); x.moveTo(0, gy); x.lineTo(64, gy); x.stroke() } x.strokeStyle = 'rgba(40,28,16,0.1)'; x.lineWidth = 1; for (let i = 0; i < 44; i++) { const gx = R() * 64; x.beginPath(); x.moveTo(gx, 0); x.lineTo(gx + (R() - 0.5) * 6, 64); x.stroke() } })
+    plankTex.wrapS = plankTex.wrapT = THREE.RepeatWrapping; plankTex.repeat.set(9, 1.3)
     // 材（昭和の茶の間。暖色・飴色の木・砂壁・畳。夜は沈める）
-    const wallMat = mk(C(0x8c7c5c, 0x2a2430)), wainsMat = mk(C(0x6a4e34, 0x221b22)) // 砂壁(明るい団地の壁)・腰壁(羽目板)
+    const wallMat = mk(C(0x8c7c5c, 0x2a2430), sandTex), wainsMat = mk(C(0x6a4e34, 0x221b22), plankTex) // 砂壁(粒)・腰壁(板目)
     const tatMat = mk(0xffffff, tatTex), cmat = mk(0xffffff, ceilTex)
     const woodMat = mk(C(0x7a5630, 0x2c241d)), woodDk = mk(C(0x4a3320, 0x1d1611))
     const fabMat = mk(C(0xa8564a, 0x3a2630)), fab2 = mk(C(0x4e6a52, 0x26302a))
