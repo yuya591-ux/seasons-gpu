@@ -3879,6 +3879,7 @@ export async function mountTown3d(parent, opts = {}) {
   let windChime = null // 夏の窓辺の風鈴（窓をあけると外気でちりんと揺れる）
   const teaSteam = [] // 急須から立ちのぼる湯気
   let winPendulum = null // 振り子柱時計（振り子が静かに揺れる）
+  let winDust = null // 窓の光に舞うほこり（昼の“居る部屋”の空気感）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -4057,6 +4058,20 @@ export async function mountTown3d(parent, opts = {}) {
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.082, 0.012, 6, 14), cordMat); rim.rotation.x = Math.PI / 2; rim.position.y = -0.55; rim.renderOrder = 3; wc.add(rim)
       const tongue = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5), cordMat); tongue.position.y = -0.6; tongue.renderOrder = 3; wc.add(tongue)
       const tanzaku = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.13), curtMat); tanzaku.position.y = -0.72; tanzaku.renderOrder = 3; wc.add(tanzaku)
+    }
+    // ── 窓から差し込む光（昼）＝畳に落ちる暖かな採光と、光に舞うほこり。最も多く眺める“座っている景色”に空気を与える。──
+    if (!isNight) {
+      // 畳に落ちる窓明かり（夕ほど暖色で濃い。夜の灯りだまりの昼版）
+      const ltTex = cv(96, 96, (x) => { const g = x.createRadialGradient(48, 40, 4, 48, 48, 50); g.addColorStop(0, 'rgba(255,246,222,0.95)'); g.addColorStop(0.5, 'rgba(255,238,200,0.34)'); g.addColorStop(1, 'rgba(255,238,200,0)'); x.fillStyle = g; x.fillRect(0, 0, 96, 96) })
+      const patchMat = new THREE.MeshBasicMaterial({ map: ltTex, color: new THREE.Color(0xfff1cc).lerp(sunCol, 0.5), transparent: true, opacity: 0.17 + duskAmt * 0.24, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); winRoomMats.push(patchMat)
+      const patch = new THREE.Mesh(new THREE.PlaneGeometry(owW + 1.6, 2.7), patchMat); patch.rotation.x = -Math.PI / 2; patch.rotation.z = 0.1; patch.position.set(-0.2, FY + 0.05, 1.75); patch.renderOrder = 4; winRoom.add(patch) // 窓から斜めに差す向き
+      // 光に舞うほこり（窓辺の空間にゆっくり漂う微粒。昼の静かな部屋の手応え。小さく淡く＝雪に見せない）
+      const N = 46, dp = new Float32Array(N * 3), base = []
+      for (let i = 0; i < N; i++) { const x0 = (R() - 0.5) * 3.1, y0 = FY + 0.45 + R() * (oT - FY - 0.3), z0 = 0.5 + R() * 2.7; dp[i * 3] = x0; dp[i * 3 + 1] = y0; dp[i * 3 + 2] = z0; base.push({ x0, y0, z0, ph: R() * 6.28, sp: 0.25 + R() * 0.4, amp: 0.05 + R() * 0.07 }) }
+      const dgeo = new THREE.BufferGeometry(); dgeo.setAttribute('position', new THREE.BufferAttribute(dp, 3))
+      const dmat = new THREE.PointsMaterial({ color: new THREE.Color(0xffeccb).lerp(sunCol, 0.5), size: 0.026, transparent: true, opacity: 0.22 + duskAmt * 0.16, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }); winRoomMats.push(dmat)
+      const dust = new THREE.Points(dgeo, dmat); dust.frustumCulled = false; dust.renderOrder = 6; winRoom.add(dust)
+      winDust = { geo: dgeo, arr: dp, base }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -5346,6 +5361,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (winRoom.visible && windChime) windChime.rotation.z = Math.sin(t * 1.7) * (0.02 + 0.05 * wo) // 風鈴は窓をあけるとよく揺れる（閉=ごく僅か）
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
     if (winRoom.visible && winPendulum) winPendulum.rotation.x = Math.sin(t * 2.0) * 0.16 // 柱時計の振り子が静かに時を刻む
+    if (winRoom.visible && winDust) { for (let i = 0; i < winDust.base.length; i++) { const b = winDust.base[i]; winDust.arr[i * 3] = b.x0 + Math.sin(t * b.sp + b.ph) * b.amp * 3; winDust.arr[i * 3 + 1] = b.y0 + Math.sin(t * b.sp * 0.7 + b.ph * 1.7) * b.amp * 4; winDust.arr[i * 3 + 2] = b.z0 + Math.cos(t * b.sp * 0.5 + b.ph) * b.amp * 3 } winDust.geo.attributes.position.needsUpdate = true } // 窓の光にほこりがゆらゆら舞う
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
