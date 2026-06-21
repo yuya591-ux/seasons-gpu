@@ -3977,6 +3977,13 @@ export async function mountTown3d(parent, opts = {}) {
     winSashR = rpane; winSashX0 = owW / 4; winSashX1 = -owW / 4
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
+    // ── 窓辺の湯呑み（縁側でお茶＝“いま家でくつろいでいる”気配）。湯気は teaSteam に合流して立ちのぼる。──
+    { const cupY = oB + 0.04
+      cyl(0.064, 0.052, 0.016, -0.72, cupY - 0.02, 0.31, ceramMat, 14) // 受け皿
+      cyl(0.05, 0.043, 0.078, -0.72, cupY + 0.03, 0.31, ceramMat, 14)  // 湯呑み
+      cyl(0.064, 0.064, 0.006, -0.72, cupY + 0.07, 0.31, mk(C(0x6a8a52, 0x33422a)), 14) // お茶の面（緑）
+      const stTex2 = cv(48, 48, (x) => { const g = x.createRadialGradient(24, 24, 1, 24, 24, 24); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.32)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 48, 48) })
+      for (let i = 0; i < 2; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stTex2, transparent: true, opacity: 0, depthWrite: false, fog: false })); sp.position.set(-0.72, cupY + 0.12, 0.31); sp.userData = { x0: -0.72, y0: cupY + 0.12, ph: i / 2 }; sp.renderOrder = 7; winRoom.add(sp); teaSteam.push(sp); winRoomMats.push(sp.material) } }
     // ベランダの手すり（窓の外・下＝団地の上階から街を見下ろす気配）。室内と一緒に乗り出すと退く。
     const railMat = mk(C(0xa6a298, 0x3a3e44)) // ベランダ手すり（鈍い色でチカチカ抑制）
     box(owW + 0.7, 0.08, 0.08, 0, oB + 0.62, -0.55, railMat); box(owW + 0.7, 0.08, 0.08, 0, oB + 0.04, -0.55, railMat) // 上下の手すり桟
