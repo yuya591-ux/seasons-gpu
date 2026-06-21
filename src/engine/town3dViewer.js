@@ -3711,6 +3711,9 @@ export async function mountTown3d(parent, opts = {}) {
     { x: 73, z: -34, n: 3, rad: 2.6 },                                // 砂浜（海辺の人）
     { x: HARBOR.x - 2, z: HARBOR.z + 1, n: 3, rad: 3.0 },             // 港（働く人）
     { x: -47, z: -42, n: 2, rad: 2.2 },                               // 川辺の遊歩道（南寄り）
+    { x: DOWNTOWN.x, z: DOWNTOWN.z + 8, n: 6, rad: 4.2 },             // 副都心の駅前広場（通勤の人波）
+    { x: DOWNTOWN.x - 10, z: DOWNTOWN.z - 6, n: 4, rad: 3.2 },        // 副都心の通り
+    { x: STADIUM.x, z: STADIUM.z + 18, n: 6, rad: 4.4 },             // 競技場のゲート前（観客）
   ]
   for (const s of crowdSpots) for (let i = 0; i < (LIGHT ? Math.ceil(s.n * 0.5) : s.n); i++) {
     const g = makePeep()
