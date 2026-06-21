@@ -3933,8 +3933,9 @@ export async function mountTown3d(parent, opts = {}) {
       x.lineJoin = 'round'; x.lineCap = 'round'
       const ol = (sw) => { x.strokeStyle = OL; x.lineWidth = sw; x.stroke() }
       const ell = (cx, cy, rx, ry, fill, sw) => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 6.2832); if (fill) { x.fillStyle = fill; x.fill() } if (sw) ol(sw) }
-      // 後ろ髪（顔の後ろ・襟足までのボブ）
-      x.beginPath(); x.moveTo(90, 84); x.bezierCurveTo(78, 150, 96, 172, 128, 174); x.bezierCurveTo(160, 172, 178, 150, 166, 84); x.bezierCurveTo(162, 44, 94, 44, 90, 84); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
+      // 後ろ髪（ボブ・顔を囲み毛先が軽く外へ）
+      x.beginPath(); x.moveTo(94, 86); x.bezierCurveTo(80, 146, 98, 166, 128, 168); x.bezierCurveTo(158, 166, 176, 146, 162, 86); x.bezierCurveTo(158, 46, 98, 46, 94, 86); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
+      x.beginPath(); x.moveTo(142, 62); x.bezierCurveTo(168, 84, 168, 142, 150, 162); x.bezierCurveTo(160, 138, 160, 92, 146, 66); x.closePath(); x.fillStyle = '#1b1815'; x.fill() // 右側の影
       // パンツ（ハイウエストのワイド・濃紺）
       x.beginPath(); x.moveTo(94, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.lineTo(123, 470); x.lineTo(102, 470); x.bezierCurveTo(74, 372, 76, 300, 80, 268); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
       x.beginPath(); x.moveTo(128, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.closePath(); x.fillStyle = '#283039'; x.fill() // 右脚の影
@@ -3948,42 +3949,44 @@ export async function mountTown3d(parent, opts = {}) {
       x.beginPath(); x.moveTo(90, 256); x.lineTo(166, 256); x.strokeStyle = OL; x.lineWidth = 2.5; x.stroke() // 裾(ウエスト)
       // 肩紐（サスペンダー）
       for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 16, 158); x.lineTo(128 + sx * 22, 256); x.strokeStyle = bot; x.lineWidth = 6; x.stroke(); ol(1.5) }
-      // 腕（半袖の白＋素肌の前腕・体側で軽く前へ）
+      // 腕（半袖の白い肩袖＋自然な太さの前腕＋ちゃんとした手）。体側で軽く前へ。
       for (const sx of [-1, 1]) {
-        x.beginPath(); x.moveTo(128 + sx * 36, 164); x.bezierCurveTo(128 + sx * 50, 175, 128 + sx * 50, 195, 128 + sx * 44, 205); x.lineTo(128 + sx * 34, 200); x.bezierCurveTo(128 + sx * 30, 185, 128 + sx * 28, 172, 128 + sx * 30, 165); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5) // 半袖
-        x.beginPath(); x.moveTo(128 + sx * 44, 202); x.bezierCurveTo(128 + sx * 46, 235, 128 + sx * 40, 270, 128 + sx * 36, 286); x.lineTo(128 + sx * 28, 282); x.bezierCurveTo(128 + sx * 30, 250, 128 + sx * 33, 220, 128 + sx * 34, 200); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5) // 前腕
-        ell(128 + sx * 33, 292, 7, 8, skin, 3) // 手
+        x.beginPath(); x.moveTo(128 + sx * 30, 160); x.bezierCurveTo(128 + sx * 49, 166, 128 + sx * 51, 196, 128 + sx * 46, 214); x.lineTo(128 + sx * 31, 209); x.bezierCurveTo(128 + sx * 27, 188, 128 + sx * 26, 170, 128 + sx * 30, 160); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5) // 半袖（丸い肩）
+        x.beginPath(); x.moveTo(128 + sx * 46, 210); x.bezierCurveTo(128 + sx * 49, 242, 128 + sx * 44, 270, 128 + sx * 41, 288); x.lineTo(128 + sx * 30, 286); x.bezierCurveTo(128 + sx * 31, 254, 128 + sx * 33, 226, 128 + sx * 32, 208); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5) // 前腕（自然な太さ）
+        // 手（手のひら＋親指＋指の丸み）
+        x.beginPath(); x.moveTo(128 + sx * 42, 285); x.bezierCurveTo(128 + sx * 47, 295, 128 + sx * 45, 309, 128 + sx * 38, 312); x.bezierCurveTo(128 + sx * 29, 312, 128 + sx * 27, 299, 128 + sx * 29, 287); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
+        x.beginPath(); x.moveTo(128 + sx * 30, 303); x.quadraticCurveTo(128 + sx * 38, 304, 128 + sx * 43, 300); x.strokeStyle = skinSh; x.lineWidth = 1.3; x.stroke() // 指の境
       }
       // 斜め掛けの鞄（紐＋本体）
       x.beginPath(); x.moveTo(104, 162); x.lineTo(172, 250); x.strokeStyle = bag; x.lineWidth = 7; x.stroke(); ol(1.5)
       x.beginPath(); x.rect(168, 246, 34, 40); x.fillStyle = bag; x.fill(); ol(3.5); x.beginPath(); x.moveTo(168, 258); x.lineTo(202, 258); ol(2)
       // 首
       x.beginPath(); x.rect(118, 128, 20, 26); x.fillStyle = skin; x.fill(); ol(3)
-      // 顔（やや尖った顎の輪郭）
-      x.beginPath(); x.moveTo(96, 86); x.bezierCurveTo(96, 118, 112, 140, 128, 140); x.bezierCurveTo(144, 140, 160, 118, 160, 86); x.bezierCurveTo(160, 56, 96, 56, 96, 86); x.closePath(); x.fillStyle = skin; x.fill(); ol(4)
+      // 顔（やや小さく・柔らかい輪郭＋細い顎）
+      x.beginPath(); x.moveTo(101, 86); x.bezierCurveTo(101, 114, 114, 136, 128, 136); x.bezierCurveTo(142, 136, 155, 114, 155, 86); x.bezierCurveTo(155, 60, 101, 60, 101, 86); x.closePath(); x.fillStyle = skin; x.fill(); ol(4)
       // 額の落ち影（前髪の下＝立体感）
-      x.beginPath(); x.moveTo(98, 84); x.quadraticCurveTo(128, 96, 158, 84); x.quadraticCurveTo(128, 92, 98, 84); x.closePath(); x.fillStyle = 'rgba(210,170,140,0.45)'; x.fill()
+      x.beginPath(); x.moveTo(102, 86); x.quadraticCurveTo(128, 96, 154, 86); x.quadraticCurveTo(128, 92, 102, 86); x.closePath(); x.fillStyle = 'rgba(210,170,140,0.4)'; x.fill()
       // 頬の赤み
-      ell(110, 112, 9, 6, blush); ell(146, 112, 9, 6, blush)
-      // 目（ジブリ風＝小さめだが澄んだ瞳。暖色の虹彩＋太い上まぶた＋大きめハイライト＋薄い下まぶた）
+      ell(112, 113, 7.5, 5, blush); ell(144, 113, 7.5, 5, blush)
+      // 目（小さく控えめ＝ジブリ風。澄んだ瞳・細い上まぶた）
       for (const sx of [-1, 1]) {
-        const ex = 128 + sx * 17, ey = 102
-        x.beginPath(); x.ellipse(ex, ey, 7.5, 9.5, 0, 0, 6.2832); x.fillStyle = '#fcf8f1'; x.fill() // 白目
-        x.beginPath(); x.ellipse(ex, ey + 1.5, 6, 8, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill() // 虹彩（暖色）
-        x.beginPath(); x.ellipse(ex, ey + 2.5, 2.9, 4.3, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill() // 瞳孔
-        x.beginPath(); x.ellipse(ex - sx * 2.4, ey - 3.4, 2.5, 3.1, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト大
-        x.beginPath(); x.ellipse(ex + sx * 2.2, ey + 4.2, 1, 1.4, 0, 0, 6.2832); x.fillStyle = 'rgba(255,255,255,0.6)'; x.fill() // 下の小反射
-        x.beginPath(); x.moveTo(ex - 8.5, ey - 4); x.quadraticCurveTo(ex, ey - 11, ex + 8.5, ey - 4); x.strokeStyle = OL; x.lineWidth = 3.2; x.stroke() // 上まぶた（太め＝目力）
-        x.beginPath(); x.moveTo(ex - 6.5, ey + 8); x.quadraticCurveTo(ex, ey + 9.5, ex + 6, ey + 7); x.strokeStyle = 'rgba(110,80,62,0.5)'; x.lineWidth = 1.5; x.stroke() // 下まぶた(薄)
-        x.beginPath(); x.moveTo(ex - 8, ey - 15); x.quadraticCurveTo(ex, ey - 18, ex + 8, ey - 14); x.strokeStyle = hair; x.lineWidth = 2.4; x.stroke() // 眉
+        const ex = 128 + sx * 14, ey = 104
+        x.beginPath(); x.ellipse(ex, ey, 5, 6.4, 0, 0, 6.2832); x.fillStyle = '#fbf7f0'; x.fill() // 白目（小）
+        x.beginPath(); x.ellipse(ex, ey + 1, 4, 5.4, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill() // 虹彩
+        x.beginPath(); x.ellipse(ex, ey + 1.6, 1.9, 2.9, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill() // 瞳孔
+        x.beginPath(); x.ellipse(ex - sx * 1.7, ey - 2.2, 1.7, 2.1, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト
+        x.beginPath(); x.moveTo(ex - 5.6, ey - 2.8); x.quadraticCurveTo(ex, ey - 7.4, ex + 5.6, ey - 2.8); x.strokeStyle = OL; x.lineWidth = 2.4; x.stroke() // 上まぶた（細め）
+        x.beginPath(); x.moveTo(ex - 6, ey - 11); x.quadraticCurveTo(ex, ey - 13.5, ex + 6, ey - 10.5); x.strokeStyle = hair; x.lineWidth = 2; x.stroke() // 眉
       }
       // 鼻・口（小さく）
-      x.beginPath(); x.moveTo(128, 116); x.lineTo(125, 121); x.strokeStyle = skinSh; x.lineWidth = 2; x.stroke()
-      x.beginPath(); x.moveTo(122, 128); x.quadraticCurveTo(128, 132, 134, 128); x.strokeStyle = mouthC; x.lineWidth = 2.4; x.stroke()
-      // 前髪（額を覆う束＋サイドの毛）
-      x.beginPath(); x.moveTo(92, 80); x.bezierCurveTo(96, 50, 160, 50, 164, 80); x.bezierCurveTo(150, 66, 150, 92, 138, 86); x.bezierCurveTo(132, 70, 124, 70, 118, 86); x.bezierCurveTo(106, 92, 106, 66, 92, 80); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
-      for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 34, 78); x.bezierCurveTo(128 + sx * 40, 110, 128 + sx * 34, 135, 128 + sx * 26, 140); x.bezierCurveTo(128 + sx * 30, 120, 128 + sx * 30, 96, 128 + sx * 30, 82); x.closePath(); x.fillStyle = hair; x.fill(); ol(3) } // サイドの髪（頬に沿う）
-      x.beginPath(); x.moveTo(108, 60); x.quadraticCurveTo(128, 52, 148, 60); x.strokeStyle = hairHi; x.lineWidth = 2; x.stroke() // 髪の艶
+      x.beginPath(); x.moveTo(128, 115); x.lineTo(125.5, 119); x.strokeStyle = skinSh; x.lineWidth = 1.8; x.stroke()
+      x.beginPath(); x.moveTo(123, 126); x.quadraticCurveTo(128, 129, 133, 126); x.strokeStyle = mouthC; x.lineWidth = 2.2; x.stroke()
+      // 前髪（中央でふんわり分け＋毛束＝束感のあるボブ）
+      x.beginPath(); x.moveTo(96, 84); x.bezierCurveTo(98, 54, 158, 54, 160, 84)
+      x.bezierCurveTo(153, 70, 149, 92, 140, 86); x.bezierCurveTo(136, 73, 132, 73, 129, 82) // 右の毛束
+      x.bezierCurveTo(125, 73, 121, 73, 117, 86); x.bezierCurveTo(108, 92, 104, 70, 96, 84); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
+      for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 30, 80); x.bezierCurveTo(128 + sx * 37, 110, 128 + sx * 31, 142, 128 + sx * 22, 150); x.bezierCurveTo(128 + sx * 27, 122, 128 + sx * 27, 98, 128 + sx * 27, 82); x.closePath(); x.fillStyle = hair; x.fill(); ol(3) } // サイドの毛（頬に沿って顎へ）
+      x.beginPath(); x.moveTo(106, 64); x.quadraticCurveTo(128, 56, 150, 64); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 髪の艶（ハイライト）
     }
     const maxAniso = renderer.capabilities.getMaxAnisotropy()
     const makeAnimeSprite = () => {
