@@ -2352,8 +2352,8 @@ export async function mountTown3d(parent, opts = {}) {
         // 城下に木立を散らす（家々の合間・辻・空き地を緑で埋める＝home並みの緑量へ）。統合で軽量（1本ごとのドローコールを増やさない）。
         { const leafC = season === 'spring' ? 0x7faa4e : season === 'autumn' ? 0xcf8a38 : season === 'winter' ? 0xcdd6cc : 0x5a7e44
           const trunkGeos = [], coneGeos = [], leafGeos = [], tmM2 = new THREE.Matrix4()
-          for (let k = 0; k < 40; k++) { const a2 = R() * 6.2832, r2 = 22 + R() * 80, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz)
-            if (py < SEA.level + 1.4 || edoStream(px, pz) < 5 || Math.hypot(px - ex, pz - ez) < 21 || edoFac.some((f) => Math.hypot(px - f.x, pz - f.z) < f.r + 1)) continue // 海/小川/堀の内/庭園は避ける
+          for (let k = 0; k < 76; k++) { const a2 = R() * 6.2832, r2 = 22 + R() * 96, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz)
+            if (py < SEA.level + 1.4 || edoStream(px, pz) < 5 || Math.hypot(px - ex, pz - ez) < 21 || edoFac.some((f) => Math.hypot(px - f.x, pz - f.z) < f.r + 1)) continue // 海/小川/堀の内/庭園は避ける（拡大した島の外周まで緑を行き渡らせる）
             const pine = R() < 0.4, s = pine ? 1 : 0.85 + R() * 0.5
             const trG = new THREE.CylinderGeometry(0.17 * s, 0.27 * s, 1.9 * s, 6); tmM2.makeTranslation(px, py + 0.95 * s, pz); trG.applyMatrix4(tmM2); trunkGeos.push(trG)
             if (pine) { const fG = new THREE.ConeGeometry(1.6, 2.3, 7); tmM2.makeTranslation(px, py + 2.8, pz); fG.applyMatrix4(tmM2); coneGeos.push(fG) } // 松/杉
@@ -2792,7 +2792,11 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < 11; k++) { const a = (k / 11) * 6.28 + 0.2, r2 = 12 + R() * 30, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.4 || Math.hypot(px - (tx + 6), pz - (tz - 4)) < 6) continue
             const [nm, bg] = tenmei[k % tenmei.length]; mkSignH(px, py + 3.0, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, nm, bg, 0xf2ece0) } // 大正の店の看板
           const tfolC = season === 'spring' ? 0x88aa55 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48
-          for (let k = 0; k < 26; k++) { const a = R() * 6.28, r2 = 12 + R() * 50, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5 || taishoCanal(px, pz) < 4) continue; const s = 0.7 + R() * 0.5; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3 * s, 0), toon(tfolC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 街のあちこちに木立（密度UP）
+          const tTrunkG = [], tLeafG = [], tmM4 = new THREE.Matrix4() // 木立を統合＝拡大した島の全域に緑を行き渡らせつつ描画コール据え置き
+          for (let k = 0; k < 58; k++) { const a = R() * 6.28, r2 = 12 + R() * 94, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5 || taishoCanal(px, pz) < 4) continue; const s = 0.7 + R() * 0.5
+            const trG = new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6); tmM4.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(tmM4); tTrunkG.push(trG)
+            const fG = new THREE.IcosahedronGeometry(1.3 * s, 0); tmM4.makeTranslation(px, py + 1.9 * s, pz); fG.applyMatrix4(tmM4); tLeafG.push(fG) }
+          for (const [geos, mat] of [[tTrunkG, toon(0x6a4f38)], [tLeafG, toon(tfolC)]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } } } // 街のあちこちに木立（密度UP・統合）
         // 港を見下ろす高台の洋館（大正の見どころ。クリームの壁＋マンサード屋根＋並木）
         { const mx0 = tx - 44, mz0 = tz + 42, my0 = heightAt(mx0, mz0)
           const body = new THREE.Mesh(new RoundedBoxGeometry(9, 5.0, 7, 1, 0.12), facadeMat('yofu', 0xe6ddc8)); body.position.set(mx0, my0 + 2.5, mz0); body.castShadow = true; body.receiveShadow = true; town.add(body); town.add(addOutline(body))
