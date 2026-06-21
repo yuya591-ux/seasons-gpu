@@ -4064,10 +4064,15 @@ export async function mountTown3d(parent, opts = {}) {
     box(0.34, 0.03, 0.46, tcx - 0.5, FY + 0.06, tcz + 0.7, creamMat) // たたんだ新聞
     if (season === 'winter') { box(1.95, 0.5, 1.95, tcx, FY + 0.28, tcz, fabMat) } // こたつの布団
     else if (season === 'summer') { cyl(0.04, 0.04, 1.0, -3.0, FY + 0.5, 5.2, blackMat); const fan = cyl(0.32, 0.32, 0.1, -3.0, FY + 1.0, 5.2, ceramMat, 16); fan.rotation.z = Math.PI / 2; box(0.5, 0.1, 0.5, -3.0, FY + 0.05, 5.2, blackMat) } // 扇風機（夏）
-    // ── 窓辺のカーテン（淡い色。窓の左右） ──
-    const curtMat = mk(C(0xd8cbb0, 0x4a4450))
-    for (const cs of [-1, 1]) { const ct = box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.42, curtMat); ct.userData.cs = cs; ct.userData.x0 = cs * (owW / 2 + 0.18); winCurtains.push(ct) } // 窓枠より手前に吊る（桟と重ねない）
-    box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.44, curtMat) // 上飾り
+    // ── 窓辺のカーテン（ひだのある布。窓の左右。明暗の縦ひだで“ギャザーの寄った布”に） ──
+    const curtMat = mk(C(0xd8cbb0, 0x4a4450)) // 上飾り（grad付きの平面）
+    const ctC = (h) => { const c = new THREE.Color(h); if (roomWarm) c.multiply(roomWarm); const m = new THREE.MeshBasicMaterial({ color: c, fog: false }); winRoomMats.push(m); return m } // 子群ローカル＝素のMeshBasic（grad黒落ち回避）
+    const curtLight = ctC(C(0xe0d4ba, 0x4e4a5a)), curtDark = ctC(C(0xc2b69c, 0x383442))
+    for (const cs of [-1, 1]) { const cg = new THREE.Group(); cg.position.set(cs * (owW / 2 + 0.18), WINCY, 0.42) // ひだの束
+      const folds = 5, fw = 0.072
+      for (let f = 0; f < folds; f++) { const fold = new THREE.Mesh(new THREE.CylinderGeometry(fw * 0.62, fw * 0.62, owH + 0.34, 8), f % 2 ? curtDark : curtLight); fold.position.x = (f - (folds - 1) / 2) * fw; fold.renderOrder = 2; cg.add(fold) }
+      cg.userData.cs = cs; cg.userData.x0 = cs * (owW / 2 + 0.18); winCurtains.push(cg); winRoom.add(cg) }
+    box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.44, curtMat) // 上飾り（バランス）
     // ── 夏＝窓辺の風鈴（吊り紐＋硝子の釣鐘＋舌＋短冊。窓をあけると外気でそっと揺れる） ──
     if (season === 'summer') {
       const wc = new THREE.Group(); wc.position.set(owW * 0.34, oT + 0.02, 0.42); winRoom.add(wc); windChime = wc
