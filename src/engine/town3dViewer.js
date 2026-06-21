@@ -4284,8 +4284,8 @@ export async function mountTown3d(parent, opts = {}) {
       for (const s of [-0.035, 0, 0.035]) hAdd(CY(0.005, 0.055), furD, s, 0.085, 0.05, 0.55, 0, 0)
       // ひげ（左右3本ずつ・細く）
       for (const s of [-1, 1]) for (const dy of [-0.018, 0, 0.018]) { const w = hAdd(CY(0.0018, 0.14, 4), whisk, s * 0.12, -0.03 + dy, 0.1); w.rotation.z = s * 1.45; w.rotation.y = -s * (0.2 + dy * 6) }
-      floorShadow(0.5, 1.62, 0.78, 0.6) // 猫の接地影
-      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, eyesClosed, eyesOpen, hit, y0: 0.78, headX0: -0.46, headY0: 0.33, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1, alert: 0, alertTarget: 0, petAmt: 0, petActive: 0, wakeT: 26 + R() * 40, wakeHold: 0, purr: 0 }
+      const catShadow = floorShadow(0.5, 1.62, 0.78, 0.6) // 猫の接地影（移動について回る）
+      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, eyesClosed, eyesOpen, hit, catShadow, y0: 0.78, headX0: -0.46, headY0: 0.33, baseY: FY + 0.02, homeX: 0.5, homeZ: 1.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1, alert: 0, alertTarget: 0, petAmt: 0, petActive: 0, wakeT: 26 + R() * 40, wakeHold: 0, purr: 0, relocT: 38 + R() * 50, relocP: 1, x0: 0.5, z0: 1.62, rot0: 0.38, x1: 0.5, z1: 1.62, rot1: 0.38 }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -5586,7 +5586,15 @@ export async function mountTown3d(parent, opts = {}) {
       c.wakeT -= dt
       if (c.wakeT < 0 && c.wakeHold <= 0 && c.petActive < 1) { c.wakeT = 32 + R() * 52; c.wakeHold = 2.5 + R() * 3.5 } // たまにふと目を覚ます
       if (c.wakeHold > 0) c.wakeHold -= dt
-      c.alertTarget = (c.petActive >= 1 || c.wakeHold > 0) ? 1 : 0
+      // たまに起き上がって伸びをし、日だまりの別の場所へ移って丸くなる（猫の現実的な“移動”）
+      c.relocT -= dt
+      if (c.relocT < 0 && c.relocP >= 1 && c.petActive < 1 && c.alert < 0.3) { c.relocT = 46 + R() * 60; c.relocP = 0
+        c.x0 = c.g.position.x; c.z0 = c.g.position.z; c.rot0 = c.g.rotation.y; c.g.rotation.z = 0
+        const ang = Math.random() * 6.28, d = 0.55 + Math.random() * 0.75
+        c.x1 = Math.max(-0.35, Math.min(1.35, c.x0 + Math.cos(ang) * d)); c.z1 = Math.max(1.05, Math.min(2.35, c.z0 + Math.sin(ang) * d))
+        c.rot1 = Math.atan2(c.x1 - c.x0, c.z1 - c.z0) }
+      const reloc = c.relocP < 1
+      c.alertTarget = (c.petActive >= 1 || c.wakeHold > 0 || reloc) ? 1 : 0
       c.alert += (c.alertTarget - c.alert) * Math.min(1, dt * 3.2)
       if (c.petActive >= 1) c.petAmt = Math.min(1, c.petAmt + dt * 0.5); else c.petAmt = Math.max(0, c.petAmt - dt * 0.5)
       // ゴロゴロ（撫でられているほど強い）。間引いて音側へ。
@@ -5609,9 +5617,25 @@ export async function mountTown3d(parent, opts = {}) {
       // 耳: たまにピクッ（撫でると小刻み）
       c.earT -= dt; if (c.earT < 0) { c.earT = (c.petAmt > 0.3 ? 3 : 7) + R() * 9; c.earK = 0.45 }
       if (c.earK > 0) { c.earK -= dt; const e = Math.sin((0.45 - c.earK) * 26) * 0.22 * Math.max(0, c.earK / 0.45); c.ears[0].rotation.x = c.ears0[0] + e; c.ears[1].rotation.x = c.ears0[1] - e }
-      // 寝返り（眠っている時だけ）
-      c.settleT -= dt; if (c.settleT < 0 && c.settleP >= 1 && c.alert < 0.2) { c.settleT = 30 + R() * 44; c.settleP = 0 }
-      if (c.settleP < 1) { c.settleP = Math.min(1, c.settleP + dt / 3.6); c.g.rotation.z = Math.sin(c.settleP * Math.PI) * 0.12 } }
+      // 寝返り（眠っている・移動していない時だけ）
+      c.settleT -= dt; if (c.settleT < 0 && c.settleP >= 1 && c.alert < 0.2 && !reloc) { c.settleT = 30 + R() * 44; c.settleP = 0 }
+      if (c.settleP < 1 && !reloc) { c.settleP = Math.min(1, c.settleP + dt / 3.6); c.g.rotation.z = Math.sin(c.settleP * Math.PI) * 0.12 }
+      // 移動: 立ち上がり→ぐーっと伸び→とことこ歩く→新しい場所で伏せる。接地影も連れて動く。
+      if (reloc) {
+        c.relocP = Math.min(1, c.relocP + dt / 5.4)
+        const p = c.relocP
+        const mv = p < 0.24 ? 0 : p > 0.82 ? 1 : (p - 0.24) / 0.58, ease = mv * mv * (3 - 2 * mv)
+        c.g.position.x = c.x0 + (c.x1 - c.x0) * ease
+        c.g.position.z = c.z0 + (c.z1 - c.z0) * ease
+        c.g.rotation.y = c.rot0 + (c.rot1 - c.rot0) * Math.min(1, p * 2.2)
+        const stand = Math.sin(Math.min(1, p / 0.85) * Math.PI)                  // 立ち上がって着地で伏せる
+        const step = (mv > 0 && mv < 1) ? Math.abs(Math.sin(p * 26)) * 0.018 : 0  // とことこ
+        c.g.position.y = c.baseY + stand * 0.05 + step
+        const st = Math.sin(Math.max(0, Math.min(1, (p - 0.04) / 0.18)) * Math.PI) // 最初のぐーっと伸び
+        c.body.scale.x = 1.5 * (1 + st * 0.4 + (mv > 0 && mv < 1 ? 0.14 : 0))
+        c.body.scale.z = 1.22 * (1 - st * 0.12)
+        if (c.catShadow) { c.catShadow.position.x = c.g.position.x; c.catShadow.position.z = c.g.position.z }
+      } else { c.body.scale.x = 1.5; c.body.scale.z = 1.22; if (Math.abs(c.g.position.y - c.baseY) > 0.0005) c.g.position.y = c.baseY } }
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
@@ -5659,6 +5683,8 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2) } } // 検証用: 描画コール/三角形/オブジェクト数
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
     window.__town3dResFace = (i, ya) => { if (residents[i]) { residents[i].rotation.y = ya; residents[i].userData.face = ya } } // 検証用: 住人の向きを固定（顔の確認）
+    window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
+    window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
