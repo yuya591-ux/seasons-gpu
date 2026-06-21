@@ -3779,93 +3779,94 @@ export async function mountTown3d(parent, opts = {}) {
   const RES_BOT = [0x39414e, 0x4a4036, 0x2e3640, 0x55504a, 0x6a3a3a, 0x40506a]
   const RES_IRIS = [0x6a86c0, 0x5a9a6a, 0xb88a44, 0x9a6238, 0x7a5aa0] // 明るめ＝アニメの澄んだ瞳（青/緑/琥珀/榛/菫）
   const makeResident = (cfg = {}) => {
+    // アニメの頭身（約6頭身・すらりと細身）＋丸みのある作り＋澄んだ大きな目。没入できる等身のキャラクター。
     const g = new THREE.Group()
     const outfit = cfg.outfit || 'modern'
-    const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x2c2824)
-    const white = new THREE.MeshBasicMaterial({ color: 0xf7f3ed, fog: true }), dark = toon(0x201c18), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xb06a60), browM = toon(cfg.hair)
+    const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x33302b)
+    const white = new THREE.MeshBasicMaterial({ color: 0xfcf9f4, fog: true }), dark = toon(0x2c2622), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xca8478), browM = toon(cfg.hair), blush = toon(0xe6a99a)
     const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
-    const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 14, h || 12), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 8), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
+    const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 14), CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 4, 10), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 14), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
     const add = (p, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx !== undefined) m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.castShadow = true; p.add(m); return m }
     const arms = [], legs = []
-    const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.245, 1.4, 0); g.add(armG)
-      if (wide) { add(armG, BX(0.17, 0.36, 0.15), sleeveMat, s * 0.03, -0.2, 0); add(armG, SP(0.05), skin, s * 0.02, -0.46, 0.02) } // 着物の袖
-      else { add(armG, CY(0.062, 0.05, 0.34, 7), sleeveMat, 0, -0.17, 0); add(armG, CY(0.046, 0.04, 0.3, 7), skin, 0, -0.42, 0); add(armG, SP(0.05), skin, 0, -0.6, 0) }
-      armG.rotation.z = s * 0.05; arms.push(armG) } }
-    const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.1, 0.9, 0); g.add(legG) // 股関節で振れる脚
-      add(legG, CY(rad, rad * 0.85, 0.7, 7), legMat, 0, -0.34, 0); add(legG, BX(0.15, 0.1, 0.28), shoeM, 0, -0.72, 0.05); legs.push(legG) } }
-    // ── 体（衣装別）──
+    const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.175, 1.42, 0); g.add(armG) // 細く長い腕
+      if (wide) { add(armG, CAP(0.066, 0.34), sleeveMat, s * 0.02, -0.24, 0); add(armG, SP(0.044), skin, s * 0.01, -0.5, 0.01) } // 着物の袖
+      else { add(armG, CAP(0.043, 0.42), sleeveMat, 0, -0.24, 0); add(armG, SP(0.04), skin, 0, -0.52, 0) } // 腕＋手
+      armG.rotation.z = s * 0.07; arms.push(armG) } }
+    const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.072, 0.96, 0); g.add(legG) // 細く長い脚（股関節で振れる）
+      add(legG, CAP(rad, 0.74), legMat, 0, -0.45, 0); add(legG, SP(0.062), shoeM, 0, -0.85, 0.04, 1.2, 0.62, 1.6); legs.push(legG) } }
+    // ── 体（衣装別。すらりと細身。頭は約6頭身で小さめ）──
     if (outfit === 'kimono' || outfit === 'armor') {
-      add(g, CY(0.27, 0.21, 1.26, 12), topM, 0, 0.74, 0)                    // 着物の身頃（裾広がりの筒）
-      add(g, CY(0.28, 0.27, 0.13, 12), accentM, 0, 0.88, 0)                 // 帯
-      for (const s of [-1, 1]) add(g, BX(0.05, 0.42, 0.02), white, s * 0.05, 1.16, 0.2).rotation.z = -s * 0.34 // 襟（Vの重ね）
-      for (const s of [-1, 1]) add(g, BX(0.14, 0.06, 0.28), shoeM, s * 0.085, 0.05, 0.05) // 草履＋足
+      add(g, CY(0.2, 0.16, 1.32, 16), topM, 0, 0.74, 0)                     // 着物の身頃（裾広がり・細身）
+      add(g, SP(0.165, 14, 10), topM, 0, 1.38, 0, 1.1, 0.62, 0.9)          // 肩
+      add(g, CY(0.205, 0.2, 0.11, 16), accentM, 0, 0.9, 0)                 // 帯
+      for (const s of [-1, 1]) add(g, BX(0.042, 0.42, 0.02), white, s * 0.04, 1.18, 0.15).rotation.z = -s * 0.32 // 襟（Vの重ね）
+      for (const s of [-1, 1]) add(g, SP(0.062), shoeM, s * 0.068, 0.06, 0.05, 1.25, 0.62, 1.7) // 草履＋足
       buildArms(topM, true)
-      if (outfit === 'armor') { add(g, CY(0.29, 0.27, 0.44, 10), botM, 0, 1.06, 0) // 胴（胸当て）
-        for (let i = 0; i < 5; i++) { const a = (i - 2) * 0.46; add(g, BX(0.12, 0.2, 0.04), botM, Math.sin(a) * 0.28, 0.74, Math.cos(a) * 0.28).rotation.y = a } // 草摺
-        for (const s of [-1, 1]) add(g, BX(0.17, 0.17, 0.15), botM, s * 0.27, 1.32, 0) } // 袖（肩の防具）
+      if (outfit === 'armor') { add(g, CY(0.22, 0.2, 0.42, 14), botM, 0, 1.12, 0) // 胴（胸当て）
+        for (let i = 0; i < 5; i++) { const a = (i - 2) * 0.46; add(g, BX(0.1, 0.2, 0.04), botM, Math.sin(a) * 0.21, 0.76, Math.cos(a) * 0.21).rotation.y = a } // 草摺
+        for (const s of [-1, 1]) add(g, SP(0.095, 10, 8), botM, s * 0.2, 1.38, 0, 1, 0.8, 0.9) } // 肩の防具
     } else if (outfit === 'hakama') {
-      add(g, CY(0.24, 0.22, 0.64, 12), topM, 0, 1.06, 0)                    // 上衣
-      add(g, CY(0.31, 0.2, 0.8, 12), botM, 0, 0.5, 0)                       // 袴（下が広い）
-      add(g, CY(0.27, 0.31, 0.1, 12), accentM, 0, 0.88, 0)                  // 帯
-      for (const s of [-1, 1]) add(g, BX(0.14, 0.06, 0.28), shoeM, s * 0.085, 0.05, 0.05)
+      add(g, CY(0.18, 0.17, 0.66, 16), topM, 0, 1.06, 0)                   // 上衣
+      add(g, SP(0.155, 14, 10), topM, 0, 1.38, 0, 1.1, 0.62, 0.9)          // 肩
+      add(g, CY(0.235, 0.15, 0.86, 16), botM, 0, 0.5, 0)                   // 袴（下が広い）
+      add(g, CY(0.195, 0.235, 0.09, 16), accentM, 0, 0.9, 0)               // 帯
+      for (const s of [-1, 1]) add(g, SP(0.062), shoeM, s * 0.068, 0.06, 0.05, 1.25, 0.62, 1.7)
       buildArms(topM, true)
     } else if (outfit === 'dress') {
-      buildLegs(skin, 0.058) // 脚（股関節で振れる）
-      add(g, CY(0.33, 0.17, 0.64, 12), topM, 0, 0.78, 0)                    // スカート（Aライン）
-      add(g, CY(0.18, 0.18, 0.42, 10), topM, 0, 1.16, 0)                    // 上身頃
-      add(g, CY(0.19, 0.19, 0.06, 10), accentM, 0, 0.96, 0)                 // ウエストの差し色
-      add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0)
+      buildLegs(skin, 0.05) // 脚
+      add(g, CY(0.25, 0.12, 0.66, 16), topM, 0, 0.78, 0)                   // スカート（Aライン）
+      add(g, SP(0.14, 14, 12), topM, 0, 1.18, 0, 1.0, 1.45, 0.82)          // 上身頃（細い）
+      add(g, CY(0.14, 0.14, 0.05, 14), accentM, 0, 0.98, 0)                // ウエストの差し色
       buildArms(topM, false)
     } else { // modern / suit
-      buildLegs(botM, 0.085) // 脚（股関節で振れる）
-      add(g, BX(0.36, 0.22, 0.24), botM, 0, 0.92, 0)
-      add(g, CY(0.215, 0.18, 0.5, 12), topM, 0, 1.16, 0)
-      add(g, SP(0.2, 12, 8), topM, 0, 1.34, 0, 1.15, 0.62, 0.82)
-      if (outfit === 'suit') add(g, BX(0.05, 0.3, 0.02), accentM, 0, 1.16, 0.19) // ネクタイ
-      add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0)
+      buildLegs(botM, 0.072) // 脚
+      add(g, SP(0.155, 16, 14), topM, 0, 1.16, 0, 1.0, 1.62, 0.82)         // 胴（細いたまご型）
+      add(g, SP(0.16, 14, 10), topM, 0, 1.4, 0, 1.16, 0.55, 0.86)          // 肩
+      if (outfit === 'suit') add(g, BX(0.042, 0.3, 0.02), accentM, 0, 1.2, 0.14) // ネクタイ
       buildArms(topM, false)
     }
-    // ── 頭＋顔（共通・アニメ調）──
+    add(g, CY(0.05, 0.048, 0.1, 10), skin, 0, 1.46, 0) // 首（細い）
+    // ── 頭（約6頭身で小さめ）＋顔（澄んだ大きな目が主役・アニメの瞳） ──
     const headG = new THREE.Group(); headG.position.set(0, 1.62, 0); g.add(headG)
-    add(headG, SP(0.17, 18, 16), skin, 0, 0, 0, 0.96, 1.04, 0.97)
-    for (const s of [-1, 1]) add(headG, SP(0.03), skin, s * 0.163, -0.01, 0.01, 0.7, 1, 0.7) // 耳
-    for (const s of [-1, 1]) {
-      add(headG, SP(0.056, 14, 12), white, s * 0.072, -0.003, 0.142, 1.0, 1.3, 0.45)
-      add(headG, SP(0.037, 14, 12), irisM, s * 0.072, -0.006, 0.163, 1.0, 1.12, 0.5)
-      add(headG, SP(0.016, 10, 8), dark, s * 0.072, -0.008, 0.176, 1, 1.1, 0.5)
-      add(headG, SP(0.016, 8, 6), white, s * 0.072 + s * 0.015, 0.016, 0.187)
-      add(headG, SP(0.007, 6, 6), white, s * 0.072 - s * 0.012, -0.018, 0.184)
-      add(headG, BX(0.088, 0.015, 0.014), dark, s * 0.072, 0.042, 0.156).rotation.z = s * 0.1
-      add(headG, BX(0.064, 0.012, 0.012), browM, s * 0.08, 0.073, 0.15).rotation.z = s * 0.13
+    add(headG, SP(0.15, 22, 20), skin, 0, 0, 0, 1.0, 1.04, 0.97) // 頭（小さめ＝高頭身）
+    for (const s of [-1, 1]) add(headG, SP(0.026), skin, s * 0.145, -0.01, 0.0, 0.7, 1, 0.7) // 耳
+    for (const s of [-1, 1]) { // 大きなアニメの瞳（頭に対して大きく）
+      add(headG, SP(0.05, 16, 14), white, s * 0.062, -0.004, 0.122, 1.0, 1.36, 0.45) // 白目
+      add(headG, SP(0.035, 16, 14), irisM, s * 0.062, -0.008, 0.142, 1.0, 1.16, 0.5)  // 虹彩
+      add(headG, SP(0.016, 12, 10), dark, s * 0.062, -0.01, 0.155, 1, 1.1, 0.5)        // 瞳孔
+      add(headG, SP(0.016, 8, 8), white, s * 0.062 + s * 0.014, 0.018, 0.164)          // ハイライト
+      add(headG, SP(0.007, 6, 6), white, s * 0.062 - s * 0.011, -0.02, 0.16)           // 下の小反射
+      add(headG, BX(0.08, 0.014, 0.012), dark, s * 0.062, 0.04, 0.135).rotation.z = s * 0.1 // 上まつ毛
+      add(headG, BX(0.058, 0.011, 0.01), browM, s * 0.068, 0.07, 0.128).rotation.z = s * 0.13 // 眉
+      add(headG, SP(0.022, 8, 8), blush, s * 0.1, -0.04, 0.113, 1.2, 0.7, 0.4) // 頬の赤み
     }
-    add(headG, BX(0.011, 0.02, 0.009), dark, 0.01, -0.05, 0.174)
-    add(headG, BX(0.046, 0.013, 0.012), mouthM, 0, -0.092, 0.164)
-    // ── 髪（hairStyle: modern0/1/2・topknot=髷・bob・short・hat=帽子下で控えめ）──
+    add(headG, BX(0.01, 0.018, 0.008), dark, 0.01, -0.046, 0.15) // 鼻
+    add(headG, BX(0.04, 0.012, 0.01), mouthM, 0, -0.084, 0.144)  // 口
+    // ── 髪（hairStyle）。頭0.15に合わせた寸法 ──
     const hs = cfg.hairStyle
-    if (hs === 'topknot') { add(headG, SP(0.178, 14, 12), hairM, 0, 0.02, -0.04, 1.02, 1.0, 1.0) // 後ろ髪
-      add(headG, CY(0.04, 0.05, 0.1, 8), hairM, 0, 0.17, -0.02) // 髷（小さなまげ）
-      add(headG, SP(0.06, 10, 8), skin, 0, 0.12, 0.12, 1.6, 0.5, 0.6) } // 月代（額を出す）
-    else if (hs === 'bob') { add(headG, SP(0.2, 16, 14), hairM, 0, 0.0, -0.02, 1.05, 1.05, 1.05) // 丸いボブ
-      for (const s of [-1, 1]) add(headG, SP(0.08, 10, 10), hairM, s * 0.17, -0.08, 0.02, 0.7, 1.5, 0.9) // 頬の横の髪
-      for (const [hx, hz] of [[-0.09, 0.13], [0.0, 0.15], [0.09, 0.13]]) add(headG, SP(0.06, 10, 8), hairM, hx, 0.11, hz, 1, 0.8, 0.8) } // 前髪（ぱっつん）
-    else if (hs === 'hat') { add(headG, SP(0.176, 12, 10), hairM, 0, 0.0, -0.05, 1.0, 0.9, 1.0) } // 帽子下：後ろに少し
-    else if (hs === 'short') { add(headG, SP(0.178, 14, 12), hairM, 0, 0.04, -0.02, 1.04, 0.95, 1.04)
-      for (const [hx, hz] of [[-0.1, 0.13], [0.0, 0.15], [0.1, 0.13]]) add(headG, SP(0.045, 8, 8), hairM, hx, 0.115, hz, 1, 0.8, 0.8) }
-    else { add(headG, SP(0.183, 16, 14), hairM, 0, 0.03, -0.055, 1.04, 1.04, 1.0) // modern
-      for (const [hx, hz] of [[-0.12, 0.12], [-0.06, 0.15], [0.0, 0.16], [0.06, 0.15], [0.12, 0.12]]) add(headG, SP(0.05, 10, 8), hairM, hx, 0.108, hz, 1, 0.9, 0.9)
-      if ((hs | 0) === 1) add(headG, SP(0.1, 12, 10), hairM, 0, -0.13, -0.16, 1.1, 1.0, 0.9)
-      else for (const s of [-1, 1]) add(headG, SP(0.07, 10, 10), hairM, s * 0.15, -0.06, -0.02, 0.7, 1.4, 0.9) }
-    // ── 帽子（hat）──
-    if (cfg.hat === 'kasa') { add(g, CY(0.04, 0.34, 0.16, 14), toon(cfg.hatCol || 0xc6a866), 0, 1.86, 0) } // 笠（菅笠）
-    else if (cfg.hat === 'jingasa') { add(g, CY(0.06, 0.3, 0.1, 14), toon(cfg.hatCol || 0x4a3a2c), 0, 1.84, 0) } // 陣笠
-    else if (cfg.hat === 'fedora') { const hm = toon(cfg.hatCol || 0x3a322a); add(g, CY(0.21, 0.21, 0.02, 14), hm, 0, 1.78, 0); add(g, CY(0.13, 0.14, 0.14, 12), hm, 0, 1.86, 0) } // 中折れ帽
-    else if (cfg.hat === 'cap') { const hm = toon(cfg.hatCol || 0x2a2e38); add(g, SP(0.18, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hm, 0, 1.75, 0); add(g, BX(0.26, 0.03, 0.12), hm, 0, 1.72, 0.16) } // 学生帽
-    // ── 小道具（prop）──
-    if (cfg.prop === 'swords') for (const [ln, yy] of [[0.62, 1.0], [0.42, 0.95]]) { const sw = add(g, BX(0.025, ln, 0.06), toon(0x2a2620), -0.28, yy, -0.04); sw.rotation.z = 0.5; sw.rotation.x = -0.2 } // 大小の刀（左腰）
-    else if (cfg.prop === 'spear') { add(g, CY(0.022, 0.022, 2.0, 6), toon(0x5a4632), 0.32, 1.0, -0.05); add(g, CY(0.0, 0.03, 0.18, 6), toon(0xb8bcc2), 0.32, 2.05, -0.05) } // 槍
-    else if (cfg.prop === 'bundle') { add(g, BX(0.3, 0.26, 0.22), toon(cfg.accent || 0x8a6a4a), 0, 1.16, -0.24) } // 背中の風呂敷包み
-    else if (cfg.prop === 'cane') { add(g, CY(0.016, 0.016, 0.9, 6), toon(0x3a2e22), 0.34, 0.46, 0.12) } // ステッキ
-    g.scale.setScalar((cfg.scale || 1) * (0.95 + R() * 0.14))
+    if (hs === 'topknot') { add(headG, SP(0.157, 16, 14), hairM, 0, 0.015, -0.04, 1.02, 1.0, 1.0)
+      add(headG, CY(0.034, 0.04, 0.085, 10), hairM, 0, 0.15, -0.015); add(headG, SP(0.054, 10, 8), skin, 0, 0.1, 0.11, 1.6, 0.5, 0.6) } // 髷＋月代
+    else if (hs === 'bob') { add(headG, SP(0.172, 18, 16), hairM, 0, 0.0, -0.015, 1.04, 1.05, 1.05)
+      for (const s of [-1, 1]) add(headG, SP(0.07, 12, 12), hairM, s * 0.15, -0.08, 0.02, 0.7, 1.5, 0.95)
+      for (const [hx, hz] of [[-0.075, 0.118], [0.0, 0.132], [0.075, 0.118]]) add(headG, SP(0.052, 12, 10), hairM, hx, 0.095, hz, 1, 0.8, 0.8) }
+    else if (hs === 'hat') { add(headG, SP(0.154, 14, 12), hairM, 0, 0.0, -0.045, 1.0, 0.9, 1.0) }
+    else if (hs === 'short') { add(headG, SP(0.157, 16, 14), hairM, 0, 0.04, -0.015, 1.04, 0.95, 1.04)
+      for (const [hx, hz] of [[-0.088, 0.115], [0.0, 0.132], [0.088, 0.115]]) add(headG, SP(0.04, 10, 8), hairM, hx, 0.105, hz, 1, 0.8, 0.8) }
+    else { add(headG, SP(0.162, 18, 16), hairM, 0, 0.025, -0.045, 1.03, 1.03, 1.0)
+      for (const [hx, hz] of [[-0.108, 0.103], [-0.052, 0.132], [0.0, 0.14], [0.052, 0.132], [0.108, 0.103]]) add(headG, SP(0.045, 12, 10), hairM, hx, 0.096, hz, 1, 0.9, 0.9)
+      if ((hs | 0) === 1) add(headG, SP(0.088, 14, 12), hairM, 0, -0.12, -0.13, 1.1, 1.0, 0.9)
+      else for (const s of [-1, 1]) add(headG, SP(0.062, 12, 12), hairM, s * 0.132, -0.06, -0.015, 0.7, 1.4, 0.9) }
+    // ── 帽子（hat） ──
+    if (cfg.hat === 'kasa') { add(g, CY(0.04, 0.3, 0.14, 16), toon(cfg.hatCol || 0xc6a866), 0, 1.84, 0) }
+    else if (cfg.hat === 'jingasa') { add(g, CY(0.05, 0.26, 0.085, 16), toon(cfg.hatCol || 0x4a3a2c), 0, 1.82, 0) }
+    else if (cfg.hat === 'fedora') { const hm = toon(cfg.hatCol || 0x3a322a); add(g, CY(0.19, 0.19, 0.02, 16), hm, 0, 1.78, 0); add(g, CY(0.12, 0.13, 0.13, 14), hm, 0, 1.85, 0) }
+    else if (cfg.hat === 'cap') { const hm = toon(cfg.hatCol || 0x2a2e38); add(g, SP(0.158, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hm, 0, 1.73, 0); add(g, BX(0.22, 0.025, 0.1), hm, 0, 1.71, 0.15) }
+    // ── 小道具（prop） ──
+    if (cfg.prop === 'swords') for (const [ln, yy] of [[0.58, 1.0], [0.4, 0.96]]) { const sw = add(g, CY(0.014, 0.014, ln, 6), toon(0x2a2620), -0.22, yy, -0.04); sw.rotation.z = 0.5; sw.rotation.x = -0.2 }
+    else if (cfg.prop === 'spear') { add(g, CY(0.018, 0.018, 1.9, 6), toon(0x5a4632), 0.26, 0.96, -0.05); add(g, CY(0.0, 0.026, 0.15, 6), toon(0xb8bcc2), 0.26, 1.94, -0.05) }
+    else if (cfg.prop === 'bundle') { add(g, SP(0.14, 12, 10), toon(cfg.accent || 0x8a6a4a), 0, 1.16, -0.19, 1, 1.1, 0.9) }
+    else if (cfg.prop === 'cane') { add(g, CY(0.013, 0.013, 0.9, 6), toon(0x3a2e22), 0.26, 0.46, 0.12) }
+    g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
     g.userData = { arms, legs, headG }
     return g
   }
@@ -5772,7 +5773,7 @@ export async function mountTown3d(parent, opts = {}) {
     })
     window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2) } } // 検証用: 描画コール/三角形/オブジェクト数
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
-    window.__town3dResFace = (i, ya) => { if (residents[i]) { residents[i].rotation.y = ya; residents[i].userData.face = ya } } // 検証用: 住人の向きを固定（顔の確認）
+    window.__town3dResFace = (i, ya) => { if (residents[i]) { const u = residents[i].userData; residents[i].rotation.y = ya; u.face = ya; u.moving = false; u.pauseT = 999; for (const a of u.arms) a.rotation.x = 0; for (const l of u.legs) l.rotation.x = 0 } } // 検証用: 住人を止めて向きを固定（顔の確認）
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
