@@ -3933,8 +3933,11 @@ export async function mountTown3d(parent, opts = {}) {
     // 3Dを1体だけ作り、正射影で8方向から1枚ずつ描き出してテクスチャ化。実行時は見る角度に応じて該当方向の絵を見せる（紙人形/Doom方式）。
     const SPR_DIRS = 8, cellW = 200, cellH = 330
     const bakeScene = new THREE.Scene()
-    bakeScene.add(new THREE.HemisphereLight(0xfff3e3, 0x6e665a, 1.18)) // 柔らかな全体光（どの世界の明るさにも馴染むよう平板めに）
-    const bakeKey = new THREE.DirectionalLight(0xffffff, 0.5); bakeKey.position.set(0.35, 1.0, 0.95); bakeScene.add(bakeKey) // ほんのり前上から
+    // 焼くときは「本来の色が明るく出る」よう、平らな地明かり＋カメラ寄りの強い主光で正面を充分に照らす。
+    // （Hemisphereだけだとトゥーンがカメラ向きの垂直面を陰と判定して黒く沈む＝図が暗くなる元凶）
+    bakeScene.add(new THREE.AmbientLight(0xfff5ec, 0.92)) // 平らな全体光＝陰側も色が残る
+    const bakeKey = new THREE.DirectionalLight(0xffffff, 1.0); bakeKey.position.set(0.25, 0.85, 1.2); bakeScene.add(bakeKey) // 前上からの主光＝正面が明るく色が出る
+    const bakeFill = new THREE.DirectionalLight(0xeaf0ff, 0.32); bakeFill.position.set(-0.7, 0.35, 0.6); bakeScene.add(bakeFill) // 反対側の弱い補助で平板化を防ぐ
     // 正射影の上下はカメラ基準。カメラを図の中央(y0.9)に置き、上下を±0.92にして world-y ≒ -0.02〜1.82 を写す（全身が収まる）。
     const bakeCam = new THREE.OrthographicCamera(-0.56, 0.56, 0.92, -0.92, 0.1, 12)
     bakeCam.position.set(0, 0.9, 5); bakeCam.lookAt(0, 0.9, 0)
