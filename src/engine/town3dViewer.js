@@ -1150,6 +1150,23 @@ export async function mountTown3d(parent, opts = {}) {
       const rack = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 0.4), toon(0x6a6e72)); rack.position.set(lx + (scx - lx) * 0.08, ly + 9.2, lz + (scz - lz) * 0.08); town.add(rack)
       if (isNight || duskAmt > 0.3) { const gl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.1, 0.12), new THREE.MeshBasicMaterial({ color: 0xfff4d0, fog: true })); gl.position.set(lx + (scx - lx) * 0.12, ly + 9.2, lz + (scz - lz) * 0.12); town.add(gl) } } // 照明塔×4（夜は灯る）
   }
+  // ── 湾のヨット（旗艦homeの海辺の憩い）。沖に係留のヨット＋防波堤＋海辺の遊歩道。狭い湾でも破綻しないよう桟橋は置かず水面に浮かべる。 ──
+  {
+    const mhx = 80, mhz = -14, deckMat = toon(0x8a6a48) // 湾の沖（水面の上）
+    const bw = new THREE.Mesh(new THREE.BoxGeometry(16, 1.6, 2.6), mottleMat(season === 'winter' ? 0xc6cac4 : 0x9a948a, 120, 0.12, [4, 1])); bw.position.set(mhx + 8, SEA.level + 0.7, mhz - 11); bw.castShadow = true; town.add(bw); town.add(addOutline(bw)) // 防波堤
+    const hullMat = toon(season === 'winter' ? 0xe2dccf : 0xdcd6c8), mastMat = toon(0x8a8278), sailMat = toon(0xeae4d6)
+    for (let i = 0; i < 6; i++) { const yz = mhz - 7 + i * 2.8 + (R() - 0.5), yx = mhx + 3 + (R() - 0.5) * 3.2
+      const yacht = new THREE.Group(); yacht.position.set(yx, SEA.level + 0.2, yz); yacht.rotation.y = Math.PI / 2 + (R() - 0.5) * 0.3; yacht.userData = { ph: R() * 6.28 }
+      const hull = new THREE.Mesh(new RoundedBoxGeometry(3.2, 0.7, 1.1, 1, 0.3), hullMat); hull.position.y = 0.4; hull.castShadow = true; yacht.add(hull)
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.4, 5), mastMat); mast.position.set(0, 2.0, 0); yacht.add(mast)
+      const sail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.5, 1.5), sailMat); sail.position.set(0, 1.85, 0.55); yacht.add(sail)
+      town.add(yacht); boats.push(yacht) } // 係留のヨット（白い船体＋マスト＋帆）＝波にゆれる
+    // 海辺の遊歩道（岸の上）＝ベンチ＋街路樹＋人
+    const promY = (px, pz) => heightAt(px, pz)
+    for (let i = 0; i < 5; i++) { const pz = mhz - 10 + i * 5.5, px = 69, py = promY(px, pz); if (py < SEA.level + 0.5) continue
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.45, 0.6), deckMat); bench.position.set(px, py + 0.3, pz); bench.rotation.y = Math.PI / 2; town.add(bench)
+      if (i % 2 === 0) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6), toon(0x6a4f38)); tr.position.set(px - 2, py + 0.9, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 0), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e8a52)); fo.position.set(px - 2, py + 2.3, pz); fo.castShadow = true; town.add(fo) } }
+  }
 
   // ── 自分の丘の近所（手前の両脇の家。緑だけの近景を埋め、自分も坂の街に居る感じに） ──
   for (const c of [[-13, 24], [13, 25], [-19, 19], [20, 20], [-10, 28], [11, 29]]) {
