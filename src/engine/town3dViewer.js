@@ -4117,6 +4117,11 @@ export async function mountTown3d(parent, opts = {}) {
       const blanMat = mk(C(0xcdb48e, 0x4a4036), clothTex) // たたんだ膝掛け（生成りの暖色）＝ここで暖まれる安心
       for (let i = 0; i < 3; i++) box(0.46, 0.038, 0.5 - i * 0.05, -0.62 + i * 0.012, FY + 0.045 + i * 0.036, 2.46, blanMat) // 少しずつずらした層
       floorShadow(-0.6, 2.46, 0.62, 0.62) } // 膝掛けの接地影
+    // ── 窓辺の読みかけの本（くつろぎの時間の気配。少しずれて積む） ──
+    { const bx = 0.82, bz = 2.46, cols = [mk(C(0x6a7a86, 0x2c343c)), mk(C(0xb0705a, 0x42302a)), mk(C(0xcabfa2, 0x4a4438))]
+      let by = FY + 0.04
+      for (let i = 0; i < 3; i++) { const bk = box(0.32 - i * 0.02, 0.04, 0.23 - i * 0.015, bx + (R() - 0.5) * 0.05, by + 0.02, bz, cols[i]); bk.rotation.y = (R() - 0.5) * 0.35; by += 0.046 }
+      floorShadow(bx, bz, 0.44, 0.36) }
     // ── 主な床置き家具の接地影（畳との間に柔らかい影＝浮きを消し、見下ろしで床が締まる） ──
     floorShadow(0.1, 2.5, 1.05, 1.05)       // 窓辺の座布団
     floorShadow(SX - 0.42, 3.0, 2.1, 1.4)   // テレビ台
