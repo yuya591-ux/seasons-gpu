@@ -3937,11 +3937,14 @@ export async function mountTown3d(parent, opts = {}) {
       x.beginPath(); x.moveTo(90, 84); x.bezierCurveTo(78, 150, 96, 172, 128, 174); x.bezierCurveTo(160, 172, 178, 150, 166, 84); x.bezierCurveTo(162, 44, 94, 44, 90, 84); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
       // パンツ（ハイウエストのワイド・濃紺）
       x.beginPath(); x.moveTo(94, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.lineTo(123, 470); x.lineTo(102, 470); x.bezierCurveTo(74, 372, 76, 300, 80, 268); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
+      x.beginPath(); x.moveTo(128, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.closePath(); x.fillStyle = '#283039'; x.fill() // 右脚の影
+      x.beginPath(); x.moveTo(90, 262); x.bezierCurveTo(86, 320, 96, 372, 108, 420); x.strokeStyle = botHi; x.lineWidth = 4; x.stroke() // 左の当たり（ハイライト）
       x.beginPath(); x.moveTo(128, 268); x.lineTo(128, 470); ol(2.5) // 脚の境
       // 靴
       for (const sx of [120, 142]) { x.beginPath(); x.ellipse(sx, 482, 13, 9, 0, 0, 6.2832); x.fillStyle = '#2a2622'; x.fill(); ol(3) }
       // ブラウス（白い半袖・上半身）
       x.beginPath(); x.moveTo(100, 158); x.bezierCurveTo(88, 168, 84, 210, 90, 262); x.lineTo(166, 262); x.bezierCurveTo(172, 210, 168, 168, 156, 158); x.bezierCurveTo(148, 150, 108, 150, 100, 158); x.closePath(); x.fillStyle = top; x.fill(); ol(4)
+      x.beginPath(); x.moveTo(138, 156); x.bezierCurveTo(150, 170, 152, 220, 150, 262); x.lineTo(166, 262); x.bezierCurveTo(172, 210, 168, 168, 156, 158); x.closePath(); x.fillStyle = topSh; x.fill() // 影側（右）
       x.beginPath(); x.moveTo(90, 256); x.lineTo(166, 256); x.strokeStyle = OL; x.lineWidth = 2.5; x.stroke() // 裾(ウエスト)
       // 肩紐（サスペンダー）
       for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 16, 158); x.lineTo(128 + sx * 22, 256); x.strokeStyle = bot; x.lineWidth = 6; x.stroke(); ol(1.5) }
@@ -3958,21 +3961,25 @@ export async function mountTown3d(parent, opts = {}) {
       x.beginPath(); x.rect(118, 128, 20, 26); x.fillStyle = skin; x.fill(); ol(3)
       // 顔（やや尖った顎の輪郭）
       x.beginPath(); x.moveTo(96, 86); x.bezierCurveTo(96, 118, 112, 140, 128, 140); x.bezierCurveTo(144, 140, 160, 118, 160, 86); x.bezierCurveTo(160, 56, 96, 56, 96, 86); x.closePath(); x.fillStyle = skin; x.fill(); ol(4)
+      // 額の落ち影（前髪の下＝立体感）
+      x.beginPath(); x.moveTo(98, 84); x.quadraticCurveTo(128, 96, 158, 84); x.quadraticCurveTo(128, 92, 98, 84); x.closePath(); x.fillStyle = 'rgba(210,170,140,0.45)'; x.fill()
       // 頬の赤み
-      ell(110, 110, 9, 6, blush); ell(146, 110, 9, 6, blush)
-      // 目（小さく控えめ＝ジブリ風。濃茶のアーモンド＋虹彩＋ハイライト）
+      ell(110, 112, 9, 6, blush); ell(146, 112, 9, 6, blush)
+      // 目（ジブリ風＝小さめだが澄んだ瞳。暖色の虹彩＋太い上まぶた＋大きめハイライト＋薄い下まぶた）
       for (const sx of [-1, 1]) {
-        const ex = 128 + sx * 17, ey = 100
-        x.beginPath(); x.ellipse(ex, ey, 7, 9, 0, 0, 6.2832); x.fillStyle = '#fbf7f0'; x.fill() // 白目（小）
-        x.beginPath(); x.ellipse(ex, ey + 1, 5.5, 7.5, 0, 0, 6.2832); x.fillStyle = irisC; x.fill() // 虹彩
-        x.beginPath(); x.ellipse(ex, ey + 2, 2.6, 4, 0, 0, 6.2832); x.fillStyle = eyeC; x.fill() // 瞳孔
-        x.beginPath(); x.ellipse(ex - sx * 2, ey - 3, 1.8, 2.4, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト
-        x.beginPath(); x.moveTo(ex - 8, ey - 5); x.quadraticCurveTo(ex, ey - 10, ex + 8, ey - 5); x.strokeStyle = OL; x.lineWidth = 2.6; x.stroke() // 上まぶたの線
-        x.beginPath(); x.moveTo(ex - 7, ey - 13); x.quadraticCurveTo(ex, ey - 16, ex + 7, ey - 12); x.strokeStyle = hair; x.lineWidth = 2.2; x.stroke() // 眉
+        const ex = 128 + sx * 17, ey = 102
+        x.beginPath(); x.ellipse(ex, ey, 7.5, 9.5, 0, 0, 6.2832); x.fillStyle = '#fcf8f1'; x.fill() // 白目
+        x.beginPath(); x.ellipse(ex, ey + 1.5, 6, 8, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill() // 虹彩（暖色）
+        x.beginPath(); x.ellipse(ex, ey + 2.5, 2.9, 4.3, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill() // 瞳孔
+        x.beginPath(); x.ellipse(ex - sx * 2.4, ey - 3.4, 2.5, 3.1, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト大
+        x.beginPath(); x.ellipse(ex + sx * 2.2, ey + 4.2, 1, 1.4, 0, 0, 6.2832); x.fillStyle = 'rgba(255,255,255,0.6)'; x.fill() // 下の小反射
+        x.beginPath(); x.moveTo(ex - 8.5, ey - 4); x.quadraticCurveTo(ex, ey - 11, ex + 8.5, ey - 4); x.strokeStyle = OL; x.lineWidth = 3.2; x.stroke() // 上まぶた（太め＝目力）
+        x.beginPath(); x.moveTo(ex - 6.5, ey + 8); x.quadraticCurveTo(ex, ey + 9.5, ex + 6, ey + 7); x.strokeStyle = 'rgba(110,80,62,0.5)'; x.lineWidth = 1.5; x.stroke() // 下まぶた(薄)
+        x.beginPath(); x.moveTo(ex - 8, ey - 15); x.quadraticCurveTo(ex, ey - 18, ex + 8, ey - 14); x.strokeStyle = hair; x.lineWidth = 2.4; x.stroke() // 眉
       }
-      // 鼻・口
-      x.beginPath(); x.moveTo(128, 114); x.lineTo(125, 119); x.strokeStyle = skinSh; x.lineWidth = 2; x.stroke()
-      x.beginPath(); x.moveTo(122, 126); x.quadraticCurveTo(128, 130, 134, 126); x.strokeStyle = mouthC; x.lineWidth = 2.4; x.stroke()
+      // 鼻・口（小さく）
+      x.beginPath(); x.moveTo(128, 116); x.lineTo(125, 121); x.strokeStyle = skinSh; x.lineWidth = 2; x.stroke()
+      x.beginPath(); x.moveTo(122, 128); x.quadraticCurveTo(128, 132, 134, 128); x.strokeStyle = mouthC; x.lineWidth = 2.4; x.stroke()
       // 前髪（額を覆う束＋サイドの毛）
       x.beginPath(); x.moveTo(92, 80); x.bezierCurveTo(96, 50, 160, 50, 164, 80); x.bezierCurveTo(150, 66, 150, 92, 138, 86); x.bezierCurveTo(132, 70, 124, 70, 118, 86); x.bezierCurveTo(106, 92, 106, 66, 92, 80); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
       for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 34, 78); x.bezierCurveTo(128 + sx * 40, 110, 128 + sx * 34, 135, 128 + sx * 26, 140); x.bezierCurveTo(128 + sx * 30, 120, 128 + sx * 30, 96, 128 + sx * 30, 82); x.closePath(); x.fillStyle = hair; x.fill(); ol(3) } // サイドの髪（頬に沿う）
@@ -5871,6 +5878,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
+    window.__town3dSpriteTo = (i, x, z) => { if (animeSprites[i]) animeSprites[i].position.set(x, heightAt(x, z), z) } // 検証用: 2Dスプライトを開けた場所へ
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
