@@ -3923,7 +3923,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 材（昭和の茶の間。暖色・飴色の木・砂壁・畳。夜は沈める）
     const wallMat = mk(C(0x8c7c5c, 0x2a2430), sandTex), wainsMat = mk(C(0x6a4e34, 0x221b22), plankTex) // 砂壁(粒)・腰壁(板目)
     const tatMat = mk(0xffffff, tatTex), cmat = mk(0xffffff, ceilTex)
-    const woodMat = mk(C(0x7a5630, 0x2c241d)), woodDk = mk(C(0x4a3320, 0x1d1611))
+    // 木目（横に流れるやわらかな濃淡の筋＝飴色の木の手触り。家具全般に効く）
+    const woodTex = cv(64, 64, (x) => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 64, 64); for (let i = 0; i < 22; i++) { const y = R() * 64, a = 0.05 + R() * 0.08; x.strokeStyle = `rgba(58,38,22,${a})`; x.lineWidth = 0.6 + R() * 1.4; x.beginPath(); x.moveTo(0, y); for (let xx = 0; xx <= 64; xx += 8) x.lineTo(xx, y + Math.sin(xx * 0.2 + i) * 1.2); x.stroke() } })
+    woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping; woodTex.repeat.set(2, 2)
+    const woodMat = mk(C(0x7a5630, 0x2c241d), woodTex), woodDk = mk(C(0x4a3320, 0x1d1611))
     // 布の織り目（細かな格子＋微細なムラ＝座布団が布に見える）
     const clothTex = cv(48, 48, (x) => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 48, 48); x.strokeStyle = 'rgba(0,0,0,0.07)'; x.lineWidth = 1; for (let i = 0; i < 48; i += 3) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 48); x.stroke(); x.beginPath(); x.moveTo(0, i); x.lineTo(48, i); x.stroke() } for (let i = 0; i < 380; i++) { x.fillStyle = `rgba(${R() < 0.5 ? 0 : 255},${R() < 0.5 ? 0 : 255},${R() < 0.5 ? 0 : 255},0.03)`; x.fillRect(R() * 48, R() * 48, 1.5, 1.5) } })
     clothTex.wrapS = clothTex.wrapT = THREE.RepeatWrapping; clothTex.repeat.set(3, 3)
