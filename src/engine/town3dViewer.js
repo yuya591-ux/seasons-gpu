@@ -3881,6 +3881,7 @@ export async function mountTown3d(parent, opts = {}) {
   let winPendulum = null // 振り子柱時計（振り子が静かに揺れる）
   let winDust = null // 窓の光に舞うほこり（昼の“居る部屋”の空気感）
   let winCat = null // 窓辺の日だまりで丸くなって眠る猫（呼吸でそっと上下）
+  let winRefl = null // 窓ガラスへの室内の映り込み（夕/夜ほど強い・窓をあけると消える）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -3981,6 +3982,14 @@ export async function mountTown3d(parent, opts = {}) {
     const lpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); lpane.position.set(-owW / 4, WINCY, 0.18); lpane.renderOrder = 4; winRoom.add(lpane) // 左の障子（固定・壁より手前/桟より奥）
     const rpane = new THREE.Mesh(new THREE.PlaneGeometry(owW / 2 - 0.1, owH - 0.12), glassMat); rpane.position.set(owW / 4, WINCY, 0.20); rpane.renderOrder = 4; winRoom.add(rpane) // 右の障子（あけると左へ）
     winSashR = rpane; winSashX0 = owW / 4; winSashX1 = -owW / 4
+    // 窓ガラスへの室内の映り込み（街と一緒に暖かい部屋の気配が硝子に映る。夕/夜ほど強く・昼はほぼ無い・窓をあけると消える）
+    { const reflTex = cv(128, 128, (x) => {
+        const g = x.createLinearGradient(0, 72, 0, 128); g.addColorStop(0, 'rgba(255,228,182,0)'); g.addColorStop(1, 'rgba(255,222,168,0.42)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128) // 下半分にうっすら室内の暖色
+        const rg = x.createRadialGradient(94, 30, 2, 94, 30, 26); rg.addColorStop(0, 'rgba(255,242,208,0.8)'); rg.addColorStop(1, 'rgba(255,242,208,0)'); x.fillStyle = rg; x.fillRect(0, 0, 128, 128) }) // 灯りの映り込み（上右＝街の焦点を避ける）
+      const reflBase = isNight ? 0.5 : duskAmt * 0.24
+      const reflMat = new THREE.MeshBasicMaterial({ map: reflTex, transparent: true, opacity: reflBase, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); winRoomMats.push(reflMat)
+      const refl = new THREE.Mesh(new THREE.PlaneGeometry(owW - 0.06, owH - 0.12), reflMat); refl.position.set(0, WINCY, 0.215); refl.renderOrder = 5; winRoom.add(refl)
+      winRefl = { mat: reflMat, base: reflBase } }
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
     // ── 窓辺の湯呑み（縁側でお茶＝“いま家でくつろいでいる”気配）。湯気は teaSteam に合流して立ちのぼる。──
@@ -5433,6 +5442,7 @@ export async function mountTown3d(parent, opts = {}) {
     // lean>0.16で非表示＝カメラがベランダの手すり/窓枠へ達する前に室内ごと消す（貫通して見えるのを防ぐ）。空/地上でも非表示。
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
+    if (winRoom.visible && winRefl) winRefl.mat.opacity = winRefl.base * (1 - wo) // 窓をあけると硝子の映り込みは消える（外気が澄む）
     if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.42 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
     if (winRoom.visible && windChime) windChime.rotation.z = Math.sin(t * 1.7) * (0.02 + 0.05 * wo) // 風鈴は窓をあけるとよく揺れる（閉=ごく僅か）
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
