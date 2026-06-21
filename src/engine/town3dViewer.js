@@ -518,6 +518,7 @@ export async function mountTown3d(parent, opts = {}) {
   let cars = []
   let peeps = []
   let residents = [] // 作り込んだ住人（顔つき・アニメ調）。近くで見える要所に少数配置＝量産は階層分けで
+  let standees = [] // 港町の少女＝一枚絵の立ち絵（常にこちらを向くビルボード）
   let ferris = null
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
   let teacups = null // 遊園地のコーヒーカップ（回る）
@@ -3785,6 +3786,84 @@ export async function mountTown3d(parent, opts = {}) {
   const resShadowMat = new THREE.MeshBasicMaterial({ map: resShadowTex, transparent: true, depthWrite: false, fog: true })
   const resShadowGeo = new THREE.PlaneGeometry(1, 1)
   const RES_OUTLINE = new THREE.MeshBasicMaterial({ color: 0x2a211c, side: THREE.BackSide, fog: true }) // セル画の黒い主線（裏面を法線方向に押し出す定番手法）
+  // ── 港町の少女（一枚絵の立ち絵）。顔も体も一枚として描き、常にこちらを向く＝「顔と体が合わない/お面が浮く」が原理的に起きない。手描きの温かみで街に馴染ませる。 ──
+  const drawHarborGirl2D = (x, cfg = {}) => {
+    const skin = '#f3d4b6', skinSh = '#e7bd97', hair = cfg.hair || '#2b2521', hairSh = '#1d1814', hairHi = '#4c4137'
+    const top = cfg.top || '#f2ede2', topSh = '#ddd6c7', bot = cfg.bottom || '#37424f', botSh = '#2a333e', botHi = '#434f5d'
+    const bag = cfg.bag || '#9c7d56', bagSh = '#7e6240', line = '#3a2c24', mouthC = '#bb7567', blush = 'rgba(231,150,127,0.42)'
+    x.lineJoin = 'round'; x.lineCap = 'round'
+    const L = (w, c) => { x.strokeStyle = c || line; x.lineWidth = w; x.stroke() }
+    const F = (c) => { x.fillStyle = c; x.fill() }
+    // 後ろ髪（ボブ）
+    x.beginPath(); x.moveTo(138, 96); x.bezierCurveTo(112, 150, 120, 205, 150, 232); x.bezierCurveTo(165, 246, 168, 232, 180, 232); x.bezierCurveTo(192, 232, 195, 246, 210, 232); x.bezierCurveTo(240, 205, 248, 150, 222, 96); x.bezierCurveTo(210, 52, 150, 52, 138, 96); x.closePath(); F(hair); L(4)
+    x.beginPath(); x.moveTo(206, 72); x.bezierCurveTo(236, 112, 234, 182, 210, 228); x.bezierCurveTo(226, 182, 226, 120, 206, 82); x.closePath(); F(hairSh)
+    // パンツ（濃紺・ハイウエストのワイド）
+    x.beginPath(); x.moveTo(140, 330); x.lineTo(222, 330); x.bezierCurveTo(240, 340, 244, 430, 236, 500); x.lineTo(214, 628); x.lineTo(188, 628); x.lineTo(182, 500); x.lineTo(176, 628); x.lineTo(150, 628); x.bezierCurveTo(124, 500, 120, 410, 140, 330); x.closePath(); F(bot); L(4)
+    x.beginPath(); x.moveTo(182, 332); x.lineTo(222, 330); x.bezierCurveTo(240, 340, 244, 430, 236, 500); x.lineTo(214, 628); x.lineTo(188, 628); x.lineTo(182, 500); x.closePath(); F(botSh)
+    x.beginPath(); x.moveTo(138, 348); x.bezierCurveTo(130, 430, 140, 520, 156, 600); L(4, botHi)
+    x.beginPath(); x.moveTo(182, 350); x.lineTo(182, 626); L(2.5)
+    for (const sx of [165, 199]) { x.beginPath(); x.ellipse(sx, 636, 17, 11, 0, 0, 6.2832); F('#2c2722'); L(3) } // 靴
+    // ブラウス（白・半袖）
+    x.beginPath(); x.moveTo(150, 200); x.bezierCurveTo(132, 214, 126, 280, 134, 340); x.lineTo(228, 340); x.bezierCurveTo(236, 280, 230, 214, 212, 200); x.bezierCurveTo(200, 188, 162, 188, 150, 200); x.closePath(); F(top); L(4)
+    x.beginPath(); x.moveTo(192, 196); x.bezierCurveTo(214, 216, 220, 286, 216, 340); x.lineTo(228, 340); x.bezierCurveTo(236, 280, 230, 214, 212, 200); x.closePath(); F(topSh)
+    x.beginPath(); x.moveTo(134, 334); x.lineTo(228, 334); L(2.5)
+    for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(180 + sx * 22, 200); x.lineTo(180 + sx * 28, 332); L(7, bot); L(1.5) } // 肩紐
+    // 斜め掛けの鞄
+    x.beginPath(); x.moveTo(150, 206); x.lineTo(238, 360); L(9, bag); L(1.5)
+    x.beginPath(); x.moveTo(214, 350); x.lineTo(262, 360); x.lineTo(252, 432); x.lineTo(204, 422); x.closePath(); F(bag); L(4)
+    x.beginPath(); x.moveTo(210, 372); x.lineTo(258, 382); L(2.5, bagSh)
+    // 腕（半袖＋素肌の前腕＋手）
+    for (const sx of [-1, 1]) {
+      x.beginPath(); x.moveTo(180 + sx * 34, 200); x.bezierCurveTo(180 + sx * 62, 206, 180 + sx * 64, 244, 180 + sx * 56, 272); x.lineTo(180 + sx * 36, 268); x.bezierCurveTo(180 + sx * 32, 236, 180 + sx * 32, 214, 180 + sx * 34, 200); x.closePath(); F(top); L(3.5)
+      x.beginPath(); x.moveTo(180 + sx * 56, 268); x.bezierCurveTo(180 + sx * 58, 312, 180 + sx * 52, 354, 180 + sx * 47, 388); x.bezierCurveTo(180 + sx * 40, 390, 180 + sx * 36, 388, 180 + sx * 35, 384); x.bezierCurveTo(180 + sx * 36, 340, 180 + sx * 38, 300, 180 + sx * 37, 266); x.closePath(); F(skin); L(3.5)
+      x.beginPath(); x.moveTo(180 + sx * 47, 384); x.bezierCurveTo(180 + sx * 53, 396, 180 + sx * 51, 416, 180 + sx * 43, 422); x.bezierCurveTo(180 + sx * 34, 424, 180 + sx * 30, 408, 180 + sx * 33, 388); x.closePath(); F(skin); L(3)
+      x.beginPath(); x.moveTo(180 + sx * 36, 410); x.quadraticCurveTo(180 + sx * 44, 414, 180 + sx * 50, 406); L(1.4, skinSh)
+    }
+    // 首
+    x.beginPath(); x.moveTo(166, 158); x.lineTo(194, 158); x.lineTo(192, 196); x.lineTo(168, 196); x.closePath(); F(skin); L(3)
+    x.beginPath(); x.moveTo(168, 176); x.quadraticCurveTo(180, 184, 192, 176); L(2, skinSh)
+    // 顔
+    x.beginPath(); x.moveTo(146, 108); x.bezierCurveTo(146, 142, 160, 166, 180, 166); x.bezierCurveTo(200, 166, 214, 142, 214, 108); x.bezierCurveTo(214, 72, 146, 72, 146, 108); x.closePath(); F(skin); L(4)
+    x.beginPath(); x.moveTo(208, 100); x.bezierCurveTo(212, 130, 204, 152, 192, 162); L(6, 'rgba(228,180,150,0.5)')
+    x.beginPath(); x.moveTo(150, 100); x.quadraticCurveTo(180, 112, 210, 100); x.quadraticCurveTo(180, 106, 150, 100); x.closePath(); F('rgba(220,175,142,0.4)')
+    for (const sx of [-1, 1]) { x.beginPath(); x.ellipse(180 + sx * 30, 135, 11, 7, 0, 0, 6.2832); F(blush) }
+    // 目（小さめ・やさしい）
+    for (const sx of [-1, 1]) {
+      const ex = 180 + sx * 21, ey = 123
+      x.beginPath(); x.ellipse(ex, ey, 8.5, 10, 0, 0, 6.2832); F('#fcf8f2')
+      x.beginPath(); x.ellipse(ex, ey + 1, 6.8, 8.6, 0, 0, 6.2832); F('#6b4e36')
+      x.beginPath(); x.ellipse(ex, ey + 1.6, 3.4, 4.6, 0, 0, 6.2832); F('#2c2018')
+      x.beginPath(); x.ellipse(ex - sx * 2.4, ey - 2.4, 2.3, 2.8, 0, 0, 6.2832); F('#ffffff')
+      x.beginPath(); x.ellipse(ex + sx * 2.2, ey + 3.4, 1.2, 1.4, 0, 0, 6.2832); F('rgba(255,255,255,0.6)')
+      x.beginPath(); x.moveTo(ex - 9.5, ey - 4); x.quadraticCurveTo(ex - 1, ey - 11, ex + 9.5, ey - 3.2); L(3, line) // 上まぶた（やわらかい弧）
+      x.beginPath(); x.moveTo(ex + sx * 9, ey - 3.4); x.lineTo(ex + sx * 13, ey - 5.4); L(2.2, line) // 目尻
+      x.beginPath(); x.moveTo(ex - 10, ey - 14.5); x.quadraticCurveTo(ex, ey - 16.5, ex + 11, ey - 13.5); L(2.4, hairSh) // 眉（低め・ゆるい＝驚き顔を避ける）
+    }
+    // 鼻・口
+    x.beginPath(); x.moveTo(180, 140); x.lineTo(176, 148); L(1.6, skinSh)
+    x.beginPath(); x.moveTo(170, 156); x.quadraticCurveTo(180, 163, 190, 156); L(2.6, mouthC)
+    x.beginPath(); x.moveTo(173, 157.5); x.quadraticCurveTo(180, 160.5, 187, 157.5); L(2.2, '#e0a48f')
+    // 前髪（中央分け＋毛束、生え際を額に重ね）
+    x.beginPath(); x.moveTo(142, 106); x.bezierCurveTo(140, 60, 220, 60, 218, 106); x.bezierCurveTo(208, 96, 198, 101, 186, 99); x.bezierCurveTo(182, 90, 178, 90, 174, 99); x.bezierCurveTo(162, 101, 152, 96, 142, 106); x.closePath(); F(hair); L(3) // 前髪（やわらかい中央分けのフリンジ）
+    x.beginPath(); x.moveTo(180, 80); x.quadraticCurveTo(176, 92, 173, 100); L(1.8, hairSh); x.beginPath(); x.moveTo(180, 80); x.quadraticCurveTo(184, 92, 187, 100); L(1.8, hairSh) // 中央分けの毛流れ
+    for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(180 + sx * 38, 98); x.bezierCurveTo(180 + sx * 46, 132, 180 + sx * 40, 168, 180 + sx * 30, 178); x.bezierCurveTo(180 + sx * 36, 144, 180 + sx * 36, 116, 180 + sx * 35, 100); x.closePath(); F(hair); L(3) } // サイドの毛
+    x.beginPath(); x.moveTo(156, 76); x.quadraticCurveTo(180, 68, 204, 76); L(3.5, hairHi) // 艶
+  }
+  if (/[?&]dev=1/.test(location.search)) window.__girlPNG2 = (cfgJson) => { const cv = document.createElement('canvas'); cv.width = 360; cv.height = 720; drawHarborGirl2D(cv.getContext('2d'), cfgJson ? JSON.parse(cfgJson) : {}); return cv.toDataURL() } // 検証用: 立ち絵をそのままPNGに
+  // 立ち絵を板ポリのビルボードに。シーンの光色で淡く染め（MeshBasicの満光が夕景で“浮く/光る”のを防ぐ）＋fogで遠近を馴染ませる。
+  const girlTint = new THREE.Color(isNight ? 0x9aa6c0 : sunCol.getHex()).multiplyScalar(isNight ? 0.5 : 0.86)
+  const makeGirlStandee = (cfg) => {
+    const cv = document.createElement('canvas'); cv.width = 360; cv.height = 720; drawHarborGirl2D(cv.getContext('2d'), cfg || {})
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy()
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, fog: true }); mat.color.copy(girlTint)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 2.1), mat); m.position.y = 1.03
+    const grp = new THREE.Group(); grp.add(m)
+    const sh = new THREE.Mesh(resShadowGeo, resShadowMat); sh.rotation.x = -Math.PI / 2; sh.position.set(0, 0.03, 0.04); sh.scale.set(0.5, 0.7, 1); sh.renderOrder = 1; grp.add(sh)
+    grp.userData = { spr: m }; return grp
+  }
+  const placeGirl = (hx, hz, cfg) => { const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; const g = makeGirlStandee(cfg); g.position.set(hx, gy, hz); town.add(g); standees.push(g) }
+  const GIRL_HAIR = ['#2b2521', '#33291f', '#241c18'], GIRL_TOP = ['#f2ede2', '#eee7d9', '#f3efe6'], GIRL_BOT = ['#37424f', '#2f3a44', '#3a3530'], GIRL_BAG = ['#9c7d56', '#7e6748', '#a98c63']
+  const girlCfg = () => ({ hair: GIRL_HAIR[(R() * 3) | 0], top: GIRL_TOP[(R() * 3) | 0], bottom: GIRL_BOT[(R() * 3) | 0], bag: GIRL_BAG[(R() * 3) | 0] })
   // ── 顔は「手描きの顔テクスチャ」を頭の前面に貼る（スタイライズド3Dの定番）。近接でも表情が読め、横/後ろからは見えない。全住人で共有。 ──
   const makeFaceTex = (skinHex) => {
     const c = document.createElement('canvas'); c.width = 180; c.height = 180; const x = c.getContext('2d')
@@ -3814,7 +3893,8 @@ export async function mountTown3d(parent, opts = {}) {
     return c
   }
   const faceTex = new THREE.CanvasTexture(makeFaceTex()); faceTex.colorSpace = THREE.SRGBColorSpace; faceTex.anisotropy = renderer.capabilities.getMaxAnisotropy()
-  const faceMat = new THREE.MeshBasicMaterial({ map: faceTex, transparent: true, depthWrite: false, side: THREE.FrontSide, fog: true })
+  const faceMat = new THREE.MeshToonMaterial({ map: faceTex, gradientMap: grad, transparent: true, depthWrite: false, side: THREE.FrontSide, fog: true }) // 体と同じシーン光で陰影＝顔が浮かない（自己発光のMeshBasicは夕景で顔だけ光って“貼り付けたお面”に見える）
+  faceMat.emissive = new THREE.Color(0xf6d8bd); faceMat.emissiveIntensity = 0.16 // 影でも顔が暗く沈み過ぎない床（頭の肌と同じ扱い）
   const makeResident = (cfg = {}) => {
     // アニメ寄りだが人に近い：自然なアーモンドの目・一体感のある体・関節（膝/肘）・接地影。約6頭身。
     const g = new THREE.Group()
@@ -3930,7 +4010,7 @@ export async function mountTown3d(parent, opts = {}) {
   for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
   // ── 添付画像の模倣：港町の少女（白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋黒のショートボブ＋斜め掛けの鞄）。港・水辺・街角に。──
   const harborGirl = () => ({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: [0x1d1916, 0x241c18, 0x2c2622][(R() * 3) | 0], iris: [0x3a2e26, 0x4a3a2c, 0x4a6a9a][(R() * 3) | 0], outfit: 'blouse', top: [0xf0ece2, 0xeae6da, 0xf2eee6][(R() * 3) | 0], bottom: [0x33373e, 0x2e3a42, 0x3a3530][(R() * 3) | 0], hairStyle: 'bob', prop: 'bag', bagCol: [0x8a7256, 0x6a5a44, 0x9a8460][(R() * 3) | 0] })
-  for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeResident(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, harborGirl())
+  for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
   const pickC = (a) => a[(R() * a.length) | 0]
   const placeEra = (cx, cz, n, factory) => { for (let i = 0; i < n; i++) { const a = (i / n) * 6.2832 + R() * 0.6, rr = 8 + R() * 22; placeResident(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, factory()) } }
@@ -3952,8 +4032,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (r < 0.36) return { outfit: 'armor', skin, hair, iris, hairStyle: 'hat', hat: 'jingasa', top: pickC([0x40382e, 0x3a3a34]), bottom: pickC([0x4a3a30, 0x3a4250, 0x55504a]), accent: 0x6a3a30, prop: 'spear' } // 足軽
     if (r < 0.58) return { outfit: 'armor', skin, hair, iris, hairStyle: 'topknot', top: pickC([0x3a3a40, 0x44382e]), bottom: pickC([0x6a3a30, 0x3a4a5e, 0x55503a]), accent: pickC([0x9a7a44, 0x7a3a32]), prop: 'swords' } // 武者
     return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
-    // 港町の少女を home の要所にも数体（3Dの住人として配置＝自然に回り・歩く。遠目の住人として街に馴染む方針）。
-    for (const sp of [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]) placeResident(sp.x + (R() - 0.5) * 3, sp.z + (R() - 0.5) * 3, harborGirl())
+    // 港町の少女を home の要所にも数体（一枚絵の立ち絵＝常にこちらを向くビルボード）。
+    for (const sp of [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]) placeGirl(sp.x + (R() - 0.5) * 3, sp.z + (R() - 0.5) * 3, girlCfg())
     // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
     if (/[?&]dev=1/.test(location.search)) window.__town3dFigShot = (yaw, cfgJson, faceZoom) => {
       const cfg = cfgJson ? JSON.parse(cfgJson) : { skin: 0xf7d8bc, hair: 0x241c18, iris: 0x4a3a2c, outfit: 'blouse', top: 0xf0ece2, bottom: 0x2e3a42, hairStyle: 'bob', prop: 'bag', bagCol: 0x8a7256 }
@@ -5181,6 +5261,8 @@ export async function mountTown3d(parent, opts = {}) {
       let ddy = u.face - r.rotation.y; while (ddy > Math.PI) ddy -= 6.2832; while (ddy < -Math.PI) ddy += 6.2832
       r.rotation.y += ddy * Math.min(1, dt * 6) // 進行方向へなめらかに向き直る
     }
+    // 港町の少女（一枚絵の立ち絵）は常にカメラの方を向く
+    for (const sp of standees) sp.rotation.y = Math.atan2(camera.position.x - sp.position.x, camera.position.z - sp.position.z)
     // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
     const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
     const wakeSpd = wakeOn ? Math.min(1, Math.hypot(active.vel.x, active.vel.z) / FLY.speed) : 0
@@ -5870,6 +5952,8 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
     window.__town3dResFront = (i, dist = 4, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
+    window.__town3dGirlFront = (i, dist = 5) => { const g = standees[i]; if (!g) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); g.position.set(t.x, t.y - 1.0, t.z) } // 検証用: 立ち絵をカメラ正面の視線上へ
+    window.__town3dGirlCount = () => standees.length
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
