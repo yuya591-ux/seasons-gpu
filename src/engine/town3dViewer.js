@@ -1763,9 +1763,11 @@ export async function mountTown3d(parent, opts = {}) {
     }
     for (const c of [[-16, 19], [17, 20], [-21, 14], [21, 16]]) tree(c[0], c[1], 1.7 + R() * 0.5) // 手前の額装木立
   } else {
-    for (let i = 0; i < (LIGHT ? 108 : 165); i++) { // 非力端末は散在木を間引く
-      const x = (R() - 0.5) * 168, z = -118 + R() * 152
+    for (let i = 0; i < (LIGHT ? 150 : 232); i++) { // 非力端末は散在木を間引く。拡張した旗艦home全域に緑を行き渡らせる
+      const x = -200 + R() * 335, z = -189 + R() * 223 // 拡張した西/北まで覆う
       if (Math.abs(x) < 4.5 && z > -2) continue          // 手前中央の道は空ける
+      if (Math.hypot(x - DOWNTOWN.x, z - DOWNTOWN.z) < DOWNTOWN.r - 5) continue // 副都心は街路樹で別途
+      if (Math.hypot(x - STADIUM.x, z - STADIUM.z) < STADIUM.r) continue // 競技場は空ける
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < SHRINE.r) continue // 神社の境内は専用の木立で囲む
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r - 2) continue // 駅前は空ける
