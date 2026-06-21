@@ -324,6 +324,8 @@ export function createAudio(opts) {
   // ループ素材の上にうっすら重ねて「同じ所が繰り返る」ループ感を消す（CC0原則と完全整合）。
   // master 経由なので音量/ミュート/おやすみに自動追従。値は控えめ（うっすら空気が動く程度）。
   let windNode = null
+  let purrNode = null // 窓辺の猫のゴロゴロ（撫でている間だけ）
+  let purrV = 0
   let flyWindV = 0 // 飛行速度に応じた風の強さ（setFlyWind）。細かな変化を無視する基準
   let altDuckV = 0 // 高度に応じた環境音のしぼり（setAltitudeDuck）。細かな変化を無視する基準
   function startWind() {
@@ -346,6 +348,19 @@ export function createAudio(opts) {
       const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.01; lfo2.connect(lfo2G).connect(g.gain); lfo2.start()
     } catch { /* LFO非対応でも常時うっすらの風は鳴る */ }
     try { src.start() } catch { /* 無視 */ }
+  }
+  // 猫のゴロゴロ＝低めの暖色トーン＋約25Hzの震え（喉鳴り）。撫でている間だけそっと（機械音の唸りでなく猫の喉に）。
+  function startPurr() {
+    if (!ctx || purrNode || !ctx.createOscillator) return
+    const a = ctx.createOscillator(); a.type = 'triangle'; a.frequency.value = 100
+    const b = ctx.createOscillator(); b.type = 'sine'; b.frequency.value = 150
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480; lp.Q.value = 0.4
+    const pt = ctx.createGain(); pt.gain.value = 0.55                 // トレモロの土台
+    const pg = ctx.createGain(); pg.gain.value = 0.0001              // 全体音量（setPurrで上下）
+    a.connect(lp); b.connect(lp); lp.connect(pt).connect(pg).connect(master)
+    try { const trem = ctx.createOscillator(); trem.type = 'sine'; trem.frequency.value = 25; const td = ctx.createGain(); td.gain.value = 0.45; trem.connect(td).connect(pt.gain); trem.start() } catch { /* 震え無しでも鳴る */ }
+    try { a.start(); b.start() } catch { /* 無視 */ }
+    purrNode = { pg }
   }
 
   // ── 生成的なBGMの下地（素材ゼロ・合成パッド）。CC0/オフライン原則と完全整合。
@@ -549,6 +564,15 @@ export function createAudio(opts) {
         windNode.bp.frequency.setTargetAtTime(620 + v * 1180, t, 0.4)    // 速いほど高く明るい「ひゅーー」（低い唸りにしない）
         if (windNode.hp) windNode.hp.frequency.setTargetAtTime(300 + v * 260, t, 0.4) // 速いほど低音を更に削いで澄む
       } catch { /* 無視 */ }
+    },
+    /** 窓辺の猫を撫でた時のゴロゴロ（0..1）。撫でているほど大きく、離すと冷める。 */
+    setPurr(level) {
+      if (!ctx) return
+      const v = Math.max(0, Math.min(1, level || 0))
+      if (Math.abs(v - purrV) < 0.03 && v > 0.001) return
+      purrV = v
+      if (v > 0.001 && !purrNode) startPurr()
+      if (purrNode) { try { purrNode.pg.gain.setTargetAtTime(Math.max(0.0001, v * 0.045), now(), 0.18) } catch { /* 無視 */ } }
     },
     /** 散策の足音（地上を歩くときだけ・ごく控えめ）。短いこもったノイズで「踏みしめる」手応え。 */
     footstep() {

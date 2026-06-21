@@ -167,6 +167,7 @@ function start() {
           onAltitude: (v) => audio.setAltitudeDuck(v), // 高空で街の環境音をしぼる（風だけの静けさへ）
           onScene: (c) => { if (!sleepFading) audio.setMusicBed(c) }, // 場面に応じて生成BGMの下地を静かに変える
           onSeaBird: () => { if (!sleepFading) audio.seaBird() }, // 海の上で時々かもめが鳴く
+          onPurr: (v) => { if (!sleepFading) audio.setPurr(v) }, // 窓辺の猫を撫でるとゴロゴロ鳴る
 
 
 
