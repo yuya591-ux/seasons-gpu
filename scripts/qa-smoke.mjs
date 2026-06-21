@@ -12,8 +12,8 @@ await page.waitForTimeout(700)
 for (const scene of ['kitaterao-window-3d', 'kitaterao-window-3d-night']) {
   await page.evaluate((s) => window.__applyScene(s), scene); await page.waitForTimeout(2200)
   await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(600)
-  await page.evaluate(() => window.__town3dFlyPose(415, 44, -46, Math.PI / 2, -0.1)); await page.waitForTimeout(600) // 江戸
-  await page.evaluate(() => window.__town3dFlyPose(50, 30, -430, 0.2, -0.12)); await page.waitForTimeout(600) // 戦国
+  await page.evaluate(() => window.__town3dFlyPose(600, 44, -46, Math.PI / 2, -0.1)); await page.waitForTimeout(600) // 江戸(x640)
+  await page.evaluate(() => window.__town3dFlyPose(140, 30, -580, 0.2, -0.12)); await page.waitForTimeout(600) // 戦国(z-640)
   await page.evaluate(() => { window.__town3dLand(true) }); await page.waitForTimeout(800) // 着地して歩く
   await page.evaluate(() => { window.__town3dLand(false) }); await page.waitForTimeout(400)
 }

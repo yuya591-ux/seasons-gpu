@@ -73,7 +73,7 @@ const FLY = {
   turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
   // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上の島・大橋を越えるxMaxまで）。
-  bound: { x: 612, xMax: 612, zMin: -624, zMax: 42, yMax: 132, yFloor: 4.5 }, // 拡大した3拠点(西=大正r100/東=江戸r112/北=戦国r58)の汀まで飛べる。yMaxは高台/峰のぶん少し上げる
+  bound: { x: 790, xMax: 790, zMin: -810, zMax: 120, yMax: 132, yFloor: 4.5 }, // Phase0で時代の島を~640へ遠ざけた汀まで飛べる（東=江戸764/西=大正-752/北=戦国-740）。zMaxはhome南の拡張ぶん
   // 谷戸（棚田の谷）用の箱。左右の里山に分け入りすぎない狭めの幅・谷筋に沿う前後＝谷を流すように飛ぶ。
   yatoBound: { x: 22, zMin: -52, zMax: 24, yMax: 74, yFloor: 4.0 },
 }
@@ -567,9 +567,10 @@ export async function mountTown3d(parent, opts = {}) {
   const HARBOR = { x: 74, z: -64, r: 11, padY: SEA.level + 2 }
   // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
   const ISLAND = { x: 98, z: -40, r: 8 }
-  const EDO = { x: 486, z: -46, r: 124 } // 海の向こうの広い島（江戸の城下町）。拡大(r124・中心を東へ寄せ現代から遠ざけ共視界の余裕を増やす)。武家屋敷町/寺社地を追加
-  const SENGOKU = { x: 120, z: -486, r: 54 } // 北の海の果ての戦国の山城。山裾の城下を広げ拡大。海(x>82)から立ち上がる峰。江戸/大正と別方角・遠距離
-  const TAISHO = { x: -490, z: -30, r: 112 } // 西の海の向こうの大正の港町（赤レンガ倉庫/洋館/時計塔/桟橋/異人館街/路面電車）。拡大(r112)。中心据置でも現代は霧で隠れる（共視界の余裕あり）
+  // Phase0(2026-06-21): home を旗艦＝最大にするため、時代の島を home からさらに遠ざけ(~640)余地をつくる。海の渡りが長くなる＝旅情UP。共視界は据置で保てる（縁の霧で隠れる）。
+  const EDO = { x: 640, z: -46, r: 124 } // 東の海の向こうの江戸の城下町。homeから遠ざけ拡大の余地
+  const SENGOKU = { x: 140, z: -640, r: 54 } // 北の海の果ての戦国の山城（霧の谷あいの城下町）。homeから遠ざけ
+  const TAISHO = { x: -640, z: -30, r: 112 } // 西の海の向こうの大正の港町。homeから遠ざけ
   const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }, { x: TAISHO.x, z: TAISHO.z }] // オートシネマで周回する名所（現代の街/江戸/戦国/大正の中心）
   // 江戸の島を蛇行する小川の川筋。中心線からの横距離を返す（小さいほど川。堀の内/島の外は川なし）。heightAtの掘り込みと建物除外で共用。
   const edoStream = (x, z) => { const dx = x - EDO.x, dz = z - EDO.z, edd = Math.hypot(dx, dz); if (edd < 23 || edd > EDO.r - 6) return 999; let da = Math.atan2(dz, dx) - (1.15 + Math.sin(edd * 0.085) * 0.34); da = Math.atan2(Math.sin(da), Math.cos(da)); return Math.abs(da) * edd }
@@ -2162,11 +2163,11 @@ export async function mountTown3d(parent, opts = {}) {
       wg.addColorStop(1, '#' + new THREE.Color(0x1f4d6c).lerp(skyHorizon, 0.06).getHexString())
       wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
       for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
-      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(82, 52); seaTex = wtex
-      const seaGeo = new THREE.PlaneGeometry(1360, 860); seaGeo.rotateX(-Math.PI / 2)
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(104, 69); seaTex = wtex
+      const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       const seaMesh = new THREE.Mesh(seaGeo, new THREE.MeshBasicMaterial({ map: wtex, fog: true }))
-      seaMesh.position.set(10, SEA.level, -252); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-670..690・z≈-682..178 を広く覆う（拡大した西=大正/東=江戸/北=戦国への渡りの海）
+      seaMesh.position.set(0, SEA.level, -300); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-880..880・z≈-890..290 を広く覆う（Phase0で遠ざけた西=大正/東=江戸/北=戦国への長い渡りの海）
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
@@ -2420,8 +2421,9 @@ export async function mountTown3d(parent, opts = {}) {
           const sail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.7, 3.5), toon(season === 'winter' ? 0xe6e2d8 : 0xe7dec8)); sail.position.set(0.5, 3.3, 0); ship.add(sail)
           town.add(ship); boats.push(ship)
         }
-        addShip(150, -52, 0.5); addShip(250, -28, -0.7); addShip(350, -56, 0.25); addShip(300, -40, -0.4) // 東(江戸)への長い渡りに帆船を散らす
-        addShip(134, -170, 1.7); addShip(108, -300, -1.5); addShip(130, -410, 1.6) // 北(戦国)への渡りにも帆船
+        addShip(180, -52, 0.5); addShip(320, -28, -0.7); addShip(460, -56, 0.25); addShip(380, -40, -0.4) // 東(江戸)への長い渡りに帆船を散らす
+        addShip(150, -200, 1.7); addShip(135, -360, -1.5); addShip(150, -500, 1.6) // 北(戦国)への渡りにも帆船
+        addShip(-220, -28, 0.6); addShip(-360, -44, -0.5); addShip(-480, -30, 0.3) // 西(大正)への渡りにも蒸気船/帆船
         const addIslet = (ix, iz, scl) => { // 渡りの途中の緑豊かな小島（岩＋森＋松＝道中を退屈にしない）
           const my = SEA.level - 0.4
           const mound = new THREE.Mesh(new THREE.ConeGeometry(5.2 * scl, 3.4 * scl, 8), toon(0x6e6a5c)); mound.position.set(ix, my + 1.6 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound))
@@ -2430,8 +2432,9 @@ export async function mountTown3d(parent, opts = {}) {
           for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.2832, rr = (0.3 + R() * 0.7) * 3.4 * scl; mkPine(ix + Math.cos(a) * rr, topY - rr * 0.22, iz + Math.sin(a) * rr, (0.7 + R() * 0.5) * scl) } // 森
           for (let i = 0; i < 3; i++) { const a = R() * 6.28, rk = new THREE.Mesh(new THREE.IcosahedronGeometry((0.6 + R() * 0.6) * scl, 0), toon(0x7c766a)); rk.position.set(ix + Math.cos(a) * 4.6 * scl, my + 0.5, iz + Math.sin(a) * 4.6 * scl); rk.rotation.set(R() * 3, R() * 3, R() * 3); town.add(rk) } // 岩
         }
-        addIslet(150, -38, 1.4); addIslet(250, -50, 1.0); addIslet(350, -40, 1.2) // 東(江戸)への島々（渡りを退屈にしない中継）
-        addIslet(124, -190, 1.4); addIslet(112, -290, 1.0); addIslet(126, -390, 1.2) // 北(戦国)への島々
+        addIslet(180, -38, 1.4); addIslet(300, -50, 1.0); addIslet(420, -40, 1.3); addIslet(520, -52, 1.0) // 東(江戸)への島々（長い渡りを退屈にしない中継）
+        addIslet(150, -210, 1.4); addIslet(138, -330, 1.0); addIslet(150, -450, 1.3); addIslet(140, -560, 1.0) // 北(戦国)への島々
+        addIslet(-200, -30, 1.4); addIslet(-320, -42, 1.0); addIslet(-440, -30, 1.3); addIslet(-540, -38, 1.0) // 西(大正)への島々（新設＝西の渡りも賑やかに）
         // 道中の小島で羽を休める鳥（飛んで近づくと一斉に舞い立つ＝旅の途中の一瞬の生気）
         const mkIslandFlock = (cx, cz) => {
           const bmat = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3a4e : 0x3a3a40, fog: true }), birds = []
@@ -2444,7 +2447,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
           islandFlocks.push({ birds, cx, cz, state: 'perched', t: 0 })
         }
-        mkIslandFlock(250, -50); mkIslandFlock(112, -290) // 東(江戸)/北(戦国)それぞれの道中の小島
+        mkIslandFlock(300, -50); mkIslandFlock(138, -330); mkIslandFlock(-320, -42) // 東(江戸)/北(戦国)/西(大正)の道中の小島の鳥
       }
       // ── 北の海の果ての戦国の山城（時代の異なる第2の目的地。Edoとは遠く海で隔て共視界に入れない）──
       {
@@ -2801,9 +2804,9 @@ export async function mountTown3d(parent, opts = {}) {
       }
       // ── 行き先の気配（飛び立つと方角がそれとなく分かる導線）。東=城下町への澪標／北=山城への鳥居の海路 ──
       {
-        for (let mx = 110; mx <= 400; mx += 30) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 14, 6), toon(0x6a4f38)); pole.position.set(mx, SEA.level + 5, -44); pole.castShadow = true; town.add(pole); const cage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), toon(0x5a4632)); cage.position.set(mx, SEA.level + 11.5, -44); town.add(cage); town.add(addOutline(cage)); const flag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 2.0), toon(0xc24a33)); flag.position.set(mx, SEA.level + 9.4, -42.9); town.add(flag); if (isNight) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcf8a, fog: true })); lamp.position.set(mx, SEA.level + 11.5, -44); town.add(lamp) } } // 澪標（東＝江戸への海路。島の汀の手前まで）
+        for (let mx = 110; mx <= 520; mx += 30) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 14, 6), toon(0x6a4f38)); pole.position.set(mx, SEA.level + 5, -44); pole.castShadow = true; town.add(pole); const cage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), toon(0x5a4632)); cage.position.set(mx, SEA.level + 11.5, -44); town.add(cage); town.add(addOutline(cage)); const flag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 2.0), toon(0xc24a33)); flag.position.set(mx, SEA.level + 9.4, -42.9); town.add(flag); if (isNight) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcf8a, fog: true })); lamp.position.set(mx, SEA.level + 11.5, -44); town.add(lamp) } } // 澪標（東＝江戸への海路。島の汀の手前まで）
         const redM = toon(season === 'winter' ? 0xb04438 : 0xc0392b)
-        for (let tz = -150; tz >= -430; tz -= 30) { const s = 2.3, g = new THREE.Group(); g.position.set(120, SEA.level, tz)
+        for (let tz = -160; tz >= -540; tz -= 30) { const s = 2.3, g = new THREE.Group(); g.position.set(140, SEA.level, tz)
           for (const px of [-1.6 * s, 1.6 * s]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * s, 0.32 * s, 5.4 * s, 7), redM); pil.position.set(px, 2.7 * s, 0); pil.castShadow = true; g.add(pil) }
           const kasagi = new THREE.Mesh(new THREE.BoxGeometry(4.8 * s, 0.5 * s, 0.6 * s), redM); kasagi.position.set(0, 5.4 * s, 0); kasagi.castShadow = true; g.add(kasagi)
           const nuki = new THREE.Mesh(new THREE.BoxGeometry(4.0 * s, 0.34 * s, 0.4 * s), redM); nuki.position.set(0, 4.3 * s, 0); g.add(nuki)
@@ -2811,7 +2814,7 @@ export async function mountTown3d(parent, opts = {}) {
         } // 鳥居の海路（北＝戦国の山城へ。大きな朱の鳥居が海に連なる＝空からも方角が分かる）
         // 灯標の海路（西＝大正の港町へ。白い航路標識が点々と続く）
         const buoyW = toon(0xe4ddd0), buoyR = toon(0xb24a3a)
-        for (let mx = -180; mx >= -410; mx -= 32) { const g = new THREE.Group(); g.position.set(mx, SEA.level, -30)
+        for (let mx = -180; mx >= -530; mx -= 32) { const g = new THREE.Group(); g.position.set(mx, SEA.level, -30)
           const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 9, 7), buoyW); pole.position.y = 4; pole.castShadow = true; g.add(pole)
           const bnd = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 1.6, 7), buoyR); bnd.position.y = 5.6; g.add(bnd)
           const cap = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 7), isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : buoyR); cap.position.y = 8.8; g.add(cap); town.add(g) }
@@ -2820,10 +2823,10 @@ export async function mountTown3d(parent, opts = {}) {
         const gc = document.createElement('canvas'); gc.width = gc.height = 48; const gcx = gc.getContext('2d'); const ggr = gcx.createRadialGradient(24, 24, 1, 24, 24, 24); ggr.addColorStop(0, 'rgba(255,255,255,0.95)'); ggr.addColorStop(1, 'rgba(255,255,255,0)'); gcx.fillStyle = ggr; gcx.fillRect(0, 0, 48, 48); const glowTex = new THREE.CanvasTexture(gc)
         const goldMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffd6a0, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
         const redMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffae9c, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
-        for (let mx = 100; mx <= 410; mx += 13) { const sp = new THREE.Sprite(goldMat); sp.position.set(mx, SEA.level + 1.4, -44); sp.scale.set(5.4, 5.4, 1); town.add(sp) }       // 東＝江戸への海路の光点
-        for (let tz = -140; tz >= -440; tz -= 13) { const sp = new THREE.Sprite(redMat); sp.position.set(120, SEA.level + 1.4, tz); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 北＝戦国への海路の光点
+        for (let mx = 100; mx <= 520; mx += 13) { const sp = new THREE.Sprite(goldMat); sp.position.set(mx, SEA.level + 1.4, -44); sp.scale.set(5.4, 5.4, 1); town.add(sp) }       // 東＝江戸への海路の光点
+        for (let tz = -140; tz >= -545; tz -= 13) { const sp = new THREE.Sprite(redMat); sp.position.set(140, SEA.level + 1.4, tz); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 北＝戦国への海路の光点
         const taiMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffcc9c, transparent: true, opacity: isNight ? 0.82 : 0.42, depthWrite: false, blending: THREE.AdditiveBlending, fog: true })
-        for (let mx = -170; mx >= -388; mx -= 13) { const sp = new THREE.Sprite(taiMat); sp.position.set(mx, SEA.level + 1.4, -30); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 西＝大正への海路の光点（島の縁まで）
+        for (let mx = -170; mx >= -530; mx -= 13) { const sp = new THREE.Sprite(taiMat); sp.position.set(mx, SEA.level + 1.4, -30); sp.scale.set(5.4, 5.4, 1); town.add(sp) } // 西＝大正への海路の光点（島の縁まで）
       }
       // ── 別世界の演出: 時代の気配（舞う粒子）＋霞の帯（くぐると世界が変わる関門）──
       {
@@ -2841,7 +2844,7 @@ export async function mountTown3d(parent, opts = {}) {
         const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mcx = mc.getContext('2d'); const mg = mcx.createRadialGradient(32, 32, 1, 32, 32, 32); mg.addColorStop(0, 'rgba(255,255,255,0.8)'); mg.addColorStop(1, 'rgba(255,255,255,0)'); mcx.fillStyle = mg; mcx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
         const mistMat = new THREE.SpriteMaterial({ map: mistTex, color: 0xeef2f6, transparent: true, opacity: 0.42, depthWrite: false, fog: true })
         const band = (cx, cz, axis) => { for (let i = 0; i < 10; i++) { const o = (i - 4.5) * 11, sp = new THREE.Sprite(mistMat); axis === 'x' ? sp.position.set(cx, SEA.level + 7 + R() * 14, cz + o) : sp.position.set(cx + o, SEA.level + 7 + R() * 14, cz); sp.scale.set(30, 22, 1); town.add(sp) } }
-        band(341, EDO.z, 'x'); band(SENGOKU.x, -357, 'z'); band(TAISHO.x + 129, TAISHO.z, 'x') // 江戸/戦国/大正の関門（接近路 d≈129 に漂う霧のかたまり＝くぐると別世界）
+        band(EDO.x - 129, EDO.z, 'x'); band(SENGOKU.x, SENGOKU.z + 129, 'z'); band(TAISHO.x + 129, TAISHO.z, 'x') // 江戸/戦国/大正の関門（接近路 d≈129 に漂う霧のかたまり＝くぐると別世界。中心から導出し追従）
       }
       // 防波堤（汀から海へ伸びる一本。コンクリの天端を1メッシュへ）
       const jz = -26, jStartX = 80, jEndX = 100, jetGeos = []
@@ -3046,8 +3049,9 @@ export async function mountTown3d(parent, opts = {}) {
         scene.add(g); gulls.push(g)
       }
       const mkGull = (cx, cz) => { const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [1, -1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wing.position.z = s * 0.85; g.add(wing) } g.userData = { cx, cz, rad: 7 + R() * 12, y: SEA.level + 12 + R() * 16, sp: (R() < 0.5 ? 1 : -1) * (0.16 + R() * 0.14), ph: R() * 6.28 }; scene.add(g); gulls.push(g) }
-      for (let i = 0; i < 6; i++) mkGull(150 + R() * 260, -44 + (R() - 0.5) * 50) // 東(江戸)への長い渡りの海鳥
-      for (let i = 0; i < 5; i++) mkGull(120 + (R() - 0.5) * 50, -160 - R() * 270) // 北(戦国)への渡りの海鳥
+      for (let i = 0; i < 7; i++) mkGull(160 + R() * 360, -44 + (R() - 0.5) * 50) // 東(江戸)への長い渡りの海鳥
+      for (let i = 0; i < 6; i++) mkGull(140 + (R() - 0.5) * 50, -180 - R() * 360) // 北(戦国)への渡りの海鳥
+      for (let i = 0; i < 5; i++) mkGull(-200 - R() * 340, -30 + (R() - 0.5) * 50) // 西(大正)への渡りの海鳥
     }
 
     // ── 海釣りの桟橋（南の海へ伸びる木の桟橋）＋釣り人。静かな海辺の暮らし。──
