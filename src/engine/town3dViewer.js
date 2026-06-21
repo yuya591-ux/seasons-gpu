@@ -1728,7 +1728,7 @@ export async function mountTown3d(parent, opts = {}) {
         ? [[0xb86a32, 0xa85a36, 0x9a6a30, 0x4e6048, 0x586a50], [0xe0a858, 0xd89a4a, 0xc98a40, 0x687a54, 0x70845a]] // 紅葉＋常緑(杉松)
         : weather === 'snow'
           ? [[0x44543e, 0x4e6048, 0x42503c], [0x586a50, 0x627458, 0x54664e]]
-          : [[0x4f6e3e, 0x547640, 0x5c7c46], [0x6f9050, 0x7a9c5a, 0x82a262]]
+          : [[0x46673a, 0x547a40, 0x648a48, 0x748f4c, 0x52784a, 0x5e8444], [0x689050, 0x7ea05c, 0x92b066, 0xa2b66e, 0x86a868, 0x90ac5c]] // 夏の樹冠に色幅（深緑〜若葉〜黄緑〜青緑）＝同色の綿玉畑を脱す
   const leafBaseMats = leafBase.map((c) => { const m = toon(c); m.vertexColors = true; return m }) // 樹冠に頂点色の上下グラデ（陰陽）を効かせる
   const leafHiMats = leafHi.map(toon)
   const treesArr = []
@@ -1756,7 +1756,7 @@ export async function mountTown3d(parent, opts = {}) {
     const main = new THREE.IcosahedronGeometry(r, det)
     main.applyMatrix4(new THREE.Matrix4().makeScale(ax, ay, ax)); main.applyMatrix4(new THREE.Matrix4().makeTranslation(0, trunkH + r * ay * 0.5, 0))
     leafGeos.push(main)
-    const nC = scale > 1.4 ? 3 + ((R() * 2) | 0) : 1 + (R() < 0.45 ? 1 : 0)
+    const nC = scale > 1.4 ? 4 + ((R() * 2) | 0) : 2 + ((R() * 2) | 0) // 房を増やし樹冠の輪郭を不揃いに（綿玉の真球を脱す）
     for (let k = 0; k < nC; k++) {
       const cr = r * (0.44 + R() * 0.42), s = 0.85 + R() * 0.3
       const cg = new THREE.IcosahedronGeometry(cr, det)
