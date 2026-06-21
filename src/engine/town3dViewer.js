@@ -4161,28 +4161,52 @@ export async function mountTown3d(parent, opts = {}) {
       const dust = new THREE.Points(dgeo, dmat); dust.frustumCulled = false; dust.renderOrder = 6; winRoom.add(dust)
       winDust = { geo: dgeo, arr: dp, base }
     }
-    // ── 窓辺の日だまりで丸くなって眠る猫（採光のだまりに据える＝最高の“居る部屋”の一枚）。子群ローカルは素のMeshBasic（grad黒落ち回避）。──
+    // ── 窓辺の日だまりで丸くなる猫（“居る部屋”の主役。顔まで作り込む）。子群ローカルは素のMeshBasic（grad黒落ち回避）。──
     {
       const tint = (h) => { const c = new THREE.Color(h); if (roomWarm) c.multiply(roomWarm); return c }
-      const fur = new THREE.MeshBasicMaterial({ color: tint(isNight ? 0x6f665a : 0x9c8f7c), fog: false })       // 茶トラ寄りの灰茶
-      const furD = new THREE.MeshBasicMaterial({ color: tint(isNight ? 0x564e44 : 0x7d7160), fog: false })      // 縞/陰
-      const furP = new THREE.MeshBasicMaterial({ color: tint(isNight ? 0x8e857a : 0xcabba4), fog: false })      // 胸・口先の淡色
-      const noseM = new THREE.MeshBasicMaterial({ color: tint(0xb98a86), fog: false })
-      winRoomMats.push(fur, furD, furP, noseM)
-      const cat = new THREE.Group(); cat.position.set(0.5, FY + 0.02, 1.5); cat.rotation.y = -0.6 // 採光だまりの中・やや斜め
+      const M = (h) => { const m = new THREE.MeshBasicMaterial({ color: tint(h), fog: false }); winRoomMats.push(m); return m }
+      const fur = M(isNight ? 0x6f665a : 0x9c8f7c)   // 地色（茶トラの灰茶）
+      const furD = M(isNight ? 0x4e4739 : 0x6e6150)  // 縞・陰
+      const furL = M(isNight ? 0x7d7464 : 0xb6a98f)  // 背の明るみ
+      const white = M(isNight ? 0x8c8576 : 0xeae0cf) // 胸・口先・足先
+      const pink = M(isNight ? 0x7e615d : 0xd69a90)  // 鼻・耳の内
+      const dark = M(isNight ? 0x231e19 : 0x3b332b)  // 閉じた目・口
+      const whisk = M(isNight ? 0x9a9384 : 0xeee7d6) // ひげ
+      const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 13)
+      const CO = (r, h, s) => new THREE.ConeGeometry(r, h, s || 9)
+      const CY = (r, h, s) => new THREE.CylinderGeometry(r, r, h, s || 6)
+      const cat = new THREE.Group(); cat.position.set(0.5, FY + 0.02, 1.62); cat.rotation.y = 0.38 // 採光だまり・顔をこちらへ
       const add = (geo, mat, x, y, z, rx, ry, rz, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); m.scale.set(sx || 1, sy || 1, sz || 1); m.renderOrder = 2; cat.add(m); return m }
-      const body = add(new THREE.SphereGeometry(0.2, 18, 14), fur, 0, 0.12, 0, 0, 0, 0, 1.55, 0.62, 1.0)        // 丸まった胴
-      add(new THREE.SphereGeometry(0.2, 16, 12), furP, 0.02, 0.07, 0, 0, 0, 0, 1.2, 0.4, 0.78)                  // 胸/腹の淡色（手前下）
-      const head = add(new THREE.SphereGeometry(0.12, 16, 14), fur, 0.27, 0.12, 0.05, 0, 0, 0, 1.0, 0.94, 1.0)  // 頭（前方）
-      const ears = [], ears0 = []; for (const ez of [-0.06, 0.06]) { ears.push(add(new THREE.ConeGeometry(0.042, 0.075, 10), fur, 0.26, 0.21, 0.05 + ez, 0.18 * Math.sign(ez), 0, -0.12)); ears0.push(0.18 * Math.sign(ez)) } // 耳
-      add(new THREE.SphereGeometry(0.055, 12, 10), furP, 0.36, 0.095, 0.05, 0, 0, 0, 1.0, 0.82, 1.0)            // 口先
-      add(new THREE.SphereGeometry(0.014, 8, 6), noseM, 0.405, 0.1, 0.05)                                        // 鼻
-      for (const ez of [-0.045, 0.045]) add(new THREE.BoxGeometry(0.03, 0.006, 0.012), furD, 0.34, 0.15, 0.05 + ez) // 閉じた目（細い線）
-      const tail = add(new THREE.TorusGeometry(0.135, 0.036, 8, 18, Math.PI * 1.35), fur, -0.13, 0.07, 0.17, Math.PI / 2, 0, 0.5) // 丸めた尻尾（胴の手前へ）
-      // 背の縞（茶トラ）
-      for (const sx2 of [-0.06, 0.04, 0.14]) add(new THREE.BoxGeometry(0.03, 0.02, 0.26), furD, sx2, 0.27, 0, 0, 0, 0, 1, 1, 0.7)
-      floorShadow(0.46, 1.52, 0.72, 0.52) // 猫の接地影
-      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, y0: 0.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1 }
+      // ── 胴（丸くなって伏せる。お尻が高く、手前に前足。香箱に近い）──
+      const body = add(SP(0.22, 20, 16), fur, 0, 0.15, -0.04, 0, 0, 0, 1.5, 0.78, 1.22)        // 胴
+      add(SP(0.18), fur, -0.2, 0.17, -0.06, 0, 0, 0, 1.0, 0.95, 1.0)                            // お尻のふくらみ
+      add(SP(0.19), white, 0.08, 0.085, 0.16, 0, 0, 0, 1.2, 0.5, 0.9)                           // 胸〜お腹の白
+      for (const px of [-0.08, 0.08]) add(SP(0.05), white, 0.12 + 0, 0.045, 0.3 + 0, 0, 0, 0, 1.3, 0.8, 1.5).position.set(0.16 + px * 0.55, 0.05, 0.27) // 前足（白い足先）
+      // 背の薄墨の縞（茶トラ）。胴に沿って弧を伏せる。
+      for (const sx2 of [-0.16, -0.06, 0.04, 0.14]) add(new THREE.TorusGeometry(0.16, 0.016, 6, 14, Math.PI * 0.62), furD, sx2, 0.18, -0.02, 0, 0, Math.PI, 1.1, 1, 1.5)
+      add(SP(0.2), furL, 0, 0.27, -0.04, 0, 0, 0, 1.3, 0.4, 1.0) // 背の明るみ
+      // 尻尾（胴の手前へ巻き、先が淡い）
+      const tail = add(new THREE.TorusGeometry(0.15, 0.038, 8, 20, Math.PI * 1.3), fur, 0.04, 0.08, 0.2, Math.PI / 2, 0, 0.4)
+      add(SP(0.045), white, 0.2, 0.08, 0.28) // 尻尾の先（淡色）
+      // ── 頭（顔をこちらへ。子群＝寝返り/呼吸でいっしょに動く）──
+      const headG = new THREE.Group(); headG.position.set(0.1, 0.33, 0.22); headG.rotation.set(-0.46, 0.0, 0); cat.add(headG) // 顔をこちらへ上げて（見下ろす視点でも顔が見える・正面）
+      const hAdd = (geo, mat, x, y, z, rx, ry, rz, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); m.scale.set(sx || 1, sy || 1, sz || 1); m.renderOrder = 3; headG.add(m); return m }
+      hAdd(SP(0.125, 18, 15), fur, 0, 0, 0, 0, 0, 0, 1.05, 0.96, 0.96)              // 頭
+      for (const s of [-1, 1]) hAdd(SP(0.07), fur, s * 0.085, -0.035, 0.05, 0, 0, 0, 0.95, 0.95, 0.95) // 頬のふくらみ
+      hAdd(SP(0.062), white, 0, -0.055, 0.09, 0, 0, 0, 1.25, 0.92, 0.92)            // 口先（白マズル）
+      hAdd(CO(0.02, 0.022, 3), pink, 0, -0.028, 0.135, Math.PI, 0, 0)               // 鼻（ピンクの逆三角）
+      hAdd(CY(0.004, 0.028), dark, 0, -0.058, 0.125)                                // 口の縦線
+      for (const s of [-1, 1]) hAdd(new THREE.TorusGeometry(0.018, 0.004, 5, 9, Math.PI), dark, s * 0.02, -0.072, 0.12, 0, 0, s > 0 ? Math.PI * 0.5 : Math.PI * 1.5) // ωの口
+      // 閉じた目（やさしい弧＝うとうと）
+      const eyes = []; for (const s of [-1, 1]) eyes.push(hAdd(new THREE.TorusGeometry(0.03, 0.006, 6, 14, Math.PI), dark, s * 0.052, 0.016, 0.112, 0, 0, Math.PI))
+      // 耳（外＝毛色／内＝ピンク。先を少し外へ）
+      const ears = [], ears0 = []; for (const s of [-1, 1]) { ears.push(hAdd(CO(0.052, 0.092, 12), fur, s * 0.075, 0.115, -0.005, 0.12, 0, s * -0.2)); ears0.push(0.12); hAdd(CO(0.03, 0.055, 10), pink, s * 0.073, 0.108, 0.01, 0.12, 0, s * -0.2) }
+      // 額のМ字縞（茶トラの印）
+      for (const s of [-0.035, 0, 0.035]) hAdd(CY(0.005, 0.055), furD, s, 0.085, 0.05, 0.55, 0, 0)
+      // ひげ（左右3本ずつ・細く）
+      for (const s of [-1, 1]) for (const dy of [-0.018, 0, 0.018]) { const w = hAdd(CY(0.0018, 0.14, 4), whisk, s * 0.12, -0.03 + dy, 0.1); w.rotation.z = s * 1.45; w.rotation.y = -s * (0.2 + dy * 6) }
+      floorShadow(0.5, 1.62, 0.78, 0.6) // 猫の接地影
+      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, y0: 0.78, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1 }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
