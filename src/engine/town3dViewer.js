@@ -4063,8 +4063,14 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // ── 窓から差し込む光（昼）＝畳に落ちる暖かな採光。最も多く眺める“座っている景色”に光の差す向きを与える。──
     if (!isNight) {
-      // 畳に落ちる窓明かり（夕ほど暖色で濃い。夜の灯りだまりの昼版）
-      const ltTex = cv(96, 96, (x) => { const g = x.createRadialGradient(48, 40, 4, 48, 48, 50); g.addColorStop(0, 'rgba(255,246,222,0.95)'); g.addColorStop(0.5, 'rgba(255,238,200,0.34)'); g.addColorStop(1, 'rgba(255,238,200,0)'); x.fillStyle = g; x.fillRect(0, 0, 96, 96) })
+      // 畳に落ちる窓明かり（夕ほど暖色で濃い。夜の灯りだまりの昼版）。窓桟の影を抜いて“この窓から差す光”に。
+      const ltTex = cv(128, 128, (x) => {
+        const g = x.createRadialGradient(64, 52, 4, 64, 64, 66); g.addColorStop(0, 'rgba(255,247,224,0.96)'); g.addColorStop(0.5, 'rgba(255,239,202,0.34)'); g.addColorStop(1, 'rgba(255,239,202,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128)
+        x.globalCompositeOperation = 'destination-out'; x.filter = 'blur(2.5px)'; x.fillStyle = 'rgba(0,0,0,0.55)' // 桟の影＝光を抜く（やわらかい縞）
+        for (const bx of [30, 64, 98]) x.fillRect(bx - 3.5, 0, 7, 128)  // 縦桟（左右の障子＋召し合わせ）の影
+        x.fillRect(0, 56, 128, 6)                                       // 横桟（窓台）の影
+        x.filter = 'none'; x.globalCompositeOperation = 'source-over'
+      })
       const patchMat = new THREE.MeshBasicMaterial({ map: ltTex, color: new THREE.Color(0xfff1cc).lerp(sunCol, 0.5), transparent: true, opacity: 0.17 + duskAmt * 0.24, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); winRoomMats.push(patchMat)
       const patch = new THREE.Mesh(new THREE.PlaneGeometry(owW + 1.6, 2.7), patchMat); patch.rotation.x = -Math.PI / 2; patch.rotation.z = 0.1; patch.position.set(-0.2, FY + 0.05, 1.75); patch.renderOrder = 4; winRoom.add(patch) // 窓から斜めに差す向き
     }
