@@ -3724,16 +3724,19 @@ export async function mountTown3d(parent, opts = {}) {
     colliders.push({ x: rx, z: rz, r: 3.2 })
   }
 
-  // ── 歩く住民（歩道を行き交う小さな人影）＋ランドマークの賑わい ──
-  const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8]
-  const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24]
-  const skinMat = toon(0xf0c49c)
+  // ── 歩く住民（歩道を行き交う人影）＋ランドマークの賑わい。脚・腕のある中品質に底上げ（近景=walk/低空で映える）。──
+  const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8, 0x4a5560, 0xcf6f93, 0xd0904e]
+  const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e, 0x55504a], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24, 0x4c3727, 0x6b5038]
+  const skinCols = [0xf0c49c, 0xf6d2b0, 0xe8b489]
   const makePeep = () => {
     const g = new THREE.Group()
-    const legs = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.58, 0.32), toon(pantsCols[(R() * pantsCols.length) | 0])); legs.position.y = 0.4; legs.castShadow = true; g.add(legs) // ズボン
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.42, 3, 6), toon(peepCols[(R() * peepCols.length) | 0])); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 上着
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 8, 6), skinMat); head.position.y = 1.42; g.add(head)
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.245, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.62), toon(hairCols[(R() * hairCols.length) | 0])); hair.position.y = 1.45; g.add(hair) // 髪
+    const pm = toon(pantsCols[(R() * pantsCols.length) | 0]), tm = toon(peepCols[(R() * peepCols.length) | 0]), hm = toon(hairCols[(R() * hairCols.length) | 0]), sm = toon(skinCols[(R() * skinCols.length) | 0])
+    for (const s of [-1, 1]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.62, 6), pm); leg.position.set(s * 0.11, 0.4, 0); leg.castShadow = true; g.add(leg) } // 2本の脚
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.54, 8), tm); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 胴
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), tm); shoulder.position.y = 1.18; shoulder.scale.set(1.1, 0.6, 0.8); g.add(shoulder) // 肩
+    for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.5, 6), tm); arm.position.set(s * 0.28, 0.94, 0); arm.rotation.z = s * 0.07; arm.castShadow = true; g.add(arm) } // 腕
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), sm); head.position.y = 1.42; head.scale.set(0.96, 1.04, 0.96); g.add(head)
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.66), hm); hair.position.set(0, 1.45, -0.015); g.add(hair) // 髪（上＋後ろ。顔は出す）
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
     return g
   }
