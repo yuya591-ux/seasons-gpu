@@ -535,7 +535,7 @@ export function createAudio(opts) {
         }
       }
     },
-    /** 飛行速度(0..1)で風を膨らませる（速いほど風切りが強まり高くなる＝飛んでいる手応え）。 */
+    /** 飛行速度(0..1)で風をごくわずかに膨らませる。夢の中の空中散歩＝機械音にしない（実機FB「飛行機のブォーが要らない」）。 */
     setFlyWind(v) {
       if (!windNode || !ctx) return
       v = Math.max(0, Math.min(1, v || 0))
@@ -543,8 +543,8 @@ export function createAudio(opts) {
       flyWindV = v
       const t = now()
       try {
-        windNode.g.gain.setTargetAtTime(0.022 + v * 0.05, t, 0.35)       // 風量を速度で増す
-        windNode.bp.frequency.setTargetAtTime(420 + v * 300, t, 0.35)    // 速いほど高い風切り
+        windNode.g.gain.setTargetAtTime(0.02 + v * 0.016, t, 0.6)       // 風量はほんの少しだけ増す（速くてもエンジン音にならない）
+        windNode.bp.frequency.setTargetAtTime(360 + v * 70, t, 0.6)     // ピッチもほぼ一定＝風切りが「ブォー」と高鳴らない
       } catch { /* 無視 */ }
     },
     /** 散策の足音（地上を歩くときだけ・ごく控えめ）。短いこもったノイズで「踏みしめる」手応え。 */
@@ -562,16 +562,17 @@ export function createAudio(opts) {
       else src.connect(g).connect(master)
       try { src.start(t); src.stop(t + 0.13) } catch { /* 無視 */ }
     },
-    /** 高く昇るほど街の環境音をしぼる（風はそのまま＝高空は風だけの静けさへ）。v=高度(0..1)。 */
+    /** 街の環境音(虫/街音)をしぼる。v=しぼり量(0..1)。高空＋海上＋homeから離れた量を engine が合成して渡す。
+     *  海に出ると虫の音がほぼ消える＝「海の上は風と鳥だけ」。風(生成)は別系統なので残る。 */
     setAltitudeDuck(v) {
       if (!ctx) return
       v = Math.max(0, Math.min(1, v || 0))
-      if (Math.abs(v - altDuckV) < 0.04) return
+      if (Math.abs(v - altDuckV) < 0.03) return
       altDuckV = v
       const t = now()
       for (const l of layers) {
         if (l.stopped) continue
-        try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.72)), t, 0.4) } catch { /* 無視 */ }
+        try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.92)), t, 0.5) } catch { /* 無視 */ } // 海上ではほぼ無音まで
       }
     },
     /** 鳥が驚いて飛び立つ羽音（近づくと数回の柔らかい羽ばたき）。ごく控えめに。 */
@@ -589,6 +590,21 @@ export function createAudio(opts) {
         if (bp) { bp.type = 'bandpass'; bp.frequency.value = 900 + Math.random() * 500; bp.Q.value = 0.6; src.connect(bp).connect(g).connect(master) }
         else src.connect(g).connect(master)
         try { src.start(at); src.stop(at + 0.08) } catch { /* 無視 */ }
+      }
+    },
+    /** 海鳥(かもめ)の遠い鳴き声。海の上で時々＝海らしさと、長い渡りの退屈しのぎ。数声の下降する笛のような声。 */
+    seaBird() {
+      if (!ctx || muted) return
+      const t0 = now() + 0.02, cries = 1 + ((Math.random() * 2) | 0)
+      for (let c = 0; c < cries; c++) {
+        const at = t0 + c * (0.22 + Math.random() * 0.18), f0 = 850 + Math.random() * 520
+        const o = ctx.createOscillator(); o.type = 'sawtooth'
+        o.frequency.setValueAtTime(f0, at); o.frequency.linearRampToValueAtTime(f0 * 0.62, at + 0.18 + Math.random() * 0.1) // 下降する鳴き
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.045, at + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.32)
+        let node = o
+        if (ctx.createBiquadFilter) { const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.1; node = o.connect(bp) } // 笛らしく
+        if (ctx.createStereoPanner) { const pan = ctx.createStereoPanner(); pan.pan.value = (Math.random() - 0.5) * 1.3; node.connect(g).connect(pan).connect(master) } else node.connect(g).connect(master)
+        try { o.start(at); o.stop(at + 0.38) } catch { /* 無視 */ }
       }
     },
     /** 見回しの角度(yaw)で音場を左右に動かす（右を向くと音は左へ＝視覚と一致）。聴覚にも窓の外の広がりを。 */

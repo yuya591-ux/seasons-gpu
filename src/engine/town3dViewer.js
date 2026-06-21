@@ -262,6 +262,7 @@ export async function mountTown3d(parent, opts = {}) {
   const onBirdFlush = typeof opts.onBirdFlush === 'function' ? opts.onBirdFlush : () => {} // 鳥が驚いて飛び立つ（羽音）
   const onAltitude = typeof opts.onAltitude === 'function' ? opts.onAltitude : () => {} // 飛行高度(0..1)を外へ伝える（高空で環境音をしぼる）
   const onScene = typeof opts.onScene === 'function' ? opts.onScene : () => {} // 場面（部屋/窓/飛行/歩行・速度・高度・地形・時代の近さ）を外へ伝える（BGMの下地）
+  const onSeaBird = typeof opts.onSeaBird === 'function' ? opts.onSeaBird : () => {} // 海の上で時々かもめが鳴く（海らしさ＋渡りの退屈しのぎ）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -524,6 +525,7 @@ export async function mountTown3d(parent, opts = {}) {
   let cityWalkers = [] // 城下を行き交う人（大通り/山道をゆっくり往復＝動く生気）
   const senMist = [] // 戦国の谷にたなびく霧の帯（ゆっくり漂う）
   const trams = [] // 大正の港町を走る路面電車（大通りを往復）
+  let crossFlock = null, crossT = 99, crossNext = 5 // 渡りの海で時々カメラの近くを横切る鳥の群れ（退屈しのぎ）
   let islandFlocks = [] // 道中の小島で羽を休める鳥（飛行で近づくと一斉に舞い立つ）
   let critters = [] // 舞う蝶/蜻蛉（frameでふわふわ）＝街/季節ごとの生きもの
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
@@ -4950,6 +4952,24 @@ export async function mountTown3d(parent, opts = {}) {
       if (senMist.length && Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) < 220) for (let i = 0; i < senMist.length; i++) { const m = senMist[i]; m.position.x += Math.sin(t * 0.12 + i * 1.7) * dt * 0.6 }
       // 大正の路面電車が大通りを往復（近くを飛ぶ時だけ更新）
       if (trams.length && Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) < 240) for (const tm of trams) { const span = tm.x1 - tm.x0, u = ((t * tm.sp + tm.ph) % (span * 2)), fwd = u < span, x = tm.x0 + (fwd ? u : span * 2 - u); tm.g.position.set(x, heightAt(x, tm.z) + 0.16, tm.z); tm.g.rotation.y = fwd ? Math.PI / 2 : -Math.PI / 2 }
+      // ── 渡りの海の鳥: 海の上を飛んでいると時々、群れがカメラの近くを横切る（長い渡りの退屈しのぎ＋海らしさ）。鳴き声も。──
+      if (active.mode !== 'walk' && flyAmt > 0.6 && heightAt(fp.x, fp.z) < SEA.level + 0.5) {
+        crossT += dt
+        if (crossT > crossNext) {
+          if (!crossFlock) { crossFlock = new THREE.Group(); crossFlock.userData.wings = []
+            const bm = new THREE.MeshBasicMaterial({ color: isNight ? 0x3a4452 : 0x4a4a44, fog: true })
+            for (let i = 0; i < 6; i++) { const bird = new THREE.Group(); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.05, 0.32), bm); w.position.x = s * 0.5; w.userData.side = s; bird.add(w); crossFlock.userData.wings.push(w) } bird.position.set((R() - 0.5) * 6, (R() - 0.5) * 2.5, (i - 3) * 1.4); crossFlock.add(bird) }
+            scene.add(crossFlock) }
+          const ang = Math.atan2(active.vel.z || 0.5, active.vel.x || 0.5) + (R() < 0.5 ? 1 : -1) * 1.25 // 進行方向の斜め前から横切る
+          crossFlock.position.set(fp.x + Math.cos(ang) * 42, fp.y + 3 + R() * 9, fp.z + Math.sin(ang) * 42)
+          crossFlock.userData.vx = -Math.cos(ang) * 7.5; crossFlock.userData.vz = -Math.sin(ang) * 7.5
+          crossFlock.rotation.y = Math.atan2(crossFlock.userData.vx, crossFlock.userData.vz)
+          crossFlock.visible = true; onSeaBird(); crossT = 0; crossNext = 10 + R() * 13
+        }
+        if (crossFlock && crossFlock.visible) { crossFlock.position.x += crossFlock.userData.vx * dt; crossFlock.position.z += crossFlock.userData.vz * dt
+          const flap = Math.sin(t * 9) * 0.55; for (const w of crossFlock.userData.wings) w.rotation.z = -w.userData.side * flap
+          if (Math.hypot(crossFlock.position.x - fp.x, crossFlock.position.z - fp.z) > 75) crossFlock.visible = false }
+      } else if (crossFlock) crossFlock.visible = false
       // 道中の小島の鳥: 近づくと一斉に舞い立ち、機が離れるとまた枝へ戻る
       for (const fl of islandFlocks) {
         const d = Math.hypot(fp.x - fl.cx, fp.z - fl.cz)
@@ -5174,7 +5194,10 @@ export async function mountTown3d(parent, opts = {}) {
       // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）＋環境音をしぼる
       const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
       if (Math.abs(altT - altTintCur) > 0.02) { altTintCur = altT; altTint.style.opacity = (altT * 0.16).toFixed(2) }
-      altDuck01 = altT
+      // 街の環境音(虫)をしぼる量 = 高度 ＋ 海の上 ＋ homeから離れた、の合成。海に出ると虫が消え、風と鳥だけになる（実機FB）。
+      const overSeaT = isWalk ? 0 : (heightAt(active.flyPos.x, active.flyPos.z) < SEA.level + 0.5 ? 1 : 0) * flyAmt // 水面の上か
+      const dHomeT = isWalk ? 0 : Math.min(1, Math.max(0, (Math.hypot(active.flyPos.x, active.flyPos.z) - 80) / 90)) * flyAmt // homeから離れたか
+      altDuck01 = Math.max(altT, overSeaT, dHomeT)
       // 夕暮れ・夜の光の粒（暗い空ほど見え、カメラ周辺を漂い流れる）
       const moteOp = duskAmt * flyAmt * 0.4
       motes.visible = moteOp > 0.015
