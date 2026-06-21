@@ -3924,7 +3924,10 @@ export async function mountTown3d(parent, opts = {}) {
     const wallMat = mk(C(0x8c7c5c, 0x2a2430), sandTex), wainsMat = mk(C(0x6a4e34, 0x221b22), plankTex) // 砂壁(粒)・腰壁(板目)
     const tatMat = mk(0xffffff, tatTex), cmat = mk(0xffffff, ceilTex)
     const woodMat = mk(C(0x7a5630, 0x2c241d)), woodDk = mk(C(0x4a3320, 0x1d1611))
-    const fabMat = mk(C(0xa8564a, 0x3a2630)), fab2 = mk(C(0x4e6a52, 0x26302a))
+    // 布の織り目（細かな格子＋微細なムラ＝座布団が布に見える）
+    const clothTex = cv(48, 48, (x) => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 48, 48); x.strokeStyle = 'rgba(0,0,0,0.07)'; x.lineWidth = 1; for (let i = 0; i < 48; i += 3) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 48); x.stroke(); x.beginPath(); x.moveTo(0, i); x.lineTo(48, i); x.stroke() } for (let i = 0; i < 380; i++) { x.fillStyle = `rgba(${R() < 0.5 ? 0 : 255},${R() < 0.5 ? 0 : 255},${R() < 0.5 ? 0 : 255},0.03)`; x.fillRect(R() * 48, R() * 48, 1.5, 1.5) } })
+    clothTex.wrapS = clothTex.wrapT = THREE.RepeatWrapping; clothTex.repeat.set(3, 3)
+    const fabMat = mk(C(0xa8564a, 0x3a2630), clothTex), fab2 = mk(C(0x4e6a52, 0x26302a), clothTex)
     const lampMat = mk(C(0xfff0c8, 0xffdf9a)), scrollMat = mk(C(0xe8e0cc, 0x726a5c))
     const ceramMat = mk(C(0xb6c2cc, 0x3a4048)), blackMat = mk(C(0x262420, 0x14120d)), greenMat = mk(C(0x4e7446, 0x26361f))
     const tvMat = mk(C(0x7c6e5c, 0x2a2620)), screenMat = mk(C(0x1c2026, 0x0f1115)), mikanMat = mk(C(0xe8902e, 0x6a4520)), creamMat = mk(C(0xe6ddc6, 0x5c564c)), redMat = mk(C(0xc24a38, 0x52261e))
@@ -4085,7 +4088,7 @@ export async function mountTown3d(parent, opts = {}) {
       const tanzaku = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.13), curtMat); tanzaku.position.y = -0.72; tanzaku.renderOrder = 3; wc.add(tanzaku)
     }
     // ── 窓辺の座布団＝“自分の席”。ここに座って街を眺める、家の安心の居場所。──
-    { const zabuMat = mk(C(0x8f9cab, 0x353d48)), tieMat = mk(C(0x73808e, 0x2a313a)) // 落ち着いた藍鼠
+    { const zabuMat = mk(C(0x8f9cab, 0x353d48), clothTex), tieMat = mk(C(0x73808e, 0x2a313a)) // 落ち着いた藍鼠（布の織り）
       box(0.84, 0.12, 0.84, 0.1, FY + 0.05, 2.5, zabuMat)          // 座布団本体
       box(0.07, 0.05, 0.07, 0.1, FY + 0.12, 2.5, tieMat)          // 中央の綴じ
       for (const [dx, dz] of [[0.34, 0.34], [-0.34, 0.34], [0.34, -0.34], [-0.34, -0.34]]) box(0.05, 0.04, 0.05, 0.1 + dx, FY + 0.115, 2.5 + dz, tieMat) } // 四隅の房
