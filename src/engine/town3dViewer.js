@@ -3789,48 +3789,55 @@ export async function mountTown3d(parent, opts = {}) {
     const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x33302b)
     const white = new THREE.MeshBasicMaterial({ color: 0xf6f1ea, fog: true }), dark = toon(0x2c2622), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xc08274), browM = toon(cfg.hair), blush = toon(0xe2a596)
     const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
-    const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 14), CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 5, 12), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 16), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
+    const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 14), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 16), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
     const add = (p, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx !== undefined) m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.castShadow = true; p.add(m); return m }
+    // ── 一体の連続メッシュ：断面リング(楕円)を滑らかにつなぐ＝球の寄せ集めでない「一枚の体・手足」。──
+    const loft = (rings, mat, parent) => { const N = 14, vp = [], idx = []
+      for (const r of rings) for (let j = 0; j < N; j++) { const a = (j / N) * Math.PI * 2; vp.push((r.x || 0) + Math.cos(a) * r.rx, r.y, (r.z || 0) + Math.sin(a) * (r.rz || r.rx)) }
+      for (let i = 0; i < rings.length - 1; i++) { const a0 = i * N, a1 = (i + 1) * N; for (let j = 0; j < N; j++) { const jn = (j + 1) % N; idx.push(a0 + j, a1 + j, a0 + jn, a0 + jn, a1 + j, a1 + jn) } } // 外向き
+      const cap = (r, dir, base) => { const c = vp.length / 3; vp.push(r.x || 0, r.y + dir * Math.max(r.rx, r.rz || r.rx) * 0.85, r.z || 0); for (let j = 0; j < N; j++) { const jn = (j + 1) % N; if (dir > 0) idx.push(base + j, base + jn, c); else idx.push(base + jn, base + j, c) } }
+      cap(rings[0], -1, 0); cap(rings[rings.length - 1], 1, (rings.length - 1) * N)
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); return m }
     const arms = [], legs = []
-    // 腕＝上腕＋肘＋前腕（少し前へ＝自然）＋手。肩で振れる。
-    const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.152, 1.42, 0); g.add(armG)
-      if (wide) { add(armG, CAP(0.072, 0.3), sleeveMat, s * 0.02, -0.2, 0); add(armG, SP(0.046), skin, s * 0.01, -0.44, 0.02) } // 着物の袖
-      else { add(armG, CAP(0.046, 0.18), sleeveMat, 0, -0.12, 0); add(armG, SP(0.047), sleeveMat, 0, -0.26, 0.006); add(armG, CAP(0.04, 0.2), skin, 0, -0.41, 0.035); add(armG, SP(0.04), skin, 0, -0.55, 0.06) } // 上腕＋肘＋前腕＋手
-      armG.rotation.z = s * 0.11; arms.push(armG) } }
-    // 脚＝腿＋膝＋脛＋足。股関節で振れる。
-    const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.077, 0.92, 0); g.add(legG)
-      add(legG, CAP(rad, 0.26), legMat, 0, -0.2, 0); add(legG, SP(rad * 1.05), legMat, 0, -0.4, 0.006); add(legG, CAP(rad * 0.92, 0.26), legMat, 0, -0.6, 0.02); add(legG, SP(0.057), shoeM, 0, -0.82, 0.06, 1.4, 0.5, 1.9); legs.push(legG) } }
-    // ── 体（衣装別。胸→腰のくびれ・腰→脚のつながりで一体感を出す）──
+    // 腕＝肩→肘→手首の滑らかな一本のテーパー（少し前へ＝自然）＋手。肩で振れる。
+    const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.15, 1.4, 0); g.add(armG)
+      if (wide) loft([{ y: 0.04, rx: 0.082 }, { y: -0.16, rx: 0.09 }, { y: -0.34, rx: 0.07 }, { y: -0.45, rx: 0.05 }], sleeveMat, armG) // 着物の袖
+      else { loft([{ y: 0.05, rx: 0.054 }, { y: -0.13, rx: 0.046 }, { y: -0.27, rx: 0.04, z: 0.015 }, { y: -0.44, rx: 0.036, z: 0.035 }], sleeveMat, armG); add(armG, SP(0.04), skin, 0, -0.55, 0.05) }
+      armG.rotation.z = s * 0.1; arms.push(armG) } }
+    // 脚＝腰→膝→足首の滑らかな一本のテーパー＋足。股関節で振れる。
+    const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.078, 0.92, 0); g.add(legG)
+      loft([{ y: 0.05, rx: rad * 1.22 }, { y: -0.2, rx: rad }, { y: -0.4, rx: rad * 0.9, z: 0.012 }, { y: -0.6, rx: rad * 0.82, z: 0.02 }, { y: -0.8, rx: rad * 0.72, z: 0.02 }], legMat, legG); add(legG, SP(0.055), shoeM, 0, -0.84, 0.06, 1.45, 0.5, 1.95); legs.push(legG) } }
+    // ── 体（衣装別。胴は一体のロフトで人体の一枚の形に）──
     if (outfit === 'kimono' || outfit === 'armor') {
-      add(g, CY(0.18, 0.14, 1.36, 18), topM, 0, 0.74, 0)                   // 着物の身頃（裾広がり）
-      add(g, SP(0.155, 18, 14), topM, 0, 1.42, 0, 1.12, 0.74, 0.92)        // 胸・肩（身頃上端と重ねて滑らかに）
-      add(g, CY(0.19, 0.185, 0.1, 18), accentM, 0, 0.9, 0)                 // 帯
-      for (const s of [-1, 1]) add(g, BX(0.04, 0.4, 0.02), white, s * 0.038, 1.2, 0.135).rotation.z = -s * 0.3 // 襟（Vの重ね）
-      for (const s of [-1, 1]) add(g, SP(0.057), shoeM, s * 0.062, 0.05, 0.05, 1.4, 0.5, 1.9) // 足
+      loft([{ y: 0.06, rx: 0.2, rz: 0.16 }, { y: 0.5, rx: 0.17, rz: 0.14 }, { y: 0.9, rx: 0.15, rz: 0.12 }, { y: 1.2, rx: 0.152, rz: 0.116 }, { y: 1.42, rx: 0.172, rz: 0.118 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 着物の身頃（裾広がりの一枚）
+      add(g, CY(0.158, 0.152, 0.1, 18), accentM, 0, 0.9, 0) // 帯
+      for (const s of [-1, 1]) add(g, BX(0.04, 0.4, 0.02), white, s * 0.038, 1.2, 0.12).rotation.z = -s * 0.3 // 襟
+      for (const s of [-1, 1]) add(g, SP(0.057), shoeM, s * 0.06, 0.05, 0.05, 1.4, 0.5, 1.9) // 足
       buildArms(topM, true)
-      if (outfit === 'armor') { add(g, CY(0.205, 0.19, 0.42, 16), botM, 0, 1.1, 0) // 胴（胸当て）
-        for (let i = 0; i < 5; i++) { const a = (i - 2) * 0.46; add(g, BX(0.1, 0.2, 0.04), botM, Math.sin(a) * 0.2, 0.76, Math.cos(a) * 0.2).rotation.y = a } // 草摺
-        for (const s of [-1, 1]) add(g, SP(0.092, 12, 10), botM, s * 0.18, 1.4, 0, 1, 0.8, 0.9) } // 肩の防具
+      if (outfit === 'armor') { loft([{ y: 0.86, rx: 0.185, rz: 0.155 }, { y: 1.08, rx: 0.2, rz: 0.165 }, { y: 1.3, rx: 0.185, rz: 0.155 }], botM, g) // 胴丸（胸当て）
+        for (const s of [-1, 1]) add(g, SP(0.088, 12, 10), botM, s * 0.165, 1.4, 0, 1, 0.82, 0.9) } // 肩の防具
     } else if (outfit === 'hakama') {
-      add(g, CY(0.155, 0.16, 0.6, 18), topM, 0, 1.04, 0)                   // 上衣
-      add(g, SP(0.15, 18, 14), topM, 0, 1.42, 0, 1.12, 0.74, 0.92)         // 胸・肩
-      add(g, CY(0.215, 0.15, 0.86, 18), botM, 0, 0.48, 0)                  // 袴（下が広い）
-      add(g, CY(0.175, 0.215, 0.09, 18), accentM, 0, 0.86, 0)              // 帯
-      for (const s of [-1, 1]) add(g, SP(0.057), shoeM, s * 0.062, 0.05, 0.05, 1.4, 0.5, 1.9)
+      loft([{ y: 0.9, rx: 0.16, rz: 0.13 }, { y: 1.18, rx: 0.152, rz: 0.116 }, { y: 1.42, rx: 0.168, rz: 0.116 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 上衣
+      loft([{ y: 0.06, rx: 0.225, rz: 0.17 }, { y: 0.4, rx: 0.2, rz: 0.155 }, { y: 0.78, rx: 0.17, rz: 0.135 }, { y: 0.93, rx: 0.16, rz: 0.128 }], botM, g) // 袴（下が広い）
+      add(g, CY(0.165, 0.225, 0.09, 18), accentM, 0, 0.86, 0) // 帯
+      for (const s of [-1, 1]) add(g, SP(0.057), shoeM, s * 0.06, 0.05, 0.05, 1.4, 0.5, 1.9)
       buildArms(topM, true)
     } else if (outfit === 'dress') {
       buildLegs(skin, 0.05) // 脚
-      add(g, CY(0.24, 0.12, 0.62, 18), topM, 0, 0.74, 0)                   // スカート（Aライン）
-      add(g, CY(0.125, 0.135, 0.42, 16), topM, 0, 1.18, 0)                 // 上身頃（くびれ）
-      add(g, SP(0.135, 16, 12), topM, 0, 1.4, 0, 1.12, 0.78, 0.9)          // 胸・肩
-      add(g, CY(0.13, 0.13, 0.05, 16), accentM, 0, 0.96, 0)                // ウエスト
+      loft([{ y: 0.1, rx: 0.235, rz: 0.18 }, { y: 0.5, rx: 0.155, rz: 0.125 }, { y: 0.86, rx: 0.125, rz: 0.1 }, { y: 1.1, rx: 0.12, rz: 0.095 }, { y: 1.3, rx: 0.138, rz: 0.1 }, { y: 1.42, rx: 0.155, rz: 0.105 }, { y: 1.47, rx: 0.08, rz: 0.07 }], topM, g) // ワンピース（裾広がり〜くびれ〜肩の一枚）
+      add(g, CY(0.124, 0.124, 0.05, 16), accentM, 0, 1.0, 0) // ウエスト
+      buildArms(topM, false)
+    } else if (outfit === 'blouse') { // 添付の模倣: 白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋肩紐
+      buildLegs(botM, 0.084)
+      loft([{ y: 0.74, rx: 0.15, rz: 0.12 }, { y: 0.95, rx: 0.145, rz: 0.115 }, { y: 1.1, rx: 0.135, rz: 0.105 }], botM, g) // ハイウエストのパンツ
+      loft([{ y: 1.07, rx: 0.13, rz: 0.1 }, { y: 1.22, rx: 0.135, rz: 0.102 }, { y: 1.34, rx: 0.155, rz: 0.108 }, { y: 1.42, rx: 0.182, rz: 0.112 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 白ブラウス（主役）
+      for (const s of [-1, 1]) add(g, BX(0.024, 0.32, 0.025), botM, s * 0.07, 1.26, 0.095).rotation.z = s * 0.03 // 肩紐
       buildArms(topM, false)
     } else { // modern / suit
-      buildLegs(botM, 0.07) // 脚
-      add(g, CY(0.13, 0.155, 0.2, 16), botM, 0, 0.86, 0)                   // 腰（脚へつながる）
-      add(g, CY(0.155, 0.122, 0.5, 18), topM, 0, 1.2, 0)                   // 胴（胸→腰のくびれ）
-      add(g, SP(0.158, 18, 14), topM, 0, 1.42, 0, 1.12, 0.82, 0.92)        // 胸・肩（胴上端と重ねて滑らかに）
-      if (outfit === 'suit') add(g, BX(0.04, 0.3, 0.02), accentM, 0, 1.24, 0.13) // ネクタイ
+      buildLegs(botM, 0.07)
+      loft([{ y: 0.74, rx: 0.155, rz: 0.115 }, { y: 0.95, rx: 0.138, rz: 0.103 }, { y: 1.07, rx: 0.126, rz: 0.097 }], botM, g) // 腰〜パンツ
+      loft([{ y: 1.04, rx: 0.125, rz: 0.096 }, { y: 1.18, rx: 0.122, rz: 0.094 }, { y: 1.32, rx: 0.155, rz: 0.108 }, { y: 1.42, rx: 0.184, rz: 0.112 }, { y: 1.47, rx: 0.085, rz: 0.075 }], topM, g) // 胴（肩広く腰くびれの一枚）
+      if (outfit === 'suit') add(g, BX(0.04, 0.3, 0.02), accentM, 0, 1.24, 0.1) // ネクタイ
       buildArms(topM, false)
     }
     add(g, CY(0.048, 0.05, 0.11, 12), skin, 0, 1.47, 0) // 首
@@ -3875,6 +3882,9 @@ export async function mountTown3d(parent, opts = {}) {
     else if (cfg.prop === 'spear') { add(g, CY(0.018, 0.018, 1.9, 6), toon(0x5a4632), 0.25, 0.92, -0.05); add(g, CY(0.0, 0.026, 0.15, 6), toon(0xb8bcc2), 0.25, 1.9, -0.05) }
     else if (cfg.prop === 'bundle') { add(g, SP(0.14, 12, 10), toon(cfg.accent || 0x8a6a4a), 0, 1.16, -0.18, 1, 1.1, 0.9) }
     else if (cfg.prop === 'cane') { add(g, CY(0.013, 0.013, 0.86, 6), toon(0x3a2e22), 0.25, 0.44, 0.12) }
+    else if (cfg.prop === 'bag') { const bm = toon(cfg.bagCol || 0x8a7256) // 斜め掛けの鞄（添付の少女）
+      const strap = add(g, BX(0.028, 0.52, 0.02), bm, 0, 1.18, 0.12); strap.rotation.z = 0.52 // たすき掛けの紐
+      add(g, BX(0.17, 0.2, 0.08), bm, 0.2, 0.92, 0.07, 1, 1, 1).rotation.y = 0.1 } // 鞄本体（腰）
     // 接地影（足元の柔らかな影＝人形の浮きを消して地に立たせる）
     const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.5, 0.72, 1); shadow.renderOrder = 1; g.add(shadow)
     g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
@@ -3884,8 +3894,11 @@ export async function mountTown3d(parent, opts = {}) {
   // ── home（現代）の住人を要所に ──
   const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 } ]
   const placeResident = (hx, hz, cfg) => { const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); const u = g.userData; u.ax = hx; u.az = hz; u.tx = hx; u.tz = hz; u.face = R() * 6.28; u.ph = R() * 6.28; u.pauseT = 0.5 + R() * 4; u.moving = false; u.speed = 0.66 + R() * 0.5; u.rad = 4 + R() * 5; g.rotation.y = u.face; town.add(g); residents.push(g) }
-  const RES_MODERN = ['modern', 'modern', 'suit']
+  const RES_MODERN = ['modern', 'modern', 'suit', 'blouse']
   for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
+  // ── 添付画像の模倣：港町の少女（白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋黒のショートボブ＋斜め掛けの鞄）。港・水辺・街角に。──
+  const harborGirl = () => ({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: [0x1d1916, 0x241c18, 0x2c2622][(R() * 3) | 0], iris: [0x3a2e26, 0x4a3a2c, 0x4a6a9a][(R() * 3) | 0], outfit: 'blouse', top: [0xf0ece2, 0xeae6da, 0xf2eee6][(R() * 3) | 0], bottom: [0x33373e, 0x2e3a42, 0x3a3530][(R() * 3) | 0], hairStyle: 'bob', prop: 'bag', bagCol: [0x8a7256, 0x6a5a44, 0x9a8460][(R() * 3) | 0] })
+  for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeResident(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, harborGirl())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
   const pickC = (a) => a[(R() * a.length) | 0]
   const placeEra = (cx, cz, n, factory) => { for (let i = 0; i < n; i++) { const a = (i / n) * 6.2832 + R() * 0.6, rr = 8 + R() * 22; placeResident(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, factory()) } }
@@ -5787,6 +5800,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dResFace = (i, ya) => { if (residents[i]) { const u = residents[i].userData; residents[i].rotation.y = ya; u.face = ya; u.moving = false; u.pauseT = 999; for (const a of u.arms) a.rotation.x = 0; for (const l of u.legs) l.rotation.x = 0 } } // 検証用: 住人を止めて向きを固定（顔の確認）
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
+    window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
