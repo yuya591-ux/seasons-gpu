@@ -4029,47 +4029,54 @@ export async function mountTown3d(parent, opts = {}) {
       for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 30, 72); x.quadraticCurveTo(128 + sx * 40, 122, 128 + sx * 22, 168); x.strokeStyle = hairSh; x.lineWidth = 2; x.stroke() }
       x.beginPath(); x.moveTo(108, 66); x.quadraticCurveTo(128, 60, 148, 66); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 艶
     }
-    // ── 横顔（プロフィール・左を向く） ──
+    // ── 横顔（プロフィール・左を向く。なめらかな輪郭線と立体感を保つ） ──
     const drawGirlSide = (x, P = girlPalette()) => {
       const OL = P.OL, skin = P.skin, skinSh = P.skinSh, hair = P.hair, hairHi = P.hairHi, hairSh = P.hairSh
       const top = P.top, topSh = P.topSh, bot = P.bot, botSh = P.botSh, bag = P.bag, mouthC = P.mouthC, blush = P.blush
       x.lineJoin = 'round'; x.lineCap = 'round'
       const ol = (sw) => { x.strokeStyle = OL; x.lineWidth = sw; x.stroke() }
-      // パンツ（横・尻のふくらみは後ろ＝右へ）
-      x.beginPath(); x.moveTo(98, 252); x.lineTo(156, 252); x.bezierCurveTo(166, 300, 160, 360, 152, 420); x.lineTo(150, 468); x.lineTo(118, 468); x.bezierCurveTo(94, 460, 90, 380, 94, 300); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(132, 256); x.bezierCurveTo(150, 300, 146, 380, 140, 460); x.lineTo(150, 468); x.bezierCurveTo(160, 360, 166, 300, 156, 252); x.lineTo(132, 252); x.closePath(); x.fillStyle = botSh; x.fill()
-      x.beginPath(); x.ellipse(106, 482, 17, 9, 0, 0, 6.2832); x.fillStyle = '#2a2622'; x.fill(); ol(3) // 靴（前へ）
-      // ブラウス（横・胸は前＝左、背は右）
-      x.beginPath(); x.moveTo(112, 156); x.bezierCurveTo(96, 168, 94, 212, 100, 258); x.lineTo(152, 258); x.bezierCurveTo(156, 210, 154, 170, 144, 158); x.bezierCurveTo(136, 150, 120, 150, 112, 156); x.closePath(); x.fillStyle = top; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(136, 156); x.bezierCurveTo(150, 172, 152, 214, 150, 258); x.lineTo(152, 258); x.bezierCurveTo(156, 210, 154, 170, 144, 158); x.closePath(); x.fillStyle = topSh; x.fill()
-      x.beginPath(); x.moveTo(100, 254); x.lineTo(152, 254); ol(2.5)
-      // 鞄（肩から前へ垂れる）
-      x.beginPath(); x.moveTo(130, 158); x.lineTo(92, 252); x.strokeStyle = bag; x.lineWidth = 7; x.stroke(); ol(1.5)
-      x.beginPath(); x.rect(78, 248, 30, 40); x.fillStyle = bag; x.fill(); ol(3.5); x.beginPath(); x.moveTo(78, 260); x.lineTo(108, 260); ol(2)
-      // 腕（前に垂れる・一本）
-      x.beginPath(); x.moveTo(112, 162); x.bezierCurveTo(100, 178, 100, 200, 104, 214); x.lineTo(118, 212); x.bezierCurveTo(120, 190, 120, 172, 118, 160); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5)
-      x.beginPath(); x.moveTo(104, 212); x.bezierCurveTo(101, 242, 104, 268, 108, 288); x.lineTo(120, 286); x.bezierCurveTo(120, 254, 118, 228, 118, 210); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5)
-      x.beginPath(); x.moveTo(106, 285); x.bezierCurveTo(101, 295, 103, 309, 110, 312); x.bezierCurveTo(119, 312, 121, 299, 119, 287); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
-      // 首
-      x.beginPath(); x.moveTo(116, 132); x.lineTo(134, 134); x.lineTo(132, 158); x.lineTo(118, 158); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
-      // 後頭部の髪
-      x.beginPath(); x.moveTo(120, 52); x.bezierCurveTo(152, 50, 166, 88, 158, 122); x.bezierCurveTo(154, 150, 138, 170, 124, 170); x.bezierCurveTo(132, 150, 130, 118, 128, 98); x.bezierCurveTo(127, 78, 126, 62, 120, 52); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
-      // 顔（横顔の輪郭・額→鼻→唇→顎）
-      x.beginPath(); x.moveTo(124, 58); x.bezierCurveTo(106, 62, 101, 78, 102, 92); x.bezierCurveTo(102, 98, 96, 101, 94, 107); x.bezierCurveTo(98, 111, 102, 112, 101, 115); x.bezierCurveTo(98, 118, 103, 121, 101, 124); x.bezierCurveTo(101, 129, 107, 136, 117, 139); x.bezierCurveTo(122, 140, 125, 138, 125, 133); x.lineTo(124, 58); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5)
-      // 頬の赤み
-      x.beginPath(); x.ellipse(112, 120, 6, 4.2, 0, 0, 6.2832); x.fillStyle = blush; x.fill()
-      // 目（横顔＝アーモンド一つ・前寄り）
-      x.beginPath(); x.moveTo(108, 102); x.quadraticCurveTo(114, 99, 119, 102); x.quadraticCurveTo(114, 106, 108, 102); x.closePath(); x.fillStyle = '#fbf7f0'; x.fill()
-      x.beginPath(); x.ellipse(112, 102.5, 2.6, 3.2, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill()
-      x.beginPath(); x.ellipse(112, 103, 1.4, 2, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill()
-      x.beginPath(); x.moveTo(107, 100); x.quadraticCurveTo(113, 97, 119, 100); x.strokeStyle = OL; x.lineWidth = 2.2; x.stroke() // 上まぶた
-      x.beginPath(); x.moveTo(106, 94); x.quadraticCurveTo(112, 91, 119, 94); x.strokeStyle = hair; x.lineWidth = 2; x.stroke() // 眉
-      // 鼻先・口
-      x.beginPath(); x.moveTo(101, 115); x.quadraticCurveTo(105, 117, 107, 116); x.strokeStyle = skinSh; x.lineWidth = 1.6; x.stroke()
-      x.beginPath(); x.moveTo(101, 124); x.quadraticCurveTo(106, 127, 111, 125); x.strokeStyle = mouthC; x.lineWidth = 2.2; x.stroke()
-      // 前髪（額にかかる・横流れ）
-      x.beginPath(); x.moveTo(124, 54); x.bezierCurveTo(106, 56, 100, 76, 103, 92); x.bezierCurveTo(106, 80, 114, 74, 124, 80); x.bezierCurveTo(127, 68, 127, 60, 124, 54); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
-      x.beginPath(); x.moveTo(126, 62); x.quadraticCurveTo(140, 64, 150, 80); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 艶
+      // パンツ（横・尻は後ろ＝右へふくらみ、脚はS字）
+      x.beginPath(); x.moveTo(104, 252); x.lineTo(150, 252); x.bezierCurveTo(164, 290, 160, 344, 154, 396); x.lineTo(150, 468); x.lineTo(120, 468); x.bezierCurveTo(110, 410, 104, 360, 102, 320); x.bezierCurveTo(100, 296, 100, 272, 104, 252); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
+      x.beginPath(); x.moveTo(132, 256); x.bezierCurveTo(150, 300, 148, 380, 142, 460); x.lineTo(150, 468); x.bezierCurveTo(160, 360, 164, 300, 150, 252); x.lineTo(132, 252); x.closePath(); x.fillStyle = botSh; x.fill() // 背側の陰
+      x.beginPath(); x.moveTo(98, 476); x.bezierCurveTo(86, 478, 84, 489, 96, 491); x.lineTo(126, 491); x.bezierCurveTo(133, 489, 131, 477, 124, 476); x.closePath(); x.fillStyle = '#2a2622'; x.fill(); ol(3) // 靴（つま先は前へ）
+      // ブラウス（横・胸は前＝左へなだらか、背は右）
+      x.beginPath(); x.moveTo(112, 156); x.bezierCurveTo(98, 166, 95, 204, 99, 240); x.lineTo(99, 256); x.lineTo(150, 256); x.bezierCurveTo(154, 210, 153, 172, 144, 158); x.bezierCurveTo(135, 150, 120, 150, 112, 156); x.closePath(); x.fillStyle = top; x.fill(); ol(4)
+      x.beginPath(); x.moveTo(138, 156); x.bezierCurveTo(151, 174, 153, 214, 150, 256); x.lineTo(150, 256); x.bezierCurveTo(154, 210, 153, 172, 144, 158); x.closePath(); x.fillStyle = topSh; x.fill() // 背側の陰
+      x.beginPath(); x.moveTo(99, 252); x.lineTo(150, 252); ol(2.5) // ウエスト
+      // 鞄（肩から前へ垂れ、体の前で揺れる）
+      x.beginPath(); x.moveTo(126, 158); x.lineTo(96, 250); x.strokeStyle = bag; x.lineWidth = 7; x.stroke(); ol(1.5)
+      x.beginPath(); x.moveTo(82, 248); x.lineTo(112, 248); x.lineTo(110, 288); x.lineTo(84, 288); x.closePath(); x.fillStyle = bag; x.fill(); ol(3.5); x.beginPath(); x.moveTo(82, 260); x.lineTo(112, 260); ol(2)
+      // 腕（肩から体の中ほどへ自然に垂れる＝前へ突き出さない）
+      x.beginPath(); x.moveTo(120, 156); x.bezierCurveTo(110, 160, 108, 184, 113, 206); x.lineTo(132, 206); x.bezierCurveTo(136, 184, 135, 162, 128, 154); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5) // 半袖
+      x.beginPath(); x.moveTo(115, 204); x.bezierCurveTo(113, 234, 115, 262, 118, 286); x.bezierCurveTo(124, 288, 129, 286, 130, 282); x.bezierCurveTo(131, 256, 131, 230, 130, 204); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5) // 前腕
+      x.beginPath(); x.moveTo(118, 283); x.bezierCurveTo(114, 294, 117, 308, 124, 310); x.bezierCurveTo(131, 310, 134, 298, 131, 284); x.closePath(); x.fillStyle = skin; x.fill(); ol(3) // 手
+      // 首（顎から肩へなめらかに繋ぐ）
+      x.beginPath(); x.moveTo(116, 133); x.bezierCurveTo(116, 145, 117, 152, 121, 158); x.lineTo(134, 156); x.bezierCurveTo(133, 148, 132, 142, 132, 134); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
+      x.beginPath(); x.moveTo(118, 139); x.quadraticCurveTo(125, 145, 131, 141); x.strokeStyle = skinSh; x.lineWidth = 1.5; x.stroke() // 顎下の陰
+      // 後頭部の髪（丸いボリューム＋襟足＋毛流れ）
+      x.beginPath(); x.moveTo(120, 50); x.bezierCurveTo(150, 48, 167, 84, 160, 120); x.bezierCurveTo(157, 146, 146, 164, 133, 170); x.bezierCurveTo(138, 150, 134, 120, 132, 100); x.bezierCurveTo(131, 78, 128, 60, 120, 50); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
+      x.beginPath(); x.moveTo(150, 70); x.quadraticCurveTo(161, 106, 150, 142); x.strokeStyle = hairSh; x.lineWidth = 2.2; x.stroke()
+      // 顔（横顔の輪郭：額→鼻筋→鼻先→人中→唇→顎。控えめでなめらかな美しいライン）
+      x.beginPath(); x.moveTo(122, 56); x.bezierCurveTo(108, 58, 102, 72, 101, 88); x.bezierCurveTo(100, 94, 96, 98, 95, 103); x.bezierCurveTo(99, 106, 101, 108, 101, 111); x.bezierCurveTo(98, 114, 102, 117, 101, 120); x.bezierCurveTo(100, 125, 105, 133, 114, 137); x.bezierCurveTo(120, 139, 125, 137, 125, 131); x.lineTo(124, 56); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5)
+      // 頬・エラの陰（立体感）
+      x.beginPath(); x.moveTo(120, 98); x.bezierCurveTo(118, 112, 116, 124, 119, 133); x.strokeStyle = 'rgba(226,182,152,0.55)'; x.lineWidth = 5; x.stroke()
+      x.beginPath(); x.ellipse(111, 117, 6, 4, 0, 0, 6.2832); x.fillStyle = blush; x.fill() // 頬の赤み
+      // 耳（後ろ寄り・くぼみ）
+      x.beginPath(); x.ellipse(125, 104, 4.6, 6.6, 0, 0, 6.2832); x.fillStyle = skin; x.fill(); ol(2.4)
+      x.beginPath(); x.moveTo(125, 100); x.quadraticCurveTo(122, 104, 125, 108); x.strokeStyle = skinSh; x.lineWidth = 1.4; x.stroke()
+      // 目（横顔のアーモンド・前寄り＝小さく澄む）
+      x.beginPath(); x.moveTo(105, 100); x.quadraticCurveTo(111, 97, 117, 100); x.quadraticCurveTo(111, 104, 105, 100); x.closePath(); x.fillStyle = '#fbf7f0'; x.fill()
+      x.beginPath(); x.ellipse(109, 100.5, 2.5, 3.1, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill()
+      x.beginPath(); x.ellipse(109, 101, 1.3, 1.9, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill()
+      x.beginPath(); x.ellipse(107.4, 99, 0.9, 1.1, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト
+      x.beginPath(); x.moveTo(104, 98); x.quadraticCurveTo(110, 95, 117, 98); x.strokeStyle = OL; x.lineWidth = 2.2; x.stroke() // 上まぶた
+      x.beginPath(); x.moveTo(103, 92); x.quadraticCurveTo(110, 89, 117, 92); x.strokeStyle = hair; x.lineWidth = 2; x.stroke() // 眉
+      // 鼻先の陰・口
+      x.beginPath(); x.moveTo(100, 111); x.quadraticCurveTo(104, 113, 106, 112); x.strokeStyle = skinSh; x.lineWidth = 1.5; x.stroke()
+      x.beginPath(); x.moveTo(100, 120); x.quadraticCurveTo(105, 123, 110, 121); x.strokeStyle = mouthC; x.lineWidth = 2.2; x.stroke()
+      // 前髪（額にふんわりかかり毛先が顔の前へ）
+      x.beginPath(); x.moveTo(124, 52); x.bezierCurveTo(106, 54, 99, 74, 101, 90); x.bezierCurveTo(104, 80, 110, 74, 118, 76); x.bezierCurveTo(122, 68, 124, 60, 124, 52); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
+      x.beginPath(); x.moveTo(108, 64); x.quadraticCurveTo(126, 58, 142, 72); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 艶
     }
     const maxAniso = renderer.capabilities.getMaxAnisotropy()
     const makeAnimeSprite = (cfg = {}) => {

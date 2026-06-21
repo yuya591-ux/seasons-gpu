@@ -336,14 +336,14 @@ export function createAudio(opts) {
     let b0 = 0, b1 = 0, b2 = 0 // 明るめのノイズ（低音の「ぶぶぶ」を出さず、空気を切る「サー/ひゅー」寄りに）
     for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = 0.99 * b0 + w * 0.05; b1 = 0.96 * b1 + w * 0.08; b2 = 0.90 * b2 + w * 0.09; d[i] = (b0 * 0.3 + b1 * 0.9 + b2 * 1.25 + w * 0.16) * 0.4 }
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.5 // 低音の唸り(ぶぶぶ)を断つ
-    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 680; bp.Q.value = 0.85 // 風切りの芯（速度で上へ動く）
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 560; hp.Q.value = 0.5 // 低音の唸り(ぶー)を完全に断つ
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 0.5 // 高くて広い帯＝空気を切る「ひゅーー」の芯（速度で更に上へ。低い唸りにならない）
     const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.001, now() + 8) // 静止/地上はほぼ無音。setFlyWindが飛行速度で膨らませる
     src.connect(hp).connect(bp).connect(g).connect(master)
     windNode = { src, g, bp, hp } // g/bp は飛行速度で風を膨らませる（setFlyWind）ために保持
     try {
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06
-      const lfoG = ctx.createGain(); lfoG.gain.value = 160; lfo.connect(lfoG).connect(bp.frequency); lfo.start() // ゆるい息づき（突風）
+      const lfoG = ctx.createGain(); lfoG.gain.value = 120; lfo.connect(lfoG).connect(bp.frequency); lfo.start() // ゆるい息づき（突風・高い帯を僅かに上下＝ワウにしない）
       const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.083
       const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.0005; lfo2.connect(lfo2G).connect(g.gain); lfo2.start() // 息づきはごく僅か（静止時に鳴らない）
     } catch { /* LFO非対応でも常時うっすらの風は鳴る */ }
@@ -502,7 +502,10 @@ export function createAudio(opts) {
       if (ctx.state === 'suspended') await ctx.resume()
       started = true
       startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
-      startMusicBed() // 生成的なBGMの下地を用意（3Dの街で場面に応じて静かに鳴る。setMusicBedが音量を上げるまでは無音）
+      // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
+      // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
+      // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
+      // （startMusicBed/setMusicBed は将来用に残すが呼ばない。bedNodesがnullのままなのでsetMusicBedは何もしない）
       if (currentScene) await playScene(currentScene, false)
     },
     /** 画面の現象に音を結ぶ（花火の遠い破裂・流れ星のきらめき）。無音の現象は鳴らさない。 */
@@ -563,9 +566,9 @@ export function createAudio(opts) {
       const t = now()
       const e = v * v // 加速の手応え＝速いほど一気に風が増す
       try {
-        windNode.g.gain.setTargetAtTime(v < 0.06 ? 0.0006 : (0.004 + e * 0.06), t, 0.4) // 静止/低速はほぼ無音。速いほど明確に「ひゅーー」
-        windNode.bp.frequency.setTargetAtTime(620 + v * 1180, t, 0.4)    // 速いほど高く明るい（低い唸りにしない）
-        if (windNode.hp) windNode.hp.frequency.setTargetAtTime(300 + v * 260, t, 0.4) // 速いほど低音を更に削いで澄む
+        windNode.g.gain.setTargetAtTime(v < 0.06 ? 0.0008 : (0.003 + e * 0.05), t, 0.4) // 静止/低速はほぼ無音。速いほど明確に「ひゅーー」
+        windNode.bp.frequency.setTargetAtTime(1500 + v * 1700, t, 0.4)   // 常に高い帯(1.5〜3.2kHz)＝低い唸りにならず空気を切る笛に
+        if (windNode.hp) windNode.hp.frequency.setTargetAtTime(520 + v * 900, t, 0.4) // 速いほど低音を更に削いで澄む
       } catch { /* 無視 */ }
     },
     /** 窓辺の猫を撫でた時のゴロゴロ（0..1）。撫でているほど大きく、離すと冷める。 */
