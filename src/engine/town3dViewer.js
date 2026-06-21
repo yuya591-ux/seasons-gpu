@@ -3992,6 +3992,16 @@ export async function mountTown3d(parent, opts = {}) {
       winRefl = { mat: reflMat, base: reflBase } }
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
+    // ── 窓辺の一輪挿し（季節の花＝移ろう暮らし。春=桜色/夏=朝顔/秋=コスモス橙/冬=椿の紅） ──
+    { const vx = 0.18, vy = oB + 0.02, vz = 0.30
+      const bloomBright = ({ spring: 0xe6a6c2, summer: 0x7d8fd6, autumn: 0xd9803a, winter: 0xc23a30 })[season] || 0xe6a6c2
+      const bloomDim = new THREE.Color(bloomBright).multiplyScalar(0.5).getHex()
+      const flMat = mk(C(bloomBright, bloomDim)), stMat = mk(C(0x5a7a48, 0x2c3a26)), vaseMat = mk(C(0xcfd8da, 0x3a4248))
+      cyl(0.036, 0.05, 0.15, vx, vy + 0.06, vz, vaseMat, 12) // 花瓶（淡い硝子）
+      for (const [dx, dy, dz] of [[0, 0.2, 0], [-0.06, 0.16, 0.03], [0.07, 0.17, -0.03], [0.01, 0.13, 0.05]]) {
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, dy, 5), stMat); stem.position.set(vx + dx * 0.5, vy + 0.1 + dy / 2, vz + dz * 0.5); stem.rotation.z = -dx * 1.4; stem.renderOrder = 2; winRoom.add(stem)
+        const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.032, 0), flMat); fl.position.set(vx + dx, vy + 0.12 + dy, vz + dz); grad(fl); fl.renderOrder = 2; winRoom.add(fl) }
+    }
     // ── 窓辺の湯呑み（縁側でお茶＝“いま家でくつろいでいる”気配）。湯気は teaSteam に合流して立ちのぼる。──
     { const cupY = oB + 0.04
       cyl(0.064, 0.052, 0.016, -0.72, cupY - 0.02, 0.31, ceramMat, 14) // 受け皿
