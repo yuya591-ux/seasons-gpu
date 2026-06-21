@@ -1077,9 +1077,10 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 街区をばらまく（奥へ広がる坂の街。手前中央は道＝視界が抜ける）。等間隔の碁盤に見えないよう、
   // 格子からの揺らぎを大きめに取り、区画の大きさも独立に振って、見下ろしの「市松の屋根」を崩す。
-  for (let zi = -16; zi <= 4; zi++) {
-    for (let xi = -13; xi <= 9; xi++) {
-      if (Math.abs(xi) < 1.6 && zi > -3) continue // 手前中央は道（街を見通す抜け）
+  for (let zi = -16; zi <= 7; zi++) {
+    for (let xi = -15; xi <= 9; xi++) {
+      if (Math.abs(xi) < 1.6 && zi > -3 && zi <= 4) continue // 手前中央は道（街を見通す抜け）
+      if (zi > 4 && heightAt(xi * 9, zi * 9) > 30) continue // 手前の丘の天端より上(急斜面)は空ける＝住宅街は丘の中腹まで
       if (R() < 0.12) continue // 空地・駐車場・庭で時々抜く（碁盤の規則性を崩す）
       if (zi < -13 && R() < 0.42) continue // 最奥の列は疎に（遠景の点描・性能の余裕を残す）
       const x = xi * 9 + (R() - 0.5) * 5.4 // 格子からの揺らぎを大きく（隣と不揃いに寄る＝密集の自然さ）
