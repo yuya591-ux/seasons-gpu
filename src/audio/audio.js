@@ -331,18 +331,19 @@ export function createAudio(opts) {
     const len = Math.floor(2 * ctx.sampleRate)
     const buf = ctx.createBuffer(1, len, ctx.sampleRate)
     const d = buf.getChannelData(0)
-    let b0 = 0, b1 = 0, b2 = 0 // ピンクノイズ近似（Paul Kellet 風の簡易版）
-    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = 0.99 * b0 + w * 0.05; b1 = 0.96 * b1 + w * 0.08; b2 = 0.90 * b2 + w * 0.09; d[i] = (b0 + b1 + b2) * 0.45 }
+    let b0 = 0, b1 = 0, b2 = 0 // 明るめのノイズ（低音の「ぶぶぶ」を出さず、空気を切る「サー/ひゅー」寄りに）
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = 0.99 * b0 + w * 0.05; b1 = 0.96 * b1 + w * 0.08; b2 = 0.90 * b2 + w * 0.09; d[i] = (b0 * 0.3 + b1 * 0.9 + b2 * 1.25 + w * 0.16) * 0.4 }
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
-    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 0.7
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.022, now() + 8)
-    src.connect(bp).connect(g).connect(master)
-    windNode = { src, g, bp } // g/bp は飛行速度で風を膨らませる（setFlyWind）ために保持
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.5 // 低音の唸り(ぶぶぶ)を断つ
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 680; bp.Q.value = 0.85 // 風切りの芯（速度で上へ動く）
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.012, now() + 8)
+    src.connect(hp).connect(bp).connect(g).connect(master)
+    windNode = { src, g, bp, hp } // g/bp は飛行速度で風を膨らませる（setFlyWind）ために保持
     try {
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05
-      const lfoG = ctx.createGain(); lfoG.gain.value = 180; lfo.connect(lfoG).connect(bp.frequency); lfo.start()
-      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.073
-      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.012; lfo2.connect(lfo2G).connect(g.gain); lfo2.start()
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06
+      const lfoG = ctx.createGain(); lfoG.gain.value = 160; lfo.connect(lfoG).connect(bp.frequency); lfo.start() // ゆるい息づき（突風）
+      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.083
+      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.01; lfo2.connect(lfo2G).connect(g.gain); lfo2.start()
     } catch { /* LFO非対応でも常時うっすらの風は鳴る */ }
     try { src.start() } catch { /* 無視 */ }
   }
@@ -535,16 +536,18 @@ export function createAudio(opts) {
         }
       }
     },
-    /** 飛行速度(0..1)で風をごくわずかに膨らませる。夢の中の空中散歩＝機械音にしない（実機FB「飛行機のブォーが要らない」）。 */
+    /** 飛行速度(0..1)で風切り音を膨らませる。機械音(ブォー/ぶぶぶ)でなく、空気を切る自然な「ひゅーー」＝飛んでいると分かる風（BoTWの滑空のイメージ）。 */
     setFlyWind(v) {
       if (!windNode || !ctx) return
       v = Math.max(0, Math.min(1, v || 0))
-      if (Math.abs(v - flyWindV) < 0.04) return // 細かな変化は無視（無駄なスケジューリングを抑える）
+      if (Math.abs(v - flyWindV) < 0.03) return // 細かな変化は無視（無駄なスケジューリングを抑える）
       flyWindV = v
       const t = now()
+      const e = v * v // 加速の手応え＝速いほど一気に風が増す
       try {
-        windNode.g.gain.setTargetAtTime(0.02 + v * 0.016, t, 0.6)       // 風量はほんの少しだけ増す（速くてもエンジン音にならない）
-        windNode.bp.frequency.setTargetAtTime(360 + v * 70, t, 0.6)     // ピッチもほぼ一定＝風切りが「ブォー」と高鳴らない
+        windNode.g.gain.setTargetAtTime(0.01 + e * 0.06, t, 0.4)         // 速いほど明確に大きく＝飛んでいる手応え
+        windNode.bp.frequency.setTargetAtTime(620 + v * 1180, t, 0.4)    // 速いほど高く明るい「ひゅーー」（低い唸りにしない）
+        if (windNode.hp) windNode.hp.frequency.setTargetAtTime(300 + v * 260, t, 0.4) // 速いほど低音を更に削いで澄む
       } catch { /* 無視 */ }
     },
     /** 散策の足音（地上を歩くときだけ・ごく控えめ）。短いこもったノイズで「踏みしめる」手応え。 */
