@@ -4079,7 +4079,13 @@ export async function mountTown3d(parent, opts = {}) {
       const tongue = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5), cordMat); tongue.position.y = -0.6; tongue.renderOrder = 3; wc.add(tongue)
       const tanzaku = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.13), curtMat); tanzaku.position.y = -0.72; tanzaku.renderOrder = 3; wc.add(tanzaku)
     }
+    // ── 窓辺の座布団＝“自分の席”。ここに座って街を眺める、家の安心の居場所。──
+    { const zabuMat = mk(C(0x8f9cab, 0x353d48)), tieMat = mk(C(0x73808e, 0x2a313a)) // 落ち着いた藍鼠
+      box(0.84, 0.12, 0.84, 0.1, FY + 0.05, 2.5, zabuMat)          // 座布団本体
+      box(0.07, 0.05, 0.07, 0.1, FY + 0.12, 2.5, tieMat)          // 中央の綴じ
+      for (const [dx, dz] of [[0.34, 0.34], [-0.34, 0.34], [0.34, -0.34], [-0.34, -0.34]]) box(0.05, 0.04, 0.05, 0.1 + dx, FY + 0.115, 2.5 + dz, tieMat) } // 四隅の房
     // ── 主な床置き家具の接地影（畳との間に柔らかい影＝浮きを消し、見下ろしで床が締まる） ──
+    floorShadow(0.1, 2.5, 1.05, 1.05)       // 窓辺の座布団
     floorShadow(SX - 0.42, 3.0, 2.1, 1.4)   // テレビ台
     floorShadow(-SX + 0.4, 2.6, 1.85, 1.05) // 整理ダンス
     floorShadow(-SX + 0.4, 4.7, 1.95, 1.15) // 茶箪笥
