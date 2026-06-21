@@ -4174,7 +4174,7 @@ export async function mountTown3d(parent, opts = {}) {
       // 背の縞（茶トラ）
       for (const sx2 of [-0.06, 0.04, 0.14]) add(new THREE.BoxGeometry(0.03, 0.02, 0.26), furD, sx2, 0.27, 0, 0, 0, 0, 1, 1, 0.7)
       floorShadow(0.46, 1.52, 0.72, 0.52) // 猫の接地影
-      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, y0: 0.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0 }
+      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, y0: 0.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1 }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -5472,7 +5472,9 @@ export async function mountTown3d(parent, opts = {}) {
       let flick = 0; if (c.flickT > 0) { c.flickT -= dt; flick = Math.sin((0.7 - c.flickT) * 16) * 0.4 * Math.max(0, c.flickT / 0.7) }
       c.tail.rotation.y = Math.sin(t * 0.55) * 0.07 + flick // ゆっくり揺れ＋ピクッ
       c.earT -= dt; if (c.earT < 0) { c.earT = 7 + R() * 9; c.earK = 0.45 } // たまに耳をピクッ
-      if (c.earK > 0) { c.earK -= dt; const e = Math.sin((0.45 - c.earK) * 26) * 0.22 * Math.max(0, c.earK / 0.45); c.ears[0].rotation.x = c.ears0[0] + e; c.ears[1].rotation.x = c.ears0[1] - e } }
+      if (c.earK > 0) { c.earK -= dt; const e = Math.sin((0.45 - c.earK) * 26) * 0.22 * Math.max(0, c.earK / 0.45); c.ears[0].rotation.x = c.ears0[0] + e; c.ears[1].rotation.x = c.ears0[1] - e }
+      c.settleT -= dt; if (c.settleT < 0 && c.settleP >= 1) { c.settleT = 28 + R() * 40; c.settleP = 0 } // たまに寝返り＝ゆっくり傾いて戻る
+      if (c.settleP < 1) { c.settleP = Math.min(1, c.settleP + dt / 3.6); c.g.rotation.z = Math.sin(c.settleP * Math.PI) * 0.12 } }
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
