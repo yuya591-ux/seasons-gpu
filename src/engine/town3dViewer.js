@@ -3780,55 +3780,119 @@ export async function mountTown3d(parent, opts = {}) {
   const RES_IRIS = [0x6a86c0, 0x5a9a6a, 0xb88a44, 0x9a6238, 0x7a5aa0] // 明るめ＝アニメの澄んだ瞳（青/緑/琥珀/榛/菫）
   const makeResident = (cfg = {}) => {
     const g = new THREE.Group()
-    const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom), shoeM = toon(cfg.shoe || 0x2c2824)
+    const outfit = cfg.outfit || 'modern'
+    const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x2c2824)
     const white = new THREE.MeshBasicMaterial({ color: 0xf7f3ed, fog: true }), dark = toon(0x201c18), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xb06a60), browM = toon(cfg.hair)
+    const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
     const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 14, h || 12), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 8), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
     const add = (p, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx !== undefined) m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.castShadow = true; p.add(m); return m }
-    // 脚＋靴
-    for (const s of [-1, 1]) { add(g, CY(0.085, 0.072, 0.66, 8), botM, s * 0.1, 0.47, 0); add(g, BX(0.15, 0.11, 0.3), shoeM, s * 0.1, 0.16, 0.06) }
-    add(g, BX(0.36, 0.22, 0.24), botM, 0, 0.92, 0) // 腰
-    // 胴（上着）＋肩＋首
-    add(g, CY(0.215, 0.18, 0.5, 12), topM, 0, 1.16, 0)
-    add(g, SP(0.2, 12, 8), topM, 0, 1.34, 0, 1.15, 0.62, 0.82) // 肩
-    add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0) // 首
-    // 腕（肩で振れる子群）
     const arms = []
-    for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.245, 1.4, 0); g.add(armG)
-      add(armG, CY(0.062, 0.05, 0.34, 7), topM, 0, -0.17, 0); add(armG, CY(0.046, 0.04, 0.3, 7), skin, 0, -0.42, 0); add(armG, SP(0.05), skin, 0, -0.6, 0)
-      armG.rotation.z = s * 0.05; arms.push(armG) }
-    // 頭（子群）
-    const headG = new THREE.Group(); headG.position.set(0, 1.62, 0); g.add(headG)
-    add(headG, SP(0.17, 18, 16), skin, 0, 0, 0, 0.96, 1.04, 0.97) // 頭
-    for (const s of [-1, 1]) add(headG, SP(0.03), skin, s * 0.163, -0.01, 0.01, 0.7, 1, 0.7) // 耳
-    // アニメ顔（大きな目が鍵。顔は+z）
-    for (const s of [-1, 1]) {
-      add(headG, SP(0.056, 14, 12), white, s * 0.072, -0.003, 0.142, 1.0, 1.3, 0.45)   // 白目（大きく明るく）
-      add(headG, SP(0.037, 14, 12), irisM, s * 0.072, -0.006, 0.163, 1.0, 1.12, 0.5)    // 虹彩（明色）
-      add(headG, SP(0.016, 10, 8), dark, s * 0.072, -0.008, 0.176, 1, 1.1, 0.5)         // 瞳孔（小さめ＝瞳が澄む）
-      add(headG, SP(0.016, 8, 6), white, s * 0.072 + s * 0.015, 0.016, 0.187)           // ハイライト（大きめ＝いきいき）
-      add(headG, SP(0.007, 6, 6), white, s * 0.072 - s * 0.012, -0.018, 0.184)          // 小さな反射（下）
-      add(headG, BX(0.088, 0.015, 0.014), dark, s * 0.072, 0.042, 0.156).rotation.z = s * 0.1 // 上まつ毛の線
-      add(headG, BX(0.064, 0.012, 0.012), browM, s * 0.08, 0.073, 0.15).rotation.z = s * 0.13 // 眉
+    const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.245, 1.4, 0); g.add(armG)
+      if (wide) { add(armG, BX(0.17, 0.36, 0.15), sleeveMat, s * 0.03, -0.2, 0); add(armG, SP(0.05), skin, s * 0.02, -0.46, 0.02) } // 着物の袖
+      else { add(armG, CY(0.062, 0.05, 0.34, 7), sleeveMat, 0, -0.17, 0); add(armG, CY(0.046, 0.04, 0.3, 7), skin, 0, -0.42, 0); add(armG, SP(0.05), skin, 0, -0.6, 0) }
+      armG.rotation.z = s * 0.05; arms.push(armG) } }
+    // ── 体（衣装別）──
+    if (outfit === 'kimono' || outfit === 'armor') {
+      add(g, CY(0.27, 0.21, 1.26, 12), topM, 0, 0.74, 0)                    // 着物の身頃（裾広がりの筒）
+      add(g, CY(0.28, 0.27, 0.13, 12), accentM, 0, 0.88, 0)                 // 帯
+      for (const s of [-1, 1]) add(g, BX(0.05, 0.42, 0.02), white, s * 0.05, 1.16, 0.2).rotation.z = -s * 0.34 // 襟（Vの重ね）
+      for (const s of [-1, 1]) add(g, BX(0.14, 0.06, 0.28), shoeM, s * 0.085, 0.05, 0.05) // 草履＋足
+      buildArms(topM, true)
+      if (outfit === 'armor') { add(g, CY(0.29, 0.27, 0.44, 10), botM, 0, 1.06, 0) // 胴（胸当て）
+        for (let i = 0; i < 5; i++) { const a = (i - 2) * 0.46; add(g, BX(0.12, 0.2, 0.04), botM, Math.sin(a) * 0.28, 0.74, Math.cos(a) * 0.28).rotation.y = a } // 草摺
+        for (const s of [-1, 1]) add(g, BX(0.17, 0.17, 0.15), botM, s * 0.27, 1.32, 0) } // 袖（肩の防具）
+    } else if (outfit === 'hakama') {
+      add(g, CY(0.24, 0.22, 0.64, 12), topM, 0, 1.06, 0)                    // 上衣
+      add(g, CY(0.31, 0.2, 0.8, 12), botM, 0, 0.5, 0)                       // 袴（下が広い）
+      add(g, CY(0.27, 0.31, 0.1, 12), accentM, 0, 0.88, 0)                  // 帯
+      for (const s of [-1, 1]) add(g, BX(0.14, 0.06, 0.28), shoeM, s * 0.085, 0.05, 0.05)
+      buildArms(topM, true)
+    } else if (outfit === 'dress') {
+      for (const s of [-1, 1]) { add(g, CY(0.06, 0.05, 0.4, 6), skin, s * 0.09, 0.3, 0); add(g, BX(0.12, 0.08, 0.22), shoeM, s * 0.09, 0.08, 0.04) } // 脚＋靴
+      add(g, CY(0.33, 0.17, 0.64, 12), topM, 0, 0.78, 0)                    // スカート（Aライン）
+      add(g, CY(0.18, 0.18, 0.42, 10), topM, 0, 1.16, 0)                    // 上身頃
+      add(g, CY(0.19, 0.19, 0.06, 10), accentM, 0, 0.96, 0)                 // ウエストの差し色
+      add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0)
+      buildArms(topM, false)
+    } else { // modern / suit
+      for (const s of [-1, 1]) { add(g, CY(0.085, 0.072, 0.66, 8), botM, s * 0.1, 0.47, 0); add(g, BX(0.15, 0.11, 0.3), shoeM, s * 0.1, 0.16, 0.06) }
+      add(g, BX(0.36, 0.22, 0.24), botM, 0, 0.92, 0)
+      add(g, CY(0.215, 0.18, 0.5, 12), topM, 0, 1.16, 0)
+      add(g, SP(0.2, 12, 8), topM, 0, 1.34, 0, 1.15, 0.62, 0.82)
+      if (outfit === 'suit') add(g, BX(0.05, 0.3, 0.02), accentM, 0, 1.16, 0.19) // ネクタイ
+      add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0)
+      buildArms(topM, false)
     }
-    add(headG, BX(0.011, 0.02, 0.009), dark, 0.01, -0.05, 0.174) // 鼻（ごく控えめな影）
-    add(headG, BX(0.046, 0.013, 0.012), mouthM, 0, -0.092, 0.164) // 口
-    // 髪（後頭部の塊＋トップ＋前髪。顔は出す）
-    add(headG, SP(0.183, 16, 14), hairM, 0, 0.03, -0.055, 1.04, 1.04, 1.0) // 後ろ〜トップの髪
-    const style = cfg.hairStyle | 0
-    for (const [hx, hz] of [[-0.12, 0.12], [-0.06, 0.15], [0.0, 0.16], [0.06, 0.15], [0.12, 0.12]]) add(headG, SP(0.05, 10, 8), hairM, hx, 0.108, hz, 1, 0.9, 0.9) // 前髪
-    if (style === 0) { for (const s of [-1, 1]) add(headG, SP(0.07, 10, 10), hairM, s * 0.15, -0.06, -0.02, 0.7, 1.4, 0.9) } // サイドの髪（やや長め）
-    else if (style === 1) { add(headG, SP(0.1, 12, 10), hairM, 0, -0.13, -0.16, 1.1, 1.0, 0.9) } // 後ろで束ねた低めのまとめ髪
-    else { add(headG, SP(0.085, 12, 10), hairM, 0, 0.12, -0.02, 1.3, 0.7, 1.1) } // 短髪のトップボリューム
-    g.scale.setScalar(0.96 + R() * 0.16)
-    g.userData = { arms, headG, breath: 0 }
+    // ── 頭＋顔（共通・アニメ調）──
+    const headG = new THREE.Group(); headG.position.set(0, 1.62, 0); g.add(headG)
+    add(headG, SP(0.17, 18, 16), skin, 0, 0, 0, 0.96, 1.04, 0.97)
+    for (const s of [-1, 1]) add(headG, SP(0.03), skin, s * 0.163, -0.01, 0.01, 0.7, 1, 0.7) // 耳
+    for (const s of [-1, 1]) {
+      add(headG, SP(0.056, 14, 12), white, s * 0.072, -0.003, 0.142, 1.0, 1.3, 0.45)
+      add(headG, SP(0.037, 14, 12), irisM, s * 0.072, -0.006, 0.163, 1.0, 1.12, 0.5)
+      add(headG, SP(0.016, 10, 8), dark, s * 0.072, -0.008, 0.176, 1, 1.1, 0.5)
+      add(headG, SP(0.016, 8, 6), white, s * 0.072 + s * 0.015, 0.016, 0.187)
+      add(headG, SP(0.007, 6, 6), white, s * 0.072 - s * 0.012, -0.018, 0.184)
+      add(headG, BX(0.088, 0.015, 0.014), dark, s * 0.072, 0.042, 0.156).rotation.z = s * 0.1
+      add(headG, BX(0.064, 0.012, 0.012), browM, s * 0.08, 0.073, 0.15).rotation.z = s * 0.13
+    }
+    add(headG, BX(0.011, 0.02, 0.009), dark, 0.01, -0.05, 0.174)
+    add(headG, BX(0.046, 0.013, 0.012), mouthM, 0, -0.092, 0.164)
+    // ── 髪（hairStyle: modern0/1/2・topknot=髷・bob・short・hat=帽子下で控えめ）──
+    const hs = cfg.hairStyle
+    if (hs === 'topknot') { add(headG, SP(0.178, 14, 12), hairM, 0, 0.02, -0.04, 1.02, 1.0, 1.0) // 後ろ髪
+      add(headG, CY(0.04, 0.05, 0.1, 8), hairM, 0, 0.17, -0.02) // 髷（小さなまげ）
+      add(headG, SP(0.06, 10, 8), skin, 0, 0.12, 0.12, 1.6, 0.5, 0.6) } // 月代（額を出す）
+    else if (hs === 'bob') { add(headG, SP(0.2, 16, 14), hairM, 0, 0.0, -0.02, 1.05, 1.05, 1.05) // 丸いボブ
+      for (const s of [-1, 1]) add(headG, SP(0.08, 10, 10), hairM, s * 0.17, -0.08, 0.02, 0.7, 1.5, 0.9) // 頬の横の髪
+      for (const [hx, hz] of [[-0.09, 0.13], [0.0, 0.15], [0.09, 0.13]]) add(headG, SP(0.06, 10, 8), hairM, hx, 0.11, hz, 1, 0.8, 0.8) } // 前髪（ぱっつん）
+    else if (hs === 'hat') { add(headG, SP(0.176, 12, 10), hairM, 0, 0.0, -0.05, 1.0, 0.9, 1.0) } // 帽子下：後ろに少し
+    else if (hs === 'short') { add(headG, SP(0.178, 14, 12), hairM, 0, 0.04, -0.02, 1.04, 0.95, 1.04)
+      for (const [hx, hz] of [[-0.1, 0.13], [0.0, 0.15], [0.1, 0.13]]) add(headG, SP(0.045, 8, 8), hairM, hx, 0.115, hz, 1, 0.8, 0.8) }
+    else { add(headG, SP(0.183, 16, 14), hairM, 0, 0.03, -0.055, 1.04, 1.04, 1.0) // modern
+      for (const [hx, hz] of [[-0.12, 0.12], [-0.06, 0.15], [0.0, 0.16], [0.06, 0.15], [0.12, 0.12]]) add(headG, SP(0.05, 10, 8), hairM, hx, 0.108, hz, 1, 0.9, 0.9)
+      if ((hs | 0) === 1) add(headG, SP(0.1, 12, 10), hairM, 0, -0.13, -0.16, 1.1, 1.0, 0.9)
+      else for (const s of [-1, 1]) add(headG, SP(0.07, 10, 10), hairM, s * 0.15, -0.06, -0.02, 0.7, 1.4, 0.9) }
+    // ── 帽子（hat）──
+    if (cfg.hat === 'kasa') { add(g, CY(0.04, 0.34, 0.16, 14), toon(cfg.hatCol || 0xc6a866), 0, 1.86, 0) } // 笠（菅笠）
+    else if (cfg.hat === 'jingasa') { add(g, CY(0.06, 0.3, 0.1, 14), toon(cfg.hatCol || 0x4a3a2c), 0, 1.84, 0) } // 陣笠
+    else if (cfg.hat === 'fedora') { const hm = toon(cfg.hatCol || 0x3a322a); add(g, CY(0.21, 0.21, 0.02, 14), hm, 0, 1.78, 0); add(g, CY(0.13, 0.14, 0.14, 12), hm, 0, 1.86, 0) } // 中折れ帽
+    else if (cfg.hat === 'cap') { const hm = toon(cfg.hatCol || 0x2a2e38); add(g, SP(0.18, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hm, 0, 1.75, 0); add(g, BX(0.26, 0.03, 0.12), hm, 0, 1.72, 0.16) } // 学生帽
+    // ── 小道具（prop）──
+    if (cfg.prop === 'swords') for (const [ln, yy] of [[0.62, 1.0], [0.42, 0.95]]) { const sw = add(g, BX(0.025, ln, 0.06), toon(0x2a2620), -0.28, yy, -0.04); sw.rotation.z = 0.5; sw.rotation.x = -0.2 } // 大小の刀（左腰）
+    else if (cfg.prop === 'spear') { add(g, CY(0.022, 0.022, 2.0, 6), toon(0x5a4632), 0.32, 1.0, -0.05); add(g, CY(0.0, 0.03, 0.18, 6), toon(0xb8bcc2), 0.32, 2.05, -0.05) } // 槍
+    else if (cfg.prop === 'bundle') { add(g, BX(0.3, 0.26, 0.22), toon(cfg.accent || 0x8a6a4a), 0, 1.16, -0.24) } // 背中の風呂敷包み
+    else if (cfg.prop === 'cane') { add(g, CY(0.016, 0.016, 0.9, 6), toon(0x3a2e22), 0.34, 0.46, 0.12) } // ステッキ
+    g.scale.setScalar((cfg.scale || 1) * (0.95 + R() * 0.14))
+    g.userData = { arms, headG }
     return g
   }
+  // ── home（現代）の住人を要所に ──
   const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 } ]
-  for (const sp of residentSpots) { const hx = sp.x + (R() - 0.5) * 1.6, hz = sp.z + (R() - 0.5) * 1.6
-    const g = makeResident({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], hairStyle: (R() * 3) | 0 })
-    g.position.set(hx, heightAt(hx, hz), hz); g.userData.face = R() * 6.28; g.rotation.y = g.userData.face; g.userData.ph = R() * 6.28
-    town.add(g); residents.push(g)
-  }
+  const placeResident = (hx, hz, cfg) => { const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); g.userData.face = R() * 6.28; g.rotation.y = g.userData.face; g.userData.ph = R() * 6.28; town.add(g); residents.push(g) }
+  const RES_MODERN = ['modern', 'modern', 'suit']
+  for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
+  // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
+  const pickC = (a) => a[(R() * a.length) | 0]
+  const placeEra = (cx, cz, n, factory) => { for (let i = 0; i < n; i++) { const a = (i / n) * 6.2832 + R() * 0.6, rr = 8 + R() * 22; placeResident(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, factory()) } }
+  // 江戸: 町人(着物+髷)・侍(甲冑+刀)・笠の行商
+  const EDO_KIMONO = [0x3a4a5e, 0x5a4230, 0x55504a, 0x6a3a30, 0x44503a, 0x4a4a52, 0x70604a], EDO_OBI = [0x8a6a3a, 0x7a3a32, 0x55603a, 0x3a4250, 0x9a7a44]
+  placeEra(EDO.x, EDO.z, 8, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+    if (r < 0.24) return { outfit: 'armor', skin, hair, iris, hairStyle: 'topknot', top: pickC([0x3a3a44, 0x4a4038, 0x33414e]), bottom: pickC([0x55504a, 0x6a5238, 0x4a4a3a]), accent: pickC(EDO_OBI), prop: 'swords' } // 侍
+    if (r < 0.46) return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', top: pickC(EDO_KIMONO), accent: pickC(EDO_OBI), prop: R() < 0.5 ? 'bundle' : null } // 笠の行商
+    return { outfit: 'kimono', skin, hair, iris, hairStyle: r < 0.74 ? 'topknot' : 'short', top: pickC(EDO_KIMONO), accent: pickC(EDO_OBI) } }) // 町人
+  // 大正: 書生(袴+学生帽)・モダンガール(洋装+ボブ)・洋装紳士(背広+中折れ帽)
+  const TAI_DRESS = [0xb5677e, 0x6a8a9a, 0x9a7aa0, 0xc08a5a, 0x5a7a6a], TAI_SUIT = [0x3a3a42, 0x4a4036, 0x44484a, 0x55504a]
+  placeEra(TAISHO.x, TAISHO.z, 8, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+    if (r < 0.34) return { outfit: 'hakama', skin, hair, iris, hairStyle: 'hat', hat: 'cap', top: pickC([0x3a4250, 0x40443a, 0x4a4038]), bottom: pickC([0x2e3038, 0x35302c]), accent: 0x2a2e30 } // 書生
+    if (r < 0.66) return { outfit: 'dress', skin, hair, iris, hairStyle: 'bob', top: pickC(TAI_DRESS), accent: pickC([0xf0e6d2, 0xeae0cc, 0x8a3a44]) } // モダンガール
+    return { outfit: 'suit', skin, hair, iris, hairStyle: 'hat', hat: 'fedora', top: pickC(TAI_SUIT), bottom: pickC(TAI_SUIT), accent: pickC([0x7a3a32, 0x3a4a5e]), prop: R() < 0.5 ? 'cane' : null } }) // 紳士
+  // 戦国: 農夫(笠+素朴な着物)・足軽(陣笠+甲冑+槍)・武者(甲冑+刀)
+  const SEN_DRAB = [0x5a4c3a, 0x4a4a44, 0x44503a, 0x6a5a44, 0x504838]
+  placeEra(SENGOKU.x, SENGOKU.z, 7, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+    if (r < 0.36) return { outfit: 'armor', skin, hair, iris, hairStyle: 'hat', hat: 'jingasa', top: pickC([0x40382e, 0x3a3a34]), bottom: pickC([0x4a3a30, 0x3a4250, 0x55504a]), accent: 0x6a3a30, prop: 'spear' } // 足軽
+    if (r < 0.58) return { outfit: 'armor', skin, hair, iris, hairStyle: 'topknot', top: pickC([0x3a3a40, 0x44382e]), bottom: pickC([0x6a3a30, 0x3a4a5e, 0x55503a]), accent: pickC([0x9a7a44, 0x7a3a32]), prop: 'swords' } // 武者
+    return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
   } // ← 車・住民（街のみ）ここまで
 
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
