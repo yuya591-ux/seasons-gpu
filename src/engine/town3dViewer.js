@@ -3935,6 +3935,10 @@ export async function mountTown3d(parent, opts = {}) {
       }
       m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3)); return m
     }
+    // ── 家具の接地影（畳に柔らかい影を敷いて“浮き”を消す＝見下ろしで効く作り込み）──
+    const shadowTex = cv(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(0.6, 'rgba(0,0,0,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64) })
+    const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: isNight ? 0.34 : 0.42, depthWrite: false, fog: false }); winRoomMats.push(shadowMat)
+    const floorShadow = (x, z, w, d) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), shadowMat); m.rotation.x = -Math.PI / 2; m.position.set(x, FY + 0.016, z); m.renderOrder = 3; winRoom.add(m); return m } // 不透明な畳(renderOrder2)より後に重ねて畳を暗くする（先に描くと畳に上書きされ消える）
     // ── 躯体（床=畳／天井=竿縁／奥・両側=砂壁）。RW/RD/WTで一括スケール。 ──
     const WH = WT - FY + 0.6 // 壁の高さ
     grad(box(RW, 0.3, RD, 0, FY - 0.15, BZ / 2, tatMat))        // 床（畳）
@@ -4061,6 +4065,13 @@ export async function mountTown3d(parent, opts = {}) {
       const tongue = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5), cordMat); tongue.position.y = -0.6; tongue.renderOrder = 3; wc.add(tongue)
       const tanzaku = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.13), curtMat); tanzaku.position.y = -0.72; tanzaku.renderOrder = 3; wc.add(tanzaku)
     }
+    // ── 主な床置き家具の接地影（畳との間に柔らかい影＝浮きを消し、見下ろしで床が締まる） ──
+    floorShadow(SX - 0.42, 3.0, 2.1, 1.4)   // テレビ台
+    floorShadow(-SX + 0.4, 2.6, 1.85, 1.05) // 整理ダンス
+    floorShadow(-SX + 0.4, 4.7, 1.95, 1.15) // 茶箪笥
+    floorShadow(-2.6, BZ - 0.4, 1.1, 0.95)  // 電話台
+    floorShadow(tcx, tcz, 2.5, 2.5)         // ちゃぶ台＋座布団
+    floorShadow(1.9, 0.9, 0.8, 0.8)         // 観葉植物
     // ── 窓から差し込む光（昼）＝畳に落ちる暖かな採光。最も多く眺める“座っている景色”に光の差す向きを与える。──
     if (!isNight) {
       // 畳に落ちる窓明かり（夕ほど暖色で濃い。夜の灯りだまりの昼版）。窓桟の影を抜いて“この窓から差す光”に。
