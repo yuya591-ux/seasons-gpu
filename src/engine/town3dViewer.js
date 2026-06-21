@@ -3785,6 +3785,7 @@ export async function mountTown3d(parent, opts = {}) {
   const winRoomMats = []
   let winSashR = null, winSashX0 = 0, winSashX1 = 0 // 引き違いの可動ガラス障子（窓をあけると横へすべる）
   const winCurtains = [] // 窓辺のカーテン（窓をあけると外気でそっとそよぐ）
+  let windChime = null // 夏の窓辺の風鈴（窓をあけると外気でちりんと揺れる）
   const teaSteam = [] // 急須から立ちのぼる湯気
   let winPendulum = null // 振り子柱時計（振り子が静かに揺れる）
   {
@@ -3955,6 +3956,17 @@ export async function mountTown3d(parent, opts = {}) {
     const curtMat = mk(C(0xd8cbb0, 0x4a4450))
     for (const cs of [-1, 1]) { const ct = box(0.3, owH + 0.34, 0.05, cs * (owW / 2 + 0.18), WINCY, 0.42, curtMat); ct.userData.cs = cs; ct.userData.x0 = cs * (owW / 2 + 0.18); winCurtains.push(ct) } // 窓枠より手前に吊る（桟と重ねない）
     box(owW + 0.7, 0.3, 0.07, 0, oT + 0.12, 0.44, curtMat) // 上飾り
+    // ── 夏＝窓辺の風鈴（吊り紐＋硝子の釣鐘＋舌＋短冊。窓をあけると外気でそっと揺れる） ──
+    if (season === 'summer') {
+      const wc = new THREE.Group(); wc.position.set(owW * 0.34, oT + 0.02, 0.42); winRoom.add(wc); windChime = wc
+      const cordMat = mk(C(0x7a6a4e, 0x3a342a))
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.46, 5), cordMat); cord.position.y = -0.23; cord.renderOrder = 3; wc.add(cord)
+      const glass = new THREE.MeshBasicMaterial({ color: isNight ? 0x86a6ae : 0xbfe2e8, transparent: true, opacity: 0.72, fog: false }); winRoomMats.push(glass)
+      const bell = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), glass); bell.position.y = -0.5; bell.renderOrder = 3; wc.add(bell)
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.082, 0.012, 6, 14), cordMat); rim.rotation.x = Math.PI / 2; rim.position.y = -0.55; rim.renderOrder = 3; wc.add(rim)
+      const tongue = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5), cordMat); tongue.position.y = -0.6; tongue.renderOrder = 3; wc.add(tongue)
+      const tanzaku = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.13), curtMat); tanzaku.position.y = -0.72; tanzaku.renderOrder = 3; wc.add(tanzaku)
+    }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
   }
@@ -5196,6 +5208,7 @@ export async function mountTown3d(parent, opts = {}) {
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
     if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.42 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
+    if (winRoom.visible && windChime) windChime.rotation.z = Math.sin(t * 1.7) * (0.02 + 0.05 * wo) // 風鈴は窓をあけるとよく揺れる（閉=ごく僅か）
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
     if (winRoom.visible && winPendulum) winPendulum.rotation.x = Math.sin(t * 2.0) * 0.16 // 柱時計の振り子が静かに時を刻む
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
