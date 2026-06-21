@@ -3880,6 +3880,7 @@ export async function mountTown3d(parent, opts = {}) {
   const teaSteam = [] // 急須から立ちのぼる湯気
   let winPendulum = null // 振り子柱時計（振り子が静かに揺れる）
   let winDust = null // 窓の光に舞うほこり（昼の“居る部屋”の空気感）
+  let winCat = null // 窓辺の日だまりで丸くなって眠る猫（呼吸でそっと上下）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -4094,6 +4095,29 @@ export async function mountTown3d(parent, opts = {}) {
       const dmat = new THREE.PointsMaterial({ color: dCol, size: 0.026, transparent: true, opacity: isNight ? 0.14 : (0.22 + duskAmt * 0.16), depthWrite: false, fog: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }); winRoomMats.push(dmat)
       const dust = new THREE.Points(dgeo, dmat); dust.frustumCulled = false; dust.renderOrder = 6; winRoom.add(dust)
       winDust = { geo: dgeo, arr: dp, base }
+    }
+    // ── 窓辺の日だまりで丸くなって眠る猫（採光のだまりに据える＝最高の“居る部屋”の一枚）。子群ローカルは素のMeshBasic（grad黒落ち回避）。──
+    {
+      const tint = (h) => { const c = new THREE.Color(h); if (roomWarm) c.multiply(roomWarm); return c }
+      const fur = new THREE.MeshBasicMaterial({ color: tint(isNight ? 0x6f665a : 0x9c8f7c), fog: false })       // 茶トラ寄りの灰茶
+      const furD = new THREE.MeshBasicMaterial({ color: tint(isNight ? 0x564e44 : 0x7d7160), fog: false })      // 縞/陰
+      const furP = new THREE.MeshBasicMaterial({ color: tint(isNight ? 0x8e857a : 0xcabba4), fog: false })      // 胸・口先の淡色
+      const noseM = new THREE.MeshBasicMaterial({ color: tint(0xb98a86), fog: false })
+      winRoomMats.push(fur, furD, furP, noseM)
+      const cat = new THREE.Group(); cat.position.set(0.5, FY + 0.02, 1.5); cat.rotation.y = -0.6 // 採光だまりの中・やや斜め
+      const add = (geo, mat, x, y, z, rx, ry, rz, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); m.scale.set(sx || 1, sy || 1, sz || 1); m.renderOrder = 2; cat.add(m); return m }
+      const body = add(new THREE.SphereGeometry(0.2, 18, 14), fur, 0, 0.12, 0, 0, 0, 0, 1.55, 0.62, 1.0)        // 丸まった胴
+      add(new THREE.SphereGeometry(0.2, 16, 12), furP, 0.02, 0.07, 0, 0, 0, 0, 1.2, 0.4, 0.78)                  // 胸/腹の淡色（手前下）
+      const head = add(new THREE.SphereGeometry(0.12, 16, 14), fur, 0.27, 0.12, 0.05, 0, 0, 0, 1.0, 0.94, 1.0)  // 頭（前方）
+      for (const ez of [-0.06, 0.06]) add(new THREE.ConeGeometry(0.042, 0.075, 10), fur, 0.26, 0.21, 0.05 + ez, 0.18 * Math.sign(ez), 0, -0.12) // 耳
+      add(new THREE.SphereGeometry(0.055, 12, 10), furP, 0.36, 0.095, 0.05, 0, 0, 0, 1.0, 0.82, 1.0)            // 口先
+      add(new THREE.SphereGeometry(0.014, 8, 6), noseM, 0.405, 0.1, 0.05)                                        // 鼻
+      for (const ez of [-0.045, 0.045]) add(new THREE.BoxGeometry(0.03, 0.006, 0.012), furD, 0.34, 0.15, 0.05 + ez) // 閉じた目（細い線）
+      add(new THREE.TorusGeometry(0.135, 0.036, 8, 18, Math.PI * 1.35), fur, -0.13, 0.07, 0.17, Math.PI / 2, 0, 0.5) // 丸めた尻尾（胴の手前へ）
+      // 背の縞（茶トラ）
+      for (const sx2 of [-0.06, 0.04, 0.14]) add(new THREE.BoxGeometry(0.03, 0.02, 0.26), furD, sx2, 0.27, 0, 0, 0, 0, 1, 1, 0.7)
+      floorShadow(0.46, 1.52, 0.72, 0.52) // 猫の接地影
+      winRoom.add(cat); winCat = { g: cat, body, y0: 0.62 }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -5384,6 +5408,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
     if (winRoom.visible && winPendulum) winPendulum.rotation.x = Math.sin(t * 2.0) * 0.16 // 柱時計の振り子が静かに時を刻む
     if (winRoom.visible && winDust) { for (let i = 0; i < winDust.base.length; i++) { const b = winDust.base[i]; winDust.arr[i * 3] = b.x0 + Math.sin(t * b.sp + b.ph) * b.amp * 3; winDust.arr[i * 3 + 1] = b.y0 + Math.sin(t * b.sp * 0.7 + b.ph * 1.7) * b.amp * 4; winDust.arr[i * 3 + 2] = b.z0 + Math.cos(t * b.sp * 0.5 + b.ph) * b.amp * 3 } winDust.geo.attributes.position.needsUpdate = true } // 窓の光にほこりがゆらゆら舞う
+    if (winRoom.visible && winCat) winCat.body.scale.y = winCat.y0 * (1 + Math.sin(t * 1.5) * 0.05) // 眠る猫がそっと呼吸する
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
