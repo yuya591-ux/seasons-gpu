@@ -4224,10 +4224,21 @@ export async function mountTown3d(parent, opts = {}) {
     {
       const tint = (h) => { const c = new THREE.Color(h); if (roomWarm) c.multiply(roomWarm); return c }
       const M = (h) => { const m = new THREE.MeshBasicMaterial({ color: tint(h), fog: false }); winRoomMats.push(m); return m }
-      const fur = M(isNight ? 0x6f665a : 0x9c8f7c)   // 地色（茶トラの灰茶）
-      const furD = M(isNight ? 0x4e4739 : 0x6e6150)  // 縞・陰
-      const furL = M(isNight ? 0x7d7464 : 0xb6a98f)  // 背の明るみ
-      const white = M(isNight ? 0x8c8576 : 0xeae0cf) // 胸・口先・足先
+      // 毛色のバリエーション（読み込みごとに違う猫＝キジトラ/茶トラ/サバトラ/黒/白/灰/三毛）。夜は沈める。
+      const COATS = [
+        { f: 0x9c8f7c, d: 0x6e6150, l: 0xb6a98f, w: 0xeae0cf, n: false }, // キジトラ
+        { f: 0xc78a4c, d: 0x9a5a2c, l: 0xe2aa66, w: 0xf2e6cf, n: false }, // 茶トラ
+        { f: 0x8e8c82, d: 0x585650, l: 0xa8a698, w: 0xe8e4d8, n: false }, // サバトラ
+        { f: 0x3c3631, d: 0x282420, l: 0x544a40, w: 0x463f39, n: false }, // 黒猫（白少なめ）
+        { f: 0xe7e1d4, d: 0xcdc5b4, l: 0xf3eee3, w: 0xf6f2ea, n: false }, // 白猫
+        { f: 0x8a8a85, d: 0x605f59, l: 0xa6a69e, w: 0xe6e4dc, n: false }, // 灰
+        { f: 0xeae2d2, d: 0xc88a4c, l: 0x3c3631, w: 0xf2ece0, n: true },  // 三毛（白地に茶と黒のブチ）
+      ]
+      const coat = COATS[(Math.random() * COATS.length) | 0], dk = (h) => new THREE.Color(h).multiplyScalar(0.7).getHex() // 読み込みごとに違う毛色（Math.randomで毎回変える＝シード固定のRと別に）
+      const fur = M(isNight ? dk(coat.f) : coat.f)   // 地色
+      const furD = M(isNight ? dk(coat.d) : coat.d)  // 縞・陰
+      const furL = M(isNight ? dk(coat.l) : coat.l)  // 背の明るみ
+      const white = M(isNight ? dk(coat.w) : coat.w) // 胸・口先・足先
       const pink = M(isNight ? 0x7e615d : 0xd69a90)  // 鼻・耳の内
       const dark = M(isNight ? 0x231e19 : 0x3b332b)  // 閉じた目・口
       const whisk = M(isNight ? 0x9a9384 : 0xeee7d6) // ひげ
