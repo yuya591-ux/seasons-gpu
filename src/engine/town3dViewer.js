@@ -4069,8 +4069,16 @@ export async function mountTown3d(parent, opts = {}) {
       cyl(0.19, 0.14, 0.34, px, FY + 0.17, pz, potMat, 14)                     // 鉢
       for (const [dx, dy, dz, s] of [[0, 0.42, 0, 0.24], [-0.13, 0.34, 0.06, 0.18], [0.12, 0.36, -0.05, 0.19], [0.02, 0.54, -0.02, 0.16]]) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), leaf); lf.position.set(px + dx, FY + 0.34 + dy, pz + dz); grad(lf); lf.renderOrder = 2; winRoom.add(lf) } // 葉群
     }
-    // ── 奥壁（振り返ると）: 襖＋神棚＋黒電話 ──
-    for (let i = 0; i < 4; i++) { const fx = -3.0 + i * 2.0; box(1.94, 3.0, 0.06, fx, 0.6, BZ - 0.1, creamMat); box(0.08, 3.0, 0.09, fx - 0.98, 0.6, BZ - 0.12, woodMat); box(0.16, 0.24, 0.05, fx + 0.7, 0.6, BZ - 0.16, woodDk) } // 4枚の襖＋框＋引手
+    // ── 奥壁（振り返ると）: 襖（薄墨の山水）＋神棚＋黒電話 ──
+    // 襖絵: 鳥の子紙に薄墨の遠山と草＝静かな山水。乗り出さず眺める奥の上質。
+    const fusumaTex = cv(128, 192, (x) => {
+      x.fillStyle = '#e7ddc4'; x.fillRect(0, 0, 128, 192) // 鳥の子紙
+      for (const [cx, cy, w, h, a] of [[34, 96, 86, 30, 0.1], [86, 90, 96, 42, 0.15], [60, 84, 70, 54, 0.1]]) { x.fillStyle = `rgba(84,94,108,${a})`; x.beginPath(); x.moveTo(cx - w / 2, cy); x.quadraticCurveTo(cx - w * 0.18, cy - h, cx, cy - h * 0.7); x.quadraticCurveTo(cx + w * 0.2, cy - h * 1.05, cx + w / 2, cy); x.closePath(); x.fill() } // 薄墨の遠山（重なり・目線の高さ）
+      x.fillStyle = 'rgba(150,160,172,0.16)'; x.beginPath(); x.arc(98, 46, 13, 0, 6.28); x.fill() // 淡い月
+      x.strokeStyle = 'rgba(68,80,52,0.3)'; x.lineWidth = 1.2; for (let i = 0; i < 22; i++) { const gx = R() * 128; x.beginPath(); x.moveTo(gx, 132); x.quadraticCurveTo(gx + (R() - 0.5) * 8, 116, gx + (R() - 0.5) * 16, 100); x.stroke() } // 草（山裾）
+    })
+    const fusumaMat = mk(C(0xffffff, 0x7a7060), fusumaTex)
+    for (let i = 0; i < 4; i++) { const fx = -3.0 + i * 2.0; box(1.94, 3.0, 0.06, fx, 0.6, BZ - 0.1, fusumaMat); box(0.08, 3.0, 0.09, fx - 0.98, 0.6, BZ - 0.12, woodMat); box(0.16, 0.24, 0.05, fx + 0.7, 0.6, BZ - 0.16, woodDk) } // 4枚の襖（襖絵）＋框＋引手
     const bclk = cyl(0.26, 0.26, 0.05, 2.0, 2.4, BZ - 0.14, creamMat, 18); bclk.rotation.x = Math.PI / 2 // 壁掛け時計（奥壁）
     box(0.02, 0.16, 0.02, 2.0, 2.45, BZ - 0.17, blackMat); box(0.13, 0.02, 0.02, 2.06, 2.4, BZ - 0.17, blackMat) // 時計の針
     box(0.5, 0.72, 0.03, -0.6, 1.4, BZ - 0.13, creamMat) // 奥壁のカレンダー/ポスター
