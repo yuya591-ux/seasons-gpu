@@ -3928,177 +3928,58 @@ export async function mountTown3d(parent, opts = {}) {
     if (r < 0.36) return { outfit: 'armor', skin, hair, iris, hairStyle: 'hat', hat: 'jingasa', top: pickC([0x40382e, 0x3a3a34]), bottom: pickC([0x4a3a30, 0x3a4250, 0x55504a]), accent: 0x6a3a30, prop: 'spear' } // 足軽
     if (r < 0.58) return { outfit: 'armor', skin, hair, iris, hairStyle: 'topknot', top: pickC([0x3a3a40, 0x44382e]), bottom: pickC([0x6a3a30, 0x3a4a5e, 0x55503a]), accent: pickC([0x9a7a44, 0x7a3a32]), prop: 'swords' } // 武者
     return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
-    // ── 【試作】2Dアニメ絵のキャラ（キャンバスに手描き風で描き、板ポリでカメラを向く）。3D造形の限界を離れ参考のジブリ風に寄せる。──
-    const hx2 = (h) => '#' + ('000000' + (h >>> 0).toString(16)).slice(-6)
-    const dk = (h, f) => hx2(new THREE.Color(h).multiplyScalar(f).getHex()) // 影色
-    const girlPalette = (cfg = {}) => { const sk = cfg.skin || 0xf7dcc0, hr = cfg.hair || 0x26221e, tp = cfg.top || 0xf3f0e9, bt = cfg.bottom || 0x2f3744
-      return { OL: '#2b2521', skin: hx2(sk), skinSh: dk(sk, 0.9), hair: hx2(hr), hairHi: dk(hr, 1.5), hairSh: dk(hr, 0.72), top: hx2(tp), topSh: dk(tp, 0.9), bot: hx2(bt), botHi: dk(bt, 1.22), botSh: dk(bt, 0.85), bag: hx2(cfg.bag || 0x917658), mouthC: '#c07d6e', blush: 'rgba(228,150,128,0.5)' } }
-    const drawAnimeGirl = (x, P = girlPalette()) => {
-      const OL = P.OL, skin = P.skin, skinSh = P.skinSh, hair = P.hair, hairHi = P.hairHi, hairSh = P.hairSh
-      const top = P.top, topSh = P.topSh, bot = P.bot, botHi = P.botHi, botSh = P.botSh, bag = P.bag, mouthC = P.mouthC, blush = P.blush
-      x.lineJoin = 'round'; x.lineCap = 'round'
-      const ol = (sw) => { x.strokeStyle = OL; x.lineWidth = sw; x.stroke() }
-      const ell = (cx, cy, rx, ry, fill, sw) => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 6.2832); if (fill) { x.fillStyle = fill; x.fill() } if (sw) ol(sw) }
-      // 後ろ髪（ボブ・顔を囲み毛先が軽く外へ）
-      x.beginPath(); x.moveTo(94, 86); x.bezierCurveTo(80, 146, 98, 166, 128, 168); x.bezierCurveTo(158, 166, 176, 146, 162, 86); x.bezierCurveTo(158, 46, 98, 46, 94, 86); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(142, 62); x.bezierCurveTo(168, 84, 168, 142, 150, 162); x.bezierCurveTo(160, 138, 160, 92, 146, 66); x.closePath(); x.fillStyle = '#1b1815'; x.fill() // 右側の影
-      // パンツ（ハイウエストのワイド・濃紺）
-      x.beginPath(); x.moveTo(94, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.lineTo(123, 470); x.lineTo(102, 470); x.bezierCurveTo(74, 372, 76, 300, 80, 268); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(128, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.closePath(); x.fillStyle = '#283039'; x.fill() // 右脚の影
-      x.beginPath(); x.moveTo(90, 262); x.bezierCurveTo(86, 320, 96, 372, 108, 420); x.strokeStyle = botHi; x.lineWidth = 4; x.stroke() // 左の当たり（ハイライト）
-      x.beginPath(); x.moveTo(128, 268); x.lineTo(128, 470); ol(2.5) // 脚の境
-      // 靴
-      for (const sx of [120, 142]) { x.beginPath(); x.ellipse(sx, 482, 13, 9, 0, 0, 6.2832); x.fillStyle = '#2a2622'; x.fill(); ol(3) }
-      // ブラウス（白い半袖・上半身）
-      x.beginPath(); x.moveTo(100, 158); x.bezierCurveTo(88, 168, 84, 210, 90, 262); x.lineTo(166, 262); x.bezierCurveTo(172, 210, 168, 168, 156, 158); x.bezierCurveTo(148, 150, 108, 150, 100, 158); x.closePath(); x.fillStyle = top; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(138, 156); x.bezierCurveTo(150, 170, 152, 220, 150, 262); x.lineTo(166, 262); x.bezierCurveTo(172, 210, 168, 168, 156, 158); x.closePath(); x.fillStyle = topSh; x.fill() // 影側（右）
-      x.beginPath(); x.moveTo(90, 256); x.lineTo(166, 256); x.strokeStyle = OL; x.lineWidth = 2.5; x.stroke() // 裾(ウエスト)
-      // 肩紐（サスペンダー）
-      for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 16, 158); x.lineTo(128 + sx * 22, 256); x.strokeStyle = bot; x.lineWidth = 6; x.stroke(); ol(1.5) }
-      // 腕（ふっくらした半袖＋自然な太さの前腕＋手のひらのある手）。体側にやわらかく垂れる。
-      for (const sx of [-1, 1]) {
-        // 半袖（肩の丸みをふっくら）
-        x.beginPath(); x.moveTo(128 + sx * 26, 158); x.bezierCurveTo(128 + sx * 52, 162, 128 + sx * 54, 188, 128 + sx * 49, 208); x.lineTo(128 + sx * 30, 212); x.bezierCurveTo(128 + sx * 26, 190, 128 + sx * 24, 170, 128 + sx * 26, 158); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5)
-        x.beginPath(); x.moveTo(128 + sx * 50, 200); x.quadraticCurveTo(128 + sx * 44, 206, 128 + sx * 33, 210); x.strokeStyle = topSh; x.lineWidth = 2; x.stroke() // 袖口の影
-        // 前腕（肘から手首へしなやかに細る）
-        x.beginPath(); x.moveTo(128 + sx * 48, 206); x.bezierCurveTo(128 + sx * 50, 236, 128 + sx * 46, 266, 128 + sx * 42, 290); x.bezierCurveTo(128 + sx * 37, 292, 128 + sx * 33, 291, 128 + sx * 31, 288); x.bezierCurveTo(128 + sx * 31, 262, 128 + sx * 33, 232, 128 + sx * 30, 208); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5)
-        // 手（手のひら＋指のふくらみ）
-        x.beginPath(); x.moveTo(128 + sx * 42, 286); x.bezierCurveTo(128 + sx * 48, 294, 128 + sx * 47, 312, 128 + sx * 39, 318); x.bezierCurveTo(128 + sx * 31, 320, 128 + sx * 27, 306, 128 + sx * 29, 289); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
-        x.beginPath(); x.moveTo(128 + sx * 32, 308); x.quadraticCurveTo(128 + sx * 40, 311, 128 + sx * 45, 304); x.strokeStyle = skinSh; x.lineWidth = 1.4; x.stroke() // 指の割れ目
-      }
-      // 斜め掛けの鞄（紐＋本体）
-      x.beginPath(); x.moveTo(104, 162); x.lineTo(172, 250); x.strokeStyle = bag; x.lineWidth = 7; x.stroke(); ol(1.5)
-      x.beginPath(); x.rect(168, 246, 34, 40); x.fillStyle = bag; x.fill(); ol(3.5); x.beginPath(); x.moveTo(168, 258); x.lineTo(202, 258); ol(2)
-      // 首
-      x.beginPath(); x.rect(118, 128, 20, 26); x.fillStyle = skin; x.fill(); ol(3)
-      // 顔（丸みのある輪郭・ふっくら頬＋やわらかい顎。縦長を避ける）
-      x.beginPath(); x.moveTo(98, 94); x.bezierCurveTo(99, 116, 112, 131, 128, 131); x.bezierCurveTo(144, 131, 157, 116, 158, 94); x.bezierCurveTo(159, 64, 97, 64, 98, 94); x.closePath(); x.fillStyle = skin; x.fill(); ol(4)
-      // 額の落ち影（前髪の下＝立体感）
-      x.beginPath(); x.moveTo(100, 86); x.quadraticCurveTo(128, 97, 156, 86); x.quadraticCurveTo(128, 92, 100, 86); x.closePath(); x.fillStyle = 'rgba(210,170,140,0.4)'; x.fill()
-      // 頬の赤み
-      ell(112, 113, 7.5, 5, blush); ell(144, 113, 7.5, 5, blush)
-      // 目（小さく控えめ＝ジブリ風。澄んだ瞳・細い上まぶた）
-      for (const sx of [-1, 1]) {
-        const ex = 128 + sx * 14, ey = 104
-        x.beginPath(); x.ellipse(ex, ey, 5, 6.4, 0, 0, 6.2832); x.fillStyle = '#fbf7f0'; x.fill() // 白目（小）
-        x.beginPath(); x.ellipse(ex, ey + 1, 4, 5.4, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill() // 虹彩
-        x.beginPath(); x.ellipse(ex, ey + 1.6, 1.9, 2.9, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill() // 瞳孔
-        x.beginPath(); x.ellipse(ex - sx * 1.7, ey - 2.2, 1.7, 2.1, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト
-        x.beginPath(); x.moveTo(ex - 5.6, ey - 2.8); x.quadraticCurveTo(ex, ey - 7.4, ex + 5.6, ey - 2.8); x.strokeStyle = OL; x.lineWidth = 2.4; x.stroke() // 上まぶた（細め）
-        x.beginPath(); x.moveTo(ex - 6, ey - 11); x.quadraticCurveTo(ex, ey - 13.5, ex + 6, ey - 10.5); x.strokeStyle = hair; x.lineWidth = 2; x.stroke() // 眉
-      }
-      // 鼻・口（小さく）
-      x.beginPath(); x.moveTo(128, 115); x.lineTo(125.5, 119); x.strokeStyle = skinSh; x.lineWidth = 1.8; x.stroke()
-      x.beginPath(); x.moveTo(123, 126); x.quadraticCurveTo(128, 129, 133, 126); x.strokeStyle = mouthC; x.lineWidth = 2.2; x.stroke()
-      // 前髪（中央でふんわり分け＋毛束＝束感のあるボブ）
-      x.beginPath(); x.moveTo(96, 84); x.bezierCurveTo(98, 54, 158, 54, 160, 84)
-      x.bezierCurveTo(153, 70, 149, 92, 140, 86); x.bezierCurveTo(136, 73, 132, 73, 129, 82) // 右の毛束
-      x.bezierCurveTo(125, 73, 121, 73, 117, 86); x.bezierCurveTo(108, 92, 104, 70, 96, 84); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
-      for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 30, 80); x.bezierCurveTo(128 + sx * 37, 110, 128 + sx * 31, 142, 128 + sx * 22, 150); x.bezierCurveTo(128 + sx * 27, 122, 128 + sx * 27, 98, 128 + sx * 27, 82); x.closePath(); x.fillStyle = hair; x.fill(); ol(3) } // サイドの毛（頬に沿って顎へ）
-      x.beginPath(); x.moveTo(106, 64); x.quadraticCurveTo(128, 56, 150, 64); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 髪の艶（ハイライト）
-    }
-    // ── 後ろ姿（顔なし・髪と背中・襟足） ──
-    const drawGirlBack = (x, P = girlPalette()) => {
-      const OL = P.OL, skin = P.skin, skinSh = P.skinSh, hair = P.hair, hairHi = P.hairHi, hairSh = P.hairSh
-      const top = P.top, topSh = P.topSh, bot = P.bot, botSh = P.botSh, bag = P.bag
-      x.lineJoin = 'round'; x.lineCap = 'round'
-      const ol = (sw) => { x.strokeStyle = OL; x.lineWidth = sw; x.stroke() }
-      // パンツ（後ろ）
-      x.beginPath(); x.moveTo(94, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.lineTo(123, 470); x.lineTo(102, 470); x.bezierCurveTo(74, 372, 76, 300, 80, 268); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(128, 252); x.lineTo(162, 252); x.bezierCurveTo(180, 256, 184, 320, 176, 372); x.lineTo(154, 470); x.lineTo(133, 470); x.lineTo(128, 372); x.closePath(); x.fillStyle = botSh; x.fill()
-      x.beginPath(); x.moveTo(128, 268); x.lineTo(128, 470); ol(2.5)
-      for (const sx of [120, 142]) { x.beginPath(); x.ellipse(sx, 482, 13, 9, 0, 0, 6.2832); x.fillStyle = '#2a2622'; x.fill(); ol(3) }
-      // ブラウス（後ろ）
-      x.beginPath(); x.moveTo(100, 158); x.bezierCurveTo(88, 168, 84, 210, 90, 262); x.lineTo(166, 262); x.bezierCurveTo(172, 210, 168, 168, 156, 158); x.bezierCurveTo(148, 150, 108, 150, 100, 158); x.closePath(); x.fillStyle = top; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(138, 156); x.bezierCurveTo(150, 170, 152, 220, 150, 262); x.lineTo(166, 262); x.bezierCurveTo(172, 210, 168, 168, 156, 158); x.closePath(); x.fillStyle = topSh; x.fill()
-      x.beginPath(); x.moveTo(90, 256); x.lineTo(166, 256); ol(2.5)
-      // 肩紐（背中＝X字）
-      for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 16, 158); x.lineTo(128 - sx * 22, 250); x.strokeStyle = bot; x.lineWidth = 6; x.stroke(); ol(1.2) }
-      // 腕（前面と同じふっくらした太さ）
-      for (const sx of [-1, 1]) {
-        x.beginPath(); x.moveTo(128 + sx * 26, 158); x.bezierCurveTo(128 + sx * 52, 162, 128 + sx * 54, 188, 128 + sx * 49, 208); x.lineTo(128 + sx * 30, 212); x.bezierCurveTo(128 + sx * 26, 190, 128 + sx * 24, 170, 128 + sx * 26, 158); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5)
-        x.beginPath(); x.moveTo(128 + sx * 48, 206); x.bezierCurveTo(128 + sx * 50, 236, 128 + sx * 46, 266, 128 + sx * 42, 290); x.bezierCurveTo(128 + sx * 37, 292, 128 + sx * 33, 291, 128 + sx * 31, 288); x.bezierCurveTo(128 + sx * 31, 262, 128 + sx * 33, 232, 128 + sx * 30, 208); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5)
-        x.beginPath(); x.moveTo(128 + sx * 42, 286); x.bezierCurveTo(128 + sx * 48, 294, 128 + sx * 47, 312, 128 + sx * 39, 318); x.bezierCurveTo(128 + sx * 31, 320, 128 + sx * 27, 306, 128 + sx * 29, 289); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
-      }
-      // 鞄（背中を横切る紐＋脇の本体）
-      x.beginPath(); x.moveTo(150, 160); x.lineTo(86, 250); x.strokeStyle = bag; x.lineWidth = 7; x.stroke(); ol(1.5)
-      x.beginPath(); x.rect(54, 246, 34, 40); x.fillStyle = bag; x.fill(); ol(3.5); x.beginPath(); x.moveTo(54, 258); x.lineTo(88, 258); ol(2)
-      // 首
-      x.beginPath(); x.rect(118, 128, 20, 22); x.fillStyle = skinSh; x.fill(); ol(3)
-      // 後ろ髪（頭をすっぽり覆うボブ・襟足）
-      x.beginPath(); x.moveTo(96, 84); x.bezierCurveTo(92, 46, 164, 46, 160, 84); x.bezierCurveTo(168, 150, 150, 172, 128, 176); x.bezierCurveTo(106, 172, 88, 150, 96, 84); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(128, 52); x.lineTo(128, 174); x.strokeStyle = hairSh; x.lineWidth = 2.5; x.stroke() // 中央の分け目
-      for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(128 + sx * 30, 72); x.quadraticCurveTo(128 + sx * 40, 122, 128 + sx * 22, 168); x.strokeStyle = hairSh; x.lineWidth = 2; x.stroke() }
-      x.beginPath(); x.moveTo(108, 66); x.quadraticCurveTo(128, 60, 148, 66); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 艶
-    }
-    // ── 横顔（プロフィール・左を向く。なめらかな輪郭線と立体感を保つ） ──
-    const drawGirlSide = (x, P = girlPalette()) => {
-      const OL = P.OL, skin = P.skin, skinSh = P.skinSh, hair = P.hair, hairHi = P.hairHi, hairSh = P.hairSh
-      const top = P.top, topSh = P.topSh, bot = P.bot, botSh = P.botSh, bag = P.bag, mouthC = P.mouthC, blush = P.blush
-      x.lineJoin = 'round'; x.lineCap = 'round'
-      const ol = (sw) => { x.strokeStyle = OL; x.lineWidth = sw; x.stroke() }
-      // パンツ（横・尻は後ろ＝右へふくらみ、脚はS字）
-      x.beginPath(); x.moveTo(104, 252); x.lineTo(150, 252); x.bezierCurveTo(164, 290, 160, 344, 154, 396); x.lineTo(150, 468); x.lineTo(120, 468); x.bezierCurveTo(110, 410, 104, 360, 102, 320); x.bezierCurveTo(100, 296, 100, 272, 104, 252); x.closePath(); x.fillStyle = bot; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(132, 256); x.bezierCurveTo(150, 300, 148, 380, 142, 460); x.lineTo(150, 468); x.bezierCurveTo(160, 360, 164, 300, 150, 252); x.lineTo(132, 252); x.closePath(); x.fillStyle = botSh; x.fill() // 背側の陰
-      x.beginPath(); x.moveTo(98, 476); x.bezierCurveTo(86, 478, 84, 489, 96, 491); x.lineTo(126, 491); x.bezierCurveTo(133, 489, 131, 477, 124, 476); x.closePath(); x.fillStyle = '#2a2622'; x.fill(); ol(3) // 靴（つま先は前へ）
-      // ブラウス（横・胸は前＝左へなだらか、背は右）
-      x.beginPath(); x.moveTo(112, 156); x.bezierCurveTo(98, 166, 95, 204, 99, 240); x.lineTo(99, 256); x.lineTo(150, 256); x.bezierCurveTo(154, 210, 153, 172, 144, 158); x.bezierCurveTo(135, 150, 120, 150, 112, 156); x.closePath(); x.fillStyle = top; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(138, 156); x.bezierCurveTo(151, 174, 153, 214, 150, 256); x.lineTo(150, 256); x.bezierCurveTo(154, 210, 153, 172, 144, 158); x.closePath(); x.fillStyle = topSh; x.fill() // 背側の陰
-      x.beginPath(); x.moveTo(99, 252); x.lineTo(150, 252); ol(2.5) // ウエスト
-      // 鞄（肩から前へ垂れ、体の前で揺れる）
-      x.beginPath(); x.moveTo(126, 158); x.lineTo(96, 250); x.strokeStyle = bag; x.lineWidth = 7; x.stroke(); ol(1.5)
-      x.beginPath(); x.moveTo(82, 248); x.lineTo(112, 248); x.lineTo(110, 288); x.lineTo(84, 288); x.closePath(); x.fillStyle = bag; x.fill(); ol(3.5); x.beginPath(); x.moveTo(82, 260); x.lineTo(112, 260); ol(2)
-      // 腕（肩から体の中ほどへ自然に垂れる＝前へ突き出さない）
-      x.beginPath(); x.moveTo(120, 156); x.bezierCurveTo(110, 160, 108, 184, 113, 206); x.lineTo(132, 206); x.bezierCurveTo(136, 184, 135, 162, 128, 154); x.closePath(); x.fillStyle = top; x.fill(); ol(3.5) // 半袖
-      x.beginPath(); x.moveTo(115, 204); x.bezierCurveTo(113, 234, 115, 262, 118, 286); x.bezierCurveTo(124, 288, 129, 286, 130, 282); x.bezierCurveTo(131, 256, 131, 230, 130, 204); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5) // 前腕
-      x.beginPath(); x.moveTo(118, 283); x.bezierCurveTo(114, 294, 117, 308, 124, 310); x.bezierCurveTo(131, 310, 134, 298, 131, 284); x.closePath(); x.fillStyle = skin; x.fill(); ol(3) // 手
-      // 首（顎から肩へなめらかに繋ぐ）
-      x.beginPath(); x.moveTo(116, 133); x.bezierCurveTo(116, 145, 117, 152, 121, 158); x.lineTo(134, 156); x.bezierCurveTo(133, 148, 132, 142, 132, 134); x.closePath(); x.fillStyle = skin; x.fill(); ol(3)
-      x.beginPath(); x.moveTo(118, 139); x.quadraticCurveTo(125, 145, 131, 141); x.strokeStyle = skinSh; x.lineWidth = 1.5; x.stroke() // 顎下の陰
-      // 後頭部の髪（丸いボリューム＋襟足＋毛流れ）
-      x.beginPath(); x.moveTo(120, 50); x.bezierCurveTo(150, 48, 167, 84, 160, 120); x.bezierCurveTo(157, 146, 146, 164, 133, 170); x.bezierCurveTo(138, 150, 134, 120, 132, 100); x.bezierCurveTo(131, 78, 128, 60, 120, 50); x.closePath(); x.fillStyle = hair; x.fill(); ol(4)
-      x.beginPath(); x.moveTo(150, 70); x.quadraticCurveTo(161, 106, 150, 142); x.strokeStyle = hairSh; x.lineWidth = 2.2; x.stroke()
-      // 顔（横顔の輪郭：額→鼻筋→鼻先→人中→唇→顎。控えめでなめらかな美しいライン）
-      x.beginPath(); x.moveTo(122, 56); x.bezierCurveTo(108, 58, 102, 72, 101, 88); x.bezierCurveTo(100, 94, 96, 98, 95, 103); x.bezierCurveTo(99, 106, 101, 108, 101, 111); x.bezierCurveTo(98, 114, 102, 117, 101, 120); x.bezierCurveTo(100, 125, 105, 133, 114, 137); x.bezierCurveTo(120, 139, 125, 137, 125, 131); x.lineTo(124, 56); x.closePath(); x.fillStyle = skin; x.fill(); ol(3.5)
-      // 頬・エラの陰（立体感）
-      x.beginPath(); x.moveTo(120, 98); x.bezierCurveTo(118, 112, 116, 124, 119, 133); x.strokeStyle = 'rgba(226,182,152,0.55)'; x.lineWidth = 5; x.stroke()
-      x.beginPath(); x.ellipse(111, 117, 6, 4, 0, 0, 6.2832); x.fillStyle = blush; x.fill() // 頬の赤み
-      // 耳（後ろ寄り・くぼみ）
-      x.beginPath(); x.ellipse(125, 104, 4.6, 6.6, 0, 0, 6.2832); x.fillStyle = skin; x.fill(); ol(2.4)
-      x.beginPath(); x.moveTo(125, 100); x.quadraticCurveTo(122, 104, 125, 108); x.strokeStyle = skinSh; x.lineWidth = 1.4; x.stroke()
-      // 目（横顔のアーモンド・前寄り＝小さく澄む）
-      x.beginPath(); x.moveTo(105, 100); x.quadraticCurveTo(111, 97, 117, 100); x.quadraticCurveTo(111, 104, 105, 100); x.closePath(); x.fillStyle = '#fbf7f0'; x.fill()
-      x.beginPath(); x.ellipse(109, 100.5, 2.5, 3.1, 0, 0, 6.2832); x.fillStyle = '#7c5638'; x.fill()
-      x.beginPath(); x.ellipse(109, 101, 1.3, 1.9, 0, 0, 6.2832); x.fillStyle = '#2e231c'; x.fill()
-      x.beginPath(); x.ellipse(107.4, 99, 0.9, 1.1, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill() // ハイライト
-      x.beginPath(); x.moveTo(104, 98); x.quadraticCurveTo(110, 95, 117, 98); x.strokeStyle = OL; x.lineWidth = 2.2; x.stroke() // 上まぶた
-      x.beginPath(); x.moveTo(103, 92); x.quadraticCurveTo(110, 89, 117, 92); x.strokeStyle = hair; x.lineWidth = 2; x.stroke() // 眉
-      // 鼻先の陰・口
-      x.beginPath(); x.moveTo(100, 111); x.quadraticCurveTo(104, 113, 106, 112); x.strokeStyle = skinSh; x.lineWidth = 1.5; x.stroke()
-      x.beginPath(); x.moveTo(100, 120); x.quadraticCurveTo(105, 123, 110, 121); x.strokeStyle = mouthC; x.lineWidth = 2.2; x.stroke()
-      // 前髪（額にふんわりかかり毛先が顔の前へ）
-      x.beginPath(); x.moveTo(124, 52); x.bezierCurveTo(106, 54, 99, 74, 101, 90); x.bezierCurveTo(104, 80, 110, 74, 118, 76); x.bezierCurveTo(122, 68, 124, 60, 124, 52); x.closePath(); x.fillStyle = hair; x.fill(); ol(3)
-      x.beginPath(); x.moveTo(108, 64); x.quadraticCurveTo(126, 58, 142, 72); x.strokeStyle = hairHi; x.lineWidth = 3; x.stroke() // 艶
-    }
     const maxAniso = renderer.capabilities.getMaxAnisotropy()
-    const makeAnimeSprite = (cfg = {}) => {
-      const P = girlPalette(cfg)
-      const mk = (fn) => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 512; fn(cv.getContext('2d'), P); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; return t }
-      const views = { front: mk(drawAnimeGirl), side: mk(drawGirlSide), back: mk(drawGirlBack) }
-      const mat = new THREE.MeshBasicMaterial({ map: views.front, transparent: true, alphaTest: 0.45, side: THREE.DoubleSide, fog: true })
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.9), mat); m.position.y = 0.95
-      const grp = new THREE.Group(); grp.add(m); grp.userData = { spr: m, mat, views, facing: cfg.facing || 0, cur: 'front' }; return grp
+    // ── 2.5D：3Dの人物を8方向に焼いて板ポリの絵にする（2Dの質感 × 3Dの整合・回転 × 板ポリの軽さ）──
+    // 3Dを1体だけ作り、正射影で8方向から1枚ずつ描き出してテクスチャ化。実行時は見る角度に応じて該当方向の絵を見せる（紙人形/Doom方式）。
+    const SPR_DIRS = 8, cellW = 200, cellH = 330
+    const bakeScene = new THREE.Scene()
+    bakeScene.add(new THREE.HemisphereLight(0xfff3e3, 0x6e665a, 1.18)) // 柔らかな全体光（どの世界の明るさにも馴染むよう平板めに）
+    const bakeKey = new THREE.DirectionalLight(0xffffff, 0.5); bakeKey.position.set(0.35, 1.0, 0.95); bakeScene.add(bakeKey) // ほんのり前上から
+    // 正射影の上下はカメラ基準。カメラを図の中央(y0.9)に置き、上下を±0.92にして world-y ≒ -0.02〜1.82 を写す（全身が収まる）。
+    const bakeCam = new THREE.OrthographicCamera(-0.56, 0.56, 0.92, -0.92, 0.1, 12)
+    bakeCam.position.set(0, 0.9, 5); bakeCam.lookAt(0, 0.9, 0)
+    const bakeRT = new THREE.WebGLRenderTarget(cellW, cellH, { samples: LIGHT ? 0 : 4 })
+    bakeRT.texture.colorSpace = THREE.SRGBColorSpace // オフスクリーンはlinearで貯まる→読み出してsRGBのcanvasに置くと暗くなる。sRGBで書き出させて見た目を合わせる
+    const bakeFigureViews = (cfg) => {
+      const fig = makeResident({ ...cfg, scale: 1 })
+      const last = fig.children[fig.children.length - 1]; if (last && last.material === resShadowMat) fig.remove(last) // 接地影(共有資源)はベイクに含めない＝板ポリ側で別に付ける
+      fig.scale.setScalar(1); fig.rotation.set(0, 0, 0); fig.position.set(0, 0, 0)
+      bakeScene.add(fig)
+      const prevRT = renderer.getRenderTarget(), prevA = renderer.getClearAlpha(), prevC = new THREE.Color(); renderer.getClearColor(prevC)
+      renderer.setClearColor(0x000000, 0)
+      const views = [], buf = new Uint8Array(cellW * cellH * 4)
+      for (let d = 0; d < SPR_DIRS; d++) {
+        fig.rotation.y = (d / SPR_DIRS) * Math.PI * 2 // d=0は正面（+z＝カメラ向き）／d=4は背面
+        renderer.setRenderTarget(bakeRT); renderer.clear(); renderer.render(bakeScene, bakeCam)
+        renderer.readRenderTargetPixels(bakeRT, 0, 0, cellW, cellH, buf)
+        const cv = document.createElement('canvas'); cv.width = cellW; cv.height = cellH; const cx = cv.getContext('2d')
+        const img = cx.createImageData(cellW, cellH)
+        for (let y = 0; y < cellH; y++) { const sy = cellH - 1 - y; img.data.set(buf.subarray(sy * cellW * 4, (sy + 1) * cellW * 4), y * cellW * 4) } // GLは下が原点→上下反転
+        cx.putImageData(img, 0, 0)
+        const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; views.push(t)
+      }
+      renderer.setRenderTarget(prevRT); renderer.setClearColor(prevC, prevA)
+      bakeScene.remove(fig)
+      fig.traverse((o) => { if (o.geometry && o.geometry !== resShadowGeo) o.geometry.dispose(); if (o.material && o.material !== RES_OUTLINE && o.material !== resShadowMat) o.material.dispose() }) // 焼き終えたら破棄（共有資源は除く）
+      return views
     }
-    if (/[?&]dev=1/.test(location.search)) window.__girlPNG = (view, cfg) => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 512; const fn = { front: drawAnimeGirl, side: drawGirlSide, back: drawGirlBack }[view] || drawAnimeGirl; fn(cv.getContext('2d'), girlPalette(cfg || {})); return cv.toDataURL() } // 検証用: 1枚絵をそのままPNGに（3D遮蔽なし）
-    // 服・髪・肌の色をランダムに＝「いろんな人が世界にいる」
-    const RND = (a) => a[(R() * a.length) | 0]
-    const V_SKIN = [0xf7dcc0, 0xf2d2b6, 0xeac6a4, 0xe0b694], V_HAIR = [0x26221e, 0x322a22, 0x42301f, 0x4e3a28, 0x5b4636]
-    const V_TOP = [0xf3f0e9, 0xe9ddc9, 0xd6e0e2, 0xe8d8d8, 0xdde6d8, 0xe3ddec], V_BOT = [0x2f3744, 0x3a3633, 0x4a3d34, 0x534236, 0x39463f]
-    const V_BAG = [0x917658, 0x6e5a44, 0x9c8466, 0x736150]
-    const SP_SPOTS = [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]
-    for (const sp of SP_SPOTS) { const hx = sp.x + (R() - 0.5) * 3, hz = sp.z + (R() - 0.5) * 3, gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) continue
-      const cfg = { skin: RND(V_SKIN), hair: RND(V_HAIR), top: RND(V_TOP), bottom: RND(V_BOT), bag: RND(V_BAG), facing: R() * 6.2832 }
-      const gr = makeAnimeSprite(cfg); gr.position.set(hx, gy, hz); town.add(gr); animeSprites.push(gr) }
+    const makeFigureSprite = (views, facing) => {
+      const mat = new THREE.MeshBasicMaterial({ map: views[0], transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, fog: true })
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.0), mat); m.position.y = 0.95
+      const grp = new THREE.Group(); grp.add(m)
+      const sh = new THREE.Mesh(resShadowGeo, resShadowMat); sh.rotation.x = -Math.PI / 2; sh.position.set(0, 0.03, 0.05); sh.scale.set(0.62, 0.84, 1); sh.renderOrder = 1; grp.add(sh) // 接地影で地に立たせる
+      grp.userData = { spr: m, mat, views, facing: facing || 0, cur: 0 }
+      return grp
+    }
+    try {
+      // 港町の少女（添付の模倣：白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋黒ボブ＋斜め掛けの鞄）を数体ぶん焼き、街に配置。
+      const harborGirlCfg = () => ({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: [0x1d1916, 0x241c18, 0x2c2622][(R() * 3) | 0], iris: [0x3a2e26, 0x4a3a2c, 0x4a6a9a][(R() * 3) | 0], outfit: 'blouse', top: [0xf0ece2, 0xeae6da, 0xf2eee6][(R() * 3) | 0], bottom: [0x33373e, 0x2e3a42, 0x3a3530][(R() * 3) | 0], hairStyle: 'bob', prop: 'bag', bagCol: [0x8a7256, 0x6a5a44, 0x9a8460][(R() * 3) | 0] })
+      const variants = []
+      for (let i = 0; i < 4; i++) variants.push(bakeFigureViews(harborGirlCfg())) // 色違い4体＝「いろんな人が世界にいる」
+      const SP_SPOTS = [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]
+      for (const sp of SP_SPOTS) { const hx = sp.x + (R() - 0.5) * 3, hz = sp.z + (R() - 0.5) * 3, gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) continue
+        const gr = makeFigureSprite(variants[(R() * variants.length) | 0], R() * 6.2832); gr.position.set(hx, gy, hz); town.add(gr); animeSprites.push(gr) }
+    } catch (e) { /* ベイク不可の端末では人物を置かない（クラッシュ回避） */ }
   } // ← 車・住民（街のみ）ここまで
 
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
@@ -5306,14 +5187,14 @@ export async function mountTown3d(parent, opts = {}) {
       let ddy = u.face - r.rotation.y; while (ddy > Math.PI) ddy -= 6.2832; while (ddy < -Math.PI) ddy += 6.2832
       r.rotation.y += ddy * Math.min(1, dt * 6) // 進行方向へなめらかに向き直る
     }
-    // 2Dアニメ絵キャラ（板ポリ）はカメラの方を向きつつ、見る角度で正面／横顔／後ろ姿を出し分ける（紙人形＝Doom方式）
+    // 2.5Dキャラ（板ポリ）はカメラの方を向きつつ、見る角度に応じて8方向に焼いた絵を出し分ける（紙人形＝Doom方式）
     for (const sp of animeSprites) {
       const toCam = Math.atan2(camera.position.x - sp.position.x, camera.position.z - sp.position.z)
       sp.rotation.y = toCam
-      const ud = sp.userData; let rel = toCam - ud.facing; rel = Math.atan2(Math.sin(rel), Math.cos(rel)); const a = Math.abs(rel)
-      const view = a < 0.9 ? 'front' : a > 2.24 ? 'back' : 'side' // 前(±51°)／後ろ(>128°)／横
-      if (view !== ud.cur) { ud.mat.map = ud.views[view]; ud.mat.needsUpdate = true; ud.cur = view }
-      ud.spr.scale.x = (view === 'side' && rel < 0) ? -1 : 1 // 横顔は左右どちら側から見るかで反転
+      const ud = sp.userData, n = ud.views.length
+      let rel = toCam - ud.facing; rel = Math.atan2(Math.sin(rel), Math.cos(rel)) // -π..π（カメラが人物の正面からどれだけ回り込んでいるか）
+      let idx = Math.round(rel / (Math.PI * 2 / n)); idx = ((idx % n) + n) % n
+      if (idx !== ud.cur) { ud.mat.map = ud.views[idx]; ud.mat.needsUpdate = true; ud.cur = idx }
     }
     // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
     const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
@@ -6002,9 +5883,12 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
+    window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dSpriteTo = (i, x, z) => { if (animeSprites[i]) animeSprites[i].position.set(x, heightAt(x, z), z) } // 検証用: 2Dスプライトを開けた場所へ
     window.__town3dSpriteFace = (i, rel) => { const sp = animeSprites[i]; if (!sp) return; const toCam = Math.atan2(camera.position.x - sp.position.x, camera.position.z - sp.position.z); sp.userData.facing = toCam - rel } // 検証用: カメラ基準でrel=0正面/±π/2横/π後ろ
     window.__town3dSpriteFront = (i, dist = 12, eyeLevel = false) => { const sp = animeSprites[i]; if (!sp) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); if (eyeLevel) { const t = camera.position.clone().addScaledVector(d, dist); sp.position.set(t.x, t.y - 0.95, t.z); return } d.y = 0; d.normalize(); const x = camera.position.x + d.x * dist, z = camera.position.z + d.z * dist; sp.position.set(x, heightAt(x, z), z) } // 検証用: カメラ正面distだけ前に立たせる（eyeLevel=視線上に置いて窓中央に収める）
+    window.__town3dSpriteTex = (i, d) => { const sp = animeSprites[i]; if (!sp) return null; const v = sp.userData.views; return v && v[d] && v[d].image ? v[d].image.toDataURL() : null } // 検証用: 焼いた8方向の絵そのものをPNGで取り出す
+    window.__town3dSpriteDirs = (i) => { const sp = animeSprites[i]; return sp ? sp.userData.views.length : 0 }
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
