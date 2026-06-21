@@ -3885,10 +3885,12 @@ export async function mountTown3d(parent, opts = {}) {
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
     const RW = 2 * SX + 0.8, RD = BZ + 0.9, WT = CY + 0.3 // 室の幅/奥行/壁の上端（躯体はこれで一括スケール）
     const C = (d, n) => isNight ? n : d
+    // 室内全体の時間帯の色味＝昼は素、夕ほど飴色に温まる（“いま何時か”を部屋の中から感じる）。夜は専用色のまま。
+    const roomWarm = isNight ? null : new THREE.Color(0xffffff).lerp(new THREE.Color(0xffd6a2), duskAmt * 0.5)
     // 不透明＝室内が深度を書き込み、手前の壁が奥の壁/家具と「窓の外の街」を遮蔽＝隠れた街の塗り(fill)を早期Zで省く＋
     // 半透明ブレンドの全画面オーバードローをゼロに（カクつきの主因を断つ）。乗り出すとカメラが窓の開口を通って前へ
     // 出るので室内は自然に背後へ退く（フェード不要）。
-    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); m.vertexColors = true; winRoomMats.push(m); return m }
+    const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); if (roomWarm) m.color.multiply(roomWarm); m.vertexColors = true; winRoomMats.push(m); return m }
     // 角をわずかに面取り（街のトゥーンの丸みに合わせ、硬い箱の安っぽさを和らげる）。細い桟/薄板は面取りすると角が
     // 立ってチカチカするので平らな箱にする（しきい値を上げて家具だけ丸める）。
     const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.05, Math.min(w, h, d) * 0.24); const g = r > 0.032 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）
@@ -3928,7 +3930,7 @@ export async function mountTown3d(parent, opts = {}) {
         const near = Math.max(0, 1 - lz / (BZ + 0.4))       // 窓に近い=1／奥=0（窓からの採光）
         const lo = Math.min(1, Math.max(0, (ly - FY) / (CY - FY + 0.6))) // 床=0／天井=1
         const b = Math.max(0.4, Math.min(1.36, (0.6 + near * 0.74) * (0.86 + lo * 0.2))) // 窓際ほど明るい
-        const warm = near * (isNight ? 0.25 : 0.5)         // 窓際は暖色（昼の外光）／奥は素
+        const warm = near * (isNight ? 0.25 : (0.34 + duskAmt * 0.36)) // 窓際は暖色（昼の外光・夕ほど濃い）／奥は素
         c[i * 3] = Math.min(1.5, b * (1 + warm * 0.14)); c[i * 3 + 1] = b; c[i * 3 + 2] = b * (1 - warm * 0.16)
       }
       m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3)); return m
@@ -4059,17 +4061,20 @@ export async function mountTown3d(parent, opts = {}) {
       const tongue = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5), cordMat); tongue.position.y = -0.6; tongue.renderOrder = 3; wc.add(tongue)
       const tanzaku = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.13), curtMat); tanzaku.position.y = -0.72; tanzaku.renderOrder = 3; wc.add(tanzaku)
     }
-    // ── 窓から差し込む光（昼）＝畳に落ちる暖かな採光と、光に舞うほこり。最も多く眺める“座っている景色”に空気を与える。──
+    // ── 窓から差し込む光（昼）＝畳に落ちる暖かな採光。最も多く眺める“座っている景色”に光の差す向きを与える。──
     if (!isNight) {
       // 畳に落ちる窓明かり（夕ほど暖色で濃い。夜の灯りだまりの昼版）
       const ltTex = cv(96, 96, (x) => { const g = x.createRadialGradient(48, 40, 4, 48, 48, 50); g.addColorStop(0, 'rgba(255,246,222,0.95)'); g.addColorStop(0.5, 'rgba(255,238,200,0.34)'); g.addColorStop(1, 'rgba(255,238,200,0)'); x.fillStyle = g; x.fillRect(0, 0, 96, 96) })
       const patchMat = new THREE.MeshBasicMaterial({ map: ltTex, color: new THREE.Color(0xfff1cc).lerp(sunCol, 0.5), transparent: true, opacity: 0.17 + duskAmt * 0.24, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); winRoomMats.push(patchMat)
       const patch = new THREE.Mesh(new THREE.PlaneGeometry(owW + 1.6, 2.7), patchMat); patch.rotation.x = -Math.PI / 2; patch.rotation.z = 0.1; patch.position.set(-0.2, FY + 0.05, 1.75); patch.renderOrder = 4; winRoom.add(patch) // 窓から斜めに差す向き
-      // 光に舞うほこり（窓辺の空間にゆっくり漂う微粒。昼の静かな部屋の手応え。小さく淡く＝雪に見せない）
+    }
+    // ── 光に舞うほこり（窓辺の空間にゆっくり漂う微粒。昼は窓明かり・夜は灯りに浮かぶ。小さく淡く＝雪に見せない）──
+    {
       const N = 46, dp = new Float32Array(N * 3), base = []
       for (let i = 0; i < N; i++) { const x0 = (R() - 0.5) * 3.1, y0 = FY + 0.45 + R() * (oT - FY - 0.3), z0 = 0.5 + R() * 2.7; dp[i * 3] = x0; dp[i * 3 + 1] = y0; dp[i * 3 + 2] = z0; base.push({ x0, y0, z0, ph: R() * 6.28, sp: 0.25 + R() * 0.4, amp: 0.05 + R() * 0.07 }) }
       const dgeo = new THREE.BufferGeometry(); dgeo.setAttribute('position', new THREE.BufferAttribute(dp, 3))
-      const dmat = new THREE.PointsMaterial({ color: new THREE.Color(0xffeccb).lerp(sunCol, 0.5), size: 0.026, transparent: true, opacity: 0.22 + duskAmt * 0.16, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }); winRoomMats.push(dmat)
+      const dCol = isNight ? new THREE.Color(0xffe0a8) : new THREE.Color(0xffeccb).lerp(sunCol, 0.5) // 夜は灯り色の微粒
+      const dmat = new THREE.PointsMaterial({ color: dCol, size: 0.026, transparent: true, opacity: isNight ? 0.14 : (0.22 + duskAmt * 0.16), depthWrite: false, fog: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }); winRoomMats.push(dmat)
       const dust = new THREE.Points(dgeo, dmat); dust.frustumCulled = false; dust.renderOrder = 6; winRoom.add(dust)
       winDust = { geo: dgeo, arr: dp, base }
     }
