@@ -338,14 +338,14 @@ export function createAudio(opts) {
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.5 // 低音の唸り(ぶぶぶ)を断つ
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 680; bp.Q.value = 0.85 // 風切りの芯（速度で上へ動く）
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.012, now() + 8)
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.001, now() + 8) // 静止/地上はほぼ無音。setFlyWindが飛行速度で膨らませる
     src.connect(hp).connect(bp).connect(g).connect(master)
     windNode = { src, g, bp, hp } // g/bp は飛行速度で風を膨らませる（setFlyWind）ために保持
     try {
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06
       const lfoG = ctx.createGain(); lfoG.gain.value = 160; lfo.connect(lfoG).connect(bp.frequency); lfo.start() // ゆるい息づき（突風）
       const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.083
-      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.01; lfo2.connect(lfo2G).connect(g.gain); lfo2.start()
+      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.0005; lfo2.connect(lfo2G).connect(g.gain); lfo2.start() // 息づきはごく僅か（静止時に鳴らない）
     } catch { /* LFO非対応でも常時うっすらの風は鳴る */ }
     try { src.start() } catch { /* 無視 */ }
   }
@@ -438,6 +438,9 @@ export function createAudio(opts) {
       else if (voice === VOICE.edo) cut = 1650
       if (c.night) cut *= 0.86
     }
+    // 【実機FB2回目（2026-06-21）「空中/着地後もブーーーと鳴り続けて不快」】＝持続するシンセのパッド(正弦の和音)
+    // がドローンに聞こえる。ユーザーが繰り返し嫌うため、当面は完全無音化＝自然音(風・鳥・虫・波)だけにする。
+    gain = 0.0001
     // 細かな変化は無視（無駄なスケジューリングを抑える）。
     if (Math.abs(gain - bedState.gain) > 0.0012) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.8) } catch { /* 無視 */ } }
     if (Math.abs(cut - bedState.cut) > 24) { bedState.cut = cut; try { bedNodes.lp.frequency.setTargetAtTime(cut, t, 2.4) } catch { /* 無視 */ } }
@@ -560,8 +563,8 @@ export function createAudio(opts) {
       const t = now()
       const e = v * v // 加速の手応え＝速いほど一気に風が増す
       try {
-        windNode.g.gain.setTargetAtTime(0.01 + e * 0.06, t, 0.4)         // 速いほど明確に大きく＝飛んでいる手応え
-        windNode.bp.frequency.setTargetAtTime(620 + v * 1180, t, 0.4)    // 速いほど高く明るい「ひゅーー」（低い唸りにしない）
+        windNode.g.gain.setTargetAtTime(v < 0.06 ? 0.0006 : (0.004 + e * 0.06), t, 0.4) // 静止/低速はほぼ無音。速いほど明確に「ひゅーー」
+        windNode.bp.frequency.setTargetAtTime(620 + v * 1180, t, 0.4)    // 速いほど高く明るい（低い唸りにしない）
         if (windNode.hp) windNode.hp.frequency.setTargetAtTime(300 + v * 260, t, 0.4) // 速いほど低音を更に削いで澄む
       } catch { /* 無視 */ }
     },
