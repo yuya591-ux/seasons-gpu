@@ -567,7 +567,7 @@ export async function mountTown3d(parent, opts = {}) {
   const HARBOR = { x: 74, z: -64, r: 11, padY: SEA.level + 2 }
   // 湾に浮かぶ小島（大橋の対岸）。地形を海面上へ盛り上げる。橋でつながる目的地。
   const ISLAND = { x: 98, z: -40, r: 8 }
-  const EDO = { x: 470, z: -46, r: 112 } // 海の向こうの広い島（江戸の城下町）。広く拡大。現代の街から大きく離し共視界に入らない
+  const EDO = { x: 486, z: -46, r: 124 } // 海の向こうの広い島（江戸の城下町）。拡大(r124・中心を東へ寄せ現代から遠ざけ共視界の余裕を増やす)。武家屋敷町/寺社地を追加
   const SENGOKU = { x: 120, z: -486, r: 54 } // 北の海の果ての戦国の山城。山裾の城下を広げ拡大。海(x>82)から立ち上がる峰。江戸/大正と別方角・遠距離
   const TAISHO = { x: -490, z: -30, r: 112 } // 西の海の向こうの大正の港町（赤レンガ倉庫/洋館/時計塔/桟橋/異人館街/路面電車）。拡大(r112)。中心据置でも現代は霧で隠れる（共視界の余裕あり）
   const CINEMA_LM = [{ x: 0, z: 0 }, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }, { x: TAISHO.x, z: TAISHO.z }] // オートシネマで周回する名所（現代の街/江戸/戦国/大正の中心）
@@ -2215,8 +2215,9 @@ export async function mountTown3d(parent, opts = {}) {
         // 屋根は街区(扇形セクタ)ごとに色をまとめ＝俯瞰の市松を脱し「瓦の町並みの塊」に。町家は街路に平行な切妻、土蔵/大店は寄棟。
         const wallA = [], wallB = [], wall3 = [], litG = [], plE = [], tmpM = new THREE.Matrix4(), rotM = new THREE.Matrix4()
         const avenues = [0.4, 1.18, 1.96, 2.74, 3.6, 4.38, 5.16, 5.94] // 放射の大通り（8本＝入り組んだ街路網に）
-        const ringRoads = [40, 66, 92] // 同心円の環状道路（街区を区切る）
-        const edoFac = [{ x: ex - 52, z: ez + 44, r: 14 }, { x: ex - 26, z: ez - 58, r: 10 }] // 庭園/寺子屋の区画（建物を空ける）
+        const ringRoads = [40, 66, 92, 116] // 同心円の環状道路（街区を区切る・拡大した外周にもう一本）
+        const bukeSpots = [[5.0, 94], [5.36, 103], [5.72, 95], [5.62, 112], [4.8, 106], [6.04, 100]] // 武家屋敷町の区画（拡大した外周の新地区）[角度, 半径]
+        const edoFac = [{ x: ex - 52, z: ez + 44, r: 14 }, { x: ex - 26, z: ez - 58, r: 10 }, ...bukeSpots.map(([a, r]) => ({ x: ex + Math.cos(a) * r, z: ez + Math.sin(a) * r, r: 6.5 }))] // 庭園/寺子屋/武家屋敷の区画（町家を空ける）
         const roofPalette = isNight
           ? [0x2e2f33, 0x342c24, 0x2a2520, 0x3a2c26, 0x33302c]
           : [0x717479, 0x6a5640, 0x564636, 0x7a4f3c, 0x807668] // 瓦銀鼠/茶瓦/杉皮/弁柄/灰茶
@@ -2236,7 +2237,7 @@ export async function mountTown3d(parent, opts = {}) {
           g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(uv), 2))
           g.setIndex([...Array(18).keys()]); g.computeVertexNormals(); return g
         })()
-        for (let ring = 0; ring < 24; ring++) {
+        for (let ring = 0; ring < 28; ring++) {
           const rr = 21 + ring * 3.95, n = Math.round(rr * 1.05)
           const onRing = ringRoads.some((rr0) => Math.abs(rr - rr0) < 2.8) // 環状道路のリングは建てない
           for (let k = 0; k < n; k++) {
@@ -2271,7 +2272,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const roadMat = toon(season === 'winter' ? 0xc8ccc6 : 0x7e7050), roadGeos = [], rM = new THREE.Matrix4()
           const seg = (x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, py = heightAt(px, pz); if (py < SEA.level + 0.6) return; const bg = new THREE.BoxGeometry(w, 0.16, len + 0.9); rM.makeRotationY(Math.atan2(dx, dz)).setPosition(px, py + 0.09, pz); bg.applyMatrix4(rM); roadGeos.push(bg) }
           const road = (x0, z0, x1, z1, w) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w) }
-          for (const av of [...avenues, Math.PI]) road(ex + Math.cos(av) * 18, ez + Math.sin(av) * 18, ex + Math.cos(av) * 104, ez + Math.sin(av) * 104, av === Math.PI ? 5.2 : 4.0) // 放射の大通り（参道は太め）
+          for (const av of [...avenues, Math.PI]) road(ex + Math.cos(av) * 18, ez + Math.sin(av) * 18, ex + Math.cos(av) * 118, ez + Math.sin(av) * 118, av === Math.PI ? 5.2 : 4.0) // 放射の大通り（参道は太め・外周まで延伸）
           for (const rr0 of ringRoads) { let prev = null; for (let s = 0; s <= 56; s++) { const a = s / 56 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev) road(prev.x, prev.z, px, pz, 3.8); prev = { x: px, z: pz } } } // 環状道路
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, roadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
@@ -2387,6 +2388,19 @@ export async function mountTown3d(parent, opts = {}) {
             const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.78, 0.9, 8), toon(0x8b8478)); ring.position.set(wx, wy + 0.45, wz); ring.castShadow = true; town.add(ring); town.add(addOutline(ring))
             for (const [dx, dz] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 5), toon(0x5a4632)); post.position.set(wx + dx, wy + 1.25, wz + dz); town.add(post) }
             const wroof = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.66, 4), tRoof); wroof.rotation.y = Math.PI / 4; wroof.position.set(wx, wy + 2.4, wz); town.add(wroof); town.add(addOutline(wroof)) }
+        }
+        // ── 武家屋敷町（拡大した外周の新地区）。築地塀に囲まれた侍の屋敷＝長屋門＋入母屋の主屋＋庭の松。城下の格を上げる ──
+        { const bWall = toon(season === 'winter' ? 0xd8d2c4 : 0xcabfa8), bRoofM = tileMat(season === 'winter' ? 0xb8bcc0 : 0x564636, 2, 2, false), bCap = toon(season === 'winter' ? 0xa8acb0 : 0x5a4e3c)
+          for (const [a, rr] of bukeSpots) { const cx2 = ex + Math.cos(a) * rr, cz2 = ez + Math.sin(a) * rr, cy = heightAt(cx2, cz2); if (cy < SEA.level + 1.6) continue
+            const g = new THREE.Group(); g.position.set(cx2, cy, cz2); g.rotation.y = a + Math.PI / 2; town.add(g) // 街路に正対
+            for (const [lx, lz, lw, ld] of [[0, -4.7, 9.4, 0.4], [0, 4.7, 9.4, 0.4], [-4.7, 0, 0.4, 9.0], [4.7, 0, 0.4, 9.0]]) { const w = new THREE.Mesh(new THREE.BoxGeometry(lw, 1.5, ld), bWall); w.position.set(lx, 0.75, lz); w.castShadow = true; g.add(w); const cap = new THREE.Mesh(new THREE.BoxGeometry(lw + 0.2, 0.22, ld + 0.2), bCap); cap.position.set(lx, 1.6, lz); g.add(cap) } // 築地塀＋瓦の笠
+            const gate = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.3, 1.3), bWall); gate.position.set(0, 1.15, -4.7); gate.castShadow = true; g.add(gate); g.add(addOutline(gate)) // 長屋門
+            const groof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.0, 4), bRoofM); groof.rotation.y = Math.PI / 4; groof.scale.set(1.3, 1, 0.55); groof.position.set(0, 2.7, -4.7); g.add(groof); g.add(addOutline(groof))
+            const house = new THREE.Mesh(new RoundedBoxGeometry(5.4, 2.6, 4.2, 1, 0.1), facadeMat('machiya', season === 'winter' ? 0xd9d3c5 : 0xd2c7ad)); house.position.set(0.4, 1.3, 0.6); house.castShadow = true; house.receiveShadow = true; g.add(house); g.add(addOutline(house)) // 主屋
+            const hr = new THREE.Mesh(new THREE.ConeGeometry(4.0, 1.7, 4), bRoofM); hr.rotation.y = Math.PI / 4; hr.scale.set(1, 1, 0.86); hr.position.set(0.4, 3.5, 0.6); hr.castShadow = true; g.add(hr); g.add(addOutline(hr))
+            for (const sgn of [1, -1]) { const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.34, 3), bWall); ridge.rotation.set(Math.PI / 2, 0, Math.PI / 2); ridge.position.set(0.4, 3.0, 0.6 + sgn * 1.7); g.add(ridge) } // 千鳥破風
+            const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.4, 6), toon(0x6a4f38)); pt.position.set(3.0, 0.7, 3.0); g.add(pt); const pf = new THREE.Mesh(new THREE.ConeGeometry(1.4, 2.0, 7), toon(season === 'autumn' ? 0x8a6a32 : season === 'winter' ? 0xb8c0c4 : 0x46603a)); pf.position.set(3.0, 2.3, 3.0); pf.castShadow = true; g.add(pf) // 庭の松
+          }
         }
       }
       // ── 海の渡りの演出（帆船・島影）。退屈な海にせず、瞑想的な“渡り”に（海鳥は海鳥のループへ）。──
