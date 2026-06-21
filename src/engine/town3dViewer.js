@@ -722,12 +722,16 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(30 + 68 * i / 8, 28); g.lineTo(30 + 68 * i / 8, 68); g.stroke() }
       g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 1
       for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(0, S * i / 6); g.lineTo(S, S * i / 6); g.stroke() }
-    } else { // 大正の洋風窓: 上げ下げ窓（白枠＋十字桟）を4つ
-      for (const [wx, wy] of [[18, 16], [72, 16], [18, 66], [72, 66]]) {
-        const gr = g.createLinearGradient(0, wy, 0, wy + 42); gr.addColorStop(0, '#7a8a92'); gr.addColorStop(1, '#4a5660'); g.fillStyle = gr; g.fillRect(wx, wy, 38, 42)
-        g.strokeStyle = '#ece4d4'; g.lineWidth = 3.4; g.strokeRect(wx, wy, 38, 42)
-        g.fillStyle = '#ece4d4'; g.fillRect(wx, wy + 19, 38, 2.6); g.fillRect(wx + 17.6, wy, 2.6, 42)
+    } else { // 大正の洋風窓＋1階の店構え（看板建築）: 上2層は上げ下げ窓、1階は店の硝子＋庇＝平らな一枚板を脱す
+      for (const [wx, wy] of [[18, 12], [72, 12], [18, 50], [72, 50]]) {
+        const gr = g.createLinearGradient(0, wy, 0, wy + 32); gr.addColorStop(0, '#7a8a92'); gr.addColorStop(1, '#4a5660'); g.fillStyle = gr; g.fillRect(wx, wy, 38, 32)
+        g.strokeStyle = '#ece4d4'; g.lineWidth = 3.0; g.strokeRect(wx, wy, 38, 32)
+        g.fillStyle = '#ece4d4'; g.fillRect(wx, wy + 14, 38, 2.2); g.fillRect(wx + 17.8, wy, 2.2, 32)
       }
+      g.fillStyle = 'rgba(0,0,0,0.10)'; g.fillRect(0, 46, S, 2); g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(0, 90, S, 3) // 階の帯（層境の繰形）
+      g.fillStyle = '#' + base.clone().offsetHSL(0, 0, -0.09).getHexString(); g.fillRect(0, 94, S, 34) // 1階の腰壁（少し暗く）
+      g.fillStyle = '#9a4a3a'; g.fillRect(6, 93, S - 12, 5) // 庇（awning）の帯
+      for (const [sx2, sw] of [[14, 46], [70, 30]]) { g.fillStyle = '#cfe0e4'; g.fillRect(sx2, 101, sw, 21); g.strokeStyle = '#5a4a3a'; g.lineWidth = 2.4; g.strokeRect(sx2, 101, sw, 21); g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(sx2 + 2, 103, sw - 4, 4) } // 店の大きな硝子＋上端の映り込み
     }
     const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4; t.wrapS = t.wrapT = THREE.RepeatWrapping
     return t
