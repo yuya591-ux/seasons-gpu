@@ -560,6 +560,8 @@ export async function mountTown3d(parent, opts = {}) {
   const SCHOOL = { x: 54, z: -18, r: 13 }
   // 遊園地（既存の観覧車を中心に）。メリーゴーラウンド・遊具・ゲート＝明るい賑わいの目的地。
   const FUN = { x: -26, z: -66, r: 13 }
+  // 副都心（拡張した西の一角＝ガラスの高層ビル街）。旗艦homeの現代的な核＝街のスカイライン。飛んでいく目的地。
+  const DOWNTOWN = { x: -118, z: -56, r: 27 }
   // 海（街の東の縁が湾へ下る）。x>coast で地形を海底へ下げ、shore より沖は水面。飛んで海まで行ける。
   // 海面は谷底より低く取る＝谷を水没させず、東の縁だけが汀へ落ちる（丘が海へ落ちる入江状の海岸線）。
   const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5, westCoast: -205, westShore: -232 } // 東岸(x>64)＋西岸(x<-205)を海へ落とす。Phase1で西岸を外へ広げ旗艦homeを西へ拡大（大正は遠いので渡りは十分長い）
@@ -1099,6 +1101,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r) continue // 寺の境内は空ける
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
+      if (Math.hypot(x - DOWNTOWN.x, z - DOWNTOWN.z) < DOWNTOWN.r) continue // 副都心（高層ビル街）は専用に建てる
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) continue // 海・汀のセルは建てない（水没を防ぐ）
       if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 臨海の港（工業地帯）は専用に建てる
       if (Math.abs(z - RAIL.z) < 2.7 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1) continue // 線路の通り道は空ける
@@ -1113,6 +1116,23 @@ export async function mountTown3d(parent, opts = {}) {
       const type = h > 8.5 ? (R() < 0.55 ? 'apt' : 'mid') : (R() < 0.22 ? 'apt' : 'house')
       house(x, z, w, d, h, type)
     }
+  }
+
+  // ── 副都心（拡張した西の高層ビル街）＝旗艦homeのスカイライン。house()のガラス窓の高層を中心ほど高く密集させる。 ──
+  {
+    const dcx = DOWNTOWN.x, dcz = DOWNTOWN.z
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * 6.2832 + R() * 0.5, rr = (i % 4) * 5.4 + R() * 3.4 // 中心から渦巻状に密集
+      const px = dcx + Math.cos(a) * rr, pz = dcz + Math.sin(a) * rr, py = heightAt(px, pz)
+      if (py < SEA.level + 1) continue
+      const central = Math.max(0, 1 - rr / 22) // 中心ほど高い
+      const h = 13 + central * 23 + R() * 7, w = 4.6 + R() * 3.2, d = 4.6 + R() * 3.2 // 最大~43mの摩天楼
+      house(px, pz, w, d, h, R() < 0.5 ? 'apt' : 'mid')
+    }
+    // 駅前広場/大通りの石畳（副都心の足元を均す）と街路樹
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(DOWNTOWN.r - 4, 28), mottleMat(season === 'winter' ? 0xc6cac6 : 0x8e8a84, 110, 0.1, [5, 5])); plaza.rotation.x = -Math.PI / 2; plaza.position.set(dcx, heightAt(dcx, dcz) + 0.05, dcz); plaza.receiveShadow = true; town.add(plaza)
+    const dgC = season === 'spring' ? 0x7faa56 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xcdd6d2 : 0x5e7e46
+    for (let k = 0; k < 12; k++) { const a = R() * 6.28, rr = 14 + R() * 12, px = dcx + Math.cos(a) * rr, pz = dcz + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.4; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.6 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.8 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(dgC)); fo.position.set(px, py + 2.0 * s, pz); fo.castShadow = true; town.add(fo) } // 街路樹
   }
 
   // ── 自分の丘の近所（手前の両脇の家。緑だけの近景を埋め、自分も坂の街に居る感じに） ──
