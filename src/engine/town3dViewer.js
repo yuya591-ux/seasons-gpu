@@ -562,6 +562,8 @@ export async function mountTown3d(parent, opts = {}) {
   const FUN = { x: -26, z: -66, r: 13 }
   // 副都心（拡張した西の一角＝ガラスの高層ビル街）。旗艦homeの現代的な核＝街のスカイライン。飛んでいく目的地。
   const DOWNTOWN = { x: -118, z: -56, r: 27 }
+  // 競技場（拡張した西奥の大きなスタジアム）。楕円のスタンド＋照明塔＝旗艦homeの大型施設。飛んでいく目的地。
+  const STADIUM = { x: -150, z: -116, r: 22 }
   // 海（街の東の縁が湾へ下る）。x>coast で地形を海底へ下げ、shore より沖は水面。飛んで海まで行ける。
   // 海面は谷底より低く取る＝谷を水没させず、東の縁だけが汀へ落ちる（丘が海へ落ちる入江状の海岸線）。
   const SEA = { coast: 64, shore: 82, level: -10, floor: -13.5, westCoast: -205, westShore: -232 } // 東岸(x>64)＋西岸(x<-205)を海へ落とす。Phase1で西岸を外へ広げ旗艦homeを西へ拡大（大正は遠いので渡りは十分長い）
@@ -1102,6 +1104,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
       if (Math.hypot(x - DOWNTOWN.x, z - DOWNTOWN.z) < DOWNTOWN.r) continue // 副都心（高層ビル街）は専用に建てる
+      if (Math.hypot(x - STADIUM.x, z - STADIUM.z) < STADIUM.r) continue // 競技場は専用に建てる
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) continue // 海・汀のセルは建てない（水没を防ぐ）
       if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 臨海の港（工業地帯）は専用に建てる
       if (Math.abs(z - RAIL.z) < 2.7 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1) continue // 線路の通り道は空ける
@@ -1133,6 +1136,19 @@ export async function mountTown3d(parent, opts = {}) {
     const plaza = new THREE.Mesh(new THREE.CircleGeometry(DOWNTOWN.r - 4, 28), mottleMat(season === 'winter' ? 0xc6cac6 : 0x8e8a84, 110, 0.1, [5, 5])); plaza.rotation.x = -Math.PI / 2; plaza.position.set(dcx, heightAt(dcx, dcz) + 0.05, dcz); plaza.receiveShadow = true; town.add(plaza)
     const dgC = season === 'spring' ? 0x7faa56 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xcdd6d2 : 0x5e7e46
     for (let k = 0; k < 12; k++) { const a = R() * 6.28, rr = 14 + R() * 12, px = dcx + Math.cos(a) * rr, pz = dcz + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.4; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.6 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.8 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(dgC)); fo.position.set(px, py + 2.0 * s, pz); fo.castShadow = true; town.add(fo) } // 街路樹
+  }
+  // ── 競技場（楕円のスタジアム）＝旗艦homeの大型施設。擂鉢のスタンド＋緑のフィールド＋トラック＋白い庇＋照明塔×4 ──
+  {
+    const scx = STADIUM.x, scz = STADIUM.z, scy = heightAt(scx, scz), ex2 = 18, ez2 = 14
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.72, 4.4, 44, 1, true), toon(season === 'winter' ? 0xccd0d2 : 0xb6bac0)); bowl.scale.set(ex2, 1, ez2); bowl.position.set(scx, scy + 2.2, scz); bowl.castShadow = true; bowl.receiveShadow = true; town.add(bowl); town.add(addOutline(bowl)) // 外周の擂鉢スタンド
+    for (let ti = 0; ti < 4; ti++) { const r = 0.76 + ti * 0.06; const tier = new THREE.Mesh(new THREE.TorusGeometry(1, 0.03, 4, 44), toon(0x8a8e92)); tier.scale.set(ex2 * r, ez2 * r, 1); tier.rotation.x = -Math.PI / 2; tier.position.set(scx, scy + 1.1 + ti * 0.85, scz); town.add(tier) } // 客席の段
+    const field = new THREE.Mesh(new THREE.CircleGeometry(1, 40), toon(season === 'winter' ? 0xdce0da : 0x5a8a48)); field.scale.set(ex2 * 0.62, ez2 * 0.62, 1); field.rotation.x = -Math.PI / 2; field.position.set(scx, scy + 0.7, scz); field.receiveShadow = true; town.add(field) // 緑のフィールド
+    const track = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.72, 40), toon(0xb0563a)); track.scale.set(ex2, ez2, 1); track.rotation.x = -Math.PI / 2; track.position.set(scx, scy + 0.68, scz); town.add(track) // 赤茶のトラック
+    const canopy = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 4, 44), toon(0xeae6dc)); canopy.scale.set(ex2 * 1.02, ez2 * 1.02, 1); canopy.rotation.x = -Math.PI / 2; canopy.position.set(scx, scy + 4.4, scz); town.add(canopy); town.add(addOutline(canopy)) // 白い屋根の庇
+    for (const [ox, oz] of [[ex2 * 0.82, ez2 * 0.82], [-ex2 * 0.82, ez2 * 0.82], [ex2 * 0.82, -ez2 * 0.82], [-ex2 * 0.82, -ez2 * 0.82]]) { const lx = scx + ox, lz = scz + oz, ly = heightAt(lx, lz)
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 9, 6), toon(0x8a8e90)); pole.position.set(lx, ly + 4.5, lz); pole.castShadow = true; town.add(pole)
+      const rack = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 0.4), toon(0x6a6e72)); rack.position.set(lx + (scx - lx) * 0.08, ly + 9.2, lz + (scz - lz) * 0.08); town.add(rack)
+      if (isNight || duskAmt > 0.3) { const gl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.1, 0.12), new THREE.MeshBasicMaterial({ color: 0xfff4d0, fog: true })); gl.position.set(lx + (scx - lx) * 0.12, ly + 9.2, lz + (scz - lz) * 0.12); town.add(gl) } } // 照明塔×4（夜は灯る）
   }
 
   // ── 自分の丘の近所（手前の両脇の家。緑だけの近景を埋め、自分も坂の街に居る感じに） ──
