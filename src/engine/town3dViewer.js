@@ -2555,12 +2555,23 @@ export async function mountTown3d(parent, opts = {}) {
             prev = { x: px, z: pz, py } }
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, mtRoadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
-        // ── 棚田（西の下り斜面に段々の水田。等高線に沿う緑/水鏡の段＝里の生活感） ──
-        { const padTop = season === 'winter' ? toon(0xdfe4e6) : season === 'autumn' ? toon(0xb8a85a) : toon(isNight ? 0x35506a : 0x86a890), wallM = toon(0x6f6552)
-          for (let r = 0; r < 5; r++) { const zz = sz + 12 - r * 6, baseX = sx - 24 - r * 4
-            for (let c = 0; c < 4; c++) { const px = baseX - c * 6.5, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py < SEA.level + 0.8 || py > 16) continue
-              const pad = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.3, 5.0), padTop); pad.position.set(px, py + 0.12, pz); pad.rotation.y = (R() - 0.5) * 0.3; pad.receiveShadow = true; town.add(pad)
-              const wl = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.7, 0.5), wallM); wl.position.set(px, py - 0.1, pz + 2.4); wl.rotation.y = pad.rotation.y; town.add(wl) } } // 畦の擁壁
+        // ── 棚田（西の尾根の谷側斜面に、等高線に沿って段々に連なる水田）。段に高さをスナップして水平な田を連ね、
+        //    谷側に石の畦(擁壁)を立てる＝バラけた板でなく「階段状に揃う棚田」。夏春は水鏡、秋は刈田、冬は雪。統合で軽量。 ──
+        { const isWaterSeason = season === 'summer' || season === 'spring'
+          const padWaterMat = new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8ab0b4), fog: true }) // 水鏡（空を映す水田）
+          const padGreenMat = toon(season === 'autumn' ? 0xbfa850 : season === 'winter' ? 0xdfe4e6 : 0x6f9450) // 青田/刈田/雪田
+          const wallM = toon(season === 'winter' ? 0xc6c8c2 : 0x6f6552)
+          const padWG = [], padGG = [], wallG = [], pM = new THREE.Matrix4()
+          for (let gz = -18; gz <= 26; gz += 5.0) for (let gx = -54; gx <= -20; gx += 5.8) {
+            const px = sx + gx + (R() - 0.5) * 1.0, pz = sz + gz + (R() - 0.5) * 1.0, raw = senH(px, pz)
+            if (raw < SEA.level + 1.2 || raw > 20) continue // 斜面の中腹まで段々に（尾根のてっぺんは森のまま）
+            const vd = Math.abs((px - sx) - senValley(pz)); if (vd < 8) continue // 谷底の川/町は避ける
+            const level = Math.floor(raw / 1.4) * 1.4 + 0.6 // 段に高さをスナップ＝水平な田の面（隣接する同高の田が帯に揃う）
+            const water = isWaterSeason && R() < 0.66 // 夏春は水鏡主体（時々青田）
+            const pad = new THREE.BoxGeometry(6.2, 0.26, 5.4); pM.makeRotationY((R() - 0.5) * 0.16).setPosition(px, level + 0.13, pz); pad.applyMatrix4(pM); (water ? padWG : padGG).push(pad)
+            const wh = Math.max(0.5, raw - level + 1.0); const wl = new THREE.BoxGeometry(6.4, wh, 0.55); pM.makeRotationY((R() - 0.5) * 0.16).setPosition(px + 3.0, level - wh / 2 + 0.26, pz); wl.applyMatrix4(pM); wallG.push(wl) // 谷側(+x)の石の畦
+          }
+          for (const [geos, mat, sh] of [[padWG, padWaterMat, false], [padGG, padGreenMat, true], [wallG, wallM, true]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.receiveShadow = true; mesh.castShadow = sh; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         }
         // ── 鳥居の参道（南の河口から谷を遡って城へ向かう朱の鳥居） ──
         { const toriiM = toon(0xb5432f)
