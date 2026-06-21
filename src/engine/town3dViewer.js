@@ -3788,6 +3788,7 @@ export async function mountTown3d(parent, opts = {}) {
     const g = new THREE.Group()
     const outfit = cfg.outfit || 'modern'
     const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x33302b)
+    skin.emissive = new THREE.Color(cfg.skin); skin.emissiveIntensity = 0.16 // 顔が影側でも暗く沈まないよう肌をわずかに自己発光（のっぺりさせず読める明るさに）
     const white = new THREE.MeshBasicMaterial({ color: 0xf6f1ea, fog: true }), dark = toon(0x2c2622), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xc08274), browM = toon(cfg.hair), blush = toon(0xe2a596)
     const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
     const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 14), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 16), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
@@ -3851,16 +3852,13 @@ export async function mountTown3d(parent, opts = {}) {
     const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); g.add(headG)
     loft([{ y: 0.1, rx: 0.038 }, { y: 0.06, rx: 0.093, rz: 0.088 }, { y: 0.0, rx: 0.104, rz: 0.095 }, { y: -0.05, rx: 0.093, rz: 0.087 }, { y: -0.097, rx: 0.063, rz: 0.073 }, { y: -0.13, rx: 0.028, rz: 0.046 }], skin, headG) // 角のある顔の輪郭
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
-    const lashM = toon(0x3a2a24) // まつ毛は黒でなく濃茶＝硬さを抑える
-    for (const s of [-1, 1]) { // 小さく控えめな目（ジブリ風＝大きな目にしない）。白目はごく小さく、虹彩で満たす。
-      add(headG, SP(0.0155, 14, 12), white, s * 0.046, -0.01, 0.097, 1.5, 0.8, 0.28) // 白目（とても小さい横長）
-      add(headG, SP(0.0125, 14, 12), irisM, s * 0.046, -0.011, 0.101, 1.0, 0.95, 0.4) // 虹彩（白目をほぼ満たす）
-      add(headG, SP(0.006, 10, 8), dark, s * 0.046, -0.012, 0.104, 1, 1, 0.4)         // 瞳孔
-      add(headG, SP(0.0042, 8, 8), white, s * 0.046 + s * 0.004, -0.005, 0.107)       // 小さなキャッチライト
-      add(headG, SP(0.03, 12, 10), skin, s * 0.046, 0.026, 0.078, 1.5, 0.6, 0.5)      // 上まぶた
-      add(headG, BX(0.034, 0.005, 0.007), lashM, s * 0.046, 0.0, 0.101).rotation.z = s * 0.06 // ごく細い上まつ毛ライン
-      add(headG, BX(0.03, 0.005, 0.006), browM, s * 0.05, 0.04, 0.093).rotation.z = s * 0.1 // 細い眉
-      add(headG, SP(0.014, 8, 8), blush, s * 0.07, -0.026, 0.084, 1.2, 0.7, 0.4) // 頬のほのかな赤み
+    const eyeM = toon(0x4a3a32) // 目は黒でなく濃茶＝硬さ/暗さを抑える
+    for (const s of [-1, 1]) { // 小さくシンプルな目（層を重ねず：濃茶の小さなアーモンド＋虹彩＋キャッチライト）。ジブリ風の控えめな目。
+      add(headG, SP(0.016, 14, 12), eyeM, s * 0.046, -0.006, 0.099, 1.45, 0.95, 0.35) // 目（小さな濃茶のアーモンド）
+      add(headG, SP(0.0095, 12, 10), irisM, s * 0.046, -0.007, 0.104, 1.0, 1.0, 0.4)  // 虹彩（少し明るい芯）
+      add(headG, SP(0.0046, 8, 8), white, s * 0.046 + s * 0.004, -0.001, 0.108)       // キャッチライト
+      add(headG, BX(0.03, 0.005, 0.006), browM, s * 0.05, 0.036, 0.095).rotation.z = s * 0.1 // 細い眉
+      add(headG, SP(0.014, 8, 8), blush, s * 0.07, -0.026, 0.085, 1.2, 0.7, 0.4) // 頬のほのかな赤み
     }
     add(headG, BX(0.008, 0.016, 0.01), skin, 0, -0.032, 0.105, 1, 1, 1).rotation.x = 0.2 // 鼻筋（控えめ）
     add(headG, BX(0.027, 0.009, 0.009), mouthM, 0, -0.066, 0.1)  // 口
