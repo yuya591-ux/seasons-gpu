@@ -242,6 +242,8 @@ export async function mountTown3d(parent, opts = {}) {
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
+  let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。飛行中の解像度落としの基準に使う
+  let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
@@ -4720,6 +4722,7 @@ export async function mountTown3d(parent, opts = {}) {
   active.setBrightness = (b) => { userBright = b || 1; applyStageFilter() }
   active.setQuality = (q) => { // 描き込み変更で解像度を即反映（影/密度は次の情景読み込みでフル反映）
     const cap = q === 'light' ? 1.25 : q === 'soft' ? 2 : 1.6
+    qCap = cap; prFly = false
     curPR = Math.min(window.devicePixelRatio || 1, cap)
     renderer.setPixelRatio(curPR); renderer.setSize(stage.clientWidth, stage.clientHeight)
   }
@@ -5247,7 +5250,10 @@ export async function mountTown3d(parent, opts = {}) {
     if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
     const t = (performance.now() - startT) / 1000
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
-    if (t - lastDraw < 0.032) return
+    // 休息中（窓辺で操作も飛行も無く4秒以上経過）は更に約22fpsへ落とす＝じっと眺める長い時間の電池/発熱を抑える。
+    // 操作・飛行・イベント中は30fpsを保つので滑らかさは損なわない。
+    const restIdle = active.mode === 'window' && (active.flyP || 0) < 0.05 && (performance.now() - (active.lastInputT || 0)) > 4000
+    if (t - lastDraw < (restIdle ? 0.045 : 0.032)) return
     lastDraw = t
     const dt = Math.min(0.05, t - lastT); lastT = t
     // 車が通りを行き交う
@@ -5959,6 +5965,15 @@ export async function mountTown3d(parent, opts = {}) {
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
+    // 上空にいる間は描画解像度をひと段下げる：全世界＋海/霧のシェーダーが画面全面を覆い最も重い場面で、
+    // 動きが速く粗さは目立たない。窓辺へ戻れば最高解像度に戻す＝じっくり眺める所の画質は一切落とさない。
+    // 切替は flyP が 0.55 を跨ぐ離陸/着地の一瞬だけ＝毎フレームの再確保を避ける。
+    const wantFly = active.mode !== 'window' && (active.flyP || 0) > 0.55
+    if (wantFly !== prFly) {
+      prFly = wantFly
+      curPR = Math.min(window.devicePixelRatio || 1, wantFly ? qCap * 0.8 : qCap)
+      renderer.setPixelRatio(curPR); renderer.setSize(stage.clientWidth, stage.clientHeight)
+    }
     renderer.render(scene, camera)
   }
   renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
