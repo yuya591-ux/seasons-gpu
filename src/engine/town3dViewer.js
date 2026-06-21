@@ -529,6 +529,7 @@ export async function mountTown3d(parent, opts = {}) {
   let islandFlocks = [] // 道中の小島で羽を休める鳥（飛行で近づくと一斉に舞い立つ）
   let critters = [] // 舞う蝶/蜻蛉（frameでふわふわ）＝街/季節ごとの生きもの
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
+  let seaUniforms = null // 海面シェーダーの時間（うねり・きらめき）
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
   let train2 = null // もう一本の電車（色違い・半周ずらして走る）
@@ -2225,14 +2226,44 @@ export async function mountTown3d(parent, opts = {}) {
       const wc = document.createElement('canvas'); wc.width = wc.height = 128; const wcx = wc.getContext('2d')
       const wg = wcx.createLinearGradient(0, 0, 0, 128)
       // 海は空をうっすら映しつつ、青を芯に強く残す（夕の暖色フォグに溶けて砂色にならないよう、濃いめの青で）。
-      wg.addColorStop(0, '#' + new THREE.Color(0x2f6f9c).lerp(skyTop, 0.1).getHexString())
-      wg.addColorStop(1, '#' + new THREE.Color(0x1f4d6c).lerp(skyHorizon, 0.06).getHexString())
+      wg.addColorStop(0, '#' + new THREE.Color(0x2a6d9a).lerp(skyTop, 0.07).getHexString())
+      wg.addColorStop(1, '#' + new THREE.Color(0x163f5e).lerp(skyHorizon, 0.04).getHexString())
       wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
       for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
       const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(104, 69); seaTex = wtex
       const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
-      const seaMesh = new THREE.Mesh(seaGeo, new THREE.MeshBasicMaterial({ map: wtex, fog: true }))
+      // そこへシェーダーで「動くうねり・谷の濃藍・うろこ雲のような波頭・水平線のきらめき」を重ね、ぱっと見て海と分かる水面に。
+      seaUniforms = { uTime: { value: 0 } }
+      const seaMat = new THREE.MeshBasicMaterial({ map: wtex, fog: true })
+      seaMat.onBeforeCompile = (sh) => {
+        sh.uniforms.uTime = seaUniforms.uTime
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec3 vWPos;')
+          .replace('#include <map_fragment>', `#include <map_fragment>
+            float ph = uTime;
+            // 大きなうねり＋斜めのさざ波（複数周波の和＝規則的すぎない水面）
+            float sw = sin(vWPos.x * 0.045 + ph * 0.7) * 0.5 + sin(vWPos.z * 0.035 - ph * 0.5) * 0.5;
+            sw += 0.5 * sin((vWPos.x + vWPos.z) * 0.085 + ph * 1.1) + 0.4 * sin(vWPos.z * 0.16 - ph * 1.7);
+            float crest = smoothstep(0.55, 1.5, sw);   // 波頭
+            float trough = smoothstep(0.55, 1.7, -sw);  // 波の谷
+            vec3 deep = vec3(0.07, 0.24, 0.40);
+            vec3 shal = vec3(0.27, 0.54, 0.66);
+            vec3 foam = vec3(0.82, 0.90, 0.95);
+            diffuseColor.rgb = mix(diffuseColor.rgb, deep, trough * 0.55);
+            diffuseColor.rgb = mix(diffuseColor.rgb, shal, crest * 0.30);
+            diffuseColor.rgb += foam * crest * 0.16;
+            // 水平線まわりのきらめき（カメラから遠い帯でちらちら＝夕日の道のような輝き）
+            float dC = distance(vWPos.xz, cameraPosition.xz);
+            float band = smoothstep(170.0, 360.0, dC) * (1.0 - smoothstep(470.0, 650.0, dC));
+            float gl = 0.5 + 0.5 * sin(vWPos.x * 0.55 + vWPos.z * 0.28 + ph * 4.2);
+            diffuseColor.rgb += vec3(1.0, 0.96, 0.85) * band * pow(gl, 4.0) * 0.4;
+          `)
+      }
+      const seaMesh = new THREE.Mesh(seaGeo, seaMat)
       seaMesh.position.set(0, SEA.level, -300); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-880..880・z≈-890..290 を広く覆う（Phase0で遠ざけた西=大正/東=江戸/北=戦国への長い渡りの海）
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
@@ -4755,6 +4786,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
+    if (seaUniforms) seaUniforms.uTime.value = t // 海面のうねり・きらめきの位相
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
     for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
     for (const c of critters) { const a = t * 0.55 + c.ph // 蝶/蜻蛉がふわふわ舞う
