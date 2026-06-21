@@ -3806,10 +3806,10 @@ export async function mountTown3d(parent, opts = {}) {
       const om = new THREE.Mesh(g2, RES_OUTLINE); om.position.copy(m.position); om.quaternion.copy(m.quaternion); om.scale.copy(m.scale); om.renderOrder = -1; m.parent.add(om) } }
     const arms = [], legs = []
     // 腕＝肩→肘→手首の滑らかな一本のテーパー（少し前へ＝自然）＋手。肩で振れる。
-    const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.17, 1.4, 0); g.add(armG)
-      if (wide) loft([{ y: 0.04, rx: 0.082 }, { y: -0.16, rx: 0.09 }, { y: -0.34, rx: 0.07 }, { y: -0.45, rx: 0.05 }], sleeveMat, armG) // 着物の袖
-      else { loft([{ y: 0.05, rx: 0.054 }, { y: -0.14, rx: 0.046, z: 0.01 }, { y: -0.29, rx: 0.04, z: 0.045 }, { y: -0.45, rx: 0.036, z: 0.075 }], sleeveMat, armG); add(armG, SP(0.04), skin, 0, -0.55, 0.092) } // 肘で前へ曲げ＝自然
-      armG.rotation.z = s * 0.13; armG.rotation.x = -0.08; arms.push(armG) } } // 少し外＋手を前に休める
+    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.165, 1.36, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える
+      if (wide) loft([{ y: 0.02, rx: 0.08 }, { y: -0.18, rx: 0.09 }, { y: -0.36, rx: 0.07 }, { y: -0.47, rx: 0.05 }], sleeveMat, armG) // 着物の袖
+      else { loft([{ y: 0.03, rx: 0.05 }, { y: -0.16, rx: 0.045, z: 0.01 }, { y: -0.31, rx: 0.04, z: 0.05 }, { y: -0.47, rx: 0.036, z: 0.085 }], sleeveMat, armG); add(armG, SP(0.038), skin, 0, -0.57, 0.1, 1, 1, 1.3) } // 肘で前へ曲げ・手は縦長に
+      armG.rotation.z = s * 0.12; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 左右でわずかに角度差＝非対称（人形臭を消す）
     // 脚＝腰→膝→足首の滑らかな一本のテーパー＋足。股関節で振れる。
     const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.078, 0.92, 0); g.add(legG)
       loft([{ y: 0.05, rx: rad * 1.22 }, { y: -0.2, rx: rad }, { y: -0.4, rx: rad * 0.9, z: 0.012 }, { y: -0.6, rx: rad * 0.82, z: 0.02 }, { y: -0.8, rx: rad * 0.72, z: 0.02 }], legMat, legG); add(legG, SP(0.055), shoeM, 0, -0.84, 0.06, 1.45, 0.5, 1.95); legs.push(legG) } }
@@ -5116,13 +5116,13 @@ export async function mountTown3d(parent, opts = {}) {
           r.position.set(nx, heightAt(nx, nz) + Math.abs(sw) * (u.legs.length ? 0.03 : 0.014), nz) // 歩のバウンド（着物は控えめ）
           u.face = Math.atan2(dx, dz)
           for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x = (i ? -sw : sw) * 0.5 // 脚を交互に
-          for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = (i ? sw : -sw) * 0.34 // 腕は逆位相
+          for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = (u.arms[i].userData.base || 0) + (i ? sw : -sw) * 0.34 // 腕は逆位相
           if (u.headG) u.headG.rotation.y = Math.sin(t * 0.3 + u.ph) * 0.2
         }
       } else {
         u.pauseT -= dt
         for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x *= Math.max(0, 1 - dt * 5)
-        for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = Math.sin(t * 1.15 + u.ph + i * 3.1) * 0.05
+        for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = (u.arms[i].userData.base || 0) - 0.05 + Math.sin(t * 1.15 + u.ph + i * 3.1) * 0.05 // 非対称＋わずかに前へ休める
         if (u.headG) { u.headG.rotation.y = Math.sin(t * 0.22 + u.ph) * 0.5; u.headG.position.y = 1.6 + Math.sin(t * 1.5 + u.ph) * 0.004 }
         if (u.pauseT <= 0) { const a = R() * 6.28, rr = 1.5 + R() * u.rad, nx = u.ax + Math.cos(a) * rr, nz = u.az + Math.sin(a) * rr
           if (heightAt(nx, nz) > SEA.level + 0.6) { u.tx = nx; u.tz = nz; u.moving = true } else u.pauseT = 1 + R() * 2 }
