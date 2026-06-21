@@ -3786,11 +3786,13 @@ export async function mountTown3d(parent, opts = {}) {
     const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
     const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 14, h || 12), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 8), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
     const add = (p, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx !== undefined) m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.castShadow = true; p.add(m); return m }
-    const arms = []
+    const arms = [], legs = []
     const buildArms = (sleeveMat, wide) => { for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.245, 1.4, 0); g.add(armG)
       if (wide) { add(armG, BX(0.17, 0.36, 0.15), sleeveMat, s * 0.03, -0.2, 0); add(armG, SP(0.05), skin, s * 0.02, -0.46, 0.02) } // 着物の袖
       else { add(armG, CY(0.062, 0.05, 0.34, 7), sleeveMat, 0, -0.17, 0); add(armG, CY(0.046, 0.04, 0.3, 7), skin, 0, -0.42, 0); add(armG, SP(0.05), skin, 0, -0.6, 0) }
       armG.rotation.z = s * 0.05; arms.push(armG) } }
+    const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.1, 0.9, 0); g.add(legG) // 股関節で振れる脚
+      add(legG, CY(rad, rad * 0.85, 0.7, 7), legMat, 0, -0.34, 0); add(legG, BX(0.15, 0.1, 0.28), shoeM, 0, -0.72, 0.05); legs.push(legG) } }
     // ── 体（衣装別）──
     if (outfit === 'kimono' || outfit === 'armor') {
       add(g, CY(0.27, 0.21, 1.26, 12), topM, 0, 0.74, 0)                    // 着物の身頃（裾広がりの筒）
@@ -3808,14 +3810,14 @@ export async function mountTown3d(parent, opts = {}) {
       for (const s of [-1, 1]) add(g, BX(0.14, 0.06, 0.28), shoeM, s * 0.085, 0.05, 0.05)
       buildArms(topM, true)
     } else if (outfit === 'dress') {
-      for (const s of [-1, 1]) { add(g, CY(0.06, 0.05, 0.4, 6), skin, s * 0.09, 0.3, 0); add(g, BX(0.12, 0.08, 0.22), shoeM, s * 0.09, 0.08, 0.04) } // 脚＋靴
+      buildLegs(skin, 0.058) // 脚（股関節で振れる）
       add(g, CY(0.33, 0.17, 0.64, 12), topM, 0, 0.78, 0)                    // スカート（Aライン）
       add(g, CY(0.18, 0.18, 0.42, 10), topM, 0, 1.16, 0)                    // 上身頃
       add(g, CY(0.19, 0.19, 0.06, 10), accentM, 0, 0.96, 0)                 // ウエストの差し色
       add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0)
       buildArms(topM, false)
     } else { // modern / suit
-      for (const s of [-1, 1]) { add(g, CY(0.085, 0.072, 0.66, 8), botM, s * 0.1, 0.47, 0); add(g, BX(0.15, 0.11, 0.3), shoeM, s * 0.1, 0.16, 0.06) }
+      buildLegs(botM, 0.085) // 脚（股関節で振れる）
       add(g, BX(0.36, 0.22, 0.24), botM, 0, 0.92, 0)
       add(g, CY(0.215, 0.18, 0.5, 12), topM, 0, 1.16, 0)
       add(g, SP(0.2, 12, 8), topM, 0, 1.34, 0, 1.15, 0.62, 0.82)
@@ -3864,12 +3866,12 @@ export async function mountTown3d(parent, opts = {}) {
     else if (cfg.prop === 'bundle') { add(g, BX(0.3, 0.26, 0.22), toon(cfg.accent || 0x8a6a4a), 0, 1.16, -0.24) } // 背中の風呂敷包み
     else if (cfg.prop === 'cane') { add(g, CY(0.016, 0.016, 0.9, 6), toon(0x3a2e22), 0.34, 0.46, 0.12) } // ステッキ
     g.scale.setScalar((cfg.scale || 1) * (0.95 + R() * 0.14))
-    g.userData = { arms, headG }
+    g.userData = { arms, legs, headG }
     return g
   }
   // ── home（現代）の住人を要所に ──
   const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 } ]
-  const placeResident = (hx, hz, cfg) => { const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); g.userData.face = R() * 6.28; g.rotation.y = g.userData.face; g.userData.ph = R() * 6.28; town.add(g); residents.push(g) }
+  const placeResident = (hx, hz, cfg) => { const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); const u = g.userData; u.ax = hx; u.az = hz; u.tx = hx; u.tz = hz; u.face = R() * 6.28; u.ph = R() * 6.28; u.pauseT = 0.5 + R() * 4; u.moving = false; u.speed = 0.66 + R() * 0.5; u.rad = 4 + R() * 5; g.rotation.y = u.face; town.add(g); residents.push(g) }
   const RES_MODERN = ['modern', 'modern', 'suit']
   for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
@@ -5071,10 +5073,31 @@ export async function mountTown3d(parent, opts = {}) {
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * 5 + u.ph)) * 0.06, u.z)
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
     }
-    // 作り込んだ住人: 立ち姿でそっと息づき、ゆっくり見回し、腕を微かに揺らす（生きている佇まい）
+    // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す
     for (const r of residents) { const u = r.userData
-      if (u.headG) { u.headG.rotation.y = Math.sin(t * 0.22 + u.ph) * 0.5; u.headG.position.y = 1.62 + Math.sin(t * 1.5 + u.ph) * 0.004 }
-      for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = Math.sin(t * 1.15 + u.ph + i * 3.1) * 0.05 }
+      if (u.moving) {
+        const dx = u.tx - r.position.x, dz = u.tz - r.position.z, d = Math.hypot(dx, dz)
+        if (d < 0.28) { u.moving = false; u.pauseT = 1.5 + R() * 4 } // 着いた→ひと休み
+        else {
+          const step = Math.min(d, u.speed * dt), nx = r.position.x + dx / d * step, nz = r.position.z + dz / d * step
+          const ph = t * u.speed * 5.2 + u.ph, sw = Math.sin(ph)
+          r.position.set(nx, heightAt(nx, nz) + Math.abs(sw) * (u.legs.length ? 0.03 : 0.014), nz) // 歩のバウンド（着物は控えめ）
+          u.face = Math.atan2(dx, dz)
+          for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x = (i ? -sw : sw) * 0.5 // 脚を交互に
+          for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = (i ? sw : -sw) * 0.34 // 腕は逆位相
+          if (u.headG) u.headG.rotation.y = Math.sin(t * 0.3 + u.ph) * 0.2
+        }
+      } else {
+        u.pauseT -= dt
+        for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x *= Math.max(0, 1 - dt * 5)
+        for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = Math.sin(t * 1.15 + u.ph + i * 3.1) * 0.05
+        if (u.headG) { u.headG.rotation.y = Math.sin(t * 0.22 + u.ph) * 0.5; u.headG.position.y = 1.62 + Math.sin(t * 1.5 + u.ph) * 0.004 }
+        if (u.pauseT <= 0) { const a = R() * 6.28, rr = 1.5 + R() * u.rad, nx = u.ax + Math.cos(a) * rr, nz = u.az + Math.sin(a) * rr
+          if (heightAt(nx, nz) > SEA.level + 0.6) { u.tx = nx; u.tz = nz; u.moving = true } else u.pauseT = 1 + R() * 2 }
+      }
+      let ddy = u.face - r.rotation.y; while (ddy > Math.PI) ddy -= 6.2832; while (ddy < -Math.PI) ddy += 6.2832
+      r.rotation.y += ddy * Math.min(1, dt * 6) // 進行方向へなめらかに向き直る
+    }
     // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
     const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
     const wakeSpd = wakeOn ? Math.min(1, Math.hypot(active.vel.x, active.vel.z) / FLY.speed) : 0
