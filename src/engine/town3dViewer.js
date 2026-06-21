@@ -4206,7 +4206,7 @@ export async function mountTown3d(parent, opts = {}) {
       // ひげ（左右3本ずつ・細く）
       for (const s of [-1, 1]) for (const dy of [-0.018, 0, 0.018]) { const w = hAdd(CY(0.0018, 0.14, 4), whisk, s * 0.12, -0.03 + dy, 0.1); w.rotation.z = s * 1.45; w.rotation.y = -s * (0.2 + dy * 6) }
       floorShadow(0.5, 1.62, 0.78, 0.6) // 猫の接地影
-      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, y0: 0.78, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1 }
+      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, y0: 0.78, headX0: -0.46, headY0: 0.33, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1 }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -5506,7 +5506,9 @@ export async function mountTown3d(parent, opts = {}) {
       c.earT -= dt; if (c.earT < 0) { c.earT = 7 + R() * 9; c.earK = 0.45 } // たまに耳をピクッ
       if (c.earK > 0) { c.earK -= dt; const e = Math.sin((0.45 - c.earK) * 26) * 0.22 * Math.max(0, c.earK / 0.45); c.ears[0].rotation.x = c.ears0[0] + e; c.ears[1].rotation.x = c.ears0[1] - e }
       c.settleT -= dt; if (c.settleT < 0 && c.settleP >= 1) { c.settleT = 28 + R() * 40; c.settleP = 0 } // たまに寝返り＝ゆっくり傾いて戻る
-      if (c.settleP < 1) { c.settleP = Math.min(1, c.settleP + dt / 3.6); c.g.rotation.z = Math.sin(c.settleP * Math.PI) * 0.12 } }
+      if (c.settleP < 1) { c.settleP = Math.min(1, c.settleP + dt / 3.6); c.g.rotation.z = Math.sin(c.settleP * Math.PI) * 0.12 }
+      c.headT -= dt; if (c.headT < 0 && c.headP >= 1) { c.headT = 20 + R() * 30; c.headP = 0 } // たまに頭をもたげてこちらを見て、また眠る
+      if (c.headP < 1) { c.headP = Math.min(1, c.headP + dt / 3.2); const e = Math.sin(c.headP * Math.PI); c.headG.rotation.x = c.headX0 + e * 0.32; c.headG.position.y = c.headY0 + e * 0.045 } }
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
