@@ -3810,9 +3810,9 @@ export async function mountTown3d(parent, opts = {}) {
       const om = new THREE.Mesh(g2, RES_OUTLINE); om.position.copy(m.position); om.quaternion.copy(m.quaternion); om.scale.copy(m.scale); om.renderOrder = -1; m.parent.add(om) } }
     const arms = [], legs = []
     // 腕＝肩→肘→手首の滑らかな一本のテーパー（少し前へ＝自然）＋手。肩で振れる。
-    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.165, 1.36, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える
+    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.173, 1.36, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える。体から少し離し細い腕が黒い輪郭に飲まれないように
       if (wide) loft([{ y: 0.02, rx: 0.08 }, { y: -0.18, rx: 0.09 }, { y: -0.36, rx: 0.07 }, { y: -0.47, rx: 0.05 }], sleeveMat, armG) // 着物の袖
-      else { loft([{ y: 0.03, rx: 0.05 }, { y: -0.16, rx: 0.045, z: 0.01 }, { y: -0.31, rx: 0.04, z: 0.05 }, { y: -0.47, rx: 0.036, z: 0.085 }], sleeveMat, armG); add(armG, SP(0.038), skin, 0, -0.57, 0.1, 1, 1, 1.3) } // 肘で前へ曲げ・手は縦長に
+      else { loft([{ y: 0.03, rx: 0.064, z: 0.005 }, { y: -0.16, rx: 0.058, z: 0.015 }, { y: -0.31, rx: 0.052, z: 0.05 }, { y: -0.47, rx: 0.046, z: 0.085 }], sleeveMat, armG); add(armG, SP(0.045), skin, 0, -0.57, 0.1, 1, 1, 1.3) } // 太さを少し増し・肘で前へ曲げ・手は縦長に
       armG.rotation.z = s * 0.12; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 左右でわずかに角度差＝非対称（人形臭を消す）
     // 脚＝腰→膝→足首の滑らかな一本のテーパー＋足。股関節で振れる。
     const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.078, 0.92, 0); g.add(legG)
@@ -3892,7 +3892,8 @@ export async function mountTown3d(parent, opts = {}) {
     else if (cfg.prop === 'bag') { const bm = toon(cfg.bagCol || 0x8a7256) // 斜め掛けの鞄（添付の少女）
       const strap = add(g, BX(0.028, 0.52, 0.02), bm, 0, 1.18, 0.12); strap.rotation.z = 0.52 // たすき掛けの紐
       add(g, BX(0.17, 0.2, 0.08), bm, 0.2, 0.92, 0.07, 1, 1, 1).rotation.y = 0.1 } // 鞄本体（腰）
-    addOutlines(0.009) // 体・手足・頭に黒い主線（セル画のライン）
+    if (cfg.headScale && cfg.headScale !== 1) { headG.scale.setScalar(cfg.headScale); headG.position.y += (cfg.headScale - 1) * 0.11 } // 頭を少し大きく＝顔が見やすく親しみのある頭身（2.5D用）
+    if (cfg.outlineAmt !== 0) addOutlines(cfg.outlineAmt != null ? cfg.outlineAmt : 0.009) // 体・手足・頭に黒い主線（セル画のライン）。0で無し（細い腕が黒くなり過ぎる時）
     // 接地影（足元の柔らかな影＝人形の浮きを消して地に立たせる）
     const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.5, 0.72, 1); shadow.renderOrder = 1; g.add(shadow)
     g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
@@ -3935,9 +3936,9 @@ export async function mountTown3d(parent, opts = {}) {
     const bakeScene = new THREE.Scene()
     // 焼くときは「本来の色が明るく出る」よう、平らな地明かり＋カメラ寄りの強い主光で正面を充分に照らす。
     // （Hemisphereだけだとトゥーンがカメラ向きの垂直面を陰と判定して黒く沈む＝図が暗くなる元凶）
-    bakeScene.add(new THREE.AmbientLight(0xfff5ec, 0.92)) // 平らな全体光＝陰側も色が残る
-    const bakeKey = new THREE.DirectionalLight(0xffffff, 1.0); bakeKey.position.set(0.25, 0.85, 1.2); bakeScene.add(bakeKey) // 前上からの主光＝正面が明るく色が出る
-    const bakeFill = new THREE.DirectionalLight(0xeaf0ff, 0.32); bakeFill.position.set(-0.7, 0.35, 0.6); bakeScene.add(bakeFill) // 反対側の弱い補助で平板化を防ぐ
+    bakeScene.add(new THREE.AmbientLight(0xfff5ec, 1.55)) // 平らな全体光を強めに＝細い腕など陰側も本来の色を保つ（黒く沈ませない）
+    const bakeKey = new THREE.DirectionalLight(0xffffff, 0.55); bakeKey.position.set(0.25, 0.85, 1.2); bakeScene.add(bakeKey) // 前上からのほどよい主光＝立体感だけ少し付ける
+    const bakeFill = new THREE.DirectionalLight(0xeaf0ff, 0.3); bakeFill.position.set(-0.7, 0.4, 0.7); bakeScene.add(bakeFill) // 反対側の補助
     // 正射影の上下はカメラ基準。カメラを図の中央(y0.9)に置き、上下を±0.92にして world-y ≒ -0.02〜1.82 を写す（全身が収まる）。
     const bakeCam = new THREE.OrthographicCamera(-0.56, 0.56, 0.92, -0.92, 0.1, 12)
     bakeCam.position.set(0, 0.9, 5); bakeCam.lookAt(0, 0.9, 0)
@@ -3959,7 +3960,12 @@ export async function mountTown3d(parent, opts = {}) {
         const img = cx.createImageData(cellW, cellH)
         for (let y = 0; y < cellH; y++) { const sy = cellH - 1 - y; img.data.set(buf.subarray(sy * cellW * 4, (sy + 1) * cellW * 4), y * cellW * 4) } // GLは下が原点→上下反転
         cx.putImageData(img, 0, 0)
-        const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; views.push(t)
+        // 2Dで均一な黒縁（セル画のライン）を後付け＝3Dの細い腕でも線が潰れず、腕が黒く飲まれない。シルエットを周囲へ滲ませ濃色で抜き、上に本体を重ねる。
+        const o = document.createElement('canvas'); o.width = cellW; o.height = cellH; const octx = o.getContext('2d')
+        const rOut = 2.4; for (let k = 0; k < 12; k++) { const ang = (k / 12) * Math.PI * 2; octx.drawImage(cv, Math.round(Math.cos(ang) * rOut), Math.round(Math.sin(ang) * rOut)) }
+        octx.globalCompositeOperation = 'source-in'; octx.fillStyle = '#2a2118'; octx.fillRect(0, 0, cellW, cellH)
+        octx.globalCompositeOperation = 'source-over'; octx.drawImage(cv, 0, 0)
+        const t = new THREE.CanvasTexture(o); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; views.push(t)
       }
       renderer.setRenderTarget(prevRT); renderer.setClearColor(prevC, prevA)
       bakeScene.remove(fig)
@@ -3976,7 +3982,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     try {
       // 港町の少女（添付の模倣：白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋黒ボブ＋斜め掛けの鞄）を数体ぶん焼き、街に配置。
-      const harborGirlCfg = () => ({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: [0x1d1916, 0x241c18, 0x2c2622][(R() * 3) | 0], iris: [0x3a2e26, 0x4a3a2c, 0x4a6a9a][(R() * 3) | 0], outfit: 'blouse', top: [0xf0ece2, 0xeae6da, 0xf2eee6][(R() * 3) | 0], bottom: [0x33373e, 0x2e3a42, 0x3a3530][(R() * 3) | 0], hairStyle: 'bob', prop: 'bag', bagCol: [0x8a7256, 0x6a5a44, 0x9a8460][(R() * 3) | 0] })
+      const harborGirlCfg = () => ({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: [0x2a221c, 0x33281f, 0x241c18][(R() * 3) | 0], iris: [0x4a3a2c, 0x5a4632, 0x4a6a9a][(R() * 3) | 0], outfit: 'blouse', top: [0xf2eee6, 0xeae6da, 0xf0ece2][(R() * 3) | 0], bottom: [0x33373e, 0x2e3a42, 0x3a3530][(R() * 3) | 0], hairStyle: 'bob', prop: 'bag', bagCol: [0x8a7256, 0x6a5a44, 0x9a8460][(R() * 3) | 0], headScale: 1.2, outlineAmt: 0 })
       const variants = []
       for (let i = 0; i < 4; i++) variants.push(bakeFigureViews(harborGirlCfg())) // 色違い4体＝「いろんな人が世界にいる」
       const SP_SPOTS = [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]
