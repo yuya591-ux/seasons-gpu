@@ -515,6 +515,7 @@ export async function mountTown3d(parent, opts = {}) {
   let adBalloons = []
   let cars = []
   let peeps = []
+  let residents = [] // 作り込んだ住人（顔つき・アニメ調）。近くで見える要所に少数配置＝量産は階層分けで
   let ferris = null
   let carousel = null // 遊園地のメリーゴーラウンド（ゆっくり回る）
   let teacups = null // 遊園地のコーヒーカップ（回る）
@@ -3768,6 +3769,63 @@ export async function mountTown3d(parent, opts = {}) {
     g.position.set(hx, heightAt(hx, hz), hz)
     town.add(g); peeps.push(g)
   }
+  // ── 作り込んだ住人（顔つき・アニメ調）。近景で映える要所に少数（猫と同じ「基本図形＋トゥーン＋顔」）。──
+  const RES_SKIN = [0xf2c6a0, 0xf7d3b2, 0xe8b489, 0xefbd95]
+  const RES_HAIR = [0x2a221c, 0x1d1916, 0x3a2a1e, 0x4c3727, 0x6b5038, 0x2c2c32]
+  const RES_TOP = [0x5a78a0, 0xbf6a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd8d4cc, 0x495560, 0xd0904e, 0xcf6f93]
+  const RES_BOT = [0x39414e, 0x4a4036, 0x2e3640, 0x55504a, 0x6a3a3a, 0x40506a]
+  const RES_IRIS = [0x6a86c0, 0x5a9a6a, 0xb88a44, 0x9a6238, 0x7a5aa0] // 明るめ＝アニメの澄んだ瞳（青/緑/琥珀/榛/菫）
+  const makeResident = (cfg = {}) => {
+    const g = new THREE.Group()
+    const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom), shoeM = toon(cfg.shoe || 0x2c2824)
+    const white = new THREE.MeshBasicMaterial({ color: 0xf7f3ed, fog: true }), dark = toon(0x201c18), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xb06a60), browM = toon(cfg.hair)
+    const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 14, h || 12), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 8), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
+    const add = (p, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx !== undefined) m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.castShadow = true; p.add(m); return m }
+    // 脚＋靴
+    for (const s of [-1, 1]) { add(g, CY(0.085, 0.072, 0.66, 8), botM, s * 0.1, 0.47, 0); add(g, BX(0.15, 0.11, 0.3), shoeM, s * 0.1, 0.16, 0.06) }
+    add(g, BX(0.36, 0.22, 0.24), botM, 0, 0.92, 0) // 腰
+    // 胴（上着）＋肩＋首
+    add(g, CY(0.215, 0.18, 0.5, 12), topM, 0, 1.16, 0)
+    add(g, SP(0.2, 12, 8), topM, 0, 1.34, 0, 1.15, 0.62, 0.82) // 肩
+    add(g, CY(0.06, 0.06, 0.1, 8), skin, 0, 1.45, 0) // 首
+    // 腕（肩で振れる子群）
+    const arms = []
+    for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.245, 1.4, 0); g.add(armG)
+      add(armG, CY(0.062, 0.05, 0.34, 7), topM, 0, -0.17, 0); add(armG, CY(0.046, 0.04, 0.3, 7), skin, 0, -0.42, 0); add(armG, SP(0.05), skin, 0, -0.6, 0)
+      armG.rotation.z = s * 0.05; arms.push(armG) }
+    // 頭（子群）
+    const headG = new THREE.Group(); headG.position.set(0, 1.62, 0); g.add(headG)
+    add(headG, SP(0.17, 18, 16), skin, 0, 0, 0, 0.96, 1.04, 0.97) // 頭
+    for (const s of [-1, 1]) add(headG, SP(0.03), skin, s * 0.163, -0.01, 0.01, 0.7, 1, 0.7) // 耳
+    // アニメ顔（大きな目が鍵。顔は+z）
+    for (const s of [-1, 1]) {
+      add(headG, SP(0.056, 14, 12), white, s * 0.072, -0.003, 0.142, 1.0, 1.3, 0.45)   // 白目（大きく明るく）
+      add(headG, SP(0.037, 14, 12), irisM, s * 0.072, -0.006, 0.163, 1.0, 1.12, 0.5)    // 虹彩（明色）
+      add(headG, SP(0.016, 10, 8), dark, s * 0.072, -0.008, 0.176, 1, 1.1, 0.5)         // 瞳孔（小さめ＝瞳が澄む）
+      add(headG, SP(0.016, 8, 6), white, s * 0.072 + s * 0.015, 0.016, 0.187)           // ハイライト（大きめ＝いきいき）
+      add(headG, SP(0.007, 6, 6), white, s * 0.072 - s * 0.012, -0.018, 0.184)          // 小さな反射（下）
+      add(headG, BX(0.088, 0.015, 0.014), dark, s * 0.072, 0.042, 0.156).rotation.z = s * 0.1 // 上まつ毛の線
+      add(headG, BX(0.064, 0.012, 0.012), browM, s * 0.08, 0.073, 0.15).rotation.z = s * 0.13 // 眉
+    }
+    add(headG, BX(0.011, 0.02, 0.009), dark, 0.01, -0.05, 0.174) // 鼻（ごく控えめな影）
+    add(headG, BX(0.046, 0.013, 0.012), mouthM, 0, -0.092, 0.164) // 口
+    // 髪（後頭部の塊＋トップ＋前髪。顔は出す）
+    add(headG, SP(0.183, 16, 14), hairM, 0, 0.03, -0.055, 1.04, 1.04, 1.0) // 後ろ〜トップの髪
+    const style = cfg.hairStyle | 0
+    for (const [hx, hz] of [[-0.12, 0.12], [-0.06, 0.15], [0.0, 0.16], [0.06, 0.15], [0.12, 0.12]]) add(headG, SP(0.05, 10, 8), hairM, hx, 0.108, hz, 1, 0.9, 0.9) // 前髪
+    if (style === 0) { for (const s of [-1, 1]) add(headG, SP(0.07, 10, 10), hairM, s * 0.15, -0.06, -0.02, 0.7, 1.4, 0.9) } // サイドの髪（やや長め）
+    else if (style === 1) { add(headG, SP(0.1, 12, 10), hairM, 0, -0.13, -0.16, 1.1, 1.0, 0.9) } // 後ろで束ねた低めのまとめ髪
+    else { add(headG, SP(0.085, 12, 10), hairM, 0, 0.12, -0.02, 1.3, 0.7, 1.1) } // 短髪のトップボリューム
+    g.scale.setScalar(0.96 + R() * 0.16)
+    g.userData = { arms, headG, breath: 0 }
+    return g
+  }
+  const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 } ]
+  for (const sp of residentSpots) { const hx = sp.x + (R() - 0.5) * 1.6, hz = sp.z + (R() - 0.5) * 1.6
+    const g = makeResident({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], hairStyle: (R() * 3) | 0 })
+    g.position.set(hx, heightAt(hx, hz), hz); g.userData.face = R() * 6.28; g.rotation.y = g.userData.face; g.userData.ph = R() * 6.28
+    town.add(g); residents.push(g)
+  }
   } // ← 車・住民（街のみ）ここまで
 
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
@@ -4935,6 +4993,10 @@ export async function mountTown3d(parent, opts = {}) {
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * 5 + u.ph)) * 0.06, u.z)
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
     }
+    // 作り込んだ住人: 立ち姿でそっと息づき、ゆっくり見回し、腕を微かに揺らす（生きている佇まい）
+    for (const r of residents) { const u = r.userData
+      if (u.headG) { u.headG.rotation.y = Math.sin(t * 0.22 + u.ph) * 0.5; u.headG.position.y = 1.62 + Math.sin(t * 1.5 + u.ph) * 0.004 }
+      for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = Math.sin(t * 1.15 + u.ph + i * 3.1) * 0.05 }
     // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
     const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
     const wakeSpd = wakeOn ? Math.min(1, Math.hypot(active.vel.x, active.vel.z) / FLY.speed) : 0
@@ -5584,6 +5646,8 @@ export async function mountTown3d(parent, opts = {}) {
       vel: +Math.hypot(active.vel.x, active.vel.y, active.vel.z).toFixed(2), mvX: +active.moveX.toFixed(2), mvY: +active.moveY.toFixed(2), bank: +active.bankCur.toFixed(2),
     })
     window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2) } } // 検証用: 描画コール/三角形/オブジェクト数
+    window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
+    window.__town3dResFace = (i, ya) => { if (residents[i]) { residents[i].rotation.y = ya; residents[i].userData.face = ya } } // 検証用: 住人の向きを固定（顔の確認）
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
