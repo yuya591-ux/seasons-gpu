@@ -3785,6 +3785,36 @@ export async function mountTown3d(parent, opts = {}) {
   const resShadowMat = new THREE.MeshBasicMaterial({ map: resShadowTex, transparent: true, depthWrite: false, fog: true })
   const resShadowGeo = new THREE.PlaneGeometry(1, 1)
   const RES_OUTLINE = new THREE.MeshBasicMaterial({ color: 0x2a211c, side: THREE.BackSide, fog: true }) // セル画の黒い主線（裏面を法線方向に押し出す定番手法）
+  // ── 顔は「手描きの顔テクスチャ」を頭の前面に貼る（スタイライズド3Dの定番）。近接でも表情が読め、横/後ろからは見えない。全住人で共有。 ──
+  const makeFaceTex = (skinHex) => {
+    const c = document.createElement('canvas'); c.width = 180; c.height = 180; const x = c.getContext('2d')
+    x.lineJoin = 'round'; x.lineCap = 'round'; const OL = '#3a2c22'
+    // 肌のベース（自己発光で常に明るい＝近接でも顔が暗くならない）。縁はなだらかに透明にして頭の肌へ溶かす。
+    const sk = '#' + ('000000' + ((skinHex || 0xf6d8bd) >>> 0).toString(16)).slice(-6)
+    const g = x.createRadialGradient(90, 100, 26, 90, 98, 94); g.addColorStop(0, sk); g.addColorStop(0.68, sk); g.addColorStop(1, sk + '00')
+    x.fillStyle = g; x.beginPath(); x.ellipse(90, 99, 82, 84, 0, 0, 6.2832); x.fill() // 肌のベース（丸め＝卵型を避け頬と顎を揃える）
+    for (const s of [-1, 1]) { // やさしい中サイズのアニメ目（やや下・やや内寄せ＝額の余白を詰める）
+      const ex = 90 + s * 30, ey = 90
+      x.beginPath(); x.ellipse(ex, ey, 15, 18, 0, 0, 6.2832); x.fillStyle = '#fcf8f3'; x.fill()
+      x.beginPath(); x.ellipse(ex, ey + 1.5, 12, 15, 0, 0, 6.2832); x.fillStyle = '#7a5a3e'; x.fill()
+      x.beginPath(); x.ellipse(ex, ey + 3, 8.5, 11, 0, 0, 6.2832); x.fillStyle = '#48341f'; x.fill()
+      x.beginPath(); x.ellipse(ex, ey + 3.5, 4.2, 5.4, 0, 0, 6.2832); x.fillStyle = '#231812'; x.fill()
+      x.beginPath(); x.ellipse(ex - s * 4.5, ey - 5, 4.2, 5, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill()
+      x.beginPath(); x.ellipse(ex + s * 3.5, ey + 6, 2, 2.4, 0, 0, 6.2832); x.fillStyle = 'rgba(255,255,255,0.65)'; x.fill()
+      x.beginPath(); x.moveTo(ex - 16, ey - 9); x.quadraticCurveTo(ex - 2, ey - 22, ex + 16, ey - 8); x.lineWidth = 5.5; x.strokeStyle = OL; x.stroke()
+      x.beginPath(); x.moveTo(ex + s * 15, ey - 8); x.lineTo(ex + s * 21, ey - 12); x.lineWidth = 3.4; x.strokeStyle = OL; x.stroke()
+      x.beginPath(); x.moveTo(ex - 10, ey + 15); x.quadraticCurveTo(ex, ey + 18, ex + 10, ey + 14); x.lineWidth = 1.8; x.strokeStyle = 'rgba(110,80,60,0.55)'; x.stroke()
+      x.beginPath(); x.moveTo(ex - 15, ey - 27); x.quadraticCurveTo(ex, ey - 31, ex + 16, ey - 25); x.lineWidth = 4.4; x.strokeStyle = '#43321f'; x.stroke()
+    }
+    x.beginPath(); x.ellipse(90, 121, 8, 3.4, 0, 0, 6.2832); x.fillStyle = 'rgba(150,108,84,0.16)'; x.fill() // 鼻の下のやわらかい陰（鼻が浮かないよう繋ぐ）
+    x.beginPath(); x.moveTo(90, 113); x.lineTo(85.5, 122); x.quadraticCurveTo(90, 125, 94.5, 122); x.lineWidth = 2; x.strokeStyle = 'rgba(150,108,84,0.5)'; x.stroke() // 鼻
+    x.beginPath(); x.moveTo(77, 146); x.quadraticCurveTo(90, 154, 103, 146); x.lineWidth = 3.2; x.strokeStyle = '#b06a5a'; x.stroke() // 口
+    x.beginPath(); x.moveTo(81, 148); x.quadraticCurveTo(90, 151, 99, 148); x.lineWidth = 2.6; x.strokeStyle = '#e0a48f'; x.stroke()
+    for (const s of [-1, 1]) { x.beginPath(); x.ellipse(90 + s * 38, 130, 13, 8, 0, 0, 6.2832); x.fillStyle = 'rgba(233,150,127,0.38)'; x.fill() } // 頬の赤み
+    return c
+  }
+  const faceTex = new THREE.CanvasTexture(makeFaceTex()); faceTex.colorSpace = THREE.SRGBColorSpace; faceTex.anisotropy = renderer.capabilities.getMaxAnisotropy()
+  const faceMat = new THREE.MeshBasicMaterial({ map: faceTex, transparent: true, depthWrite: false, side: THREE.FrontSide, fog: true })
   const makeResident = (cfg = {}) => {
     // アニメ寄りだが人に近い：自然なアーモンドの目・一体感のある体・関節（膝/肘）・接地影。約6頭身。
     const g = new THREE.Group()
@@ -3809,9 +3839,9 @@ export async function mountTown3d(parent, opts = {}) {
       const om = new THREE.Mesh(g2, RES_OUTLINE); om.position.copy(m.position); om.quaternion.copy(m.quaternion); om.scale.copy(m.scale); om.renderOrder = -1; m.parent.add(om) } }
     const arms = [], legs = []
     // 腕＝肩→肘→手首の滑らかな一本のテーパー（少し前へ＝自然）＋手。肩で振れる。
-    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.165, 1.36, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える
+    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.175, 1.37, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える。体から少し離す
       if (wide) loft([{ y: 0.02, rx: 0.08 }, { y: -0.18, rx: 0.09 }, { y: -0.36, rx: 0.07 }, { y: -0.47, rx: 0.05 }], sleeveMat, armG) // 着物の袖
-      else { loft([{ y: 0.03, rx: 0.05 }, { y: -0.16, rx: 0.045, z: 0.01 }, { y: -0.31, rx: 0.04, z: 0.05 }, { y: -0.47, rx: 0.036, z: 0.085 }], sleeveMat, armG); add(armG, SP(0.038), skin, 0, -0.57, 0.1, 1, 1, 1.3) } // 肘で前へ曲げ・手は縦長に
+      else { loft([{ y: 0.03, rx: 0.072, z: 0.004 }, { y: -0.17, rx: 0.066, z: 0.016 }, { y: -0.32, rx: 0.057, z: 0.05 }, { y: -0.47, rx: 0.049, z: 0.085 }], sleeveMat, armG, true); add(armG, SP(0.046, 12, 12), skin, 0, -0.51, 0.078, 0.66, 1.18, 0.42).rotation.z = s * 0.22 } // 細い腕は黒い輪郭で潰れるので輪郭なし。手は小さく平たく内へ傾けた手のひら状に（卵ミトン回避）
       armG.rotation.z = s * 0.12; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 左右でわずかに角度差＝非対称（人形臭を消す）
     // 脚＝腰→膝→足首の滑らかな一本のテーパー＋足。股関節で振れる。
     const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.078, 0.92, 0); g.add(legG)
@@ -3851,26 +3881,21 @@ export async function mountTown3d(parent, opts = {}) {
     }
     add(g, CY(0.05, 0.054, 0.16, 12), skin, 0, 1.45, 0) // 首（少し長く＝頭が肩にめり込まない）
     // ── 頭（小さめ＝約7頭身）＋顔（角のある輪郭：頭頂は丸く・こめかみ最大・顎へ細めて顎先を出す＝アニメの面） ──
-    const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); g.add(headG)
-    loft([{ y: 0.1, rx: 0.038 }, { y: 0.06, rx: 0.093, rz: 0.088 }, { y: 0.0, rx: 0.104, rz: 0.095 }, { y: -0.05, rx: 0.093, rz: 0.087 }, { y: -0.097, rx: 0.063, rz: 0.073 }, { y: -0.13, rx: 0.028, rz: 0.046 }], skin, headG) // 角のある顔の輪郭
+    const headG = new THREE.Group(); headG.position.set(0, 1.63, 0); headG.scale.setScalar(1.3); g.add(headG) // 頭を一回り大きく＝顔が読める親しみのある頭身（約5.5頭身）
+    loft([{ y: 0.1, rx: 0.04 }, { y: 0.06, rx: 0.094, rz: 0.088 }, { y: 0.0, rx: 0.104, rz: 0.095 }, { y: -0.05, rx: 0.099, rz: 0.091 }, { y: -0.097, rx: 0.082, rz: 0.08 }, { y: -0.138, rx: 0.052, rz: 0.058 }], skin, headG) // 頬と顎を揃え丸い顎＝卵型/とがり顎を避ける
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
-    const eyeM = toon(0x4a3a32) // 目は黒でなく濃茶＝硬さ/暗さを抑える
-    for (const s of [-1, 1]) { // 小さくシンプルな目（層を重ねず：濃茶の小さなアーモンド＋虹彩＋キャッチライト）。ジブリ風の控えめな目。
-      add(headG, SP(0.016, 14, 12), eyeM, s * 0.046, -0.006, 0.099, 1.45, 0.95, 0.35) // 目（小さな濃茶のアーモンド）
-      add(headG, SP(0.0095, 12, 10), irisM, s * 0.046, -0.007, 0.104, 1.0, 1.0, 0.4)  // 虹彩（少し明るい芯）
-      add(headG, SP(0.0046, 8, 8), white, s * 0.046 + s * 0.004, -0.001, 0.108)       // キャッチライト
-      add(headG, BX(0.03, 0.005, 0.006), browM, s * 0.05, 0.036, 0.095).rotation.z = s * 0.1 // 細い眉
-      add(headG, SP(0.014, 8, 8), blush, s * 0.07, -0.026, 0.085, 1.2, 0.7, 0.4) // 頬のほのかな赤み
-    }
-    add(headG, BX(0.008, 0.016, 0.01), skin, 0, -0.032, 0.105, 1, 1, 1).rotation.x = 0.2 // 鼻筋（控えめ）
-    add(headG, BX(0.027, 0.009, 0.009), mouthM, 0, -0.066, 0.1)  // 口
+    // 顔＝手描きの顔テクスチャを頭の前面に貼る（個々の目鼻立ちを揃え近接でも表情が読める）
+    const faceP = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), faceMat); faceP.position.set(0, -0.018, 0.103); faceP.renderOrder = 2; headG.add(faceP)
     // ── 髪（hairStyle）。小さい頭に合わせた寸法 ──
     const hs = cfg.hairStyle
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
       add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代
-    else if (hs === 'bob') { add(headG, SP(0.125, 18, 16), hairM, 0, 0.0, -0.012, 1.04, 1.05, 1.05)
-      for (const s of [-1, 1]) add(headG, SP(0.052, 12, 12), hairM, s * 0.108, -0.06, 0.014, 0.7, 1.5, 0.95)
-      for (const [hx, hz] of [[-0.054, 0.085], [0.0, 0.097], [0.054, 0.085]]) add(headG, SP(0.038, 12, 10), hairM, hx, 0.068, hz, 1, 0.8, 0.8) }
+    else if (hs === 'bob') {
+      add(headG, SP(0.122, 18, 16), hairM, 0, 0.014, -0.034, 1.06, 1.06, 1.0) // 後頭部＋頭頂（後ろへ寄せ前の顔を出す）
+      for (const s of [-1, 1]) add(headG, SP(0.05, 12, 14), hairM, s * 0.107, -0.046, 0.004, 0.55, 1.55, 0.94) // 横の毛（頬に沿い顎で収める＝跳ね毛を抑え顔の横を縁取る）
+      for (const [hx, hz] of [[-0.076, 0.05], [-0.028, 0.072], [0.028, 0.072], [0.076, 0.05]]) add(headG, SP(0.045, 12, 10), hairM, hx, 0.078, hz, 1.1, 0.56, 0.66) // 前髪（眉の上で揃え、生え際を顔に少し重ね境目を消す）
+      const hairHiM = toon(new THREE.Color(cfg.hair || 0x241c18).lerp(new THREE.Color(0xfff0e0), 0.24).getHex())
+      add(headG, SP(0.05, 16, 8), hairHiM, 0, 0.092, -0.012, 1.8, 0.3, 0.92).renderOrder = 1 } // 髪の艶（頭頂に淡い光の帯）
     else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) }
     else if (hs === 'short') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.03, -0.012, 1.04, 0.95, 1.04)
       for (const [hx, hz] of [[-0.063, 0.083], [0.0, 0.095], [0.063, 0.083]]) add(headG, SP(0.029, 10, 8), hairM, hx, 0.075, hz, 1, 0.8, 0.8) }
@@ -3891,7 +3916,7 @@ export async function mountTown3d(parent, opts = {}) {
     else if (cfg.prop === 'bag') { const bm = toon(cfg.bagCol || 0x8a7256) // 斜め掛けの鞄（添付の少女）
       const strap = add(g, BX(0.028, 0.52, 0.02), bm, 0, 1.18, 0.12); strap.rotation.z = 0.52 // たすき掛けの紐
       add(g, BX(0.17, 0.2, 0.08), bm, 0.2, 0.92, 0.07, 1, 1, 1).rotation.y = 0.1 } // 鞄本体（腰）
-    addOutlines(0.009) // 体・手足・頭に黒い主線（セル画のライン）
+    addOutlines(0.0075) // 体・手足・頭に黒い主線（セル画のライン）。細い手足を黒く潰さない程度に
     // 接地影（足元の柔らかな影＝人形の浮きを消して地に立たせる）
     const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.5, 0.72, 1); shadow.renderOrder = 1; g.add(shadow)
     g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
@@ -3929,6 +3954,26 @@ export async function mountTown3d(parent, opts = {}) {
     return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
     // 港町の少女を home の要所にも数体（3Dの住人として配置＝自然に回り・歩く。遠目の住人として街に馴染む方針）。
     for (const sp of [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]) placeResident(sp.x + (R() - 0.5) * 3, sp.z + (R() - 0.5) * 3, harborGirl())
+    // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
+    if (/[?&]dev=1/.test(location.search)) window.__town3dFigShot = (yaw, cfgJson, faceZoom) => {
+      const cfg = cfgJson ? JSON.parse(cfgJson) : { skin: 0xf7d8bc, hair: 0x241c18, iris: 0x4a3a2c, outfit: 'blouse', top: 0xf0ece2, bottom: 0x2e3a42, hairStyle: 'bob', prop: 'bag', bagCol: 0x8a7256 }
+      const fig = makeResident(cfg); fig.rotation.y = yaw || 0
+      const sc = new THREE.Scene(); sc.add(new THREE.AmbientLight(0xfff6ec, 0.9))
+      const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(0.3, 1, 1.3); sc.add(dl)
+      const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.25); dl2.position.set(-0.7, 0.4, 0.6); sc.add(dl2); sc.add(fig)
+      const W = faceZoom ? 440 : 360, H = faceZoom ? 440 : 560
+      const cam = faceZoom ? new THREE.OrthographicCamera(-0.3, 0.3, 2.04, 1.44, 0.1, 12) : new THREE.OrthographicCamera(-0.62, 0.62, 0.95, -0.95, 0.1, 12)
+      if (faceZoom) { cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0) } else { cam.position.set(0, 0.9, 5); cam.lookAt(0, 0.9, 0) }
+      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(sc, cam)
+      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf)
+      renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
+      const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
+      sc.remove(fig); fig.traverse((o) => { if (o.geometry && o.geometry !== resShadowGeo) o.geometry.dispose(); if (o.material && o.material !== RES_OUTLINE && o.material !== resShadowMat) o.material.dispose() }); rt.dispose()
+      return cv.toDataURL()
+    }
   } // ← 車・住民（街のみ）ここまで
 
   // ── 降るもの（雪／桜の花びら）。季節・天気で空に舞う粒子。 ──
@@ -5823,6 +5868,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
+    window.__town3dResFront = (i, dist = 4, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
