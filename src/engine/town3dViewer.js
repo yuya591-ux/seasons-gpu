@@ -2588,13 +2588,13 @@ export async function mountTown3d(parent, opts = {}) {
           g.setIndex([...Array(18).keys()]); g.computeVertexNormals(); return g
         })()
         for (let ring = 0; ring < 31; ring++) {
-          const rr = 21 + ring * 3.3, n = Math.round(rr * 1.25) // 密に＝賑わう城下町（リング間隔を詰め、1リングの軒数も増やす）
+          const rr = 21 + ring * 3.1, n = Math.round(rr * 1.42) // 密に＝賑わう城下町（リング間隔を詰め、1リングの軒数を増やす）
           const onRing = ringRoads.some((rr0) => Math.abs(rr - rr0) < 2.6) // 環状道路のリングは建てない
           for (let k = 0; k < n; k++) {
             const a = (k / n) * 6.2832 + ring * 0.45
             if (angGap(a) < 0.3) continue // 大手門の参道
             let onAve = false; for (const av of avenues) { let d = Math.abs(a - av); if (d > Math.PI) d = 6.2832 - d; if (d < 0.12) { onAve = true; break } }
-            if (onAve || onRing || k % 22 === 0) continue // 大通り＋環状道路＋路地の隙間（路地を減らして密に）
+            if (onAve || onRing || k % 34 === 0) continue // 大通り＋環状道路＋路地の隙間（路地をさらに減らして賑わう城下町に）
             const jit = (R() - 0.5) * 1.8, hx = ex + Math.cos(a) * (rr + jit), hz = ez + Math.sin(a) * (rr + jit), hy = heightAt(hx, hz)
             if (hy < SEA.level + 1.0 || edoStream(hx, hz) < 6 || edoFac.some((f) => Math.hypot(hx - f.x, hz - f.z) < f.r)) continue // 海・汀・小川・庭園/寺子屋には建てない
             const tt = R(), two = tt < 0.44, kura = tt > 0.88, oodana = tt > 0.72 && tt <= 0.88 // 2階町家/土蔵/大店（2階を増やし高低差を出す）
