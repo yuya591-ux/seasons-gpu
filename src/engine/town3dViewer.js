@@ -3060,6 +3060,25 @@ export async function mountTown3d(parent, opts = {}) {
         }
         for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832 + R() * 0.25, rr = TAISHO.r - 5 + R() * 5, rx = tx + Math.cos(a) * rr, rz = tz + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.2, 0), toon(0x7c766a)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.6; town.add(rk) } // 汀の磯
       }
+      // ── 異時代の島々を本物の島に：開発された街の外周に森のベルト＋汀の磯を巡らせ「海から唐突に街が浮かぶ」違和感を消す ──
+      { const beltTrunk = [], beltLeaf = [], beltCone = [], rockGeos = [], nM = new THREE.Matrix4()
+        const leafCol = season === 'spring' ? 0x7faa4e : season === 'autumn' ? 0xcf8a38 : season === 'winter' ? 0xcdd6cc : 0x4e6e44
+        for (const isle of [{ x: EDO.x, z: EDO.z, r: EDO.r }, { x: SENGOKU.x, z: SENGOKU.z, r: SENGOKU.r }, { x: TAISHO.x, z: TAISHO.z, r: TAISHO.r }]) {
+          const beltN = Math.round(isle.r * 3.4) // 外周の森の密度（島の大きさに比例。縁にぐるりと密な森のベルト）
+          for (let i = 0; i < beltN; i++) { const a = R() * 6.2832, rr = isle.r * (0.9 + R() * 0.14), px = isle.x + Math.cos(a) * rr, pz = isle.z + Math.sin(a) * rr, py = heightAt(px, pz)
+            if (py < SEA.level + 0.6 || py > 34) continue // 汀より上・外周の低い所のみ（城/山頂は森にしない）
+            const pine = R() < 0.45, s = 0.8 + R() * 0.6
+            const trG = new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.8 * s, 6); nM.makeTranslation(px, py + 0.9 * s, pz); trG.applyMatrix4(nM); beltTrunk.push(trG)
+            if (pine) { const fG = new THREE.ConeGeometry(1.5 * s, 2.4 * s, 7); nM.makeTranslation(px, py + 2.7 * s, pz); fG.applyMatrix4(nM); beltCone.push(fG) } // 松/杉
+            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 0); nM.makeTranslation(px, py + 2.1 * s, pz); fG.applyMatrix4(nM); beltLeaf.push(fG) } } // 雑木
+          const rockN = Math.round(isle.r * 0.5)
+          for (let i = 0; i < rockN; i++) { const a = R() * 6.2832, rr = isle.r * (0.96 + R() * 0.12), px = isle.x + Math.cos(a) * rr, pz = isle.z + Math.sin(a) * rr, py = heightAt(px, pz)
+            if (py > SEA.level + 2.5 || py < SEA.level - 2.5) continue // 水際の岩のみ
+            const rg = new THREE.IcosahedronGeometry(0.8 + R() * 1.4, 0); nM.makeScale(1, 0.6, 1); nM.setPosition(px, Math.max(SEA.level, py) + 0.2, pz); rg.applyMatrix4(nM); rockGeos.push(rg) } // 汀の磯
+        }
+        if (BufferGeometryUtils.mergeGeometries) for (const [geos, mat] of [[beltTrunk, toon(0x6a4f38)], [beltCone, toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)], [beltLeaf, toon(leafCol)], [rockGeos, toon(season === 'winter' ? 0xc8ccc8 : 0x7c766a)]]) {
+          if (geos.length) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+      }
       // ── 生きもの（街/時代/季節で最適化）。蝶/蜻蛉はふわふわ舞い、犬猫馬は街に佇む＝生気と不自然さの解消 ──
       { const flyOK = season === 'spring' || season === 'summer', dartOK = season === 'summer' && weather !== 'rain'
         const flyCols = season === 'spring' ? [0xf6d0e0, 0xfaf0c0, 0xf2f2ee, 0xeed8a8] : [0xf2ead0, 0xe8e2c0, 0xf6e8b0, 0xeec8a0]
