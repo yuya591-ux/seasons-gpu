@@ -3063,6 +3063,7 @@ export async function mountTown3d(parent, opts = {}) {
           if (onAveX && onAveZ) continue
           const hx = tx + gx + (R() - 0.5) * 1.5, hz = tz + gz + (R() - 0.5) * 1.5, hy = heightAt(hx, hz)
           if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || taishoCanal(hx, hz) < 5.0 || taiFac.some((f) => Math.hypot(hx - f.x, hz - f.z) < f.r)) continue // 海/時計塔/運河/公園・学校は空ける
+          if (Math.abs(hz - tz) < 2.9 && Math.abs(hx - tx) < 92) continue // 路面電車の通り道(z=tz, 大通り)は完全に空ける＝電車が家を貫通しない
           if ((onAveX || onAveZ) ? R() < 0.5 : R() < 0.12) continue // 街路沿いは間引き、街区内は密に
           const dc = Math.hypot(gx - 6, gz + 4), central = Math.max(0, 1 - dc / 42) // 時計塔＝商業中心からの近さ
           const tt = R(), tall = tt < 0.1 + central * 0.24, longya = !tall && tt > 0.62 && tt < 0.8, isBrick = R() < 0.26 + central * 0.12
