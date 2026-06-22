@@ -2886,15 +2886,15 @@ export async function mountTown3d(parent, opts = {}) {
         const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根
         const sgWA = [], sgWB = [], sgR = [], sgR2 = [], sgL = [], sgM = new THREE.Matrix4()
         // 城下町＝谷底の川沿いに、街道に沿って不規則な列で家々が並ぶ（的模様の同心円を脱す）。senHに載せ谷底〜中腹のみ。
-        for (let s = 0; s < 34; s++) {
-          const zz = sz + 30 - s * 2.3, cl = senValley(zz)
+        for (let s = 0; s < 46; s++) {
+          const zz = sz + 30 - s * 2.1, cl = senValley(zz) // 谷沿いに長く（列を伸ばし賑わう城下町に）
           for (const side of [-1, 1]) {
-            const ranks = 1 + ((R() * 3) | 0) // 川の両側に1〜3列（不揃い）
+            const ranks = 2 + ((R() * 3) | 0) // 川の両側に2〜4列（密に・不揃い）
             for (let rank = 0; rank < ranks; rank++) {
-              if (R() < 0.18) continue // 抜け（空き地・辻）で不規則に
-              const off = 5.5 + rank * 4.4 + R() * 1.4
+              if (R() < 0.11) continue // 抜け（空き地・辻）で不規則に（減らして密に）
+              const off = 5.0 + rank * 4.0 + R() * 1.3
               const px = sx + cl + side * off + (R() - 0.5) * 1.6, pz = zz + (R() - 0.5) * 1.8, py = senH(px, pz)
-              if (py < SEA.level + 0.7 || py > 13.5) continue // 谷底〜中腹のみ（高い尾根や城の平場には建てない）
+              if (py < SEA.level + 0.7 || py > 18) continue // 谷底〜中腹まで（斜面も登る城下町。高い尾根や城の平場は除く）
               if (Math.hypot(px - bx, pz - bz) < 11) continue // 城の平場は空ける
               const a = (side > 0 ? -Math.PI / 2 : Math.PI / 2) + (R() - 0.5) * 0.5 // 街道に面して列の向きが揃う
               const tt = R(), two = tt < 0.2, big = tt > 0.86, white = R() < 0.25
