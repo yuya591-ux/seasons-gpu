@@ -5945,13 +5945,14 @@ export async function mountTown3d(parent, opts = {}) {
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
-    // 上空にいる間は描画解像度をひと段下げる：全世界＋海/霧のシェーダーが画面全面を覆い最も重い場面で、
-    // 動きが速く粗さは目立たない。窓辺へ戻れば最高解像度に戻す＝じっくり眺める所の画質は一切落とさない。
-    // 切替は flyP が 0.55 を跨ぐ離陸/着地の一瞬だけ＝毎フレームの再確保を避ける。
-    const wantFly = active.mode !== 'window' && (active.flyP || 0) > 0.55
+    // 解像度を下げるのは「速く動いている間」だけ。止まって景色を一望する時は最高解像度(1.6)に保ち綺麗に見せる。
+    // 速い移動中のみ一段下げて省エネ（粗さは動きで目立たない）。flyMotionをなめらかに変化させ、速度の上下でprがバタつかない。
+    const hsp = active.mode !== 'window' ? Math.hypot(active.vel.x, active.vel.z) / FLY.speed : 0 // 0..1 水平速度
+    active.flyMotion = (active.flyMotion || 0) + ((hsp > 0.2 ? 1 : 0) - (active.flyMotion || 0)) * Math.min(1, dt * 2.4) // 約0.45sでなめらかに（巡航で下げ・止まると戻す）
+    const wantFly = active.mode !== 'window' && (active.flyP || 0) > 0.55 && active.flyMotion > 0.55
     if (wantFly !== prFly) {
       prFly = wantFly
-      curPR = Math.min(window.devicePixelRatio || 1, wantFly ? qCap * 0.8 : qCap)
+      curPR = Math.min(window.devicePixelRatio || 1, wantFly ? qCap * 0.88 : qCap)
       renderer.setPixelRatio(curPR); renderer.setSize(stage.clientWidth, stage.clientHeight)
     }
     renderer.render(scene, camera)
