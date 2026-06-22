@@ -389,6 +389,7 @@ export async function mountTown3d(parent, opts = {}) {
   scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.10)) // 夜の近景が真っ黒に沈まない程度に底上げ
   let sunGlow = null // 昼/夕の空の太陽の光輪（彩雲リング付き）。カメラへ追従させて空に置く
   const sunDir = new THREE.Vector3()
+  let starMat = null // 夜の星（per-starできらめく）。frameで uT を進める
   // 夜は月と星
   if (isNight) {
     // ベタ白の円を脱す（評価 美術-M3）: わずかに暖色のクリーム＋柔らかなハロー（加算スプライト）で月らしく。
@@ -400,14 +401,22 @@ export async function mountTown3d(parent, opts = {}) {
     mhx.fillStyle = mhg; mhx.fillRect(0, 0, 64, 64)
     const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(mhc), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
     moonHalo.position.copy(moon.position); moonHalo.scale.set(42, 42, 1); scene.add(moonHalo)
+    // 満天の星（雲の上は光害が無い）。per-starできらめく（twinkle）＝生きた夜空。一様な星＋天の川（密な微星の帯）。
+    const spos = [], sph = [], ssz = [], tmp = new THREE.Vector3()
+    const R0 = 360, addStar = (d, sz) => { spos.push(d.x * R0, d.y * R0 * 0.92 + 22, d.z * R0 - 18); sph.push(Math.random() * 6.2832); ssz.push(sz) }
+    for (let i = 0; i < (LIGHT ? 420 : 720); i++) { const th = Math.random() * 6.2832, ph = Math.acos(Math.random()); addStar(tmp.set(Math.cos(th) * Math.sin(ph), Math.cos(ph), Math.sin(th) * Math.sin(ph)), 1.5 + Math.random() * Math.random() * 3.6) } // 一様（大小ばら）
+    const mwNormal = new THREE.Vector3(0.42, 0.62, 0.66).normalize() // 天の川の帯の法線（傾いた大円）
+    let placed = 0, guard = 0
+    while (placed < (LIGHT ? 380 : 640) && guard < 60000) { guard++; const th = Math.random() * 6.2832, ph = Math.acos(Math.random()); tmp.set(Math.cos(th) * Math.sin(ph), Math.cos(ph), Math.sin(th) * Math.sin(ph)); if (Math.abs(tmp.dot(mwNormal)) > 0.12) continue; addStar(tmp, 0.8 + Math.random() * 1.4); placed++ } // 帯の中だけ密に置く＝天の川
     const starGeo = new THREE.BufferGeometry()
-    const sp = []
-    for (let i = 0; i < 260; i++) {
-      const r = 360, th = Math.random() * Math.PI * 2, ph = Math.random() * Math.PI * 0.5
-      sp.push(Math.cos(th) * Math.sin(ph) * r, Math.cos(ph) * r * 0.9 + 30, -Math.abs(Math.sin(th)) * Math.sin(ph) * r - 30)
-    }
-    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3))
-    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xeaf0ff, size: 1.4, sizeAttenuation: false, fog: false })))
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(spos, 3))
+    starGeo.setAttribute('aph', new THREE.Float32BufferAttribute(sph, 1)); starGeo.setAttribute('asz', new THREE.Float32BufferAttribute(ssz, 1))
+    starMat = new THREE.ShaderMaterial({
+      uniforms: { uT: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      vertexShader: 'attribute float aph; attribute float asz; varying float vph; void main(){ vph=aph; gl_PointSize=asz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: 'uniform float uT; varying float vph; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; float tw=0.62+0.38*sin(uT*2.2+vph*7.0); gl_FragColor=vec4(0.94,0.96,1.0,(1.0-d*1.7)*tw); }',
+    })
+    scene.add(new THREE.Points(starGeo, starMat))
   } else {
     // 昼/夕＝空に柔らかな太陽の光輪＋淡い彩雲のリング（光輪の外に分光がにじむ実在の現象）。太陽の向きに置きカメラへ追従。
     const scv = document.createElement('canvas'); scv.width = scv.height = 128
@@ -6273,6 +6282,7 @@ export async function mountTown3d(parent, opts = {}) {
     camera.position.set(camX, camY, camZ)
     if (skyDome) skyDome.position.set(camX, camY, camZ) // 空ドームをカメラへ追従＝拡大世界のどこへ飛んでも空が常に周囲を覆う（黒い虚空を防ぐ）
     if (sunGlow) sunGlow.position.set(camX + sunDir.x * 470, camY + sunDir.y * 470, camZ + sunDir.z * 470) // 太陽の光輪を太陽の向きの空に追従配置
+    if (starMat) starMat.uniforms.uT.value = t // 星のきらめき（twinkle）
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     camera.lookAt(lookX, lookY, lookZ)
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
