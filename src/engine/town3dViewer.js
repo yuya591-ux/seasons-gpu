@@ -3833,8 +3833,14 @@ export async function mountTown3d(parent, opts = {}) {
   const RES_OUTLINE = new THREE.MeshBasicMaterial({ color: 0x2a211c, side: THREE.BackSide, fog: true }) // セル画の黒い主線（裏面を法線方向に押し出す定番手法）
   // ── 港町の少女（一枚絵の立ち絵）。顔も体も一枚として描き、常にこちらを向く＝「顔と体が合わない/お面が浮く」が原理的に起きない。手描きの温かみで街に馴染ませる。 ──
   const drawHarborGirl2D = (x, cfg = {}) => {
-    const skin = '#f3d4b6', skinSh = '#e7bd97', hair = cfg.hair || '#2b2521', hairSh = '#1d1814', hairHi = '#4c4137'
-    const top = cfg.top || '#f2ede2', topSh = '#ddd6c7', bot = cfg.bottom || '#37424f', botSh = '#2a333e', botHi = '#434f5d'
+    // 色は cfg から派生（陰/艶を自動生成）＝髪色・肌色・服色を変えても破綻しない＝「いろんな人」を出せる
+    const hx = (c) => '#' + c.getHexString()
+    const hcol = new THREE.Color(cfg.hair || 0x2b2521), scol = new THREE.Color(cfg.skin || 0xf3d4b6)
+    const tcol = new THREE.Color(cfg.top || 0xf2ede2), bcol = new THREE.Color(cfg.bottom || 0x37424f)
+    const hair = hx(hcol), hairSh = hx(hcol.clone().multiplyScalar(0.6)), hairHi = hx(hcol.clone().lerp(new THREE.Color(0xfff0e0), 0.3))
+    const skin = hx(scol), skinSh = hx(scol.clone().multiplyScalar(0.91))
+    const top = hx(tcol), topSh = hx(tcol.clone().multiplyScalar(0.91))
+    const bot = hx(bcol), botSh = hx(bcol.clone().multiplyScalar(0.78)), botHi = hx(bcol.clone().lerp(new THREE.Color(0xffffff), 0.16))
     const bag = cfg.bag || '#9c7d56', bagSh = '#7e6240', line = '#3a2c24', mouthC = '#bb7567', blush = 'rgba(231,150,127,0.42)'
     x.lineJoin = 'round'; x.lineCap = 'round'
     const L = (w, c) => { x.strokeStyle = c || line; x.lineWidth = w; x.stroke() }
@@ -3920,8 +3926,14 @@ export async function mountTown3d(parent, opts = {}) {
     grp.userData = { spr: m }; return grp
   }
   const placeGirl = (hx, hz, cfg) => { const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; const g = makeGirlStandee(cfg); g.position.set(hx, gy, hz); town.add(g); standees.push(g) }
-  const GIRL_HAIR = ['#2b2521', '#33291f', '#241c18'], GIRL_TOP = ['#f2ede2', '#eee7d9', '#f3efe6'], GIRL_BOT = ['#37424f', '#2f3a44', '#3a3530'], GIRL_BAG = ['#9c7d56', '#7e6748', '#a98c63']
-  const girlCfg = () => ({ hair: GIRL_HAIR[(R() * 3) | 0], top: GIRL_TOP[(R() * 3) | 0], bottom: GIRL_BOT[(R() * 3) | 0], bag: GIRL_BAG[(R() * 3) | 0] })
+  // 「いろんな人が世界にいる」＝髪/肌/服/鞄の色幅を広げてランダムに（陰/艶はdrawHarborGirl2Dが地色から自動生成）
+  const GIRL_HAIR = ['#2b2521', '#33291f', '#241c18', '#4a3526', '#5e4632', '#6b4a2e']
+  const GIRL_SKIN = ['#f3d4b6', '#efcaa8', '#e8bd98', '#f6dcc0']
+  const GIRL_TOP = ['#f2ede2', '#eae3d2', '#dde6e2', '#ecdcd8', '#dde6d6', '#e2dcec', '#cfd8dc']
+  const GIRL_BOT = ['#37424f', '#2f3a44', '#3a3530', '#4a4036', '#3d4a44', '#544a5a']
+  const GIRL_BAG = ['#9c7d56', '#7e6748', '#a98c63', '#6e5a44', '#8a6a52']
+  const GR = (a) => a[(R() * a.length) | 0]
+  const girlCfg = () => ({ hair: GR(GIRL_HAIR), skin: GR(GIRL_SKIN), top: GR(GIRL_TOP), bottom: GR(GIRL_BOT), bag: GR(GIRL_BAG) })
   // （顔テクスチャ方式は廃止。3D住人は元の幾何の目鼻に戻し、主人公だけ2D立ち絵。）
   const makeResident = (cfg = {}) => {
     // アニメ寄りだが人に近い：自然なアーモンドの目・一体感のある体・関節（膝/肘）・接地影。約6頭身。
