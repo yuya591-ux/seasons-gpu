@@ -677,6 +677,7 @@ export async function mountTown3d(parent, opts = {}) {
   const doorGeos = []
   const doorFrameGeos = [] // 戸枠・玄関庇（暖色の木）。戸を引き締め、庇の影で入口が立体に＝目線の生活感
   const fixtureGeos = []   // 雨樋・メーター箱（灰の金属/樹脂）。建物正面の生活設備＝目線で「昭和の建物」の年季
+  const potGeos = [], plantGeos = [], crateGeos = [] // 玄関脇の鉢植え（素焼き鉢＋緑）・積んだケース＝路地の生活の散らかり（エモい）。小さく低い＝俯瞰で棒にならない
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -1156,7 +1157,8 @@ export async function mountTown3d(parent, opts = {}) {
       const dw = isHouse ? 0.95 : 1.35, dh = isHouse ? 1.95 : 2.2
       const ox = (R() - 0.5) * w * 0.40, fz = d / 2 // 前面の戸口の横位置
       const rotY = g.rotation.y
-      const bake = (geos, sx, sy, sz, lx, ly, lz) => { const bg = new THREE.BoxGeometry(sx, sy, sz); bg.applyMatrix4(new THREE.Matrix4().makeTranslation(lx, ly, lz)); bg.applyMatrix4(new THREE.Matrix4().makeRotationY(rotY)); bg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z)); geos.push(bg) }
+      const bakeG = (geos, geo, lx, ly, lz) => { geo.applyMatrix4(new THREE.Matrix4().makeTranslation(lx, ly, lz)); geo.applyMatrix4(new THREE.Matrix4().makeRotationY(rotY)); geo.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z)); geos.push(geo) }
+      const bake = (geos, sx, sy, sz, lx, ly, lz) => bakeG(geos, new THREE.BoxGeometry(sx, sy, sz), lx, ly, lz)
       bake(doorGeos, dw, dh, 0.09, ox, dh / 2 + 0.02, fz + 0.02) // 暗い引き戸/扉
       bake(doorFrameGeos, 0.12, dh + 0.16, 0.14, ox - dw / 2 - 0.06, (dh + 0.16) / 2, fz + 0.05) // 左の方立
       bake(doorFrameGeos, 0.12, dh + 0.16, 0.14, ox + dw / 2 + 0.06, (dh + 0.16) / 2, fz + 0.05) // 右の方立
@@ -1173,6 +1175,23 @@ export async function mountTown3d(parent, opts = {}) {
       bake(fixtureGeos, 0.24, 0.32, 0.16, ox + (dw / 2 + 0.34) * (ox > 0 ? -1 : 1), 1.25, fz + 0.06)
       // 室外機（集合住宅/中層の壁際にも＝家は別途。前面の窓下に張り出す灰の箱）
       if (!isHouse) bake(fixtureGeos, 0.78, 0.5, 0.42, (R() - 0.5) * w * 0.5, 1.15, fz + 0.24)
+      // 玄関脇の鉢植えの並び（昭和の路地の象徴＝住人が軒先に並べる素焼き鉢。エモい生活感）。家の一部に。
+      if (isHouse && R() < 0.5) {
+        const sgn = ox > 0 ? -1 : 1, n = 2 + ((R() * 3) | 0) // 戸口と反対の軒先に2〜4鉢
+        for (let pp = 0; pp < n; pp++) {
+          const pr = 0.12 + R() * 0.06, ph2 = 0.18 + R() * 0.12
+          const lx = ox + sgn * (dw / 2 + 0.45 + pp * (pr * 2 + 0.12)), lz = fz + 0.2 + (R() - 0.5) * 0.12
+          if (Math.abs(lx) > w / 2 - 0.1) break // 壁面からはみ出さない
+          bakeG(potGeos, new THREE.CylinderGeometry(pr * 0.84, pr, ph2, 7), lx, ph2 / 2, lz)
+          const fr = pr + 0.05 + R() * 0.1, fol = new THREE.IcosahedronGeometry(fr, 0); fol.scale(1, 0.92, 1)
+          bakeG(plantGeos, fol, lx, ph2 + fr * 0.55, lz)
+        }
+      }
+      // 積んだケース（酒屋/商店の軒先のビールケース＝路地の雑多さ）。中層/集合住宅の一部に。
+      if (!isHouse && R() < 0.3) {
+        const cw = 0.7, cx = (R() < 0.5 ? -1 : 1) * (w / 2 - 0.6), st = 1 + ((R() * 3) | 0)
+        for (let cc = 0; cc < st; cc++) bake(crateGeos, cw, 0.34, cw, cx + (R() - 0.5) * 0.1, 0.17 + cc * 0.34, fz + 0.42)
+      }
     }
   }
 
@@ -1326,6 +1345,15 @@ export async function mountTown3d(parent, opts = {}) {
     const xmerged = fixtureGeos.length && BufferGeometryUtils.mergeGeometries(fixtureGeos, false)
     if (xmerged) { const fixtures = new THREE.Mesh(xmerged, toon(0x6e6a64)); fixtures.castShadow = true; fixtures.receiveShadow = true; town.add(fixtures) } // 雨樋・メーター（灰）
     fixtureGeos.forEach((g) => g.dispose())
+    const potm = potGeos.length && BufferGeometryUtils.mergeGeometries(potGeos, false)
+    if (potm) { const pots = new THREE.Mesh(potm, toon(0x9c6244)); pots.castShadow = true; pots.receiveShadow = true; town.add(pots) } // 素焼きの鉢
+    potGeos.forEach((g) => g.dispose())
+    const plm = plantGeos.length && BufferGeometryUtils.mergeGeometries(plantGeos, false)
+    if (plm) { const plants = new THREE.Mesh(plm, toon(season === 'autumn' ? 0x8a7a3a : 0x5c7a44)); plants.castShadow = true; town.add(plants) } // 鉢の緑
+    plantGeos.forEach((g) => g.dispose())
+    const crm = crateGeos.length && BufferGeometryUtils.mergeGeometries(crateGeos, false)
+    if (crm) { const crates = new THREE.Mesh(crm, toon(0x6a7a86)); crates.castShadow = true; crates.receiveShadow = true; town.add(crates) } // 積んだケース（くすんだ青灰）
+    crateGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
