@@ -274,10 +274,13 @@ export async function mountTown3d(parent, opts = {}) {
   const QUAL = opts.quality || 'standard'
   const LIGHT = QUAL === 'light'
   const PR_CAP = LIGHT ? 1.25 : QUAL === 'soft' ? 2 : 1.6
+  const PR_FLOOR = LIGHT ? 0.72 : 0.85 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
-  let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。飛行中の解像度落としの基準に使う
+  let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
+  let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
+  let lastDDT = 0 // 直近の描画間隔（検証用）
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
   let composer = null, fxaaPass = null // FXAA（輪郭をなめらかに＝解像度を上げずにくっきり）。読み込み失敗時はnullで通常描画にフォールバック
@@ -5900,7 +5903,16 @@ export async function mountTown3d(parent, opts = {}) {
     const stillNow = Math.hypot(active.vel.x, active.vel.z) < 0.8 && (active.climb || 0) === 0
     const restIdle = stillNow && (performance.now() - (active.lastInputT || 0)) > 3500
     if (t - lastDraw < (restIdle ? 0.045 : 0.032)) return
+    const drawDt = lastDraw < 0 ? 0.033 : t - lastDraw // 実際の描画間隔（カク付き検知）
     lastDraw = t
+    // ── 自動品質調整：能動飛行中、描画が30fpsに間に合わない状態が続いたら解像度を一段下げて「常に滑らか」を死守。
+    //    安定が長く続けば鮮やかさ(qCap)へ少しずつ戻す。ヒステリシスで頻繁な切替を防ぐ。restIdle/タブ復帰の巨大gapは無視。
+    lastDDT = drawDt
+    if (!restIdle && drawDt > 0.001 && drawDt < 0.4) {
+      if (drawDt > 0.047) { adQLow++; adQOk = 0 } else if (drawDt < 0.038) { adQOk++; adQLow = 0 } else { if (adQLow) adQLow--; if (adQOk) adQOk-- }
+      if (adQLow >= 16 && curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR - 0.12); applySize(); adQLow = 0; adQOk = 0 } // 重い→解像度を譲る
+      else if (adQOk >= 120 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.08); applySize(); adQOk = 0 } // 長く安定→鮮やかさを戻す
+    }
     const dt = Math.min(0.05, t - lastT); lastT = t
     // ステージ実寸が変わったら（飛行で枠が変わる／回転／レイアウト変化）即 aspect を直す＝「横に伸びる」を自動補正
     if (stage.clientWidth !== lastStageW || stage.clientHeight !== lastStageH) applySize()
@@ -6817,7 +6829,7 @@ export async function mountTown3d(parent, opts = {}) {
       yaw: +active.flyYaw.toFixed(2), camYaw: +(active.walkCamYaw || 0).toFixed(2), pitch: +active.flyPitch.toFixed(2),
       vel: +Math.hypot(active.vel.x, active.vel.y, active.vel.z).toFixed(2), mvX: +active.moveX.toFixed(2), mvY: +active.moveY.toFixed(2), bank: +active.bankCur.toFixed(2),
     })
-    window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2) } } // 検証用: 描画コール/三角形/オブジェクト数
+    window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2), ddt: +lastDDT.toFixed(3), low: adQLow, ok: adQOk } } // 検証用: 描画コール/三角形/オブジェクト数/自動品質状態
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
     window.__town3dResFace = (i, ya) => { if (residents[i]) { const u = residents[i].userData; residents[i].rotation.y = ya; u.face = ya; u.moving = false; u.pauseT = 999; for (const a of u.arms) a.rotation.x = 0; for (const l of u.legs) l.rotation.x = 0 } } // 検証用: 住人を止めて向きを固定（顔の確認）
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
