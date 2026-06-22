@@ -4072,22 +4072,24 @@ export async function mountTown3d(parent, opts = {}) {
   const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e, 0x55504a], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24, 0x4c3727, 0x6b5038]
   const skinCols = [0xf0c49c, 0xf6d2b0, 0xe8b489]
   const makePeep = () => {
-    const g = new THREE.Group()
+    const g = new THREE.Group(), legs = [], arms = []
     const pm = toon(pantsCols[(R() * pantsCols.length) | 0]), tm = toon(peepCols[(R() * peepCols.length) | 0]), hm = toon(hairCols[(R() * hairCols.length) | 0]), sm = toon(skinCols[(R() * skinCols.length) | 0])
-    for (const s of [-1, 1]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.62, 6), pm); leg.position.set(s * 0.11, 0.4, 0); leg.castShadow = true; g.add(leg) } // 2本の脚
+    // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く
+    for (const s of [-1, 1]) { const leg = new THREE.Group(); const lm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.62, 6), pm); lm.position.y = -0.31; lm.castShadow = true; leg.add(lm); leg.position.set(s * 0.11, 0.71, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点）
     const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.54, 8), tm); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 胴
     const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), tm); shoulder.position.y = 1.18; shoulder.scale.set(1.1, 0.6, 0.8); g.add(shoulder) // 肩
-    for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.5, 6), tm); arm.position.set(s * 0.28, 0.94, 0); arm.rotation.z = s * 0.07; arm.castShadow = true; g.add(arm) } // 腕
+    for (const s of [-1, 1]) { const arm = new THREE.Group(); const am = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.5, 6), tm); am.position.y = -0.25; am.castShadow = true; arm.add(am); arm.position.set(s * 0.28, 1.19, 0); arm.rotation.z = s * 0.07; g.add(arm); arms.push(arm) } // 腕（肩支点）
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), sm); head.position.y = 1.42; head.scale.set(0.96, 1.04, 0.96); g.add(head)
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.66), hm); hair.position.set(0, 1.45, -0.015); g.add(hair) // 髪（上＋後ろ。顔は出す）
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
+    g.userData = { legs, arms }
     return g
   }
   peeps = []
   for (let i = 0; i < (LIGHT ? 6 : 11); i++) {
     const g = makePeep()
     const dir = (i % 2 === 0) ? 1 : -1
-    g.userData = { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 }
+    Object.assign(g.userData, { dir, x: (dir > 0 ? -3.0 : 3.0) + (R() - 0.5), speed: 1.1 + R() * 0.8, z: -85 + R() * 105, ph: R() * 6.28 })
     town.add(g); peeps.push(g)
   }
   // ランドマークの賑わい（駅前・商店街・川辺・公園に人が集う。その場でゆっくり佇み・体の向きを変える）。
@@ -4111,7 +4113,7 @@ export async function mountTown3d(parent, opts = {}) {
   for (const s of crowdSpots) for (let i = 0; i < (LIGHT ? Math.ceil(s.n * 0.5) : s.n); i++) {
     const g = makePeep()
     const hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
-    g.userData = { loiter: true, hx, hz, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 }
+    Object.assign(g.userData, { loiter: true, hx, hz, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 })
     g.position.set(hx, heightAt(hx, hz), hz)
     town.add(g); peeps.push(g)
   }
@@ -5589,18 +5591,25 @@ export async function mountTown3d(parent, opts = {}) {
     // 住民が歩道を歩く（少し上下に弾む）
     for (const p of peeps) {
       const u = p.userData
+      const legs = u.legs || [], arms = u.arms || []
       if (u.loiter) { // ランドマークの賑わい: 定位置の周りをゆっくり佇み歩き、体の向きを少しずつ変える
         const px = u.hx + Math.sin(t * u.sp + u.ph) * u.rad
         const pz = u.hz + Math.cos(t * u.sp * 0.8 + u.ph * 1.3) * u.rad
         p.position.set(px, heightAt(px, pz) + Math.abs(Math.sin(t * 2.4 + u.ph)) * 0.05, pz)
         p.rotation.y = u.face + Math.sin(t * 0.3 + u.ph) * 0.7
+        const idle = Math.sin(t * 1.6 + u.ph) * 0.12 // 佇み＝そっと重心を移す程度
+        if (legs[0]) { legs[0].rotation.x = idle; legs[1].rotation.x = -idle }
+        if (arms[0]) { arms[0].rotation.x = -idle * 0.6; arms[1].rotation.x = idle * 0.6 }
         continue
       }
       u.z += u.dir * u.speed * dt
       if (u.z > 20) u.z = -88
       if (u.z < -88) u.z = 20
-      p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * 5 + u.ph)) * 0.06, u.z)
+      const cad = 6 + u.speed * 2.2, sw = Math.sin(t * cad + u.ph) // 歩調（速いほど速く運ぶ）
+      p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * cad + u.ph)) * 0.06, u.z) // 一歩ごとに弾む
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
+      if (legs[0]) { legs[0].rotation.x = sw * 0.55; legs[1].rotation.x = -sw * 0.55 } // 脚を交互に振る
+      if (arms[0]) { arms[0].rotation.x = -sw * 0.4; arms[1].rotation.x = sw * 0.4 } // 腕は脚と逆位相
     }
     // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す
     for (const r of residents) { const u = r.userData
