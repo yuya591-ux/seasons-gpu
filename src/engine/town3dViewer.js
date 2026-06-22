@@ -3750,8 +3750,10 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < n; i++) { let t = (pos.getY(i) - y0) / (y1 - y0); t = Math.max(0, Math.min(1, t)); t = t * t * (3 - 2 * t); c.copy(a).lerp(bC, t); arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b }
       geo.setAttribute('color', new THREE.BufferAttribute(arr, 3))
     }
-    const seaLowC = SNOWY ? 0xdfe3e9 : (isNight ? 0x636a83 : 0xcdd2da) // 谷の翳り（MeshBasic＝形状陰影が無いので谷を濃いめにして起伏を立たせる）
-    const seaHighC = SNOWY ? 0xf8f9fc : (isNight ? 0xb2b8cc : 0xfffdf8) // 陽の当たる頂（暖白）
+    // 夕焼けは雲海のいちばんの見せ場＝頂を茜金、谷を青紫の影に染める（duskで補間）。夜/雪は別色なので染めない。
+    const dk = (SNOWY || isNight) ? 0 : duskAmt
+    const seaLowC = new THREE.Color(SNOWY ? 0xdfe3e9 : (isNight ? 0x636a83 : 0xcdd2da)).lerp(new THREE.Color(0x8e7896), dk * 0.7).getHex() // 谷の翳り（夕は青紫へ）
+    const seaHighC = new THREE.Color(SNOWY ? 0xf8f9fc : (isNight ? 0xb2b8cc : 0xfffdf8)).lerp(new THREE.Color(0xffc486), dk * 0.9).getHex() // 陽の当たる頂（夕は茜金へ）
     // 群島（鳥居・五重塔・御神木・茅葺き）。それぞれ違うシルエットの発見。雲海をくぼませて据える。
     const isleGrass = isNight ? 0x3a5642 : 0x6f9a5c, isleRock = isNight ? 0x484540 : 0x7b6f60
     const tn = (col) => new THREE.MeshToonMaterial({ color: col, gradientMap: grad })
@@ -6391,6 +6393,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
     window.__town3dFaceWalk = (y) => { if (active) { active.flyYaw = active.flyYawTarget = y || 0 } } // 検証用: 歩行の向き(rad)を直接指定
     window.__town3dSoundCounts = () => ({ chime: chimeCount, wing: wingCount }) // 検証用: 鈴・羽音の発火数
+    window.__town3dPalProbe = () => ({ duskAmt: +duskAmt.toFixed(2), isNight, snowy: SNOWY, skyTop: '#' + skyTop.getHexString(), skyBright: +skyBright.toFixed(3) }) // 検証用: 時間帯
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
