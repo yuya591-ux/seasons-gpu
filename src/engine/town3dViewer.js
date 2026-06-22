@@ -1218,7 +1218,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 格子の間が素の地面だと「空き地に家がぽつぽつ」に見える→境界線を路地で結ぶと「街区＝家並み＋その間の路地」になる。
   if (kind !== 'yato') {
     const alleyMat = mottleMat(season === 'winter' ? 0xbfc2bd : 0x8a8478, 90, 0.1, [3, 3]) // 使い込まれた土/舗装の路地（俯瞰で路面の質感）
-    const alleyGeos = [], aM = new THREE.Matrix4(), aRot = new THREE.Matrix4()
+    const alleyGeos = [], gutterGeos = [], manholeGeos = [], aM = new THREE.Matrix4(), aRot = new THREE.Matrix4(), aM2 = new THREE.Matrix4()
     const areas = [SHRINE, STATION, PARK, MOROOKA, TOWER, TEMPLE, SCHOOL, FUN, DOWNTOWN, STADIUM, HARBOR]
     const skipAlley = (x, z) => {
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) return true // 海・汀
@@ -1232,14 +1232,25 @@ export async function mountTown3d(parent, opts = {}) {
     const segAlley = (x0, z0, x1, z1, w) => {
       const y0 = heightAt(x0, z0), y1 = heightAt(x1, z1); if (Math.max(y0, y1) < SEA.level + 0.9) return
       const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz), pitch = Math.atan2(y1 - y0, len)
+      aRot.makeRotationY(Math.atan2(dx, dz))
       const seg = new THREE.BoxGeometry(w, 0.12, len + 0.3)
-      aRot.makeRotationY(Math.atan2(dx, dz)); aM.makeRotationX(-pitch).premultiply(aRot); aM.setPosition((x0 + x1) / 2, (y0 + y1) / 2 + 0.07, (z0 + z1) / 2); seg.applyMatrix4(aM); alleyGeos.push(seg)
+      aM.makeRotationX(-pitch).premultiply(aRot); aM.setPosition((x0 + x1) / 2, (y0 + y1) / 2 + 0.07, (z0 + z1) / 2); seg.applyMatrix4(aM); alleyGeos.push(seg)
+      // 側溝（路地の片側のコンクリ蓋＝U字溝。歩く道が「街路」に締まる＝目線の生活感）
+      const nx = -dz / len, nz = dx / len, goff = w / 2 + 0.17
+      const gseg = new THREE.BoxGeometry(0.34, 0.13, len + 0.3)
+      aM2.makeRotationX(-pitch).premultiply(aRot); aM2.setPosition((x0 + x1) / 2 + nx * goff, (y0 + y1) / 2 + 0.075, (z0 + z1) / 2 + nz * goff); gseg.applyMatrix4(aM2); gutterGeos.push(gseg)
+      // マンホール（時々・路地に鉄蓋の濃灰）
+      if (R() < 0.16) { const mh = new THREE.CircleGeometry(0.42, 12); mh.rotateX(-Math.PI / 2); mh.translate((x0 + x1) / 2, (y0 + y1) / 2 + 0.14, (z0 + z1) / 2); manholeGeos.push(mh) }
     }
     for (let zi = -21; zi <= 7; zi++) { const lz = (zi + 0.5) * 9 // x方向（東西）の路地
       for (let xi = -22; xi <= 9; xi++) { const mx = (xi + 0.5) * 9; if (R() < 0.14 || skipAlley(mx, lz)) continue; for (let s = 0; s < 3; s++) segAlley(xi * 9 + s * 3, lz, xi * 9 + (s + 1) * 3, lz, 1.8) } }
     for (let xi = -22; xi <= 9; xi++) { const lx = (xi + 0.5) * 9 // z方向（南北）の路地
       for (let zi = -21; zi <= 7; zi++) { const mz = (zi + 0.5) * 9; if (R() < 0.14 || skipAlley(lx, mz)) continue; for (let s = 0; s < 3; s++) segAlley(lx, zi * 9 + s * 3, lx, zi * 9 + (s + 1) * 3, 1.8) } }
-    if (BufferGeometryUtils.mergeGeometries && alleyGeos.length) { const m = BufferGeometryUtils.mergeGeometries(alleyGeos, false); if (m) { const mesh = new THREE.Mesh(m, alleyMat); mesh.receiveShadow = true; town.add(mesh) } alleyGeos.forEach((g) => g.dispose()) }
+    if (BufferGeometryUtils.mergeGeometries && alleyGeos.length) {
+      const m = BufferGeometryUtils.mergeGeometries(alleyGeos, false); if (m) { const mesh = new THREE.Mesh(m, alleyMat); mesh.receiveShadow = true; town.add(mesh) } alleyGeos.forEach((g) => g.dispose())
+      const gm = gutterGeos.length && BufferGeometryUtils.mergeGeometries(gutterGeos, false); if (gm) { const gmesh = new THREE.Mesh(gm, toon(season === 'winter' ? 0xc2bdb2 : 0xada79a)); gmesh.receiveShadow = true; town.add(gmesh) } gutterGeos.forEach((g) => g.dispose()) // 側溝の蓋（明るいコンクリ）
+      const mm = manholeGeos.length && BufferGeometryUtils.mergeGeometries(manholeGeos, false); if (mm) { const mmesh = new THREE.Mesh(mm, toon(0x5a5854)); mmesh.receiveShadow = true; town.add(mmesh) } manholeGeos.forEach((g) => g.dispose()) // マンホール（濃灰の鉄蓋）
+    }
   }
 
   // ── 副都心（拡張した西の高層ビル街）＝旗艦homeのスカイライン。house()のガラス窓の高層を中心ほど高く密集させる。 ──
