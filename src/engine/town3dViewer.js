@@ -676,6 +676,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
   const doorGeos = []
   const doorFrameGeos = [] // 戸枠・玄関庇（暖色の木）。戸を引き締め、庇の影で入口が立体に＝目線の生活感
+  const fixtureGeos = []   // 雨樋・メーター箱（灰の金属/樹脂）。建物正面の生活設備＝目線で「昭和の建物」の年季
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -1162,6 +1163,16 @@ export async function mountTown3d(parent, opts = {}) {
       bake(doorFrameGeos, dw + 0.32, 0.17, 0.14, ox, dh + 0.11, fz + 0.05) // 上の楣（まぐさ）
       if (isHouse) bake(doorFrameGeos, dw + 0.52, 0.1, 0.62, ox, dh + 0.28, fz + 0.3) // 玄関の小庇（前へ張り出し＝雨除け・影で入口が立体に）
       bake(plinthGeos, dw + 0.22, 0.22, 0.44, ox, 0.11, fz + 0.2) // 上がり段（式台＝コンクリの低い段）
+      // 雨樋（建物正面の角を縦に流れる樋＝日本の建物の象徴）。前面の角に縦の細い樋＋足元の横引き。
+      const ppH = h + (type === 'house' ? d * 0.3 : 0.2) // 軒/陸屋根の高さまで
+      const pcx = w / 2 - 0.12 // 右角
+      bake(fixtureGeos, 0.1, ppH, 0.1, pcx, ppH / 2, fz + 0.04) // 右の縦樋
+      bake(fixtureGeos, 0.1, 0.1, 0.5, pcx, 0.12, fz + 0.22)    // 足元の横引き（前へ）
+      if (R() < 0.5) bake(fixtureGeos, 0.1, ppH, 0.1, -pcx, ppH / 2, fz + 0.04) // 左の縦樋（時々）
+      // メーター箱（電気/ガス＝玄関脇の小箱）
+      bake(fixtureGeos, 0.24, 0.32, 0.16, ox + (dw / 2 + 0.34) * (ox > 0 ? -1 : 1), 1.25, fz + 0.06)
+      // 室外機（集合住宅/中層の壁際にも＝家は別途。前面の窓下に張り出す灰の箱）
+      if (!isHouse) bake(fixtureGeos, 0.78, 0.5, 0.42, (R() - 0.5) * w * 0.5, 1.15, fz + 0.24)
     }
   }
 
@@ -1301,6 +1312,9 @@ export async function mountTown3d(parent, opts = {}) {
     const fmerged = doorFrameGeos.length && BufferGeometryUtils.mergeGeometries(doorFrameGeos, false)
     if (fmerged) { const frames = new THREE.Mesh(fmerged, toon(0x7c6647)); frames.castShadow = true; frames.receiveShadow = true; town.add(frames) } // 戸枠・玄関庇（暖色の木）
     doorFrameGeos.forEach((g) => g.dispose())
+    const xmerged = fixtureGeos.length && BufferGeometryUtils.mergeGeometries(fixtureGeos, false)
+    if (xmerged) { const fixtures = new THREE.Mesh(xmerged, toon(0x6e6a64)); fixtures.castShadow = true; fixtures.receiveShadow = true; town.add(fixtures) } // 雨樋・メーター（灰）
+    fixtureGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
