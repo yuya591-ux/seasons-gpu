@@ -1182,6 +1182,34 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 路地網（住宅街の建物の間を縫う細い道＝本物の街並み・路地裏。9uの街区格子の境界線に沿って細い道を敷く） ──
+  // 格子の間が素の地面だと「空き地に家がぽつぽつ」に見える→境界線を路地で結ぶと「街区＝家並み＋その間の路地」になる。
+  if (kind !== 'yato') {
+    const alleyMat = mottleMat(season === 'winter' ? 0xbfc2bd : 0x8a8478, 90, 0.1, [3, 3]) // 使い込まれた土/舗装の路地（俯瞰で路面の質感）
+    const alleyGeos = [], aM = new THREE.Matrix4(), aRot = new THREE.Matrix4()
+    const areas = [SHRINE, STATION, PARK, MOROOKA, TOWER, TEMPLE, SCHOOL, FUN, DOWNTOWN, STADIUM, HARBOR]
+    const skipAlley = (x, z) => {
+      if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) return true // 海・汀
+      if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) return true // 川筋
+      if (Math.abs(z - RAIL.z) < 2.6 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1) return true // 線路
+      if (Math.abs(x) < 4.2 && z > -98 && z < 28) return true // 中央通り（別の広い舗装）
+      for (const a of areas) if (Math.hypot(x - a.x, z - a.z) < a.r + 1) return true // 神社/駅/公園/寺/学校 等
+      return false
+    }
+    // 斜面に沿わせた1区間の路地（端の高さで傾ける）。短く割って統合＝坂でも地に着く。
+    const segAlley = (x0, z0, x1, z1, w) => {
+      const y0 = heightAt(x0, z0), y1 = heightAt(x1, z1); if (Math.max(y0, y1) < SEA.level + 0.9) return
+      const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz), pitch = Math.atan2(y1 - y0, len)
+      const seg = new THREE.BoxGeometry(w, 0.12, len + 0.3)
+      aRot.makeRotationY(Math.atan2(dx, dz)); aM.makeRotationX(-pitch).premultiply(aRot); aM.setPosition((x0 + x1) / 2, (y0 + y1) / 2 + 0.07, (z0 + z1) / 2); seg.applyMatrix4(aM); alleyGeos.push(seg)
+    }
+    for (let zi = -21; zi <= 7; zi++) { const lz = (zi + 0.5) * 9 // x方向（東西）の路地
+      for (let xi = -22; xi <= 9; xi++) { const mx = (xi + 0.5) * 9; if (R() < 0.14 || skipAlley(mx, lz)) continue; for (let s = 0; s < 3; s++) segAlley(xi * 9 + s * 3, lz, xi * 9 + (s + 1) * 3, lz, 1.8) } }
+    for (let xi = -22; xi <= 9; xi++) { const lx = (xi + 0.5) * 9 // z方向（南北）の路地
+      for (let zi = -21; zi <= 7; zi++) { const mz = (zi + 0.5) * 9; if (R() < 0.14 || skipAlley(lx, mz)) continue; for (let s = 0; s < 3; s++) segAlley(lx, zi * 9 + s * 3, lx, zi * 9 + (s + 1) * 3, 1.8) } }
+    if (BufferGeometryUtils.mergeGeometries && alleyGeos.length) { const m = BufferGeometryUtils.mergeGeometries(alleyGeos, false); if (m) { const mesh = new THREE.Mesh(m, alleyMat); mesh.receiveShadow = true; town.add(mesh) } alleyGeos.forEach((g) => g.dispose()) }
+  }
+
   // ── 副都心（拡張した西の高層ビル街）＝旗艦homeのスカイライン。house()のガラス窓の高層を中心ほど高く密集させる。 ──
   {
     const dcx = DOWNTOWN.x, dcz = DOWNTOWN.z

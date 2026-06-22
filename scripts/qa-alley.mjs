@@ -1,0 +1,20 @@
+import { chromium } from 'playwright'
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 2 })
+const errs = []
+p.on('pageerror', (e) => errs.push(String(e)))
+p.on('console', (m)=>{ if(m.type()==='error') errs.push(m.text()) })
+await p.goto('http://localhost:4801/seasons/?dev=1', { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(()=>{})
+await p.waitForTimeout(700)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d'))
+await p.waitForTimeout(2400)
+await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
+await p.evaluate(()=>window.__town3dCruise(false))
+// 住宅街を見下ろす（路地網）
+await p.evaluate(()=>window.__town3dFlyPose(-50, 30, -40, 0.5, -0.5)); await p.waitForTimeout(1100)
+await p.screenshot({ path: 'scripts/_shots/alley-1.png' })
+await p.evaluate(()=>window.__town3dFlyPose(-30, 16, -20, 0.4, -0.28)); await p.waitForTimeout(1000)
+await p.screenshot({ path: 'scripts/_shots/alley-2.png' })
+console.log(errs.length ? 'ERR '+errs.slice(0,3).join(' | ') : 'no errors')
+await b.close()
