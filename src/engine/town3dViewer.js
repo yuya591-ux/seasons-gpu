@@ -181,17 +181,21 @@ export function setTown3dLand(land) {
   if (!active || !active.flyEnabled) return
   if (land) {
     if (active.mode === 'window') return // 窓辺から直接は歩けない（空を経由）
-    // 雲上のくつろぎ場所が近く・かつ雲海の上にいるなら、地上でなく“雲上の浮島”へ降り立つ
-    const cr = active.cloudRest
-    if (cr && active.flyPos.y > cr.minY && Math.hypot(active.flyPos.x - cr.x, active.flyPos.z - cr.z) < 95) {
-      const dx = active.flyPos.x - cr.x, dz = active.flyPos.z - cr.z, d = Math.hypot(dx, dz)
-      if (d > cr.rad - 3) { const k = (cr.rad - 4) / Math.max(d, 0.001); active.flyPos.x = cr.x + dx * k; active.flyPos.z = cr.z + dz * k } // 縁の内側へ寄せる
-      active.onCloud = true
-      const ox = active.flyPos.x - cr.x, oz = active.flyPos.z - cr.z // 外（雲海の眺め）を向いて立つ
-      active.flyYaw = active.flyYawTarget = (Math.abs(ox) + Math.abs(oz) > 1) ? Math.atan2(ox, -oz) : 0
-      active.flyPitchTarget = -0.02; active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
-      active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1
-      return
+    // 雲海の上で、回遊群島のいずれかの島が近いなら、地上でなく“雲上の浮島”へ降り立つ
+    const cw = active.cloudWalk
+    if (cw && active.flyPos.y > cw.minY) {
+      let best = null, bestD = 1e9
+      for (const n of cw.nodes) { const d = Math.hypot(active.flyPos.x - n.x, active.flyPos.z - n.z); if (d < bestD) { bestD = d; best = n } }
+      if (best && bestD < 110) {
+        const dx = active.flyPos.x - best.x, dz = active.flyPos.z - best.z, d = Math.hypot(dx, dz)
+        if (d > best.r - 3) { const k = (best.r - 4) / Math.max(d, 0.001); active.flyPos.x = best.x + dx * k; active.flyPos.z = best.z + dz * k } // 島の縁の内側へ寄せる
+        active.onCloud = true
+        const ox = active.flyPos.x - best.x, oz = active.flyPos.z - best.z // 外（雲海の眺め）を向いて立つ
+        active.flyYaw = active.flyYawTarget = (Math.abs(ox) + Math.abs(oz) > 1) ? Math.atan2(ox, -oz) : 0
+        active.flyPitchTarget = -0.02; active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
+        active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1
+        return
+      }
     }
     active.onCloud = false
     // いまの真下の安全な地点へ着地（建物/樹冠に埋もれないよう退避）し、街路の抜ける方を向く
@@ -3718,7 +3722,19 @@ export async function mountTown3d(parent, opts = {}) {
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
-  let cloudRestInfo = null // 雲上のくつろぎ場所（降り立って佇める浮島）。active生成後に active.cloudRest へ渡す
+  let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
+  // 雲上の歩行面の高さ＝島の上(平ら)か橋の上(端点間を補間＋たわみ)。歩ける範囲外は null。
+  const cloudSurfaceY = (x, z) => {
+    if (!cloudWalkInfo) return null
+    for (const n of cloudWalkInfo.nodes) { if (Math.hypot(x - n.x, z - n.z) <= n.r) return n.topY }
+    for (const br of cloudWalkInfo.bridges) {
+      const dx = br.bx - br.ax, dz = br.bz - br.az, L2 = dx * dx + dz * dz
+      const t = ((x - br.ax) * dx + (z - br.az) * dz) / L2
+      if (t < 0 || t > 1) continue
+      if (Math.hypot(x - (br.ax + dx * t), z - (br.az + dz * t)) <= br.halfW) return br.ay + (br.by - br.ay) * t - Math.sin(Math.PI * t) * br.sag
+    }
+    return null
+  }
   if (kind === 'town' && BufferGeometryUtils.mergeGeometries) {
     // 雲の頂点に「陽の当たる暖白い頂 → 翳る冷たい底」の階調を焼く（法線頼みでなく確実に“雲らしい”立体陰影＝水彩調）。
     const cloudTint = (geo, y0, y1, lo, hi) => {
@@ -3765,33 +3781,67 @@ export async function mountTown3d(parent, opts = {}) {
       isles.push({ x: 10, z: -380, r: 38, g }) }
     for (const il of isles) { il.g.position.set(il.x, SEA_Y + 18, il.z); il.g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(il.g) }
 
-    // 雲上のくつろぎ場所＝降り立って佇める大きな浮島。東屋に腰かけ、雲海・鯨・灯籠を眺めて整う“休息”。空の旅の目的地。
-    const REST = { x: -20, z: -290, topY: SEA_Y + 22, rad: 24 }
-    { const g = makeFloatIsle(REST.rad), gy = 1.2 // 草の頂上面(local +1.2)を歩く面に
-      const stoneMat = tn(isNight ? 0x646670 : 0xb7b1a4)
-      const pave = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 0.4, 22), stoneMat); pave.position.y = gy + 0.05; g.add(pave) // 石畳の中央
-      const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640), azRoof = tn(isNight ? 0x3a3f4a : 0x6b5347)
-      for (const [px, pz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 5, 7), woodMat); post.position.set(px, gy + 2.7, pz); g.add(post) } // 東屋の柱
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.5, 11.4), woodMat); beam.position.y = gy + 5.2; g.add(beam)
-      const azr = new THREE.Mesh(new THREE.ConeGeometry(9.6, 3.6, 4), azRoof); azr.rotation.y = Math.PI / 4; azr.position.y = gy + 7.1; g.add(azr) // 寄棟屋根
-      const bench0 = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 1.6), woodMat); bench0.position.set(0, gy + 0.9, 4.2); g.add(bench0) // 縁台（腰かけて眺める）
-      for (const lx of [-2.6, 2.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.4), woodMat); leg.position.set(lx, gy + 0.45, 4.2); g.add(leg) }
-      const lantStone = tn(isNight ? 0x707280 : 0x9a948a)
-      for (const [lx, lz] of [[-15, 6], [14, -8]]) { // 石灯籠2基（夜ほのかに灯る）
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.0, 6), lantStone); base.position.set(lx, gy + 0.5, lz); g.add(base)
-        const fire = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0x000000), emissiveIntensity: isNight ? 1.0 : 0 })); fire.position.set(lx, gy + 1.8, lz); g.add(fire)
-        const cap = new THREE.Mesh(new THREE.ConeGeometry(1.0, 0.7, 6), lantStone); cap.position.set(lx, gy + 2.7, lz); g.add(cap)
-      }
-      const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 7, 7), tn(0x5a4636)); tk.position.set(-16, gy + 3.5, -10); g.add(tk) // 木陰の一本
-      const can = new THREE.Mesh(new THREE.IcosahedronGeometry(5.5, 1), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-16, gy + 9, -10); can.scale.y = 0.85; g.add(can)
-      const trMat = tn(isNight ? 0x7a3026 : 0xc34a32), th = 9, tw = 6 // 鳥居（空からの入口）
-      for (const sx of [-1, 1]) { const pi = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, th, 8), trMat); pi.position.set(sx * tw * 0.5 + 17, gy + th * 0.5, 10); g.add(pi) }
-      const kasa2 = new THREE.Mesh(new THREE.BoxGeometry(tw + 2.6, 0.8, 1.4), trMat); kasa2.position.set(17, gy + th + 0.4, 10); g.add(kasa2)
-      g.position.set(REST.x, REST.topY - gy, REST.z) // 草の頂上面(world)= REST.topY ＝歩く面
-      g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } })
-      scene.add(g)
-      cloudRestInfo = { x: REST.x, z: REST.z, topY: REST.topY, rad: REST.rad - 2.5, minY: SEA_Y - 6 } // 着地判定/歩行拘束に使う
+    // ── 雲上の回遊できる群島：歩いて渡れる島々を吊り橋でつなぐ。降り立って佇み、橋を渡って巡る“休息の世界” ──
+    const GY = 1.2 // makeFloatIsle の草の頂上面(local)
+    const cwNodes = [
+      { x: -20, z: -290, r: 22, topY: SEA_Y + 22, kind: 'pavilion' }, // 中心＝東屋の広場
+      { x: 40, z: -298, r: 12, topY: SEA_Y + 20, kind: 'teahouse' },  // 茶屋
+      { x: -62, z: -270, r: 12, topY: SEA_Y + 24, kind: 'lookout' },  // 見晴らし台
+      { x: -2, z: -336, r: 11, topY: SEA_Y + 19, kind: 'shrine' },    // 小さな祠
+    ]
+    const cwBridges = []
+    const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6 }) }
+    link(0, 1); link(0, 2); link(0, 3) // 中心から各島へ吊り橋
+    const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
+      const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
+      const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
+      const N = Math.max(8, Math.round(len / 1.5)), ang = Math.atan2(dx, dz), surfY = (t) => br.ay + (br.by - br.ay) * t - Math.sin(Math.PI * t) * br.sag
+      for (let i = 0; i <= N; i++) { const t = i / N; const plank = new THREE.Mesh(new THREE.BoxGeometry(br.halfW * 2, 0.16, 0.9), plankMat); plank.position.set(br.ax + dx * t, surfY(t), br.az + dz * t); plank.rotation.y = ang; g.add(plank) }
+      for (const side of [-1, 1]) for (let i = 0; i < N; i++) { const t0 = i / N, t1 = (i + 1) / N
+        const x0 = br.ax + dx * t0 + px * br.halfW * side, z0 = br.az + dz * t0 + pz * br.halfW * side, y0 = surfY(t0) + 1.2
+        const x1 = br.ax + dx * t1 + px * br.halfW * side, z1 = br.az + dz * t1 + pz * br.halfW * side, y1 = surfY(t1) + 1.2
+        const sl = Math.hypot(x1 - x0, y1 - y0, z1 - z0), rope = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, sl, 5), ropeMat)
+        rope.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); rope.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3((x1 - x0) / sl, (y1 - y0) / sl, (z1 - z0) / sl)); g.add(rope) }
+      for (const [ex, ez, ey] of [[br.ax, br.az, br.ay], [br.bx, br.bz, br.by]]) for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 2.6, 6), plankMat); post.position.set(ex + px * br.halfW * side, ey + 1.0, ez + pz * br.halfW * side); g.add(post) }
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); return g
     }
+    for (const br of cwBridges) scene.add(makeBridge(br))
+    for (const n of cwNodes) { // 各島を建てる
+      const g = makeFloatIsle(n.r)
+      if (n.kind === 'pavilion') {
+        const pave = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 0.4, 22), tn(isNight ? 0x646670 : 0xb7b1a4)); pave.position.y = GY + 0.05; g.add(pave)
+        const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640), azRoof = tn(isNight ? 0x3a3f4a : 0x6b5347)
+        for (const [px, pz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 5, 7), woodMat); post.position.set(px, GY + 2.7, pz); g.add(post) }
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.5, 11.4), woodMat); beam.position.y = GY + 5.2; g.add(beam)
+        const azr = new THREE.Mesh(new THREE.ConeGeometry(9.6, 3.6, 4), azRoof); azr.rotation.y = Math.PI / 4; azr.position.y = GY + 7.1; g.add(azr)
+        const bench0 = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 1.6), woodMat); bench0.position.set(0, GY + 0.9, 4.2); g.add(bench0)
+        for (const lx of [-2.6, 2.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.4), woodMat); leg.position.set(lx, GY + 0.45, 4.2); g.add(leg) }
+        const lantStone = tn(isNight ? 0x707280 : 0x9a948a)
+        for (const [lx, lz] of [[-14, 6], [13, -7]]) {
+          const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.0, 6), lantStone); base.position.set(lx, GY + 0.5, lz); g.add(base)
+          const fire = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0x000000), emissiveIntensity: isNight ? 1.0 : 0 })); fire.position.set(lx, GY + 1.8, lz); g.add(fire)
+          const cap = new THREE.Mesh(new THREE.ConeGeometry(1.0, 0.7, 6), lantStone); cap.position.set(lx, GY + 2.7, lz); g.add(cap)
+        }
+      } else if (n.kind === 'teahouse') {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3.0, 5), tn(isNight ? 0x6a6052 : 0xd8cdb2)); body.position.set(0, GY + 1.5, -1); g.add(body)
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(5.4, 3.0, 4), tn(isNight ? 0x4a4236 : 0x8a7a54)); roof.rotation.y = Math.PI / 4; roof.position.set(0, GY + 4.3, -1); g.add(roof) // 茅葺の茶屋
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 1.2), tn(isNight ? 0x5a4636 : 0x6e5640)); bench.position.set(0, GY + 0.9, 3.4); g.add(bench)
+      } else if (n.kind === 'lookout') {
+        const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640)
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 1.3), woodMat); bench.position.set(0, GY + 0.9, 3); g.add(bench) // 縁の腰かけ
+        for (const lx of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.1), woodMat); leg.position.set(lx, GY + 0.45, 3); g.add(leg) }
+        const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 6, 7), tn(0x5a4636)); tk.position.set(-5, GY + 3, -4); g.add(tk)
+        const can = new THREE.Mesh(new THREE.IcosahedronGeometry(4.6, 1), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-5, GY + 7, -4); can.scale.y = 0.85; g.add(can)
+      } else { // shrine（小さな祠＋鳥居）
+        const trMat = tn(isNight ? 0x7a3026 : 0xc34a32), th = 7, tw = 5
+        for (const sx of [-1, 1]) { const pi = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, th, 8), trMat); pi.position.set(sx * tw * 0.5, GY + th * 0.5, 4); g.add(pi) }
+        const kasa = new THREE.Mesh(new THREE.BoxGeometry(tw + 2, 0.7, 1.2), trMat); kasa.position.set(0, GY + th + 0.3, 4); g.add(kasa)
+        const hond = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 2.4), tn(isNight ? 0x5a4636 : 0x7a5d44)); hond.position.set(0, GY + 1.7, -2); g.add(hond)
+        const hroof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 4), tn(isNight ? 0x3a3f4a : 0x49545f)); hroof.rotation.y = Math.PI / 4; hroof.position.set(0, GY + 3.6, -2); g.add(hroof)
+      }
+      g.position.set(n.x, n.topY - GY, n.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(g)
+    }
+    cloudWalkInfo = { nodes: cwNodes.map((n) => ({ x: n.x, z: n.z, r: n.r - 2.5, topY: n.topY })), bridges: cwBridges, minY: SEA_Y - 6 }
 
     // 雲海＝下地の円盤（取りこぼしを埋め谷の翳りになる）＋「平たい底＋もくもくの頂」の雲塊（頂点階調で立体的な雲に）。
     // group ごと高度でフェード＝窓辺・巡航では消えて開けた空、高く昇ると現れて街が雲の下へ消える別世界。
@@ -3811,7 +3861,8 @@ export async function mountTown3d(parent, opts = {}) {
       for (let gz = -seaR; gz <= seaR; gz += step) {
         if (Math.hypot(gx, gz) > seaR) continue
         if (isles.some((il) => Math.hypot(gx - il.x, gz - il.z) < il.r)) continue // 島の周りはくぼませる（雲のくぼ地に据わる）
-        if (Math.hypot(gx - REST.x, gz - REST.z) < REST.rad + 22) continue // くつろぎ場所の周りもくぼませる
+        if (cwNodes.some((n) => Math.hypot(gx - n.x, gz - n.z) < n.r + 15)) continue // 回遊群島の島の周りはくぼませる
+        if (cwBridges.some((br) => { const dx = br.bx - br.ax, dz = br.bz - br.az, L2 = dx * dx + dz * dz; let t = ((gx - br.ax) * dx + (gz - br.az) * dz) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(gx - (br.ax + dx * t), gz - (br.az + dz * t)) < br.halfW + 9 })) continue // 吊り橋の筋もくぼませる
         if (gaps.some((gp) => Math.hypot(gx - gp.x, gz - gp.z) < gp.r)) continue // 雲の切れ間（地上が覗く穴）
         const jx = gx + (R() - 0.5) * step * 0.4, jz = gz + (R() - 0.5) * step * 0.4, baseY = (R() - 0.5) * 11
         const sB = (LIGHT ? 19 : 15) + R() * 9
@@ -4901,7 +4952,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     return best
   }
-  active.cloudRest = cloudRestInfo // 雲上のくつろぎ場所（着地判定/歩行拘束）。townのみ非null
+  active.cloudWalk = cloudWalkInfo // 雲上の回遊群島（着地判定/歩行ネットワーク）。townのみ非null
 
   const startT = performance.now() // THREE.Clock は非推奨→performance.now 差分で経過秒を出す（警告解消・依存削減）
   let lastT = 0
@@ -5900,14 +5951,13 @@ export async function mountTown3d(parent, opts = {}) {
 
       const b = bound
       if (isWalk) {
-        const cr = active.onCloud ? active.cloudRest : null
-        if (cr) { // 雲上のくつろぎ場所＝地形の当たり判定は無視し、円い縁の内側を自由に歩く
-          let nx = active.flyPos.x + active.vel.x * dt, nz = active.flyPos.z + active.vel.z * dt
-          const dx = nx - cr.x, dz = nz - cr.z, d = Math.hypot(dx, dz)
-          if (d > cr.rad) { nx = cr.x + dx / d * cr.rad; nz = cr.z + dz / d * cr.rad } // 縁から落ちない
-          active.flyPos.x = nx; active.flyPos.z = nz
+        const onCl = active.onCloud
+        if (onCl) { // 雲上の回遊群島＝地形の当たり判定は無視し、島＋吊り橋のネットワーク上だけ歩ける（縁から落ちない）
+          const nx = active.flyPos.x + active.vel.x * dt, nz = active.flyPos.z + active.vel.z * dt
+          if (cloudSurfaceY(nx, nz) != null) { active.flyPos.x = nx; active.flyPos.z = nz }
+          else { if (cloudSurfaceY(nx, active.flyPos.z) != null) active.flyPos.x = nx; if (cloudSurfaceY(active.flyPos.x, nz) != null) active.flyPos.z = nz } // 縁に沿って滑る
         } else tryWalk(active.flyPos, active.vel.x * dt, active.vel.z * dt) // 当たり判定つきで水平移動
-        const groundY = cr ? cr.topY : heightAt(active.flyPos.x, active.flyPos.z)
+        const groundY = onCl ? (cloudSurfaceY(active.flyPos.x, active.flyPos.z) ?? active.flyPos.y - FLY.eye) : heightAt(active.flyPos.x, active.flyPos.z)
         const eyeY = groundY + FLY.eye
         const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
         active.flyPos.y += (eyeY - active.flyPos.y) * ky // 着地はやわらかく・以降は面に沿う
@@ -5994,7 +6044,7 @@ export async function mountTown3d(parent, opts = {}) {
       // 着地の沈み込み（とんと沈んで戻る＝接地の手応え）
       if (active.dipT > 0) { active.dipT -= dt; const pp = 1 - Math.max(0, active.dipT) / 0.42; camY -= Math.sin(pp * Math.PI) * 0.6 }
       // 自分の影が真下の地面を走る（高度で大きさ・濃さが変わる＝飛んでいる手応え）
-      const gY = active.onCloud && active.cloudRest ? active.cloudRest.topY : heightAt(active.flyPos.x, active.flyPos.z)
+      const gY = active.onCloud ? (cloudSurfaceY(active.flyPos.x, active.flyPos.z) ?? active.flyPos.y - FLY.eye) : heightAt(active.flyPos.x, active.flyPos.z)
       const alt = Math.max(0, active.flyPos.y - gY)
       flyerShadow.visible = flyAmt > 0.5
       flyerShadow.position.set(active.flyPos.x, gY + 0.06, active.flyPos.z)
@@ -6236,6 +6286,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
+    window.__town3dFaceWalk = (y) => { if (active) { active.flyYaw = active.flyYawTarget = y || 0 } } // 検証用: 歩行の向き(rad)を直接指定
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
