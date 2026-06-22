@@ -43,6 +43,7 @@ const FLY = {
   // 速度・慣性（鳥/グライダーの“重さ”）
   speed: 12.5,      // 飛行の最大速度(u/s)。御しやすさ優先で少し控えめに（全倒しで到達）
   walkSpeed: 5.5,   // 歩行の最大速度(u/s)
+  walkAccel: 8,     // 歩行の加減速(1/s)。飛行の浮いた慣性(moveEase)を流用せず接地した手応えに＝即歩き出し・すっと止まる
   climbSpeed: 6.5,  // （旧）上昇/下降の速さ。スキームAでは未使用
   moveEase: 2.8,    // 速度の追従(1/s)。小さいほど重い加速／離すと惰性で滑空して停止
   // ── スキームA: オート巡航＋ドラッグ操舵（一本指） ──
@@ -60,7 +61,8 @@ const FLY = {
   // 引いた三人称“浮遊カメラ”（後方上から望む）
   camBack: 11.5, camUp: 3.6, camAhead: 9,     // 飛行: 後方/上/注視先（既定をやや引き気味＝街を広く望む。±ズームで前後可変）
   walkBack: 1.5, walkUp: 0.4, walkAhead: 4.5, // 歩行: 一人称寄り（通行人と目線を揃える＝地に足のついた散策。アバター無し）
-  camLag: 0.12,     // カメラ位置の遅れ追従（わずかな揺らぎ＝空気の流れ）
+  camLag: 0.12,     // 飛行カメラ位置の遅れ追従（わずかな揺らぎ＝空気の流れ）
+  walkCamLag: 0.3,  // 歩行カメラの追従（飛行より密着＝地に足のついた一人称の手応え。浮いた遅延を流用しない）
   // 旋回バンク（飛行の没入の要）
   bankMax: 0.32,    // 最大ロール(rad≈18°)。穏当に（酔い配慮）
   bankGain: 2.2,    // 旋回・横移動入力→バンク量
@@ -6249,7 +6251,7 @@ export async function mountTown3d(parent, opts = {}) {
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
       const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit // カメラの向き
 
-      const k = 1 - Math.exp(-FLY.moveEase * dt) // 慣性：目標速度へ寄せる（とまる/離すと0へ）
+      const k = 1 - Math.exp(-(isWalk ? FLY.walkAccel : FLY.moveEase) * dt) // 目標速度へ寄せる。歩行は接地した加減速（即・すっと）／飛行は浮いた慣性で滑空
       active.vel.x += (dvX - active.vel.x) * k
       active.vel.y += (dvY - active.vel.y) * k
       active.vel.z += (dvZ - active.vel.z) * k
@@ -6280,6 +6282,7 @@ export async function mountTown3d(parent, opts = {}) {
         // 足音: 歩いた距離を貯め、一歩ぶん進むごとに鳴らす（止まっている間は鳴らない）
         const hstep = Math.hypot(active.vel.x, active.vel.z) * dt
         active.walkDist = (active.walkDist || 0) + hstep
+        active.walkPhase = ((active.walkPhase || 0) + hstep) % 4.2 // 歩みの位相（一歩2.1u）＝頭の弾み/左右の重心移ろいを足音と同期
         if (active.walkDist > 2.1) { active.walkDist = 0; onFoot() }
       } else {
         active.flyPos.x += active.vel.x * dt; active.flyPos.y += active.vel.y * dt; active.flyPos.z += active.vel.z * dt
@@ -6325,7 +6328,7 @@ export async function mountTown3d(parent, opts = {}) {
       const camFloor = heightAt(dcx, dcz) + (isWalk ? 1.35 : 1.6) // 歩行は一人称寄り＝目線をやや低く許す
       if (dcy < camFloor) dcy = camFloor
       if (!active.camReady) { active.camPos.set(dcx, dcy, dcz); active.camReady = true } // 飛び立ち/着地直後はスナップ
-      else { active.camPos.x += (dcx - active.camPos.x) * FLY.camLag; active.camPos.y += (dcy - active.camPos.y) * FLY.camLag; active.camPos.z += (dcz - active.camPos.z) * FLY.camLag }
+      else { const cl = isWalk ? FLY.walkCamLag : FLY.camLag; active.camPos.x += (dcx - active.camPos.x) * cl; active.camPos.y += (dcy - active.camPos.y) * cl; active.camPos.z += (dcz - active.camPos.z) * cl } // 歩行は密着＝地に足のついた手応え／飛行は緩い遅れ＝空気の流れ
 
       let aLookX = fp.x + fwdX * ahead, aLookY = fp.y + fwdY * ahead + Math.sin(t * 0.5) * 0.04, aLookZ = fp.z + fwdZ * ahead
       // オートシネマ: 接線に沿って機体は流れつつ、視線は名所の中心へ向ける＝名所を画面に保つオービット
@@ -6348,8 +6351,10 @@ export async function mountTown3d(parent, opts = {}) {
       // 浮遊感: ホバリングはゆっくり上下に漂い、速いとかすかに揺れる。歩行は頭が弾む。
       const sp01 = Math.min(1, speedMag / (isWalk ? FLY.walkSpeed : FLY.speed))
       if (isWalk) {
-        camY += Math.sin(t * 8.0) * 0.03 * sp01 * flyAmt // 一人称寄りでは頭の弾みを控えめに（酔い配慮）
-        camX += Math.sin(t * 4.0) * 0.015 * sp01 * flyAmt
+        // 歩いた距離で位相を進める＝足音と同期した自然な歩み（時間でなく距離なので、ゆっくり歩けば弾みもゆっくり）。
+        const wp = active.walkPhase || 0
+        camY += Math.abs(Math.sin(wp / 2.1 * Math.PI)) * 0.04 * sp01 * flyAmt // 一歩ごとに上下（足が地につく谷で沈む）。控えめ＝酔い配慮
+        camX += Math.sin(wp / 4.2 * Math.PI) * 0.022 * sp01 * flyAmt // 二歩で左右一周＝重心の移ろい
       } else {
         // 夢の浮遊＝ホバリングほど大きくゆったり漂い（無重力に浮かぶ手触り）、速いとかすかに弾む。上昇気流ではふわっと持ち上がる手応え。
         const float = 1 - sp01 * 0.55
