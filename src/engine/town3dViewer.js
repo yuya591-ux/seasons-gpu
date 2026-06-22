@@ -5963,16 +5963,8 @@ export async function mountTown3d(parent, opts = {}) {
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
-    // 解像度を下げるのは「速く動いている間」だけ。止まって景色を一望する時は最高解像度(1.6)に保ち綺麗に見せる。
-    // 速い移動中のみ一段下げて省エネ（粗さは動きで目立たない）。flyMotionをなめらかに変化させ、速度の上下でprがバタつかない。
-    const hsp = active.mode !== 'window' ? Math.hypot(active.vel.x, active.vel.z) / FLY.speed : 0 // 0..1 水平速度
-    active.flyMotion = (active.flyMotion || 0) + ((hsp > 0.2 ? 1 : 0) - (active.flyMotion || 0)) * Math.min(1, dt * 2.4) // 約0.45sでなめらかに（巡航で下げ・止まると戻す）
-    const wantFly = active.mode !== 'window' && (active.flyP || 0) > 0.55 && active.flyMotion > 0.55
-    if (wantFly !== prFly) {
-      prFly = wantFly
-      curPR = Math.min(window.devicePixelRatio || 1, wantFly ? qCap * 0.88 : qCap)
-      applySize() // pixelRatio変更時も aspect を必ず更新（横伸びバグ防止）
-    }
+    // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に（発熱対策の解像度落としは画質劣化を招いたため廃止）。
+    // 発熱配慮は「窓辺の休息中のfps間引き」と「30fps上限・非表示時停止」で行う（画質を落とさない範囲で）。
     renderer.render(scene, camera)
   }
   renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
