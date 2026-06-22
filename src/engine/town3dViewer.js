@@ -387,6 +387,8 @@ export async function mountTown3d(parent, opts = {}) {
   // 回り込み光を抑えて平坦フィルを脱す（影側が残る＝セルの陰影と形が出る）。地面側は暖色。
   scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.34 : 0.34))
   scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.10)) // 夜の近景が真っ黒に沈まない程度に底上げ
+  let sunGlow = null // 昼/夕の空の太陽の光輪（彩雲リング付き）。カメラへ追従させて空に置く
+  const sunDir = new THREE.Vector3()
   // 夜は月と星
   if (isNight) {
     // ベタ白の円を脱す（評価 美術-M3）: わずかに暖色のクリーム＋柔らかなハロー（加算スプライト）で月らしく。
@@ -406,6 +408,19 @@ export async function mountTown3d(parent, opts = {}) {
     }
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3))
     scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xeaf0ff, size: 1.4, sizeAttenuation: false, fog: false })))
+  } else {
+    // 昼/夕＝空に柔らかな太陽の光輪＋淡い彩雲のリング（光輪の外に分光がにじむ実在の現象）。太陽の向きに置きカメラへ追従。
+    const scv = document.createElement('canvas'); scv.width = scv.height = 128
+    const sgx = scv.getContext('2d'), sgr = sgx.createRadialGradient(64, 64, 0, 64, 64, 64)
+    sgr.addColorStop(0.00, 'rgba(255,250,236,0.95)'); sgr.addColorStop(0.09, 'rgba(255,243,214,0.6)') // 太陽の芯（暖白）
+    sgr.addColorStop(0.20, 'rgba(255,228,182,0)'); sgr.addColorStop(0.42, 'rgba(255,210,160,0)')
+    sgr.addColorStop(0.47, 'rgba(176,198,255,0.10)'); sgr.addColorStop(0.53, 'rgba(188,236,200,0.11)') // 彩雲リング（青→緑）
+    sgr.addColorStop(0.59, 'rgba(255,226,168,0.12)'); sgr.addColorStop(0.65, 'rgba(255,184,172,0.10)') // 黄→赤
+    sgr.addColorStop(0.76, 'rgba(255,184,172,0)'); sgx.fillStyle = sgr; sgx.fillRect(0, 0, 128, 128)
+    sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(scv), transparent: true, opacity: 0.92, depthWrite: false, fog: false }))
+    sunGlow.scale.set(155, 155, 1); scene.add(sunGlow)
+    // 見える太陽は主視界(街=-z)の上・低めに置く（陽が街の向こうにある絵。夕焼け情景では茜の空に沈む）。影は様式化で微差を許容。
+    sunDir.set(0.06, 0.26, -1).normalize()
   }
 
   // 地平のやわらかな光のにじみ（夕陽/街あかりのグロー）。重いポスト処理を使わず、加算スプライト1枚で
@@ -3723,6 +3738,8 @@ export async function mountTown3d(parent, opts = {}) {
   const seaMats = [] // 雲海の材（高度フェードで opacity を動かす）
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
+  const cloudObjs = [] // 雲海の静的要素（入道雲・島々・吊り橋）。低空では一括で非表示にして描画コールを節約
+  let lastCloudHi = true // 雲海の世界の表示状態（変化時だけ visible を書き換える）
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
   let rainbowArch = null // 雲海の上にかかる、くぐれる虹のアーチ
@@ -3788,7 +3805,7 @@ export async function mountTown3d(parent, opts = {}) {
       const body = new THREE.Mesh(new THREE.BoxGeometry(7, 3.0, 5), wallMat); body.position.y = 2.5; g.add(body)
       const roof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 3.4, 4), thatchMat); roof.rotation.y = Math.PI / 4; roof.position.y = 5.4; g.add(roof) // 寄棟茅葺
       isles.push({ x: 10, z: -380, r: 38, g }) }
-    for (const il of isles) { il.g.position.set(il.x, SEA_Y + 18, il.z); il.g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(il.g) }
+    for (const il of isles) { il.g.position.set(il.x, SEA_Y + 18, il.z); il.g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(il.g); cloudObjs.push(il.g) }
 
     // ── 雲上の回遊できる群島：歩いて渡れる島々を吊り橋でつなぐ。降り立って佇み、橋を渡って巡る“休息の世界” ──
     const GY = 1.2 // makeFloatIsle の草の頂上面(local)
@@ -3814,7 +3831,7 @@ export async function mountTown3d(parent, opts = {}) {
       for (const [ex, ez, ey] of [[br.ax, br.az, br.ay], [br.bx, br.bz, br.by]]) for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 2.6, 6), plankMat); post.position.set(ex + px * br.halfW * side, ey + 1.0, ez + pz * br.halfW * side); g.add(post) }
       g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); return g
     }
-    for (const br of cwBridges) scene.add(makeBridge(br))
+    for (const br of cwBridges) { const bg = makeBridge(br); scene.add(bg); cloudObjs.push(bg) }
     for (const n of cwNodes) { // 各島を建てる
       const g = makeFloatIsle(n.r)
       if (n.kind === 'pavilion') {
@@ -3848,7 +3865,7 @@ export async function mountTown3d(parent, opts = {}) {
         const hond = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 2.4), tn(isNight ? 0x5a4636 : 0x7a5d44)); hond.position.set(0, GY + 1.7, -2); g.add(hond)
         const hroof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 4), tn(isNight ? 0x3a3f4a : 0x49545f)); hroof.rotation.y = Math.PI / 4; hroof.position.set(0, GY + 3.6, -2); g.add(hroof)
       }
-      g.position.set(n.x, n.topY - GY, n.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(g)
+      g.position.set(n.x, n.topY - GY, n.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(g); cloudObjs.push(g)
     }
     cloudWalkInfo = { nodes: cwNodes.map((n) => ({ x: n.x, z: n.z, r: n.r - 2.5, topY: n.topY })), bridges: cwBridges, minY: SEA_Y - 6 }
 
@@ -3905,8 +3922,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
     const tTop = BufferGeometryUtils.mergeGeometries(towerTop, false); towerTop.forEach((g) => g.dispose())
     const tBot = BufferGeometryUtils.mergeGeometries(towerBot, false); towerBot.forEach((g) => g.dispose())
-    if (tTop) scene.add(new THREE.Mesh(tTop, cloudMat))
-    if (tBot) scene.add(new THREE.Mesh(tBot, cloudBot))
+    if (tTop) { const m = new THREE.Mesh(tTop, cloudMat); scene.add(m); cloudObjs.push(m) }
+    if (tBot) { const m = new THREE.Mesh(tBot, cloudBot); scene.add(m); cloudObjs.push(m) }
 
     // やさしい幻想：雲海のぬし＝雲を泳ぐ大きな鯨＋寄り添う子鯨。ゆっくり横切り、時々ふっと潮を吹く（生命の気配・白眉）。
     { const whale = new THREE.Group()
@@ -5586,9 +5603,11 @@ export async function mountTown3d(parent, opts = {}) {
     if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
     const t = (performance.now() - startT) / 1000
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
-    // 休息中（窓辺で操作も飛行も無く4秒以上経過）は更に約22fpsへ落とす＝じっと眺める長い時間の電池/発熱を抑える。
-    // 操作・飛行・イベント中は30fpsを保つので滑らかさは損なわない。
-    const restIdle = active.mode === 'window' && (active.flyP || 0) < 0.05 && (performance.now() - (active.lastInputT || 0)) > 4000
+    // ぼーっと眺めている長い時間は約22fpsへ落とす＝電池/発熱を抑える（dtは実クロックなので動きは滑らかなまま）。
+    // 「眺めている」＝操作が3.5秒以上なく、ほぼ静止（窓辺／止まって浮かぶ／雲上や地上で休む）。雲や鯨はごく遅いので22fpsでも見た目はほぼ不変。
+    // 能動的に飛んで動く時（巡航・操舵・昇降・速い移動）は30fpsを保つので滑らかさは損なわない。
+    const stillNow = Math.hypot(active.vel.x, active.vel.z) < 0.8 && (active.climb || 0) === 0
+    const restIdle = stillNow && (performance.now() - (active.lastInputT || 0)) > 3500
     if (t - lastDraw < (restIdle ? 0.045 : 0.032)) return
     lastDraw = t
     const dt = Math.min(0.05, t - lastT); lastT = t
@@ -6234,6 +6253,7 @@ export async function mountTown3d(parent, opts = {}) {
     camera.up.set(upX, upY, upZ)
     camera.position.set(camX, camY, camZ)
     if (skyDome) skyDome.position.set(camX, camY, camZ) // 空ドームをカメラへ追従＝拡大世界のどこへ飛んでも空が常に周囲を覆う（黒い虚空を防ぐ）
+    if (sunGlow) sunGlow.position.set(camX + sunDir.x * 470, camY + sunDir.y * 470, camZ + sunDir.z * 470) // 太陽の光輪を太陽の向きの空に追従配置
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     camera.lookAt(lookX, lookY, lookZ)
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
@@ -6355,8 +6375,12 @@ export async function mountTown3d(parent, opts = {}) {
 
     // 雲がゆっくり流れる
     for (const c of clouds) { c.position.x += 0.01; if (c.position.x > 130) c.position.x = -130 }
-    // 雲海をゆっくり漂うもの（雲海のぬし＝鯨／空の灯籠）
+    // 雲海をゆっくり漂うもの（雲海のぬし＝鯨／空の灯籠／渡りの群れ／雲の滝）。
+    // 低空（窓辺・街の巡航）では雲海の世界は霧で見えない＝隠して更新も止める＝発熱低減（見た目は不変）。
+    const cloudHi = (active.flyP || 0) > 0.4 && active.flyPos.y > 52
     for (const d of skyDrifters) {
+      if (!cloudHi) { if (d.o.visible) d.o.visible = false; continue } // 低空ではまとめて隠し、アニメも回さない
+      if (!d.o.visible && d.kind !== 'fall') d.o.visible = true // 高所で復帰（滝は自前の高度フェードに任せる）
       if (d.kind === 'whale') {
         d.o.position.x += 2.2 * dt; if (d.o.position.x > 470) d.o.position.x = -470 // ゆっくり横切り、端で戻る
         d.o.position.y = d.baseY + Math.sin(t * 0.18) * 2.4 // 雲海を上下にたゆたう（呼吸のように）
@@ -6392,6 +6416,7 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.position.z = u.baseZ + Math.cos(t * 0.24 + u.ph) * u.sway
       }
     }
+    if (cloudHi !== lastCloudHi) { lastCloudHi = cloudHi; for (const o of cloudObjs) o.visible = cloudHi } // 低空では雲海の静的要素も一括で隠す（描画コール節約・見た目は霧で不変）
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
