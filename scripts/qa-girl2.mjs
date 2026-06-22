@@ -14,5 +14,7 @@ const has = await p.evaluate(() => !!window.__girlPNG2)
 if (!has) { console.log("ERR: __girlPNG2 missing"); await b.close(); process.exit(1) }
 const url = await p.evaluate(() => window.__girlPNG2())
 if (url) fs.writeFileSync("scripts/_shots/girl2.png", Buffer.from(url.split(",")[1], "base64"))
+const urlf = await p.evaluate(() => window.__girlPNG2(null, true))
+if (urlf) fs.writeFileSync("scripts/_shots/girl2-face.png", Buffer.from(urlf.split(",")[1], "base64"))
 console.log(errs.length ? "ERR " + errs.slice(0, 2).join(" | ") : "no errors")
 await b.close()

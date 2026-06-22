@@ -3824,32 +3824,42 @@ export async function mountTown3d(parent, opts = {}) {
     x.beginPath(); x.moveTo(168, 176); x.quadraticCurveTo(180, 184, 192, 176); L(2, skinSh)
     // 顔
     x.beginPath(); x.moveTo(146, 108); x.bezierCurveTo(146, 142, 160, 166, 180, 166); x.bezierCurveTo(200, 166, 214, 142, 214, 108); x.bezierCurveTo(214, 72, 146, 72, 146, 108); x.closePath(); F(skin); L(4)
-    x.beginPath(); x.moveTo(208, 100); x.bezierCurveTo(212, 130, 204, 152, 192, 162); L(6, 'rgba(228,180,150,0.5)')
-    x.beginPath(); x.moveTo(150, 100); x.quadraticCurveTo(180, 112, 210, 100); x.quadraticCurveTo(180, 106, 150, 100); x.closePath(); F('rgba(220,175,142,0.4)')
+    x.beginPath(); x.moveTo(210, 104); x.bezierCurveTo(214, 130, 206, 150, 194, 160); L(5, 'rgba(228,182,152,0.28)') // 頬/エラのやわらかい陰
+    x.beginPath(); x.ellipse(180, 106, 26, 5, 0, 0, 6.2832); F('rgba(216,170,138,0.16)') // 前髪の落ち影（ごく淡く＝線にしない）
     for (const sx of [-1, 1]) { x.beginPath(); x.ellipse(180 + sx * 30, 135, 11, 7, 0, 0, 6.2832); F(blush) }
     // 目（小さめ・やさしい）
     for (const sx of [-1, 1]) {
       const ex = 180 + sx * 21, ey = 123
-      x.beginPath(); x.ellipse(ex, ey, 8.5, 10, 0, 0, 6.2832); F('#fcf8f2')
-      x.beginPath(); x.ellipse(ex, ey + 1, 6.8, 8.6, 0, 0, 6.2832); F('#6b4e36')
-      x.beginPath(); x.ellipse(ex, ey + 1.6, 3.4, 4.6, 0, 0, 6.2832); F('#2c2018')
-      x.beginPath(); x.ellipse(ex - sx * 2.4, ey - 2.4, 2.3, 2.8, 0, 0, 6.2832); F('#ffffff')
-      x.beginPath(); x.ellipse(ex + sx * 2.2, ey + 3.4, 1.2, 1.4, 0, 0, 6.2832); F('rgba(255,255,255,0.6)')
-      x.beginPath(); x.moveTo(ex - 9.5, ey - 4); x.quadraticCurveTo(ex - 1, ey - 11, ex + 9.5, ey - 3.2); L(3, line) // 上まぶた（やわらかい弧）
-      x.beginPath(); x.moveTo(ex + sx * 9, ey - 3.4); x.lineTo(ex + sx * 13, ey - 5.4); L(2.2, line) // 目尻
-      x.beginPath(); x.moveTo(ex - 10, ey - 14.5); x.quadraticCurveTo(ex, ey - 16.5, ex + 11, ey - 13.5); L(2.4, hairSh) // 眉（低め・ゆるい＝驚き顔を避ける）
+      x.beginPath(); x.ellipse(ex, ey, 8.6, 10, 0, 0, 6.2832); F('#fcf8f2') // 白目
+      x.beginPath(); x.ellipse(ex, ey + 1, 7, 8.8, 0, 0, 6.2832); F('#5a3f28') // 虹彩（地＝濃いめ）
+      x.beginPath(); x.ellipse(ex, ey + 3.4, 6, 6, 0, 0, 6.2832); F('#956c44') // 虹彩の下を明るく＝透明感
+      x.beginPath(); x.ellipse(ex, ey + 0.2, 6.9, 4.4, 0, 0, 6.2832); F('rgba(38,26,16,0.45)') // まぶたの落ち影（上）
+      x.beginPath(); x.ellipse(ex, ey + 1.7, 3.3, 4.3, 0, 0, 6.2832); F('#241a12') // 瞳孔
+      x.beginPath(); x.ellipse(ex - sx * 2.6, ey - 2.6, 2.7, 3.3, 0, 0, 6.2832); F('#ffffff') // ハイライト大
+      x.beginPath(); x.ellipse(ex + sx * 2.5, ey + 4.2, 1.4, 1.6, 0, 0, 6.2832); F('rgba(255,255,255,0.7)') // ハイライト小
+      x.beginPath(); x.moveTo(ex - 9.6, ey - 4); x.quadraticCurveTo(ex - 1, ey - 11.5, ex + 9.8, ey - 3); L(3.4, line) // 上まぶた（太め＝目力）
+      x.beginPath(); x.moveTo(ex + sx * 9.5, ey - 3); x.quadraticCurveTo(ex + sx * 14, ey - 5, ex + sx * 15.5, ey - 8); L(2.4, line) // 目尻のまつ毛
+      x.beginPath(); x.moveTo(ex - 6, ey + 9.5); x.quadraticCurveTo(ex, ey + 11.5, ex + 7, ey + 9); L(1.4, 'rgba(120,86,62,0.5)') // 下まぶた（控えめ）
+      x.beginPath(); x.moveTo(ex - 10, ey - 15); x.quadraticCurveTo(ex - 1, ey - 17.5, ex + 11, ey - 14); L(2.2, hairSh) // 眉（細め・やわらかいアーチ）
     }
     // 鼻・口
-    x.beginPath(); x.moveTo(180, 140); x.lineTo(176, 148); L(1.6, skinSh)
+    x.beginPath(); x.ellipse(180, 149, 6, 2.6, 0, 0, 6.2832); F('rgba(200,150,120,0.2)') // 鼻先の下のやわらかい陰
+    x.beginPath(); x.moveTo(181, 140); x.lineTo(177, 148); L(1.5, 'rgba(150,108,84,0.5)')
     x.beginPath(); x.moveTo(170, 156); x.quadraticCurveTo(180, 163, 190, 156); L(2.6, mouthC)
     x.beginPath(); x.moveTo(173, 157.5); x.quadraticCurveTo(180, 160.5, 187, 157.5); L(2.2, '#e0a48f')
     // 前髪（中央分け＋毛束、生え際を額に重ね）
-    x.beginPath(); x.moveTo(142, 106); x.bezierCurveTo(140, 60, 220, 60, 218, 106); x.bezierCurveTo(208, 96, 198, 101, 186, 99); x.bezierCurveTo(182, 90, 178, 90, 174, 99); x.bezierCurveTo(162, 101, 152, 96, 142, 106); x.closePath(); F(hair); L(3) // 前髪（やわらかい中央分けのフリンジ）
-    x.beginPath(); x.moveTo(180, 80); x.quadraticCurveTo(176, 92, 173, 100); L(1.8, hairSh); x.beginPath(); x.moveTo(180, 80); x.quadraticCurveTo(184, 92, 187, 100); L(1.8, hairSh) // 中央分けの毛流れ
+    x.beginPath(); x.moveTo(140, 108)
+    x.bezierCurveTo(136, 56, 224, 56, 220, 108)
+    x.bezierCurveTo(213, 108, 206, 112, 197, 108)
+    x.bezierCurveTo(191, 110, 188, 109, 184, 104)
+    x.bezierCurveTo(181, 101, 179, 101, 176, 104)
+    x.bezierCurveTo(172, 109, 169, 110, 163, 108)
+    x.bezierCurveTo(154, 112, 147, 108, 140, 108); x.closePath(); F(hair); L(3) // 前髪（やわらかいフリンジ・浅い中央分け・生え際を下げ額を詰める／尖った房を排除）
+    x.beginPath(); x.moveTo(180, 72); x.quadraticCurveTo(178, 88, 177, 102); L(1.5, hairSh) // 中央分けの毛流れ（ごく控えめ）
     for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(180 + sx * 38, 98); x.bezierCurveTo(180 + sx * 46, 132, 180 + sx * 40, 168, 180 + sx * 30, 178); x.bezierCurveTo(180 + sx * 36, 144, 180 + sx * 36, 116, 180 + sx * 35, 100); x.closePath(); F(hair); L(3) } // サイドの毛
     x.beginPath(); x.moveTo(156, 76); x.quadraticCurveTo(180, 68, 204, 76); L(3.5, hairHi) // 艶
   }
-  if (/[?&]dev=1/.test(location.search)) window.__girlPNG2 = (cfgJson) => { const cv = document.createElement('canvas'); cv.width = 360; cv.height = 720; drawHarborGirl2D(cv.getContext('2d'), cfgJson ? JSON.parse(cfgJson) : {}); return cv.toDataURL() } // 検証用: 立ち絵をそのままPNGに
+  if (/[?&]dev=1/.test(location.search)) window.__girlPNG2 = (cfgJson, faceZoom) => { const cv = document.createElement('canvas'); cv.width = 360; cv.height = 720; drawHarborGirl2D(cv.getContext('2d'), cfgJson ? JSON.parse(cfgJson) : {}); if (faceZoom) { const fc = document.createElement('canvas'); fc.width = 340; fc.height = 360; const fx = fc.getContext('2d'); fx.drawImage(cv, 114, 44, 132, 140, 0, 0, 340, 360); return fc.toDataURL() } return cv.toDataURL() } // 検証用: 立ち絵をそのままPNGに（faceZoomで顔アップ）
   // 立ち絵を板ポリのビルボードに。シーンの光色で淡く染め（MeshBasicの満光が夕景で“浮く/光る”のを防ぐ）＋fogで遠近を馴染ませる。
   const girlTint = new THREE.Color(isNight ? 0x9aa6c0 : sunCol.getHex()).multiplyScalar(isNight ? 0.5 : 0.86)
   const makeGirlStandee = (cfg) => {
