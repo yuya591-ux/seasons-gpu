@@ -198,6 +198,16 @@ body {
   transition: opacity 0.35s ease;
   background: radial-gradient(ellipse 120% 120% at 50% 42%, rgba(247, 236, 214, 0.92) 0%, rgba(242, 224, 196, 0.78) 58%, rgba(232, 210, 184, 0.62) 100%);
 }
+/* 虹をくぐる瞬間の淡い分光のベール（やわらかく・水彩調） */
+.town3d-rainbow {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background: linear-gradient(105deg, rgba(255, 150, 150, 0.42) 0%, rgba(255, 222, 150, 0.42) 26%, rgba(168, 240, 185, 0.42) 50%, rgba(150, 198, 255, 0.42) 74%, rgba(208, 162, 244, 0.42) 100%);
+}
 /* 移動スティック（ぷにコン）。空/地上で画面左に触れると、触れた場所に静かに現れる */
 .town3d-stick {
   position: absolute;

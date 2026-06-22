@@ -3723,6 +3723,7 @@ export async function mountTown3d(parent, opts = {}) {
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
+  let rainbowArch = null // 雲海の上にかかる、くぐれる虹のアーチ
   const THERMALS = [] // 上昇気流の柱（暖かい街・丘・雲の塔・くつろぎ群島の上）。巡航中ふわっと持ち上げる＝ソアリング
   let gustT = 6 + Math.random() * 10, gustAmt = 0, gustVX = 0, gustVZ = 0, gustUp = 0 // そよ風/突風＝空気が生きている
   // 雲上の歩行面の高さ＝島の上(平ら)か橋の上(端点間を補間＋たわみ)。歩ける範囲外は null。
@@ -3951,6 +3952,38 @@ export async function mountTown3d(parent, opts = {}) {
     const gloryTex = new THREE.CanvasTexture(glCv)
     glory = new THREE.Mesh(new THREE.CircleGeometry(16, 44), new THREE.MeshBasicMaterial({ map: gloryTex, transparent: true, opacity: 0, depthWrite: false, fog: false }))
     glory.rotation.x = -Math.PI / 2; glory.visible = false; scene.add(glory)
+
+    // やさしい幻想：雲海の上にかかる大きな虹のアーチ。晴れた日に現れ、くぐると淡い分光に包まれる（実際にくぐれる夢の虹）。
+    { const grp = new THREE.Group(), mats = []
+      const bowFrag = 'varying float vR; uniform float uOp,uInner,uOuter,uRev,uScale; vec3 hsv(float h){ vec3 p=abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.); return clamp(p-1.,0.,1.); } void main(){ float rr=(vR-uInner)/(uOuter-uInner); float h=mix(0.78,0.0,rr); if(uRev>0.5) h=mix(0.0,0.78,rr); vec3 col=mix(vec3(1.0),hsv(h),0.58); float edge=smoothstep(0.0,0.22,rr)*(1.0-smoothstep(0.78,1.0,rr)); gl_FragColor=vec4(col, edge*uOp*uScale); }'
+      const makeBow = (inner, outer, reversed, opScale) => {
+        const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
+          uniforms: { uOp: { value: 0 }, uInner: { value: inner }, uOuter: { value: outer }, uRev: { value: reversed ? 1 : 0 }, uScale: { value: opScale } },
+          vertexShader: 'varying float vR; void main(){ vR=length(position.xy); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ', fragmentShader: bowFrag })
+        const ring = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 120, 1, 0, Math.PI), mat); ring.frustumCulled = false; grp.add(ring); mats.push(mat)
+      }
+      makeBow(98, 122, false, 1.0); makeBow(132, 152, true, 0.26) // 主虹＋淡い副虹
+      grp.position.set(-20, SEA_Y - 2, -360); grp.userData.mats = mats // 群島の北の空にかかる（南から北へ飛ぶと正面・くぐれる）
+      scene.add(grp); rainbowArch = grp
+    }
+    // 鳥の渡り：V字の群れが雲海の上をゆっくり渡る。追いつくと並んで飛べる。
+    { const flock = new THREE.Group(), bm = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3346 : 0x4a4a52, fog: true }), wings = []
+      for (let i = 0; i < (LIGHT ? 7 : 11); i++) { const bird = new THREE.Group()
+        for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.08, 0.55), bm); w.position.x = s * 0.9; w.userData.side = s; bird.add(w); wings.push(w) }
+        bird.add(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 1.3), bm)) // 胴
+        const row = Math.ceil(i / 2), sd = i % 2 === 0 ? 1 : -1
+        bird.position.set(sd * row * 2.8, (R() - 0.5) * 0.7, row * 2.3); flock.add(bird) } // V字（先頭から後ろへ広がる）
+      flock.userData = { wings, baseY: SEA_Y + 32 }; flock.position.set(-320, SEA_Y + 32, -250); flock.rotation.y = -Math.PI / 2 // +Xへ渡る
+      scene.add(flock); skyDrifters.push({ o: flock, kind: 'flock' })
+    }
+    // 雲の滝（滝雲）：雲海の縁から雲がゆっくり流れ落ちる絶景。落ちて薄れ、上から湧き直す。
+    { const fall = new THREE.Group(), fallMat = new THREE.MeshBasicMaterial({ color: isNight ? 0x9aa0b4 : 0xf6f4ef, transparent: true, opacity: 0.92, depthWrite: false, fog: false })
+      const topY = SEA_Y + 16, botY = SEA_Y - 54, fx = 78, fz = -232, fw = 36
+      for (let i = 0; i < (LIGHT ? 24 : 42); i++) { const s = 3 + R() * 4, puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), fallMat)
+        puff.scale.set(1, 1.5, 0.5); const x0 = fx + (R() - 0.5) * fw, z0 = fz + (R() - 0.5) * 12
+        puff.position.set(x0, botY + R() * (topY - botY), z0); puff.userData = { spd: 9 + R() * 9, x0, z0, s }; fall.add(puff) }
+      fall.userData = { topY, botY }; scene.add(fall); skyDrifters.push({ o: fall, kind: 'fall' })
+    }
     // 上昇気流＝暖かい街/丘・雲の塔・くつろぎ群島の上。巡航しながらここを通るとふわっと持ち上がる。
     THERMALS.push({ x: 0, z: -10, r: 34 }, { x: MOROOKA.x, z: MOROOKA.z, r: 28 }, { x: -20, z: -290, r: 46 })
     for (const tc of towerCenters) THERMALS.push({ x: tc.x, z: tc.z, r: 26 })
@@ -5436,6 +5469,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 雲を抜けるとき視界が白くかすむ（雲の中に入った手応え＝高度の実感）。
   const cloudHaze = document.createElement('div'); cloudHaze.className = 'town3d-cloudhaze'; stage.appendChild(cloudHaze)
   let cloudHazeCur = -1
+  // 虹をくぐる時の淡い分光のベール
+  const rainbowVeil = document.createElement('div'); rainbowVeil.className = 'town3d-rainbow'; stage.appendChild(rainbowVeil)
+  let rbVeilCur = -1
   // 高く昇るほど空気が冷たく淡くなる（高度の実感）。淡い寒色をうっすら被せる。
   const altTint = document.createElement('div'); altTint.className = 'town3d-alt'; stage.appendChild(altTint)
   let altTintCur = -1
@@ -6091,6 +6127,16 @@ export async function mountTown3d(parent, opts = {}) {
         cloudSea.visible = seaOp > 0.02
         if (cloudSea.visible) for (const m of seaMats) m.opacity = seaOp
       }
+      // 虹のアーチ＝晴れた日に雲海の上で現れ、くぐると淡い分光のベールに包まれる
+      if (rainbowArch) {
+        const ab = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - (SEA_Y - 30)) / 40))
+        const op = (!isNight && !SNOWY ? 1 : 0) * ab * flyAmt * 0.6
+        rainbowArch.visible = op > 0.02
+        for (const m of rainbowArch.userData.mats) m.uniforms.uOp.value = op
+        const dzp = Math.abs(active.flyPos.z + 360), dxy = Math.hypot(active.flyPos.x + 20, active.flyPos.y - (SEA_Y - 2)) // アーチ面(z=-360)・開口内
+        const through = (op > 0.1 && dzp < 28 && dxy < 122) ? (1 - dzp / 28) * 0.6 : 0
+        if (Math.abs(through - rbVeilCur) > 0.02) { rbVeilCur = through; rainbowVeil.style.opacity = through.toFixed(2) }
+      }
       // ブロッケンの虹輪＝雲海の上を晴れた日に飛ぶと、自分の真下の雲に円い虹が映って追従する
       if (glory) {
         const ab = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - (SEA_Y + 8)) / 16)) // 雲海の上に出ているほど
@@ -6283,6 +6329,15 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.position.x += 2.2 * dt; if (d.o.position.x > 470) d.o.position.x = -470 // ゆっくり横切り、端で戻る
         d.o.position.y = d.baseY + Math.sin(t * 0.18) * 2.4 // 雲海を上下にたゆたう（呼吸のように）
         d.o.rotation.z = Math.sin(t * 0.18) * 0.05; d.o.rotation.x = Math.sin(t * 0.13 + 1) * 0.04 // ゆるやかな傾き
+      } else if (d.kind === 'flock') { // 渡りの群れ：ゆっくり+Xへ渡り、端で戻る。羽ばたき＋たゆたい
+        d.o.position.x += 3.0 * dt; if (d.o.position.x > 360) d.o.position.x = -360
+        d.o.position.y = d.o.userData.baseY + Math.sin(t * 0.22) * 1.6
+        const flap = Math.sin(t * 6.5) * 0.5; for (const w of d.o.userData.wings) w.rotation.z = -w.userData.side * flap
+      } else if (d.kind === 'fall') { // 雲の滝：各房が落ちて、底で薄れ、上から湧き直す
+        const u = d.o.userData
+        for (const pf of d.o.children) { pf.position.y -= pf.userData.spd * dt
+          if (pf.position.y < u.botY) { pf.position.set(pf.userData.x0, u.topY, pf.userData.z0) }
+          const f = (pf.position.y - u.botY) / (u.topY - u.botY); pf.scale.set(0.5 + f * 0.5, 1.5 * (0.4 + f * 0.6), 0.5 * (0.5 + f * 0.5)) } // 底ほど細る（薄れて消える）
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
