@@ -3011,7 +3011,7 @@ export async function mountTown3d(parent, opts = {}) {
             const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.32 + R() * 0.16, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(26 + R() * 12, 9 + R() * 4, 1); town.add(m); senMist.push(m) } // ゆっくり漂わせる
         }
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
-          for (let k = 0; k < 20; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py < SEA.level + 0.8 || py > 13) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) }
+          for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py < SEA.level + 0.8 || py > 13) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
           for (let j = 0; j < 10; j++) { const z0 = sz + 20 - j * 4.4, cl = senValley(z0), wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); wg.position.set(sx + cl + 4.8, Math.max(SEA.level, senH(sx + cl + 4.8, z0)), z0); town.add(wg); cityWalkers.push({ g: wg, road: true, x0: sx + cl + 4.8, z0, len: 8 + R() * 6, sp: 0.05 + R() * 0.04, ph: R() * 2, fn: (u) => { const zz = z0 - u; const c2 = senValley(zz); const xx = sx + c2 + 4.8; return { x: xx, y: Math.max(SEA.level, senH(xx, zz)), z: zz } } }) } // 街道を行き交う旅人（初期位置を置く＝遠方時に原点へ取り残されない）
           const sgmei = ['酒', '鍛冶', '旅籠', '飯', '馬', '薬'] // 城下の店（質素な木の掛看板）
           for (let k = 0; k < 6; k++) { const zz = sz + 20 - k * 6, cl = senValley(zz), side = k % 2 ? 1 : -1, px = sx + cl + side * 6.5, pz = zz + (R() - 0.5) * 2, py = senH(px, pz); if (py < SEA.level + 1 || py > 12) continue; mkSignV(px, py + 1.1, pz, side > 0 ? -Math.PI / 2 : Math.PI / 2, sgmei[k], 0xcfc3a8, 0x2e2418) } } // 城下の店の看板
@@ -3134,7 +3134,7 @@ export async function mountTown3d(parent, opts = {}) {
             if (BufferGeometryUtils.mergeGeometries) { const pm = BufferGeometryUtils.mergeGeometries(cPoleG, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x3a3e42))); cPoleG.forEach((g) => g.dispose()); const lmM = BufferGeometryUtils.mergeGeometries(cLampG, false); if (lmM) town.add(new THREE.Mesh(lmM, lampMat)); cLampG.forEach((g) => g.dispose()) }
           }
           const tKim = [0x8a3a32, 0x3a4a6a, 0x556040, 0x7a5a34, 0x6a4a5a, 0x40443a] // 大正の人々（着物＋洋装の中間色）
-          for (let k = 0; k < 20; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) }
+          for (let k = 0; k < 6; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
           // 大正の店の看板（横書きのホーロー/洋風看板。和洋折衷の店名）
           const tenmei = [['カフエー', 0x9a3a34], ['珈琲', 0x4a3a2a], ['寫眞館', 0x3a4a5a], ['洋食', 0xb24a3a], ['郵便局', 0xc04030], ['銀行', 0x4a5a4a], ['時計店', 0x3a4a44], ['理髪', 0x3a5a6a], ['書肆', 0x6a4a3a], ['牛乳', 0xcfc4aa], ['商會', 0x7a5a3a]]
           for (let k = 0; k < 11; k++) { const a = (k / 11) * 6.28 + 0.2, r2 = 12 + R() * 30, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.4 || Math.hypot(px - (tx + 6), pz - (tz - 4)) < 6) continue
@@ -4649,19 +4649,19 @@ export async function mountTown3d(parent, opts = {}) {
   const placeEra = (cx, cz, n, factory) => { for (let i = 0; i < n; i++) { const a = (i / n) * 6.2832 + R() * 0.6, rr = 8 + R() * 22; placeResident(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, factory()) } }
   // 江戸: 町人(着物+髷)・侍(甲冑+刀)・笠の行商
   const EDO_KIMONO = [0x3a4a5e, 0x5a4230, 0x55504a, 0x6a3a30, 0x44503a, 0x4a4a52, 0x70604a], EDO_OBI = [0x8a6a3a, 0x7a3a32, 0x55603a, 0x3a4250, 0x9a7a44]
-  placeEra(EDO.x, EDO.z, 8, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+  placeEra(EDO.x, EDO.z, 20, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
     if (r < 0.24) return { outfit: 'armor', skin, hair, iris, hairStyle: 'topknot', top: pickC([0x3a3a44, 0x4a4038, 0x33414e]), bottom: pickC([0x55504a, 0x6a5238, 0x4a4a3a]), accent: pickC(EDO_OBI), prop: 'swords' } // 侍
     if (r < 0.46) return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', top: pickC(EDO_KIMONO), accent: pickC(EDO_OBI), prop: R() < 0.5 ? 'bundle' : null } // 笠の行商
     return { outfit: 'kimono', skin, hair, iris, hairStyle: r < 0.74 ? 'topknot' : 'short', top: pickC(EDO_KIMONO), accent: pickC(EDO_OBI) } }) // 町人
   // 大正: 書生(袴+学生帽)・モダンガール(洋装+ボブ)・洋装紳士(背広+中折れ帽)
   const TAI_DRESS = [0xb5677e, 0x6a8a9a, 0x9a7aa0, 0xc08a5a, 0x5a7a6a], TAI_SUIT = [0x3a3a42, 0x4a4036, 0x44484a, 0x55504a]
-  placeEra(TAISHO.x, TAISHO.z, 8, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+  placeEra(TAISHO.x, TAISHO.z, 12, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
     if (r < 0.34) return { outfit: 'hakama', skin, hair, iris, hairStyle: 'hat', hat: 'cap', top: pickC([0x3a4250, 0x40443a, 0x4a4038]), bottom: pickC([0x2e3038, 0x35302c]), accent: 0x2a2e30 } // 書生
     if (r < 0.66) return { outfit: 'dress', skin, hair, iris, hairStyle: 'bob', top: pickC(TAI_DRESS), accent: pickC([0xf0e6d2, 0xeae0cc, 0x8a3a44]) } // モダンガール
     return { outfit: 'suit', skin, hair, iris, hairStyle: 'hat', hat: 'fedora', top: pickC(TAI_SUIT), bottom: pickC(TAI_SUIT), accent: pickC([0x7a3a32, 0x3a4a5e]), prop: R() < 0.5 ? 'cane' : null } }) // 紳士
   // 戦国: 農夫(笠+素朴な着物)・足軽(陣笠+甲冑+槍)・武者(甲冑+刀)
   const SEN_DRAB = [0x5a4c3a, 0x4a4a44, 0x44503a, 0x6a5a44, 0x504838]
-  placeEra(SENGOKU.x, SENGOKU.z, 7, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+  placeEra(SENGOKU.x, SENGOKU.z, 18, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
     if (r < 0.36) return { outfit: 'armor', skin, hair, iris, hairStyle: 'hat', hat: 'jingasa', top: pickC([0x40382e, 0x3a3a34]), bottom: pickC([0x4a3a30, 0x3a4250, 0x55504a]), accent: 0x6a3a30, prop: 'spear' } // 足軽
     if (r < 0.58) return { outfit: 'armor', skin, hair, iris, hairStyle: 'topknot', top: pickC([0x3a3a40, 0x44382e]), bottom: pickC([0x6a3a30, 0x3a4a5e, 0x55503a]), accent: pickC([0x9a7a44, 0x7a3a32]), prop: 'swords' } // 武者
     return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
@@ -5962,8 +5962,10 @@ export async function mountTown3d(parent, opts = {}) {
       if (legs[0]) { legs[0].rotation.x = sw * 0.55; legs[1].rotation.x = -sw * 0.55 } // 脚を交互に振る
       if (arms[0]) { arms[0].rotation.x = -sw * 0.4; arms[1].rotation.x = sw * 0.4 } // 腕は脚と逆位相
     }
-    // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す
+    // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す。
+    // 近く（見える範囲）の住人だけ更新＝遠い時代エリアの人々を毎フレーム動かさない＝滑らかさを守りつつ人を増やせる。
     for (const r of residents) { const u = r.userData
+      const rdx = r.position.x - active.flyPos.x, rdz = r.position.z - active.flyPos.z; if (rdx * rdx + rdz * rdz > 19600) continue // 140uより遠い住人はスキップ（見えない＝負荷を割かない）
       if (u.moving) {
         const dx = u.tx - r.position.x, dz = u.tz - r.position.z, d = Math.hypot(dx, dz)
         if (d < 0.28) { u.moving = false; u.pauseT = 1.5 + R() * 4 } // 着いた→ひと休み
