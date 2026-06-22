@@ -5613,36 +5613,52 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 常時の雨（雨の角部屋＝3D化）。降る雨筋＋濡れた路面の反射を常時。weather==='rain'のみ。 ──
   if (weather === 'rain') {
-    const N = 540, len = 2.6 // 雨脚＝短い筋（風で少し斜め）
+    const N = 760, len = 3.3 // 雨脚＝筋（風で少し斜め）。歩く雨でしっかり降らせる＝自機の周りに密に
     const pos = new Float32Array(N * 2 * 3)
     const head = new Float32Array(N * 3); const spd = new Float32Array(N)
-    for (let i = 0; i < N; i++) { head[i * 3] = (R() - 0.5) * 210; head[i * 3 + 1] = R() * 95; head[i * 3 + 2] = -130 + R() * 190; spd[i] = 32 * (0.7 + R() * 0.6) }
+    for (let i = 0; i < N; i++) { head[i * 3] = (R() - 0.5) * 150; head[i * 3 + 1] = R() * 92; head[i * 3 + 2] = -100 + R() * 150; spd[i] = 34 * (0.7 + R() * 0.6) } // 範囲を絞って密度を上げる
     const rgeo = new THREE.BufferGeometry(); rgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    const rmat = new THREE.LineBasicMaterial({ color: 0xc4d4e2, transparent: true, opacity: 0.55, fog: true, depthWrite: false })
+    const rmat = new THREE.LineBasicMaterial({ color: 0xc8d6e4, transparent: true, opacity: 0.6, fog: true, depthWrite: false })
     const rseg = new THREE.LineSegments(rgeo, rmat); rseg.frustumCulled = false; scene.add(rseg)
     scene.fog.far *= 0.88 // 雨で奥がけむる
     addFx({
       update: (age, dt) => {
-        for (let i = 0; i < N; i++) { head[i * 3 + 1] -= spd[i] * dt; head[i * 3] += 4 * dt; if (head[i * 3 + 1] < -14) { head[i * 3 + 1] = 82 + R() * 16; head[i * 3] = (R() - 0.5) * 210 } }
-        const a = evAnchor(), ax = a.x, ay = a.fly ? a.y - 47 : 0, az = a.z // 飛行中は“自分”を中心に雨が追従
+        for (let i = 0; i < N; i++) { head[i * 3 + 1] -= spd[i] * dt; head[i * 3] += 4 * dt; if (head[i * 3 + 1] < -14) { head[i * 3 + 1] = 80 + R() * 16; head[i * 3] = (R() - 0.5) * 150 } }
+        const a = evAnchor(), ax = a.x, ay = a.fly ? a.y - 47 : 0, az = a.z // 飛行/歩行中は“自分”を中心に雨が追従
         for (let i = 0; i < N; i++) { const h = i * 3, p = i * 6; pos[p] = head[h] + ax; pos[p + 1] = head[h + 1] + ay; pos[p + 2] = head[h + 2] + az; pos[p + 3] = head[h] + ax + 0.6; pos[p + 4] = head[h + 1] + ay - len; pos[p + 5] = head[h + 2] + az }
         rgeo.attributes.position.needsUpdate = true; return true
       },
       cleanup: () => { scene.remove(rseg); rgeo.dispose(); rmat.dispose() },
     })
-    // 濡れた路面のきらめき（街あかりを照り返す。evWetRoadの永続版）
-    const M = 110
+    // 濡れた路面のきらめき（街あかりを照り返す）。自機の足元の周りに広がり、歩く所が濡れて光る＝雨の路地。
+    const M = 170
+    const wloc = new Float32Array(M * 2) // ローカルのばらまき(x,z)＝自機を中心に追従
     const wpos = new Float32Array(M * 3); const waph = new Float32Array(M)
-    for (let i = 0; i < M; i++) { wpos[i * 3] = (R() - 0.5) * 9; wpos[i * 3 + 1] = 0.12; wpos[i * 3 + 2] = 18 - R() * 112; waph[i] = R() * 6.28 }
+    for (let i = 0; i < M; i++) { wloc[i * 2] = (R() - 0.5) * 30; wloc[i * 2 + 1] = (R() - 0.5) * 34; wpos[i * 3 + 1] = 0.12; waph[i] = R() * 6.28 }
     const wgeo = new THREE.BufferGeometry(); wgeo.setAttribute('position', new THREE.BufferAttribute(wpos, 3)); wgeo.setAttribute('aph', new THREE.BufferAttribute(waph, 1))
     const wmat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       uniforms: { uT: { value: 0 }, uOp: { value: 0.5 }, uCol: { value: new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2) } },
-      vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.35+0.65*(0.5+0.5*sin(uT*2.6+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=3.2*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
+      vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.35+0.65*(0.5+0.5*sin(uT*2.6+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=3.4*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
       fragmentShader: 'varying float vtw; uniform vec3 uCol; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(uCol, a*vtw*uOp); }',
     })
-    const wpts = new THREE.Points(wgeo, wmat); wpts.frustumCulled = false; town.add(wpts)
-    addFx({ update: (age) => { wmat.uniforms.uT.value = age; return true }, cleanup: () => { town.remove(wpts); wgeo.dispose(); wmat.dispose() } })
+    const wpts = new THREE.Points(wgeo, wmat); wpts.frustumCulled = false; scene.add(wpts)
+    addFx({ update: (age) => { wmat.uniforms.uT.value = age
+      const a = evAnchor()
+      for (let i = 0; i < M; i++) { const wx = a.x + wloc[i * 2], wz = a.z + wloc[i * 2 + 1]; wpos[i * 3] = wx; wpos[i * 3 + 1] = heightAt(wx, wz) + 0.12; wpos[i * 3 + 2] = wz }
+      wgeo.attributes.position.needsUpdate = true; return true
+    }, cleanup: () => { scene.remove(wpts); wgeo.dispose(); wmat.dispose() } })
+    // 雨の波紋（地面に当たって広がる輪＝歩く雨の足元の生命感）。自機の近くにぽつぽつ生まれ、広がって消える。
+    const RIP = 16, rips = []
+    for (let i = 0; i < RIP; i++) { const rg = new THREE.RingGeometry(0.42, 0.5, 16); rg.rotateX(-Math.PI / 2); const rm = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: isNight ? 0xc8dcec : 0xd6e4ee, transparent: true, opacity: 0, depthWrite: false, fog: true })); rm.visible = false; rm.userData = { t: R() * 1.6, life: 0 }; scene.add(rm); rips.push(rm) }
+    addFx({ update: (age, dt) => {
+      const a = evAnchor()
+      for (const rm of rips) { const u = rm.userData; u.t -= dt
+        if (u.t <= 0) { const wx = a.x + (R() - 0.5) * 24, wz = a.z + (R() - 0.5) * 26; rm.position.set(wx, heightAt(wx, wz) + 0.06, wz); rm.scale.setScalar(0.25); rm.material.opacity = 0.5; rm.visible = true; u.t = 0.7 + R() * 1.3; u.life = 0 }
+        if (rm.visible) { u.life += dt; const f = u.life / 0.7; if (f >= 1) rm.visible = false; else { rm.scale.setScalar(0.25 + f * 1.5); rm.material.opacity = (1 - f) * 0.5 } }
+      }
+      return true
+    }, cleanup: () => { for (const rm of rips) { scene.remove(rm); rm.geometry.dispose(); rm.material.dispose() } } })
   }
 
   // ── オーロラ（夜の超レア大当たり。緑〜紫のカーテンが空に揺らめき流れる。計算で描画） ──
