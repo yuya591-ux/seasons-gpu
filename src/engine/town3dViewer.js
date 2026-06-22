@@ -244,6 +244,7 @@ export async function mountTown3d(parent, opts = {}) {
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。飛行中の解像度落としの基準に使う
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
+  let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
   renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
@@ -4620,11 +4621,14 @@ export async function mountTown3d(parent, opts = {}) {
     },
   }
 
-  function resize() {
+  // 解像度/サイズを変える時は必ずここを通す＝camera.aspect も同時に更新（更新漏れが「横に伸びる」バグの元）。
+  function applySize() {
     const w = stage.clientWidth, h = stage.clientHeight
     if (!w || !h) return
-    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix()
+    lastStageW = w; lastStageH = h
+    renderer.setPixelRatio(curPR); renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix()
   }
+  function resize() { applySize() }
   window.addEventListener('resize', resize)
 
   // ── 歩行（散策）の当たり判定 ──
@@ -4723,7 +4727,7 @@ export async function mountTown3d(parent, opts = {}) {
     const cap = q === 'light' ? 1.25 : q === 'soft' ? 2 : 1.6
     qCap = cap; prFly = false
     curPR = Math.min(window.devicePixelRatio || 1, cap)
-    renderer.setPixelRatio(curPR); renderer.setSize(stage.clientWidth, stage.clientHeight)
+    applySize() // pixelRatio＋size＋aspect をまとめて更新
   }
 
   // ════════════════════════════════════════════════════════════════════════
@@ -5255,6 +5259,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (t - lastDraw < (restIdle ? 0.045 : 0.032)) return
     lastDraw = t
     const dt = Math.min(0.05, t - lastT); lastT = t
+    // ステージ実寸が変わったら（飛行で枠が変わる／回転／レイアウト変化）即 aspect を直す＝「横に伸びる」を自動補正
+    if (stage.clientWidth !== lastStageW || stage.clientHeight !== lastStageH) applySize()
     // 車が通りを行き交う
     for (const c of cars) {
       const u = c.userData
@@ -5965,7 +5971,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (wantFly !== prFly) {
       prFly = wantFly
       curPR = Math.min(window.devicePixelRatio || 1, wantFly ? qCap * 0.88 : qCap)
-      renderer.setPixelRatio(curPR); renderer.setSize(stage.clientWidth, stage.clientHeight)
+      applySize() // pixelRatio変更時も aspect を必ず更新（横伸びバグ防止）
     }
     renderer.render(scene, camera)
   }
