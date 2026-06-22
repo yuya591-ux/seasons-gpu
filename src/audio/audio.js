@@ -580,20 +580,24 @@ export function createAudio(opts) {
       if (v > 0.001 && !purrNode) startPurr()
       if (purrNode) { try { purrNode.pg.gain.setTargetAtTime(Math.max(0.0001, v * 0.045), now(), 0.18) } catch { /* 無視 */ } }
     },
-    /** 散策の足音（地上を歩くときだけ・ごく控えめ）。短いこもったノイズで「踏みしめる」手応え。 */
-    footstep() {
+    /** 散策の足音（地上を歩くときだけ・ごく控えめ）。素材別に質感を変える＝舗装/土・草/木の遊歩道。 */
+    footstep(surf) {
       if (!ctx) return
       const t = now()
-      const len = Math.floor(0.09 * ctx.sampleRate)
+      // 素材ごとの音色: 舗装=やや硬く明るい / 土・草=柔らかく低い / 木=乾いて少し響く
+      const s = surf === 'grass' ? { f: 420, fr: 130, gain: 0.04, dec: 0.10 }
+        : surf === 'wood' ? { f: 660, fr: 220, gain: 0.05, dec: 0.16 }
+        : { f: 700, fr: 240, gain: 0.055, dec: 0.12 } // hard(舗装・既定)
+      const len = Math.floor((surf === 'wood' ? 0.11 : 0.09) * ctx.sampleRate)
       const buf = ctx.createBuffer(1, len, ctx.sampleRate)
       const d = buf.getChannelData(0)
       for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2) // 短い減衰ノイズ
       const src = ctx.createBufferSource(); src.buffer = buf
       const lp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.055, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
-      if (lp) { lp.type = 'lowpass'; lp.frequency.value = 680 + Math.random() * 280; src.connect(lp).connect(g).connect(master) } // こもった足音
+      const g = ctx.createGain(); g.gain.setValueAtTime(s.gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + s.dec)
+      if (lp) { lp.type = 'lowpass'; lp.frequency.value = s.f + Math.random() * s.fr; src.connect(lp).connect(g).connect(master) } // こもった足音
       else src.connect(g).connect(master)
-      try { src.start(t); src.stop(t + 0.13) } catch { /* 無視 */ }
+      try { src.start(t); src.stop(t + s.dec + 0.02) } catch { /* 無視 */ }
     },
     /** 街の環境音(虫/街音)をしぼる。v=しぼり量(0..1)。高空＋海上＋homeから離れた量を engine が合成して渡す。
      *  海に出ると虫の音がほぼ消える＝「海の上は風と鳥だけ」。風(生成)は別系統なので残る。 */

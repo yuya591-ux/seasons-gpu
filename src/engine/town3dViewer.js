@@ -1933,7 +1933,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 樹形のばらつき＝同形のロリポップ畑を脱す。縦長(杉檜風)/横広(落葉樹の傘)/標準を振る。
     const form = R()
     const tall = form > 0.68, broad = form < 0.28
-    const trunkH = tall ? 3.0 : broad ? 1.7 : 2.3
+    const trunkH = tall ? 3.1 : broad ? 2.1 : 2.5 // 幹を少し高く＝目線で樹冠の下が抜ける（街路を歩いて見通せる・俯瞰はほぼ不変）
     const ax = broad ? 1.32 : tall ? 0.72 : 1.06           // 樹冠の横倍率
     const ay = tall ? 1.5 : broad ? 0.74 : 0.9 + R() * 0.16 // 樹冠の縦倍率
     const tilt = (R() - 0.5) * 0.12 // わずかな基準傾き
@@ -6345,7 +6345,15 @@ export async function mountTown3d(parent, opts = {}) {
         const hstep = Math.hypot(active.vel.x, active.vel.z) * dt
         active.walkDist = (active.walkDist || 0) + hstep
         active.walkPhase = ((active.walkPhase || 0) + hstep) % 4.2 // 歩みの位相（一歩2.1u）＝頭の弾み/左右の重心移ろいを足音と同期
-        if (active.walkDist > 2.1) { active.walkDist = 0; onFoot() }
+        if (active.walkDist > 2.1) { active.walkDist = 0
+          // 足元の素材で足音を変える: 谷戸=土・草／公園=草／川辺の遊歩道=木／その他=舗装。
+          let surf = 'hard'
+          if (kind === 'yato') surf = 'grass'
+          else { const fx = active.flyPos.x, fz = active.flyPos.z
+            if (Math.hypot(fx - PARK.x, fz - PARK.z) < PARK.r || Math.hypot(fx - MOROOKA.x, fz - MOROOKA.z) < MOROOKA.r) surf = 'grass'
+            else if (Math.abs(fx - RIVER.x) < RIVER.bankW + 1.5) surf = 'wood' }
+          onFoot(surf)
+        }
       } else {
         active.flyPos.x += active.vel.x * dt; active.flyPos.y += active.vel.y * dt; active.flyPos.z += active.vel.z * dt
         active.flyPos.x = Math.max(-b.x, Math.min(b.xMax || b.x, active.flyPos.x))

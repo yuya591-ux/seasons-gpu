@@ -162,7 +162,7 @@ function start() {
             if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録
           },
           onSpeed: (v) => { if (!sleepFading) audio.setFlyWind(v) }, // 飛行速度で風音を膨らませる
-          onFoot: () => { if (!sleepFading) audio.footstep() }, // 散策の足音
+          onFoot: (surf) => { if (!sleepFading) audio.footstep(surf) }, // 散策の足音（素材別＝舗装/土・草/木）
           onBirdFlush: () => { if (!sleepFading) audio.birdFlush() }, // 鳥が驚いて飛び立つ羽音
           onAltitude: (v) => audio.setAltitudeDuck(v), // 高空で街の環境音をしぼる（風だけの静けさへ）
           onScene: (c) => { if (!sleepFading) audio.setMusicBed(c) }, // 場面に応じて生成BGMの下地を静かに変える
