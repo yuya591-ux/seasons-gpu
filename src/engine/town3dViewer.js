@@ -5,6 +5,10 @@
 
 let token = 0
 let active = null // { renderer, scene, camera, raf, dispose, stage }
+let flashV = 0 // 遠雷の稲光（0..1）。frameで減衰し、白いオーバーレイの不透明度に使う
+
+// 遠雷の稲光を立体の街でも光らせる（cue:'thunder' から呼ぶ）。シェーダー情景は別途 renderer.triggerFlash。
+export function triggerTown3dFlash(amt) { flashV = Math.max(flashV, amt || 0.6) }
 
 const lerp = (a, b, t) => a + (b - a) * t
 
@@ -5785,6 +5789,8 @@ export async function mountTown3d(parent, opts = {}) {
   // 虹をくぐる時の淡い分光のベール
   const rainbowVeil = document.createElement('div'); rainbowVeil.className = 'town3d-rainbow'; stage.appendChild(rainbowVeil)
   let rbVeilCur = -1
+  // 遠雷の稲光（雨/雪の夜などで cue:'thunder' に同期して空がほのかに白む）。frameで flashV を減衰し不透明度に。
+  const flashEl = document.createElement('div'); flashEl.className = 'town3d-flash'; stage.appendChild(flashEl); let flashCur = -1
   // 部屋から空へ踏み出す瞬間、光がふわっと開ける（薄暗い室内→明るい外気）
   const openFlash = document.createElement('div'); openFlash.className = 'town3d-open'; stage.appendChild(openFlash)
   let openCur = -1
@@ -6504,6 +6510,11 @@ export async function mountTown3d(parent, opts = {}) {
         const through = (op > 0.1 && dzp < 28 && dxy < 122) ? (1 - dzp / 28) * 0.6 : 0
         if (Math.abs(through - rbVeilCur) > 0.02) { rbVeilCur = through; rainbowVeil.style.opacity = through.toFixed(2) }
       }
+      // 遠雷の稲光：cue:'thunder' で flashV が立ち上がり、ここで減衰＝空がふっと白む（雨/雪の夜に効く）。
+      // 立ち上がりは鋭く（>0.6は素早く落ち）、余韻はゆっくり＝稲光の閃光らしさ。わずかな揺らぎで二度光りの気配。
+      if (flashV > 0.001) flashV = Math.max(0, flashV - dt * (flashV > 0.6 ? 4.2 : 1.7))
+      const fop = flashV * 0.42 * (0.85 + 0.15 * Math.sin(t * 47))
+      if (Math.abs(fop - flashCur) > 0.004) { flashCur = fop; flashEl.style.opacity = fop.toFixed(3) }
       // ブロッケンの虹輪＝雲海の上を晴れた日に飛ぶと、自分の真下の雲に円い虹が映って追従する
       if (glory) {
         const ab = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - (SEA_Y + 8)) / 16)) // 雲海の上に出ているほど
@@ -6774,6 +6785,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
     window.__town3dFaceWalk = (y) => { if (active) { active.flyYaw = active.flyYawTarget = y || 0 } } // 検証用: 歩行の向き(rad)を直接指定
     window.__town3dLook = (dx, dy) => applyTown3dLook(dx || 0, dy || 0) // 検証用: 見回しドラッグ(画面比)。歩行=横でカメラ回転/縦で上下
+    window.__town3dFlash = (v) => triggerTown3dFlash(v || 0.85) // 検証用: 遠雷の稲光を手動発火
     window.__town3dProbe = (x, z) => { // 検証用: その地点が当たり判定で塞がれているか＋近くのコライダー
       const blocked = blockedAt(x, z)
       const near = []

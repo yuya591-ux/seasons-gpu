@@ -227,6 +227,16 @@ body {
   transition: opacity 0.5s ease;
   background: linear-gradient(105deg, rgba(255, 150, 150, 0.42) 0%, rgba(255, 222, 150, 0.42) 26%, rgba(168, 240, 185, 0.42) 50%, rgba(150, 198, 255, 0.42) 74%, rgba(208, 162, 244, 0.42) 100%);
 }
+/* 遠雷の稲光（空が上ほどほのかに白む。frameで不透明度を制御するので transition なし） */
+.town3d-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(180deg, rgba(228, 236, 250, 1) 0%, rgba(214, 226, 244, 0.66) 42%, rgba(204, 216, 236, 0.26) 100%);
+}
 /* 移動スティック（ぷにコン）。空/地上で画面左に触れると、触れた場所に静かに現れる */
 .town3d-stick {
   position: absolute;

@@ -19,6 +19,7 @@ import {
   setTown3dLand,
   isTown3dFlyable,
   setTown3dSettings,
+  triggerTown3dFlash,
 } from './engine/town3dViewer.js'
 
 const BASE = import.meta.env.BASE_URL || '/'
@@ -59,10 +60,10 @@ function start() {
   applyReduceMotion()
   if (mqReduce && mqReduce.addEventListener) mqReduce.addEventListener('change', applyReduceMotion)
 
-  // 遠雷の音に合わせて空をほのかに光らせる（シェーダー情景のみ反応）
+  // 遠雷の音に合わせて空をほのかに光らせる（シェーダー情景＝renderer／立体の街＝town3d 両方に効かせる）
   const audio = createAudio({
     onCue: (def) => {
-      if (def.cue === 'thunder') renderer.triggerFlash(0.6) // 遠雷はひかえめに
+      if (def.cue === 'thunder') { renderer.triggerFlash(0.6); if (town3dMode) triggerTown3dFlash(0.6) } // 遠雷はひかえめに
     },
   })
   let splatMode = false
