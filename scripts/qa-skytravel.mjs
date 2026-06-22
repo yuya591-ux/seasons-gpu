@@ -41,5 +41,10 @@ await p.evaluate(() => window.__town3dFlyPose(80, 102, -120, 0.3, -0.05))
 await p.waitForTimeout(1000)
 await p.screenshot({ path: 'scripts/_shots/sky-5-punch.png' })
 
+// (6) 雲海のぬし（鯨）＝起動から約10秒で x≈-198,z=-210 付近。横手前から全身を望む
+await p.evaluate(() => window.__town3dFlyPose(-196, 124, -142, 0, -0.08))
+await p.waitForTimeout(1400)
+await p.screenshot({ path: 'scripts/_shots/sky-6-whale.png' })
+
 console.log(errs.length ? 'ERR ' + errs.slice(0, 4).join(' | ') : 'no errors')
 await b.close()
