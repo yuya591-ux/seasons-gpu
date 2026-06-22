@@ -5781,6 +5781,17 @@ export async function mountTown3d(parent, opts = {}) {
   const moteMat = new THREE.PointsMaterial({ map: moteTex, size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
   const motes = new THREE.Points(moteGeo, moteMat); motes.frustumCulled = false; motes.visible = false; scene.add(motes)
 
+  // ── 時代エリアの距離カリング：遠い時代の街(±640)は海/霧で見えない。時代ごとに群へまとめ、カメラが遠い時は丸ごと
+  //    非表示にして render traversal から外す＝基礎負荷(描画コール/カリング)を下げる。共視界禁止の設計なので安全。
+  const eraCull = []
+  if (kind !== 'yato') for (const ec of [{ c: EDO, r: 240 }, { c: SENGOKU, r: 180 }, { c: TAISHO, r: 230 }]) {
+    const grp = new THREE.Group(); town.add(grp)
+    const moved = []
+    for (const ch of town.children) { if (ch === grp) continue; const p = ch.position; if (Math.hypot(p.x - ec.c.x, p.z - ec.c.z) < ec.r) moved.push(ch) } // 時代の島の領域内（個別の建物/木/ランドマーク）を集める
+    for (const ch of moved) grp.add(ch) // 群へ移す（位置は原点群なので不変）。merged済の地物(position原点)は対象外＝常時描画のまま（数個なので軽い）
+    if (moved.length) eraCull.push({ grp, cx: ec.c.x, cz: ec.c.z, vis: true })
+  }
+
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
   const speedVig = document.createElement('div'); speedVig.className = 'town3d-speedvig'; stage.appendChild(speedVig)
@@ -5914,6 +5925,8 @@ export async function mountTown3d(parent, opts = {}) {
       else if (adQOk >= 120 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.08); applySize(); adQOk = 0 } // 長く安定→鮮やかさを戻す
     }
     const dt = Math.min(0.05, t - lastT); lastT = t
+    // 時代エリアの距離カリング：遠い時は群ごと非表示（海/霧で見えない距離で切替＝ポップ無し・基礎負荷ダウン）。
+    for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz); const want = d < (e.vis ? 330 : 295); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
     // ステージ実寸が変わったら（飛行で枠が変わる／回転／レイアウト変化）即 aspect を直す＝「横に伸びる」を自動補正
     if (stage.clientWidth !== lastStageW || stage.clientHeight !== lastStageH) applySize()
     // 車が通りを行き交う
@@ -6798,6 +6811,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dFaceWalk = (y) => { if (active) { active.flyYaw = active.flyYawTarget = y || 0 } } // 検証用: 歩行の向き(rad)を直接指定
     window.__town3dLook = (dx, dy) => applyTown3dLook(dx || 0, dy || 0) // 検証用: 見回しドラッグ(画面比)。歩行=横でカメラ回転/縦で上下
     window.__town3dFlash = (v) => triggerTown3dFlash(v || 0.85) // 検証用: 遠雷の稲光を手動発火
+    window.__town3dEraCull = () => eraCull.map((e) => ({ n: e.grp.children.length, vis: e.vis })) // 検証用: 時代群の捕捉数・表示状態
     window.__town3dProbe = (x, z) => { // 検証用: その地点が当たり判定で塞がれているか＋近くのコライダー
       const blocked = blockedAt(x, z)
       const near = []

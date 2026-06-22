@@ -1,0 +1,17 @@
+import { chromium } from 'playwright'
+const port = process.env.PORT || '4801'
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 800, height: 500 } })
+await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(() => {})
+await p.waitForTimeout(800)
+await p.evaluate(() => window.__applyScene('kitaterao-window-3d-sunset'))
+await p.waitForTimeout(2600)
+console.log('時代群の捕捉数:', JSON.stringify(await p.evaluate(() => window.__town3dEraCull())))
+await p.evaluate(() => window.__town3dFly(true)); await p.waitForTimeout(500)
+await p.evaluate(() => window.__town3dCruise(false))
+await p.evaluate(() => window.__town3dFlyPose(0, 40, -30, 0.2, -0.1)); await p.waitForTimeout(900)
+console.log('本町に居る時(遠い時代は隠れるはず):', JSON.stringify(await p.evaluate(() => window.__town3dEraCull())))
+await p.evaluate(() => window.__town3dFlyPose(640, 60, 40, 0.0, -0.3)); await p.waitForTimeout(900)
+console.log('江戸に居る時:', JSON.stringify(await p.evaluate(() => window.__town3dEraCull())))
+await b.close()
