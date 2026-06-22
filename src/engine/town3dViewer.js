@@ -60,7 +60,7 @@ const FLY = {
   lookEase: 0.18,   // 見回し（右ドラッグ）の追従
   // 引いた三人称“浮遊カメラ”（後方上から望む）
   camBack: 11.5, camUp: 3.6, camAhead: 9,     // 飛行: 後方/上/注視先（既定をやや引き気味＝街を広く望む。±ズームで前後可変）
-  walkBack: 1.5, walkUp: 0.4, walkAhead: 4.5, // 歩行: 一人称寄り（通行人と目線を揃える＝地に足のついた散策。アバター無し）
+  walkBack: 1.4, walkUp: 0.15, walkAhead: 6.0, // 歩行: 一人称（通行人と目線を揃え・水平に前方を望む＝街路に立つ人の眺め。見下ろしのジオラマ感を断つ。アバター無し）
   camLag: 0.12,     // 飛行カメラ位置の遅れ追従（わずかな揺らぎ＝空気の流れ）
   walkCamLag: 0.3,  // 歩行カメラの追従（飛行より密着＝地に足のついた一人称の手応え。浮いた遅延を流用しない）
   // 旋回バンク（飛行の没入の要）
@@ -215,7 +215,7 @@ export function setTown3dLand(land) {
     active.flyPos.x = sx; active.flyPos.z = sz
     active.flyYaw = active.flyYawTarget = active.openYaw(sx, sz) // 壁や木を正面にせず、抜けのある方へ向き直る
     active.walkCamYaw = active.flyYaw // カメラも進む向きの後ろから始める（着地直後に背後の抜けを望む）
-    active.flyPitchTarget = -0.05 // 立って街路をそっと見渡す
+    active.flyPitchTarget = 0 // 立って街路を水平に見渡す（見下ろさない＝街の中にいる眼差し）
     active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
     active.landedFired = false // 接地した瞬間に砂ぼこり＋沈み込みを起こす
     active.mode = 'walk'
