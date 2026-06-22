@@ -3908,25 +3908,31 @@ export async function mountTown3d(parent, opts = {}) {
     if (tTop) scene.add(new THREE.Mesh(tTop, cloudMat))
     if (tBot) scene.add(new THREE.Mesh(tBot, cloudBot))
 
-    // やさしい幻想：雲海のぬし＝雲を泳ぐ大きな鯨。ゆっくり横切り、ふと出会う生命の気配（白眉）。
+    // やさしい幻想：雲海のぬし＝雲を泳ぐ大きな鯨＋寄り添う子鯨。ゆっくり横切り、時々ふっと潮を吹く（生命の気配・白眉）。
     { const whale = new THREE.Group()
       const whaleColor = isNight ? 0x586480 : 0x8fa0b4, bellyColor = isNight ? 0x6c7890 : 0xb9c5d3
-      const whaleMat = tn(whaleColor), bellyMat = tn(bellyColor)
-      const ell = (mat, x, y, sx, sy, sz) => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat); m.position.set(x, y, 0); m.scale.set(sx, sy, sz); whale.add(m); return m } // 楕円体パーツ
-      ell(whaleMat, 10, 0, 9, 7, 8)   // 頭
-      ell(whaleMat, -2, 0, 13, 8, 8.5) // 胴（最大）
-      ell(whaleMat, -15, 0.5, 8, 5.5, 6) // 尾へ細る
-      ell(whaleMat, -24, 1.2, 4, 3, 3.5) // 尾柄
-      ell(bellyMat, -2, -3.4, 12, 3.6, 7.6) // 明るい腹
-      const fluke = ell(whaleMat, -30, 1.6, 2.6, 1.0, 11); fluke.rotation.z = 0.12 // 尾びれ（横に広く薄い）
-      for (const sd of [-1, 1]) { const fin = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6), whaleMat); fin.position.set(4, -1.5, sd * 8); fin.scale.set(7, 1.0, 3); fin.rotation.z = 0.4; fin.rotation.y = sd * 0.5; whale.add(fin) } // 胸びれ
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1a1c22, fog: true })
-      for (const sd of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.85, 8, 8), eyeMat); eye.position.set(15, 0.6, sd * 6); whale.add(eye) }
+      const whaleMat = tn(whaleColor), bellyMat = tn(bellyColor), eyeMat = new THREE.MeshBasicMaterial({ color: 0x1a1c22, fog: true })
+      const buildWhale = (g, k) => { // 鯨の本体を群 g に k 倍で組む（親k=1 / 子k=0.5）
+        const ell = (mat, x, y, sx, sy, sz) => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat); m.position.set(x * k, y * k, 0); m.scale.set(sx * k, sy * k, sz * k); g.add(m); return m }
+        ell(whaleMat, 10, 0, 9, 7, 8); ell(whaleMat, -2, 0, 13, 8, 8.5); ell(whaleMat, -15, 0.5, 8, 5.5, 6); ell(whaleMat, -24, 1.2, 4, 3, 3.5) // 頭→胴→尾柄
+        ell(bellyMat, -2, -3.4, 12, 3.6, 7.6) // 明るい腹
+        const fluke = ell(whaleMat, -30, 1.6, 2.6, 1.0, 11); fluke.rotation.z = 0.12 // 尾びれ
+        for (const sd of [-1, 1]) { const fin = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6), whaleMat); fin.position.set(4 * k, -1.5 * k, sd * 8 * k); fin.scale.set(7 * k, 1.0 * k, 3 * k); fin.rotation.z = 0.4; fin.rotation.y = sd * 0.5; g.add(fin) } // 胸びれ
+        for (const sd of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.85 * k, 8, 8), eyeMat); eye.position.set(15 * k, 0.6 * k, sd * 6 * k); g.add(eye) }
+      }
+      buildWhale(whale, 1) // 親鯨
+      const calf = new THREE.Group(); buildWhale(calf, 0.5); calf.position.set(-22, -3, 16); calf.rotation.y = 0.05; whale.add(calf) // 寄り添う子鯨（親の左斜め後ろ下）
+      // 潮吹き（頭上に立ちのぼる白い潮の柱）。下端を基準に上へ伸びる。
+      const spCv = document.createElement('canvas'); spCv.width = 32; spCv.height = 64
+      const sctx = spCv.getContext('2d'), spg = sctx.createRadialGradient(16, 50, 0, 16, 38, 30)
+      spg.addColorStop(0, 'rgba(255,255,255,0.92)'); spg.addColorStop(1, 'rgba(255,255,255,0)'); sctx.fillStyle = spg; sctx.fillRect(0, 0, 32, 64)
+      const spout = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(spCv), color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: true }))
+      spout.center.set(0.5, 0); spout.position.set(13, 7.5, 0); spout.scale.set(4, 7, 1); whale.add(spout)
       whale.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } })
       whale.scale.setScalar(1.5) // 雄大に（雲海に対し十分大きく＝遠目にも生き物と分かる）
       const wBaseY = SEA_Y + 31, wz = -210 // 雲海の上面(~110)の上を泳ぐ＝全身のシルエットが出る
       whale.position.set(-220, wBaseY, wz) // 頭(+X)を進行方向(+X)へ向けてゆっくり横切る
-      scene.add(whale); skyDrifters.push({ o: whale, kind: 'whale', baseY: wBaseY, z0: wz })
+      scene.add(whale); skyDrifters.push({ o: whale, kind: 'whale', baseY: wBaseY, z0: wz, calf, spout, spoutT: 5, spoutA: 0 })
     }
 
     // 空の灯籠（天灯）＝ゆっくり昇り漂う暖かな灯り。特に夜、雲海に灯がともる。
@@ -3988,7 +3994,7 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < (LIGHT ? 24 : 42); i++) { const s = 3 + R() * 4, puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), fallMat)
         puff.scale.set(1, 1.5, 0.5); const x0 = fx + (R() - 0.5) * fw, z0 = fz + (R() - 0.5) * 12
         puff.position.set(x0, botY + R() * (topY - botY), z0); puff.userData = { spd: 9 + R() * 9, x0, z0, s }; fall.add(puff) }
-      fall.userData = { topY, botY }; scene.add(fall); skyDrifters.push({ o: fall, kind: 'fall' })
+      fall.userData = { topY, botY }; fall.visible = false; scene.add(fall); skyDrifters.push({ o: fall, kind: 'fall', mat: fallMat })
     }
     // 上昇気流＝暖かい街/丘・雲の塔・くつろぎ群島の上。巡航しながらここを通るとふわっと持ち上がる。
     THERMALS.push({ x: 0, z: -10, r: 34 }, { x: MOROOKA.x, z: MOROOKA.z, r: 28 }, { x: -20, z: -290, r: 46 })
@@ -6355,6 +6361,11 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.position.x += 2.2 * dt; if (d.o.position.x > 470) d.o.position.x = -470 // ゆっくり横切り、端で戻る
         d.o.position.y = d.baseY + Math.sin(t * 0.18) * 2.4 // 雲海を上下にたゆたう（呼吸のように）
         d.o.rotation.z = Math.sin(t * 0.18) * 0.05; d.o.rotation.x = Math.sin(t * 0.13 + 1) * 0.04 // ゆるやかな傾き
+        if (d.calf) d.calf.position.y = -3 + Math.sin(t * 0.18 + 0.9) * 1.3 // 子鯨は親より少し遅れて上下にたゆたう
+        if (d.spout) { // 時々ふっと潮を吹く（白い柱が立ちのぼって消える）
+          if (d.spoutA > 0) { d.spoutA += dt / 1.5; if (d.spoutA >= 1) { d.spoutA = 0; d.spout.material.opacity = 0 } else { const e = Math.sin(d.spoutA * Math.PI); d.spout.material.opacity = e * 0.7; d.spout.scale.set(4 + e * 3, 7 + e * 10, 1) } }
+          else if (t >= d.spoutT) { d.spoutT = t + 6 + R() * 7; d.spoutA = 0.001 } // 6〜13秒ごと（実時計）
+        }
       } else if (d.kind === 'flock') { // 渡りの群れ：ゆっくり+Xへ渡り、端で戻る。羽ばたき＋たゆたい
         d.o.position.x += 3.0 * dt; if (d.o.position.x > 360) d.o.position.x = -360
         d.o.position.y = d.o.userData.baseY + Math.sin(t * 0.22) * 1.6
@@ -6364,10 +6375,16 @@ export async function mountTown3d(parent, opts = {}) {
           if (dd < 32) { d.wingT = (d.wingT || 0) - dt; if (d.wingT <= 0) { d.wingT = 0.5 + R() * 0.3; onFlockWing(); wingCount++ } }
         }
       } else if (d.kind === 'fall') { // 雲の滝：各房が落ちて、底で薄れ、上から湧き直す
-        const u = d.o.userData
-        for (const pf of d.o.children) { pf.position.y -= pf.userData.spd * dt
-          if (pf.position.y < u.botY) { pf.position.set(pf.userData.x0, u.topY, pf.userData.z0) }
-          const f = (pf.position.y - u.botY) / (u.topY - u.botY); pf.scale.set(0.5 + f * 0.5, 1.5 * (0.4 + f * 0.6), 0.5 * (0.5 + f * 0.5)) } // 底ほど細る（薄れて消える）
+        // 雲海と同じ高度フェード＝窓辺/低空では消し、高く昇って雲海に出た時だけ見える（宙に浮く白い柱に見えるのを防ぐ）。
+        const fop = active.mode === 'walk' ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 70) / 22)) * flyAmt
+        d.o.visible = fop > 0.02
+        if (d.o.visible) {
+          d.mat.opacity = fop * 0.9
+          const u = d.o.userData
+          for (const pf of d.o.children) { pf.position.y -= pf.userData.spd * dt
+            if (pf.position.y < u.botY) { pf.position.set(pf.userData.x0, u.topY, pf.userData.z0) }
+            const f = (pf.position.y - u.botY) / (u.topY - u.botY); pf.scale.set(0.5 + f * 0.5, 1.5 * (0.4 + f * 0.6), 0.5 * (0.5 + f * 0.5)) } // 底ほど細る（薄れて消える）
+        }
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
