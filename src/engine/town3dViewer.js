@@ -5953,6 +5953,19 @@ export async function mountTown3d(parent, opts = {}) {
       }
       wake *= 0.92; tr.userData.wake = wake // 余波はゆっくり戻る
       tr.rotation.z = tr.userData.tilt + Math.sin(t * 0.8 + tr.userData.ph) * tr.userData.amp + wake
+      // 歩行で近づいた木の樹冠を半透明にフェード＝幹(統合で残る)を残して視界が抜ける。飛行/窓辺では不透明。
+      const leaf = tr.children[0]
+      if (leaf) {
+        const walkFade = active && active.mode === 'walk' && active.flyP > 0.5
+        let dc = 99
+        if (walkFade) { const dxc = tr.position.x - active.flyPos.x, dzc = tr.position.z - active.flyPos.z; dc = Math.hypot(dxc, dzc) }
+        if (walkFade && dc < 4.4) {
+          if (!tr.userData.fadeMat) { tr.userData.origMat = leaf.material; tr.userData.fadeMat = leaf.material.clone(); tr.userData.fadeMat.transparent = true }
+          if (leaf.material !== tr.userData.fadeMat) leaf.material = tr.userData.fadeMat
+          const op = Math.max(0.1, Math.min(1, (dc - 1.4) / 2.6)) // 近いほど薄く（真下=ほぼ透明→4uで不透明）
+          tr.userData.fadeMat.opacity = op; tr.userData.fadeMat.depthWrite = op > 0.65
+        } else if (tr.userData.fadeMat && leaf.material === tr.userData.fadeMat) { leaf.material = tr.userData.origMat } // 遠ざかる/飛行で不透明に戻す
+      }
     }
     // アドバルーンがふわり揺れる
     for (const ab of adBalloons) { ab.rotation.z = Math.sin(t * 0.6) * 0.05; ab.position.x += Math.sin(t * 0.5) * 0.002 }
@@ -6752,6 +6765,13 @@ export async function mountTown3d(parent, opts = {}) {
       const out = []
       for (let a = 0; a < 16; a++) { const yaw = a / 16 * 6.2832; const hx = Math.sin(yaw), hz = -Math.cos(yaw); let d = 1.0; for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break } out.push(+d.toFixed(1)) }
       return out
+    }
+    window.__town3dTreeProbe = () => { // 検証用: 最寄りの木の距離＋その樹冠の現在の透明度
+      if (!active) return null
+      let best = null, bd = 1e9
+      for (const tr of treesArr) { const d = Math.hypot(tr.position.x - active.flyPos.x, tr.position.z - active.flyPos.z); if (d < bd) { bd = d; best = tr } }
+      const leaf = best && best.children[0]
+      return { dist: +bd.toFixed(2), faded: !!(best && best.userData.fadeMat && leaf.material === best.userData.fadeMat), opacity: leaf && leaf.material.transparent ? +leaf.material.opacity.toFixed(2) : 1 }
     }
     window.__town3dSoundCounts = () => ({ chime: chimeCount, wing: wingCount }) // 検証用: 鈴・羽音の発火数
     window.__town3dPalProbe = () => ({ duskAmt: +duskAmt.toFixed(2), isNight, snowy: SNOWY, skyTop: '#' + skyTop.getHexString(), skyBright: +skyBright.toFixed(3) }) // 検証用: 時間帯
