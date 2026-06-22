@@ -560,6 +560,8 @@ export async function mountTown3d(parent, opts = {}) {
   const RAIL = { z: STATION.z - 7.4, x0: -6, x1: 60 }
   // 公園（街の中ほどの広場）。浅い池に空を映し、太鼓橋・桜・石灯籠・ベンチで憩う。飛んで降りる目的地。
   const PARK = { x: 16, z: -27, r: 12, pondR: 5.4, pondDepth: 2.4 }
+  // 師岡町公園（実在・港北/鶴見境の丘の上の児童公園）。小高い丘＋周囲の樹林＋複合すべり台・ブランコ・砂場・ベンチ＋UFO型ジャングルジムの目印。
+  const MOROOKA = { x: -20, z: -20, r: 15 }
   // 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。谷の中ほどに立てる。
   const TOWER = { x: -7, z: -48, r: 6 }
   // 寺（五重塔のある仏閣）。谷の右奥の中腹に。観覧車と対をなす高い目印・飛んでいく目的地。
@@ -1111,6 +1113,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 2) continue // 川筋は空ける
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r) continue // 駅前は空ける
       if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r) continue // 公園の広場は空ける
+      if (Math.hypot(x - MOROOKA.x, z - MOROOKA.z) < MOROOKA.r) continue // 師岡町公園（丘の児童公園）も空ける
       if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r) continue // 寺の境内は空ける
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
@@ -1537,14 +1540,7 @@ export async function mountTown3d(parent, opts = {}) {
       const panel = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.4, 0.06), new THREE.MeshBasicMaterial({ color: 0xfff2cc, fog: true })); panel.position.set(x, gy + 1.15, z + 0.44); town.add(panel)
     }
   }
-  // ── 児童公園（砂場・すべり台・ブランコの骨組み） ──
-  {
-    const px = -16, pz = -23, gy = heightAt(px, pz)
-    const sand = new THREE.Mesh(new THREE.BoxGeometry(5, 0.25, 5), toon(0xd6c69a)); sand.position.set(px, gy + 0.12, pz); sand.receiveShadow = true; town.add(sand)
-    const slide = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.16, 3), toon(0xcc3a4a)); slide.position.set(px + 3, gy + 1.0, pz); slide.rotation.x = 0.5; slide.castShadow = true; town.add(slide)
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.16, 0.16), toon(0x6a8aa0)); bar.position.set(px - 2.5, gy + 2.0, pz); town.add(bar)
-    for (const sx of [-4.0, -1.0]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.13, 2.0, 0.13), toon(0x6a8aa0)); post.position.set(px + sx, gy + 1.0, pz); post.castShadow = true; town.add(post) }
-  }
+  // 師岡町公園は tree() 定義後にまとめて作る（丘＋樹林で囲むため）。下の「師岡町公園」ブロックを参照。
 
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
   const poleMat = toon(0x6a5c4a)
@@ -1805,6 +1801,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) continue // 川筋は空ける（水際の木は別途）
       if (Math.hypot(x - STATION.x, z - STATION.z) < STATION.r - 2) continue // 駅前は空ける
       if (Math.hypot(x - PARK.x, z - PARK.z) < PARK.r - 1) continue // 公園は専用の木立で囲む
+      if (Math.hypot(x - MOROOKA.x, z - MOROOKA.z) < MOROOKA.r - 1) continue // 師岡町公園も専用の樹林で囲む
       if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r - 2) continue // 寺は専用の木立で囲む
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
@@ -2076,6 +2073,54 @@ export async function mountTown3d(parent, opts = {}) {
       // 寺を背後と側面から抱く木立（街向き＝参道の前(+z)は開けて、塔と御堂を見せる）
       for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; if (Math.sin(a) > 0.2) continue; const rr = 11.5 + R() * 3; tree(tx + Math.cos(a) * rr, tz + Math.sin(a) * rr, 1.0 + R() * 0.6) }
       spawnAvoid.push({ x: tx, z: tz, r: 8 }) // 寺の境内に降りない
+    }
+
+    // ── 師岡町公園（実在・港北/鶴見境の丘の上の児童公園）。樹林に囲まれた広場＋複合すべり台・ブランコ・砂場・ベンチ＋UFO型ジャングルジムの目印。──
+    {
+      const mx = MOROOKA.x, mz = MOROOKA.z, gy = heightAt(mx, mz)
+      const woodM = toon(0x9a7048), barM = toon(0x6a8aa0), redM = toon(0xcc4a4a), sandM = toon(0xdccba0), benchM = toon(0x8a6a48), edgeM = toon(0x7a5a38), grassM = toon(0x789a4e)
+      // 芝の小山（截頭円錐＝平らな頂上で遊具が水平に乗る／斜面は樹林＝「丘の上の公園」）
+      const hill = new THREE.Mesh(new THREE.CylinderGeometry(8.2, 12, 3.0, 32), grassM); hill.position.set(mx, gy + 0.2, mz); hill.castShadow = true; hill.receiveShadow = true; town.add(hill)
+      const topY = gy + 1.7 // 頂上の高さ（ここに遊具を水平に置く）
+      const lawn = new THREE.Mesh(new THREE.CircleGeometry(8.0, 28), grassM); lawn.rotation.x = -Math.PI / 2; lawn.position.set(mx, topY + 0.02, mz); lawn.receiveShadow = true; town.add(lawn)
+      // 丘へ上がる階段（南側）
+      for (let s = 0; s < 5; s++) { const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.34, 0.7), edgeM); st.position.set(mx, gy + 0.3 + s * 0.34, mz + 10 - s * 0.9); st.castShadow = true; town.add(st) }
+      // 複合遊具（柱＋デッキ＋手すり＋宝形屋根＋すべり台＋はしご）
+      const pg = new THREE.Group(); pg.position.set(mx - 1.5, topY, mz + 1.5); town.add(pg)
+      for (const lx of [-1, 1]) for (const lz of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.1, 0.16), woodM); leg.position.set(lx * 0.85, 1.05, lz * 0.85); leg.castShadow = true; pg.add(leg) }
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.2, 2.0), woodM); deck.position.y = 2.1; deck.castShadow = true; pg.add(deck)
+      for (const rz of [-1, 1]) { const rr = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.08), barM); rr.position.set(0, 2.55, rz * 0.9); pg.add(rr) }
+      { const rr = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 2.0), barM); rr.position.set(-0.9, 2.55, 0); pg.add(rr) }
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(1.8, 0.95, 4), redM); roof.position.y = 3.25; roof.rotation.y = Math.PI / 4; roof.castShadow = true; pg.add(roof)
+      const slide = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.14, 3.2), redM); slide.position.set(0, 1.2, 2.1); slide.rotation.x = 0.62; slide.castShadow = true; pg.add(slide)
+      for (const ex of [-0.42, 0.42]) { const se = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 3.2), redM); se.position.set(ex, 1.32, 2.1); se.rotation.x = 0.62; pg.add(se) }
+      const ladder = new THREE.Group(); ladder.position.set(-1.05, 1.05, 0); ladder.rotation.z = 0.22; pg.add(ladder)
+      for (const lz of [-0.34, 0.34]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.1, 0.07), barM); rail.position.set(0, 0, lz); ladder.add(rail) }
+      for (let r = 0; r < 4; r++) { const rung = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.66), barM); rung.position.set(0, -0.7 + r * 0.5, 0); ladder.add(rung) }
+      // ブランコ（A字脚×2＋上桁＋座2＋鎖）
+      const swx = mx + 3.8, swz = mz - 1; const sw = new THREE.Group(); sw.position.set(swx, topY, swz); town.add(sw)
+      for (const sz of [-1.3, 1.3]) for (const sgn of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.7, 0.1), barM); leg.position.set(sgn * 0.55, 1.3, sz); leg.rotation.z = -sgn * 0.2; leg.castShadow = true; sw.add(leg) }
+      { const tb = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.9, 8), barM); tb.rotation.x = Math.PI / 2; tb.position.set(0, 2.45, 0); sw.add(tb) }
+      for (const sz of [-0.7, 0.7]) { for (const cx of [-0.22, 0.22]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.03, 1.35, 0.03), barM); ch.position.set(cx, 1.75, sz); sw.add(ch) } const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.07, 0.24), woodM); seat.position.set(0, 1.08, sz); seat.castShadow = true; sw.add(seat) }
+      // 砂場（木枠＋砂）
+      const sax = mx - 3.5, saz = mz - 3, say = topY
+      const sand = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.22, 3.0), sandM); sand.position.set(sax, say + 0.11, saz); sand.receiveShadow = true; town.add(sand)
+      for (const [ox, oz, w, d] of [[0, 1.55, 3.3, 0.25], [0, -1.55, 3.3, 0.25], [1.55, 0, 0.25, 3.3], [-1.55, 0, 0.25, 3.3]]) { const fr = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), edgeM); fr.position.set(sax + ox, say + 0.15, saz + oz); fr.castShadow = true; town.add(fr) }
+      // UFO型ジャングルジム（目印＝色違いの半円アーチを回して交差させたドーム＋天辺の円盤）
+      const ufx = mx + 1, ufz = mz - 4; const ufo = new THREE.Group(); ufo.position.set(ufx, topY, ufz); town.add(ufo)
+      const ufoCols = [0xd8643c, 0x4a8ab0, 0xe0b040, 0x6aa860]
+      for (let k = 0; k < 4; k++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.06, 6, 20, Math.PI), toon(ufoCols[k])); arc.rotation.y = k * (Math.PI / 4); arc.castShadow = true; ufo.add(arc) }
+      { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), toon(0xcfc8bc)); cap.position.y = 1.55; ufo.add(cap) }
+      // ベンチ×4（広場の縁）
+      for (const [bx, bz, ry] of [[mx - 5.5, mz + 2, 0.4], [mx + 5.5, mz + 1.5, -0.5], [mx + 2, mz + 5.5, Math.PI - 0.2], [mx - 3, mz + 5, Math.PI + 0.3]]) {
+        const bg = new THREE.Group(); bg.position.set(bx, topY, bz); bg.rotation.y = ry; town.add(bg)
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.5), benchM); seat.position.y = 0.5; seat.castShadow = true; bg.add(seat)
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.1), benchM); back.position.set(0, 0.75, -0.2); bg.add(back)
+        for (const lx of [-0.65, 0.65]) { const lg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.45), benchM); lg.position.set(lx, 0.25, 0); bg.add(lg) }
+      }
+      // 周囲の斜面林（師岡の特徴＝樹林に囲まれた丘）。丘の裾（截頭円錐の外）に疎らに環状に＝頂上の広場を塞がない背景の木立。
+      for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283 + 0.3, rr = 12.5 + R() * 2.2; tree(mx + Math.cos(a) * rr, mz + Math.sin(a) * rr, 0.48 + R() * 0.16) }
+      colliders.push({ x: mx, z: mz, r: 8.5 }); spawnAvoid.push({ x: mx, z: mz, r: 9 })
     }
 
     // ── 学校（校舎と校庭）。街の右手の馴染みの場所。時計・トラック・桜並木・プール・遊具。──
@@ -5958,6 +6003,16 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dGirlFront = (i, dist = 5) => { const g = standees[i]; if (!g) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); g.position.set(t.x, t.y - 1.0, t.z) } // 検証用: 立ち絵をカメラ正面の視線上へ
     window.__town3dGirlCount = () => standees.length
+    window.__town3dShotAt = (cx, cy, cz, lx, ly, lz, fov) => { // 検証用: 任意のカメラ位置/注視点でシーンを正確に1枚撮る（飛行の三人称オフセット無し）
+      const W = 640, H = 560
+      const cam = new THREE.PerspectiveCamera(fov || 55, W / H, 0.1, 2200); cam.position.set(cx, cy, cz); cam.lookAt(lx, ly, lz)
+      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const pRT = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, cam)
+      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT)
+      const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); const img = x.createImageData(W, H)
+      for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); x.putImageData(img, 0, 0); rt.dispose()
+      return c.toDataURL()
+    }
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
