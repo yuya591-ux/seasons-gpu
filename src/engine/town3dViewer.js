@@ -3869,16 +3869,22 @@ export async function mountTown3d(parent, opts = {}) {
     x.beginPath(); x.moveTo(168, 176); x.quadraticCurveTo(180, 184, 192, 176); L(2, skinSh)
     // 顔
     x.beginPath(); x.moveTo(146, 108); x.bezierCurveTo(146, 142, 160, 166, 180, 166); x.bezierCurveTo(200, 166, 214, 142, 214, 108); x.bezierCurveTo(214, 72, 146, 72, 146, 108); x.closePath(); F(skin); L(4)
+    // やわらかい陰影で頬・顎に丸み（光は左上から）。放射グラデで縁を溶かし“貼り付けたパッチ”を避ける。
+    { const g2 = x.createRadialGradient(202, 134, 2, 202, 134, 25); g2.addColorStop(0, 'rgba(213,165,133,0.30)'); g2.addColorStop(1, 'rgba(213,165,133,0)'); x.fillStyle = g2; x.beginPath(); x.ellipse(201, 136, 16, 28, 0, 0, 6.2832); x.fill() } // 右頬〜エラの陰
+    { const g2 = x.createRadialGradient(180, 163, 1, 180, 163, 20); g2.addColorStop(0, 'rgba(207,159,127,0.30)'); g2.addColorStop(1, 'rgba(207,159,127,0)'); x.fillStyle = g2; x.beginPath(); x.ellipse(180, 164, 19, 9, 0, 0, 6.2832); x.fill() } // 顎の下の陰
+    { const g2 = x.createRadialGradient(159, 116, 1, 159, 116, 22); g2.addColorStop(0, 'rgba(255,247,238,0.24)'); g2.addColorStop(1, 'rgba(255,247,238,0)'); x.fillStyle = g2; x.beginPath(); x.ellipse(159, 118, 16, 22, 0, 0, 6.2832); x.fill() } // 左頬の明り（ハイライト）
     // 頬の赤み（ごく淡く＝顔から浮く陰のパッチは置かない。一枚の肌として馴染ませる）
     for (const sx of [-1, 1]) { const bg = x.createRadialGradient(180 + sx * 31, 138, 1, 180 + sx * 31, 138, 13); bg.addColorStop(0, 'rgba(232,150,128,0.32)'); bg.addColorStop(1, 'rgba(232,150,128,0)'); x.fillStyle = bg; x.beginPath(); x.ellipse(180 + sx * 31, 138, 13, 9, 0, 0, 6.2832); x.fill() }
     // 目（小さめ・やさしい）
     for (const sx of [-1, 1]) {
       const ex = 180 + sx * 13.5, ey = 124 // 中央寄せ＝目1.5個分の自然な間隔
       x.beginPath(); x.ellipse(ex, ey, 5, 6.4, 0, 0, 6.2832); F('#fbf6ef') // 白目（小）
-      x.beginPath(); x.ellipse(ex, ey + 0.6, 4, 5.4, 0, 0, 6.2832); F('#574030') // 虹彩
-      x.beginPath(); x.ellipse(ex, ey + 1.2, 1.9, 2.9, 0, 0, 6.2832); F('#241a12') // 瞳孔
-      x.beginPath(); x.ellipse(ex - sx * 1.4, ey - 1.4, 1.4, 1.8, 0, 0, 6.2832); F('#ffffff') // ハイライト
-      x.beginPath(); x.moveTo(ex - 6, ey - 2.6); x.quadraticCurveTo(ex, ey - 7.4, ex + 6, ey - 2); L(2.3, line) // 上まぶた（細い弧）
+      x.beginPath(); x.ellipse(ex, ey + 0.6, 4, 5.4, 0, 0, 6.2832); F('#43301f') // 虹彩（濃い地）
+      x.beginPath(); x.ellipse(ex, ey + 2.4, 3.2, 3, 0, 0, 6.2832); F('#7c5634') // 虹彩の下＝明るく透明感
+      x.beginPath(); x.ellipse(ex, ey + 1.2, 1.9, 2.9, 0, 0, 6.2832); F('#231910') // 瞳孔
+      x.beginPath(); x.ellipse(ex - sx * 1.4, ey - 1.6, 1.5, 1.9, 0, 0, 6.2832); F('#ffffff') // ハイライト大
+      x.beginPath(); x.ellipse(ex + sx * 1.3, ey + 2.7, 0.85, 1.0, 0, 0, 6.2832); F('rgba(255,255,255,0.6)') // 下のきらめき
+      x.beginPath(); x.moveTo(ex - 6, ey - 2.6); x.quadraticCurveTo(ex, ey - 7.6, ex + 6, ey - 2); L(2.5, line) // 上まぶた（細い弧）
       x.beginPath(); x.moveTo(ex - 6.5, ey - 9.5); x.quadraticCurveTo(ex, ey - 11.5, ex + 7, ey - 9); L(1.7, hairSh) // 眉（細い）
     }
     // 鼻・口
@@ -3896,7 +3902,10 @@ export async function mountTown3d(parent, opts = {}) {
     x.bezierCurveTo(154, 112, 147, 108, 140, 108); x.closePath(); F(hair); L(3) // 前髪（やわらかいフリンジ・浅い中央分け・生え際を下げ額を詰める／尖った房を排除）
     x.beginPath(); x.moveTo(180, 72); x.quadraticCurveTo(178, 88, 177, 102); L(1.5, hairSh) // 中央分けの毛流れ（ごく控えめ）
     for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(180 + sx * 38, 98); x.bezierCurveTo(180 + sx * 46, 132, 180 + sx * 40, 168, 180 + sx * 30, 178); x.bezierCurveTo(180 + sx * 36, 144, 180 + sx * 36, 116, 180 + sx * 35, 100); x.closePath(); F(hair); L(3) } // サイドの毛
-    x.beginPath(); x.moveTo(156, 76); x.quadraticCurveTo(180, 68, 204, 76); L(3.5, hairHi) // 艶
+    // 髪の艶（頭頂の光の帯＋細い強い艶＋サイドの毛流れ＝のっぺりを脱す）
+    x.beginPath(); x.moveTo(150, 80); x.quadraticCurveTo(180, 66, 210, 80); L(5, 'rgba(122,106,94,0.45)')
+    x.beginPath(); x.moveTo(158, 76); x.quadraticCurveTo(180, 67, 202, 76); L(2.4, hairHi)
+    for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(180 + sx * 24, 72); x.quadraticCurveTo(180 + sx * 40, 120, 180 + sx * 30, 174); L(1.3, hairSh) }
   }
   if (/[?&]dev=1/.test(location.search)) window.__girlPNG2 = (cfgJson, faceZoom) => { const cv = document.createElement('canvas'); cv.width = 360; cv.height = 720; drawHarborGirl2D(cv.getContext('2d'), cfgJson ? JSON.parse(cfgJson) : {}); if (faceZoom) { const fc = document.createElement('canvas'); fc.width = 340; fc.height = 360; const fx = fc.getContext('2d'); fx.drawImage(cv, 114, 44, 132, 140, 0, 0, 340, 360); return fc.toDataURL() } return cv.toDataURL() } // 検証用: 立ち絵をそのままPNGに（faceZoomで顔アップ）
   // 立ち絵を板ポリのビルボードに。シーンの光色で淡く染め（MeshBasicの満光が夕景で“浮く/光る”のを防ぐ）＋fogで遠近を馴染ませる。
