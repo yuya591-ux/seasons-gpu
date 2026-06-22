@@ -3874,21 +3874,26 @@ export async function mountTown3d(parent, opts = {}) {
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
   const cloudObjs = [] // 雲海の静的要素（入道雲・島々・吊り橋）。低空では一括で非表示にして描画コールを節約
-  // ── 銭湯（昭和の街の象徴。煉瓦の煙突から煙が立ちのぼり、ゆれて消える＝街で唯一の「生きている」動き）。frameと同じスコープで作り、townSmokeで更新。 ──
-  const townSmoke = [] // 立ちのぼる煙（煙突）。低空（窓辺・街）で見える＝高所の雲海では隠す
+  // ── 銭湯＋夕餉の煙（昭和の街の象徴。煙突や家々から煙が立ちのぼり、ゆれて消える＝街で唯一の「生きている」動き）。frameと同じスコープで作り、townSmokeで更新。 ──
+  const townSmoke = [] // 立ちのぼる煙（銭湯の煙突・夕餉の炊事）。低空（窓辺・街）で見える＝高所の雲海では隠す
   if (kind !== 'yato') {
     const bathNight = isNight || duskAmt > 0.16
+    const smokeMat = new THREE.MeshBasicMaterial({ color: 0xe8e4dc, transparent: true, opacity: 0, depthWrite: false, fog: true })
+    // 煙の源を作る共通関数。各源ごとに上昇高さ・なびき・広がり・濃さを持たせる。
+    const mkSmoke = (mx, my, mz, n, params) => { const g = new THREE.Group(); g.position.set(mx, my, mz)
+      for (let s = 0; s < n; s++) { const pf = new THREE.Mesh(new THREE.SphereGeometry(1.0, 7, 6), smokeMat.clone()); pf.userData = { ph: s / n, spd: 0.8 + R() * 0.4 }; g.add(pf) }
+      g.userData = params; town.add(g); townSmoke.push(g) }
+    // 銭湯（煉瓦の高い煙突＝遠くからの目印）
     const sx = -24, sz = -34, sgy = heightAt(sx, sz)
     const bath = new THREE.Group()
     const body = new THREE.Mesh(new THREE.BoxGeometry(7, 4.2, 6), toon(0xcdbfa6)); body.position.y = 2.1; body.castShadow = true; bath.add(body) // 浴場の建物
     const roof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 2.6, 4), toon(0x6b6f74)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.5; bath.add(roof) // 寄棟風の屋根
     const noren = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 0.12), new THREE.MeshBasicMaterial({ color: bathNight ? 0xffe0b0 : 0xb9b3c4, fog: true })); noren.position.set(0, 2.0, 3.06); bath.add(noren) // 入口の暖簾（夕夜は内から灯る）
-    const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.86, 13, 10), toon(0x9a5a44)); ch.position.set(2.4, 10.7, -1.6); ch.castShadow = true; bath.add(ch) // 煉瓦の煙突（高い＝遠くからの目印）
+    const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.86, 13, 10), toon(0x9a5a44)); ch.position.set(2.4, 10.7, -1.6); ch.castShadow = true; bath.add(ch) // 煉瓦の煙突
     bath.position.set(sx, sgy, sz); town.add(bath)
-    const smokeMat = new THREE.MeshBasicMaterial({ color: 0xe8e4dc, transparent: true, opacity: 0, depthWrite: false, fog: true })
-    const smoke = new THREE.Group(); smoke.position.set(sx + 2.4, sgy + 17, sz - 1.6) // 煙突の口から
-    for (let s = 0; s < 6; s++) { const pf = new THREE.Mesh(new THREE.SphereGeometry(1.0, 7, 6), smokeMat.clone()); pf.userData = { ph: s / 6, spd: 0.8 + R() * 0.4 }; smoke.add(pf) }
-    town.add(smoke); townSmoke.push(smoke)
+    mkSmoke(sx + 2.4, sgy + 17, sz - 1.6, 6, { rise: 12, drift: 4.5, maxSc: 2.6, op: 0.3 }) // 煙突の口から濃く高く
+    // 夕餉の煙（夕暮れ以降のみ・家々の屋根から細くたなびく＝人の暮らしの気配。窓辺の主視界に散らす）
+    if (bathNight) for (const [hx, hz] of [[-8, -52], [16, -44], [-34, -60], [6, -30]]) { const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) continue; mkSmoke(hx, gy + 4.2, hz, 4, { rise: 6.5, drift: 2.2, maxSc: 1.3, op: 0.14 }) } // 細く淡く
   }
   let lastCloudHi = true // 雲海の世界の表示状態（変化時だけ visible を書き換える）
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
@@ -6608,11 +6613,12 @@ export async function mountTown3d(parent, opts = {}) {
     for (const sm of townSmoke) {
       if (cloudHi) { if (sm.visible) sm.visible = false; continue }
       if (!sm.visible) sm.visible = true
+      const sp = sm.userData // 源ごとの上昇高さ・なびき・広がり・濃さ
       for (const pf of sm.children) { const u = pf.userData
         u.ph += dt * u.spd * 0.09; if (u.ph > 1) u.ph -= 1
-        pf.position.set(u.ph * 4.5 + Math.sin(u.ph * 6.0 + u.spd) * 0.8, u.ph * 12, Math.cos(u.ph * 5.0 + u.spd) * 0.6) // +Xへなびきながら昇る
-        pf.material.opacity = Math.sin(u.ph * Math.PI) * 0.3
-        const sc = 1.0 + u.ph * 2.6; pf.scale.set(sc, sc, sc) } // 昇るほど広がって薄れる
+        pf.position.set(u.ph * sp.drift + Math.sin(u.ph * 6.0 + u.spd) * 0.8, u.ph * sp.rise, Math.cos(u.ph * 5.0 + u.spd) * 0.6) // +Xへなびきながら昇る
+        pf.material.opacity = Math.sin(u.ph * Math.PI) * sp.op
+        const sc = 0.7 + u.ph * sp.maxSc; pf.scale.set(sc, sc, sc) } // 昇るほど広がって薄れる
     }
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
