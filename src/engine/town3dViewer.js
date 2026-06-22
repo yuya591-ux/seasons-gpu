@@ -245,6 +245,7 @@ export async function mountTown3d(parent, opts = {}) {
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。飛行中の解像度落としの基準に使う
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
+  let composer = null, fxaaPass = null // FXAA（輪郭をなめらかに＝解像度を上げずにくっきり）。読み込み失敗時はnullで通常描画にフォールバック
   renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
@@ -4200,6 +4201,23 @@ export async function mountTown3d(parent, opts = {}) {
   const eye = kind === 'yato'
     ? new THREE.Vector3(0, 28, 27)  // 谷戸: 少し低く・谷へ寄る（棚田と茅葺屋敷が映える）
     : new THREE.Vector3(0, 31, 30)  // 街: 高台の上階から見下ろす
+  // ── FXAA（輪郭のギザギザをなめらかに）。MSAA付きの中間ターゲット→FXAA→OutputPass(色空間を正しく)。失敗時はnullで通常描画へ。──
+  try {
+    const [{ EffectComposer }, { RenderPass }, { ShaderPass }, { OutputPass }, { FXAAShader }] = await Promise.all([
+      import('three/examples/jsm/postprocessing/EffectComposer.js'),
+      import('three/examples/jsm/postprocessing/RenderPass.js'),
+      import('three/examples/jsm/postprocessing/ShaderPass.js'),
+      import('three/examples/jsm/postprocessing/OutputPass.js'),
+      import('three/examples/jsm/shaders/FXAAShader.js'),
+    ])
+    if (my !== token) return
+    const crt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }) // MSAAを保ったままFXAAも掛ける
+    composer = new EffectComposer(renderer, crt)
+    composer.addPass(new RenderPass(scene, camera))
+    fxaaPass = new ShaderPass(FXAAShader)
+    composer.addPass(fxaaPass)
+    composer.addPass(new OutputPass())
+  } catch (e) { composer = null }
 
   // ── 室内の窓枠（3Dの壁＋窓の開口）。部屋の中から窓越しに外を覗く“本物”の手応え＝近い窓枠と遠い景色が
   //    視差で分離して動き、見回す（＝室内で頭を動かす）と窓が視界を横切り壁の側が覗く。乗り出すと退いて街へ。
@@ -4627,6 +4645,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!w || !h) return
     lastStageW = w; lastStageH = h
     renderer.setPixelRatio(curPR); renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix()
+    if (composer) { composer.setPixelRatio(curPR); composer.setSize(w, h); if (fxaaPass) fxaaPass.material.uniforms.resolution.value.set(1 / (w * curPR), 1 / (h * curPR)) }
   }
   function resize() { applySize() }
   window.addEventListener('resize', resize)
@@ -5963,9 +5982,8 @@ export async function mountTown3d(parent, opts = {}) {
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
-    // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に（発熱対策の解像度落としは画質劣化を招いたため廃止）。
-    // 発熱配慮は「窓辺の休息中のfps間引き」と「30fps上限・非表示時停止」で行う（画質を落とさない範囲で）。
-    renderer.render(scene, camera)
+    // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に。輪郭のギザギザはFXAAでなめらかに（発熱をほぼ増やさず）。
+    if (composer) { try { composer.render() } catch (e) { composer = null; renderer.render(scene, camera) } } else renderer.render(scene, camera)
   }
   renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
   frame()
