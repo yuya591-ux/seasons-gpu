@@ -675,6 +675,7 @@ export async function mountTown3d(parent, opts = {}) {
   const plinthGeos = []
   // 接地階の入口（玄関/店先の戸）。前面に暗い戸口を差し、まとめて1メッシュへ＝歩くと“住んでいる街”に。
   const doorGeos = []
+  const doorFrameGeos = [] // 戸枠・玄関庇（暖色の木）。戸を引き締め、庇の影で入口が立体に＝目線の生活感
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -1148,14 +1149,19 @@ export async function mountTown3d(parent, opts = {}) {
     pg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
     pg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
     plinthGeos.push(pg)
-    // 接地階の戸口（前面 +z 面に暗いパネル）。回転・位置を焼き込んで後で統合。
+    // 接地階の玄関（前面 +z 面）＝戸＋戸枠＋小庇＋上がり段。歩いて通り過ぎると「住んでいる家」に。回転・位置を焼き込み統合。
     if (h > 2.6) {
-      const dw = type === 'house' ? 0.92 : 1.3, dh = type === 'house' ? 1.9 : 2.15
-      const dg = new THREE.BoxGeometry(dw, dh, 0.07)
-      dg.applyMatrix4(new THREE.Matrix4().makeTranslation((R() - 0.5) * w * 0.42, dh / 2 + 0.02, d / 2 + 0.04))
-      dg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
-      dg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
-      doorGeos.push(dg)
+      const isHouse = type === 'house'
+      const dw = isHouse ? 0.95 : 1.35, dh = isHouse ? 1.95 : 2.2
+      const ox = (R() - 0.5) * w * 0.40, fz = d / 2 // 前面の戸口の横位置
+      const rotY = g.rotation.y
+      const bake = (geos, sx, sy, sz, lx, ly, lz) => { const bg = new THREE.BoxGeometry(sx, sy, sz); bg.applyMatrix4(new THREE.Matrix4().makeTranslation(lx, ly, lz)); bg.applyMatrix4(new THREE.Matrix4().makeRotationY(rotY)); bg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z)); geos.push(bg) }
+      bake(doorGeos, dw, dh, 0.09, ox, dh / 2 + 0.02, fz + 0.02) // 暗い引き戸/扉
+      bake(doorFrameGeos, 0.12, dh + 0.16, 0.14, ox - dw / 2 - 0.06, (dh + 0.16) / 2, fz + 0.05) // 左の方立
+      bake(doorFrameGeos, 0.12, dh + 0.16, 0.14, ox + dw / 2 + 0.06, (dh + 0.16) / 2, fz + 0.05) // 右の方立
+      bake(doorFrameGeos, dw + 0.32, 0.17, 0.14, ox, dh + 0.11, fz + 0.05) // 上の楣（まぐさ）
+      if (isHouse) bake(doorFrameGeos, dw + 0.52, 0.1, 0.62, ox, dh + 0.28, fz + 0.3) // 玄関の小庇（前へ張り出し＝雨除け・影で入口が立体に）
+      bake(plinthGeos, dw + 0.22, 0.22, 0.44, ox, 0.11, fz + 0.2) // 上がり段（式台＝コンクリの低い段）
     }
   }
 
@@ -1292,6 +1298,9 @@ export async function mountTown3d(parent, opts = {}) {
     const dmerged = doorGeos.length && BufferGeometryUtils.mergeGeometries(doorGeos, false)
     if (dmerged) { const doors = new THREE.Mesh(dmerged, toon(0x40382f)); doors.receiveShadow = true; town.add(doors) } // 暗い戸口（玄関/店先）
     doorGeos.forEach((g) => g.dispose())
+    const fmerged = doorFrameGeos.length && BufferGeometryUtils.mergeGeometries(doorFrameGeos, false)
+    if (fmerged) { const frames = new THREE.Mesh(fmerged, toon(0x7c6647)); frames.castShadow = true; frames.receiveShadow = true; town.add(frames) } // 戸枠・玄関庇（暖色の木）
+    doorFrameGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
