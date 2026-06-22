@@ -3828,7 +3828,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (const sx of [-1, 1]) { const bg = x.createRadialGradient(180 + sx * 31, 138, 1, 180 + sx * 31, 138, 13); bg.addColorStop(0, 'rgba(232,150,128,0.32)'); bg.addColorStop(1, 'rgba(232,150,128,0)'); x.fillStyle = bg; x.beginPath(); x.ellipse(180 + sx * 31, 138, 13, 9, 0, 0, 6.2832); x.fill() }
     // 目（小さめ・やさしい）
     for (const sx of [-1, 1]) {
-      const ex = 180 + sx * 19, ey = 125
+      const ex = 180 + sx * 13.5, ey = 124 // 中央寄せ＝目1.5個分の自然な間隔
       x.beginPath(); x.ellipse(ex, ey, 5, 6.4, 0, 0, 6.2832); F('#fbf6ef') // 白目（小）
       x.beginPath(); x.ellipse(ex, ey + 0.6, 4, 5.4, 0, 0, 6.2832); F('#574030') // 虹彩
       x.beginPath(); x.ellipse(ex, ey + 1.2, 1.9, 2.9, 0, 0, 6.2832); F('#241a12') // 瞳孔
@@ -3837,10 +3837,10 @@ export async function mountTown3d(parent, opts = {}) {
       x.beginPath(); x.moveTo(ex - 6.5, ey - 9.5); x.quadraticCurveTo(ex, ey - 11.5, ex + 7, ey - 9); L(1.7, hairSh) // 眉（細い）
     }
     // 鼻・口
-    x.beginPath(); x.ellipse(180, 149, 6, 2.6, 0, 0, 6.2832); F('rgba(200,150,120,0.2)') // 鼻先の下のやわらかい陰
-    x.beginPath(); x.moveTo(181, 140); x.lineTo(177, 148); L(1.5, 'rgba(150,108,84,0.5)')
-    x.beginPath(); x.moveTo(170, 156); x.quadraticCurveTo(180, 163, 190, 156); L(2.6, mouthC)
-    x.beginPath(); x.moveTo(173, 157.5); x.quadraticCurveTo(180, 160.5, 187, 157.5); L(2.2, '#e0a48f')
+    x.beginPath(); x.ellipse(180, 145, 5.5, 2.4, 0, 0, 6.2832); F('rgba(200,150,120,0.2)') // 鼻先の下のやわらかい陰
+    x.beginPath(); x.moveTo(181, 136); x.lineTo(177, 144); L(1.5, 'rgba(150,108,84,0.5)') // 鼻（眉〜鼻／鼻〜顎を等間隔へ＝上へ寄せる）
+    x.beginPath(); x.moveTo(171, 152); x.quadraticCurveTo(180, 158, 189, 152); L(2.6, mouthC) // 口
+    x.beginPath(); x.moveTo(174, 153.5); x.quadraticCurveTo(180, 156, 186, 153.5); L(2.2, '#e0a48f')
     // 前髪（中央分け＋毛束、生え際を額に重ね）
     x.beginPath(); x.moveTo(140, 108)
     x.bezierCurveTo(136, 56, 224, 56, 220, 108)
