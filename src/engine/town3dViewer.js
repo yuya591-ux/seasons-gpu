@@ -3723,6 +3723,8 @@ export async function mountTown3d(parent, opts = {}) {
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
+  const THERMALS = [] // 上昇気流の柱（暖かい街・丘・雲の塔・くつろぎ群島の上）。巡航中ふわっと持ち上げる＝ソアリング
+  let gustT = 6 + Math.random() * 10, gustAmt = 0, gustVX = 0, gustVZ = 0, gustUp = 0 // そよ風/突風＝空気が生きている
   // 雲上の歩行面の高さ＝島の上(平ら)か橋の上(端点間を補間＋たわみ)。歩ける範囲外は null。
   const cloudSurfaceY = (x, z) => {
     if (!cloudWalkInfo) return null
@@ -3949,7 +3951,11 @@ export async function mountTown3d(parent, opts = {}) {
     const gloryTex = new THREE.CanvasTexture(glCv)
     glory = new THREE.Mesh(new THREE.CircleGeometry(16, 44), new THREE.MeshBasicMaterial({ map: gloryTex, transparent: true, opacity: 0, depthWrite: false, fog: false }))
     glory.rotation.x = -Math.PI / 2; glory.visible = false; scene.add(glory)
+    // 上昇気流＝暖かい街/丘・雲の塔・くつろぎ群島の上。巡航しながらここを通るとふわっと持ち上がる。
+    THERMALS.push({ x: 0, z: -10, r: 34 }, { x: MOROOKA.x, z: MOROOKA.z, r: 28 }, { x: -20, z: -290, r: 46 })
+    for (const tc of towerCenters) THERMALS.push({ x: tc.x, z: tc.z, r: 26 })
   }
+  if (THERMALS.length === 0) THERMALS.push({ x: 0, z: -12, r: 26 }) // 谷戸など＝谷の上の上昇気流
 
   // ── 渡る鳥（はばたきながら空を弧で渡る。数羽） ──
   const birds = []
@@ -5940,6 +5946,11 @@ export async function mountTown3d(parent, opts = {}) {
         dvX = Math.sin(active.flyYaw) * cruiseS
         dvY = (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。カメラの見る角度(flyPitch)は保持され移動には影響しない＝好きな角度で街を見下ろし続けられる
         dvZ = -Math.cos(active.flyYaw) * cruiseS
+        // 上昇気流＝暖かい場所・雲の塔の上は、巡航しながら通るとふわっと持ち上がる（押さなくても少し昇るソアリング）。
+        let thermal = 0
+        for (const th of THERMALS) { const d2 = (active.flyPos.x - th.x) ** 2 + (active.flyPos.z - th.z) ** 2; if (d2 < th.r * th.r) thermal = Math.max(thermal, 1 - Math.sqrt(d2) / th.r) }
+        active.thermal = thermal
+        if (active.cruise && active.climb === 0) dvY += thermal * FLY.climbSpeed * 0.5 // 止空/手動昇降中は効かせない（眺めを邪魔しない）
       }
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
       const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit // カメラの向き
@@ -5948,6 +5959,13 @@ export async function mountTown3d(parent, opts = {}) {
       active.vel.x += (dvX - active.vel.x) * k
       active.vel.y += (dvY - active.vel.y) * k
       active.vel.z += (dvZ - active.vel.z) * k
+      // そよ風/突風＝空気が生きている。時々ふっと押される（横＋わずかに上）。山型に立ち上がって収まる＝自然な一陣。
+      active.gustEnv = 0
+      if (!isWalk) {
+        gustT -= dt
+        if (gustT <= 0) { gustT = 11 + R() * 18; const ga = R() * 6.2832, s = 2.0 + R() * 2.6; gustVX = Math.cos(ga) * s; gustVZ = Math.sin(ga) * s; gustUp = (R() - 0.25) * 2.2; gustAmt = 1 }
+        if (gustAmt > 0) { gustAmt = Math.max(0, gustAmt - dt * 0.42); const e = Math.sin(Math.min(1, gustAmt) * Math.PI); active.gustEnv = e; active.vel.x += gustVX * e * dt * 1.6; active.vel.z += gustVZ * e * dt * 1.6; active.vel.y += gustUp * e * dt * 1.6 }
+      }
 
       const b = bound
       if (isWalk) {
@@ -6030,7 +6048,7 @@ export async function mountTown3d(parent, opts = {}) {
       const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain) + (active.wide && !isWalk ? 26 : 0) // 広角モードで視界を広げる
       fov = lerp(winFov, aloftFov, flyAmt)
       if (!isWalk && active.cinema > 0.01) fov += Math.sin(t * 0.16) * 2.6 * active.cinema // オートシネマの呼吸する画角（ゆっくり広→狭）
-      windSpeed01 = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt // 飛行の速さ＝風の膨らみ
+      windSpeed01 = Math.min(1, (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) + (active.thermal || 0) * 0.3 + (active.gustEnv || 0) * 0.45)) * flyAmt // 飛行の速さ＋上昇気流＋突風で風音が膨らむ
 
       // 浮遊感: ホバリングはゆっくり上下に漂い、速いとかすかに揺れる。歩行は頭が弾む。
       const sp01 = Math.min(1, speedMag / (isWalk ? FLY.walkSpeed : FLY.speed))
@@ -6038,8 +6056,10 @@ export async function mountTown3d(parent, opts = {}) {
         camY += Math.sin(t * 8.0) * 0.03 * sp01 * flyAmt // 一人称寄りでは頭の弾みを控えめに（酔い配慮）
         camX += Math.sin(t * 4.0) * 0.015 * sp01 * flyAmt
       } else {
-        camY += (Math.sin(t * 0.8) * 0.16 * (1 - sp01) + Math.sin(t * 7.3) * 0.12 * sp01) * flyAmt
-        camX += Math.sin(t * 5.1) * 0.12 * sp01 * flyAmt
+        // 夢の浮遊＝ホバリングほど大きくゆったり漂い（無重力に浮かぶ手触り）、速いとかすかに弾む。上昇気流ではふわっと持ち上がる手応え。
+        const float = 1 - sp01 * 0.55
+        camY += (Math.sin(t * 0.5) * 0.4 + Math.sin(t * 0.33 + 1.6) * 0.26) * float * flyAmt + Math.sin(t * 7.3) * 0.1 * sp01 * flyAmt + (active.thermal || 0) * 0.5 * flyAmt
+        camX += (Math.sin(t * 0.42 + 0.7) * 0.28 * float + Math.sin(t * 5.1) * 0.1 * sp01) * flyAmt
       }
       // 着地の沈み込み（とんと沈んで戻る＝接地の手応え）
       if (active.dipT > 0) { active.dipT -= dt; const pp = 1 - Math.max(0, active.dipT) / 0.42; camY -= Math.sin(pp * Math.PI) * 0.6 }
