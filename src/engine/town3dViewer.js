@@ -1615,6 +1615,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 師岡町公園は tree() 定義後にまとめて作る（丘＋樹林で囲むため）。下の「師岡町公園」ブロックを参照。
+  // 銭湯（煙突＋立ちのぼる煙）は、frameループと同じスコープ（雲海の宣言の近く）でまとめて作る。下の townSmoke ブロックを参照。
 
   // ── 電柱・電線（手前から奥へ一列＝強い遠近＝立体感の決め手） ──
   const poleMat = toon(0x6a5c4a)
@@ -3873,6 +3874,22 @@ export async function mountTown3d(parent, opts = {}) {
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
   const cloudObjs = [] // 雲海の静的要素（入道雲・島々・吊り橋）。低空では一括で非表示にして描画コールを節約
+  // ── 銭湯（昭和の街の象徴。煉瓦の煙突から煙が立ちのぼり、ゆれて消える＝街で唯一の「生きている」動き）。frameと同じスコープで作り、townSmokeで更新。 ──
+  const townSmoke = [] // 立ちのぼる煙（煙突）。低空（窓辺・街）で見える＝高所の雲海では隠す
+  if (kind !== 'yato') {
+    const bathNight = isNight || duskAmt > 0.16
+    const sx = -24, sz = -34, sgy = heightAt(sx, sz)
+    const bath = new THREE.Group()
+    const body = new THREE.Mesh(new THREE.BoxGeometry(7, 4.2, 6), toon(0xcdbfa6)); body.position.y = 2.1; body.castShadow = true; bath.add(body) // 浴場の建物
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 2.6, 4), toon(0x6b6f74)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.5; bath.add(roof) // 寄棟風の屋根
+    const noren = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 0.12), new THREE.MeshBasicMaterial({ color: bathNight ? 0xffe0b0 : 0xb9b3c4, fog: true })); noren.position.set(0, 2.0, 3.06); bath.add(noren) // 入口の暖簾（夕夜は内から灯る）
+    const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.86, 13, 10), toon(0x9a5a44)); ch.position.set(2.4, 10.7, -1.6); ch.castShadow = true; bath.add(ch) // 煉瓦の煙突（高い＝遠くからの目印）
+    bath.position.set(sx, sgy, sz); town.add(bath)
+    const smokeMat = new THREE.MeshBasicMaterial({ color: 0xe8e4dc, transparent: true, opacity: 0, depthWrite: false, fog: true })
+    const smoke = new THREE.Group(); smoke.position.set(sx + 2.4, sgy + 17, sz - 1.6) // 煙突の口から
+    for (let s = 0; s < 6; s++) { const pf = new THREE.Mesh(new THREE.SphereGeometry(1.0, 7, 6), smokeMat.clone()); pf.userData = { ph: s / 6, spd: 0.8 + R() * 0.4 }; smoke.add(pf) }
+    town.add(smoke); townSmoke.push(smoke)
+  }
   let lastCloudHi = true // 雲海の世界の表示状態（変化時だけ visible を書き換える）
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
@@ -6587,6 +6604,16 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
     if (cloudHi !== lastCloudHi) { lastCloudHi = cloudHi; for (const o of cloudObjs) o.visible = cloudHi } // 低空では雲海の静的要素も一括で隠す（描画コール節約・見た目は霧で不変）
+    // 銭湯の煙：低空（窓辺・街）でだけ立ちのぼる。各房が位相をずらして上昇→広がり→薄れ、上で湧き直す＝街の生きた動き。
+    for (const sm of townSmoke) {
+      if (cloudHi) { if (sm.visible) sm.visible = false; continue }
+      if (!sm.visible) sm.visible = true
+      for (const pf of sm.children) { const u = pf.userData
+        u.ph += dt * u.spd * 0.09; if (u.ph > 1) u.ph -= 1
+        pf.position.set(u.ph * 4.5 + Math.sin(u.ph * 6.0 + u.spd) * 0.8, u.ph * 12, Math.cos(u.ph * 5.0 + u.spd) * 0.6) // +Xへなびきながら昇る
+        pf.material.opacity = Math.sin(u.ph * Math.PI) * 0.3
+        const sc = 1.0 + u.ph * 2.6; pf.scale.set(sc, sc, sc) } // 昇るほど広がって薄れる
+    }
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
