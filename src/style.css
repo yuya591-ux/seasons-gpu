@@ -198,6 +198,16 @@ body {
   transition: opacity 0.35s ease;
   background: radial-gradient(ellipse 120% 120% at 50% 42%, rgba(247, 236, 214, 0.92) 0%, rgba(242, 224, 196, 0.78) 58%, rgba(232, 210, 184, 0.62) 100%);
 }
+/* 部屋から空へ踏み出す瞬間、光がふわっと開ける（中央＝窓の開口から外の明るさが満ちる） */
+.town3d-open {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse 90% 80% at 50% 46%, rgba(255, 250, 238, 0.95) 0%, rgba(252, 244, 226, 0.5) 42%, rgba(248, 238, 216, 0) 78%);
+}
 /* 虹をくぐる瞬間の淡い分光のベール（やわらかく・水彩調） */
 .town3d-rainbow {
   position: absolute;

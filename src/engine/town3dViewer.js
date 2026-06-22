@@ -5474,6 +5474,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 虹をくぐる時の淡い分光のベール
   const rainbowVeil = document.createElement('div'); rainbowVeil.className = 'town3d-rainbow'; stage.appendChild(rainbowVeil)
   let rbVeilCur = -1
+  // 部屋から空へ踏み出す瞬間、光がふわっと開ける（薄暗い室内→明るい外気）
+  const openFlash = document.createElement('div'); openFlash.className = 'town3d-open'; stage.appendChild(openFlash)
+  let openCur = -1
   // 高く昇るほど空気が冷たく淡くなる（高度の実感）。淡い寒色をうっすら被せる。
   const altTint = document.createElement('div'); altTint.className = 'town3d-alt'; stage.appendChild(altTint)
   let altTintCur = -1
@@ -5802,6 +5805,9 @@ export async function mountTown3d(parent, opts = {}) {
     const wo = easeInOut(active.winOpenP)
     const lean = easeInOut(active.leanP)
     const flyAmt = easeInOut(active.flyP) // 0=窓 / 1=空（カメラ位置・視線・画角をこの量で混ぜる）
+    // 踏み出す閾: 窓を越える序盤(flyP 0→0.45)だけ立ち上がる山型。部屋から夢の空へ身を乗り出して踏み出す一瞬の身体性。
+    const thr = (active.flyTarget > 0.5 && active.flyP > 0.001 && active.flyP < 0.5) ? Math.sin(Math.min(1, active.flyP / 0.45) * Math.PI) : 0
+    { const openOp = thr * 0.34; if (Math.abs(openOp - openCur) > 0.015) { openCur = openOp; openFlash.style.opacity = openOp.toFixed(2) } } // 光がふわっと開ける
     // 別世界感: 飛ぶほど霧を晴らして遠くの街を壮大に見せ、目的地に近いほどその時代の空気（色・露出）へ移す。
     if (flyAmt > 0.02) {
       active.fogTouched = true
@@ -6092,8 +6098,9 @@ export async function mountTown3d(parent, opts = {}) {
       const speedMag = Math.hypot(active.vel.x, active.vel.y, active.vel.z)
       const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain) + (active.wide && !isWalk ? 26 : 0) // 広角モードで視界を広げる
       fov = lerp(winFov, aloftFov, flyAmt)
+      if (thr > 0.001) fov += thr * 6.5 // 踏み出す閾＝画角がふっと広がり、視界が前へ吸い込まれて開ける（窓を越えて空へ踏み出す高揚）
       if (!isWalk && active.cinema > 0.01) fov += Math.sin(t * 0.16) * 2.6 * active.cinema // オートシネマの呼吸する画角（ゆっくり広→狭）
-      windSpeed01 = Math.min(1, (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) + (active.thermal || 0) * 0.3 + (active.gustEnv || 0) * 0.45)) * flyAmt // 飛行の速さ＋上昇気流＋突風で風音が膨らむ
+      windSpeed01 = Math.min(1, (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) + (active.thermal || 0) * 0.3 + (active.gustEnv || 0) * 0.45) * flyAmt + thr * 0.5) // 飛行の速さ＋上昇気流＋突風＋閾を越える瞬間の風の立ち上がりで風音が膨らむ
 
       // 浮遊感: ホバリングはゆっくり上下に漂い、速いとかすかに揺れる。歩行は頭が弾む。
       const sp01 = Math.min(1, speedMag / (isWalk ? FLY.walkSpeed : FLY.speed))
