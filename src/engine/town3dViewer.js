@@ -412,10 +412,11 @@ export async function mountTown3d(parent, opts = {}) {
     const mhx = mhc.getContext('2d'); const mhg = mhx.createRadialGradient(32, 32, 0, 32, 32, 32)
     mhg.addColorStop(0, 'rgba(244,242,232,0.62)'); mhg.addColorStop(0.4, 'rgba(214,224,240,0.26)'); mhg.addColorStop(1, 'rgba(214,224,240,0)')
     mhx.fillStyle = mhg; mhx.fillRect(0, 0, 64, 64)
-    const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(mhc), transparent: true, opacity: weather === 'rain' ? 0.3 : 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
-    moonHalo.position.copy(moon.position); moonHalo.scale.set(weather === 'rain' ? 30 : 42, weather === 'rain' ? 30 : 42, 1); scene.add(moonHalo) // 雨の夜は雲ごしの淡い月
-    // 満天の星（雲の上は光害が無い）。per-starできらめく（twinkle）＝生きた夜空。雨の夜は曇天なので星を出さない。
-    if (weather !== 'rain') {
+    const cloudyNight = weather === 'rain' || weather === 'snow' // 雨/雪の夜は曇天＝月は雲ごしに淡く
+    const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(mhc), transparent: true, opacity: cloudyNight ? 0.3 : 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
+    moonHalo.position.copy(moon.position); moonHalo.scale.set(cloudyNight ? 30 : 42, cloudyNight ? 30 : 42, 1); scene.add(moonHalo)
+    // 満天の星（雲の上は光害が無い）。per-starできらめく（twinkle）＝生きた夜空。雨/雪の夜は曇天なので星を出さない。
+    if (weather !== 'rain' && weather !== 'snow') {
     const spos = [], sph = [], ssz = [], tmp = new THREE.Vector3()
     const R0 = 360, addStar = (d, sz) => { spos.push(d.x * R0, d.y * R0 * 0.92 + 22, d.z * R0 - 18); sph.push(Math.random() * 6.2832); ssz.push(sz) }
     for (let i = 0; i < (LIGHT ? 420 : 720); i++) { const th = Math.random() * 6.2832, ph = Math.acos(Math.random()); addStar(tmp.set(Math.cos(th) * Math.sin(ph), Math.cos(ph), Math.sin(th) * Math.sin(ph)), 1.5 + Math.random() * Math.random() * 3.6) } // 一様（大小ばら）

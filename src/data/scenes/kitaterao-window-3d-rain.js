@@ -10,6 +10,7 @@ export default {
   desc: '坂の街に夏の雨が降る夕暮れ。雨筋がけむり、濡れた路面が灯りを照り返す。歩いて降りれば雨の路地、ヒグラシが遠くで鳴く。',
   status: 'ready',
   render: 'town3d',
+  town3dWeather: 'rain', // 雨を降らせる（降る雨筋＋濡れた路面＋波紋）。town3dはこのフィールドで天候を受け取る
 
   palette: {
     early: {
