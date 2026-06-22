@@ -46,5 +46,15 @@ await p.evaluate(() => window.__town3dFlyPose(-196, 124, -142, 0, -0.08))
 await p.waitForTimeout(1400)
 await p.screenshot({ path: 'scripts/_shots/sky-6-whale.png' })
 
+// (7) 雲の切れ間＝街の上の穴(15,-25)を見下ろし、はるか下の地上が覗く
+await p.evaluate(() => window.__town3dFlyPose(15, 126, 18, 0, -0.5))
+await p.waitForTimeout(1200)
+await p.screenshot({ path: 'scripts/_shots/sky-7-gap.png' })
+
+// (8) ブロッケンの虹輪＝開けた雲海の上から真下を見下ろす（自分の影を囲む円い虹）
+await p.evaluate(() => window.__town3dFlyPose(-30, 124, -250, 0, -0.5))
+await p.waitForTimeout(1200)
+await p.screenshot({ path: 'scripts/_shots/sky-8-glory.png' })
+
 console.log(errs.length ? 'ERR ' + errs.slice(0, 4).join(' | ') : 'no errors')
 await b.close()

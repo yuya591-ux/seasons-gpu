@@ -3703,6 +3703,7 @@ export async function mountTown3d(parent, opts = {}) {
   const seaMats = [] // 雲海の材（高度フェードで opacity を動かす）
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
+  let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   if (kind === 'town' && BufferGeometryUtils.mergeGeometries) {
     // 雲の頂点に「陽の当たる暖白い頂 → 翳る冷たい底」の階調を焼く（法線頼みでなく確実に“雲らしい”立体陰影＝水彩調）。
     const cloudTint = (geo, y0, y1, lo, hi) => {
@@ -3757,12 +3758,17 @@ export async function mountTown3d(parent, opts = {}) {
     const seaMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false })
     const discMat = new THREE.MeshBasicMaterial({ color: seaLowC, transparent: true, opacity: 0, depthWrite: false, fog: false })
     seaMats.push(seaMat, discMat)
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(seaR, 56), discMat); disc.rotation.x = -Math.PI / 2; disc.position.y = -7; cloudSeaG.add(disc) // 海面を必ず覆う下地
+    // 雲の切れ間＝雲海の所々に穴を開け、はるか下の地上が覗く（高さの実感＝奥行き）。下地に穴・その部分は雲塊も置かない。
+    const gaps = [{ x: 15, z: -25, r: 40 }, { x: 120, z: 28, r: 44 }, { x: -135, z: -120, r: 46 }, { x: 210, z: -300, r: 44 }] // 街・東の海・西の住宅・渡りの空の上に開ける
+    const seaShape = new THREE.Shape(); seaShape.absarc(0, 0, seaR, 0, Math.PI * 2, false)
+    for (const gp of gaps) { const h = new THREE.Path(); h.absarc(gp.x, -gp.z, gp.r, 0, Math.PI * 2, true); seaShape.holes.push(h) } // shapeのY→world -Z（disc.rotateX(-90°)のため符号反転）
+    const disc = new THREE.Mesh(new THREE.ShapeGeometry(seaShape, 64), discMat); disc.rotation.x = -Math.PI / 2; disc.position.y = -7; cloudSeaG.add(disc) // 切れ間以外を覆う下地
     const seaGeos = [], step = LIGHT ? 46 : 36
     for (let gx = -seaR; gx <= seaR; gx += step) {
       for (let gz = -seaR; gz <= seaR; gz += step) {
         if (Math.hypot(gx, gz) > seaR) continue
         if (isles.some((il) => Math.hypot(gx - il.x, gz - il.z) < il.r)) continue // 島の周りはくぼませる（雲のくぼ地に据わる）
+        if (gaps.some((gp) => Math.hypot(gx - gp.x, gz - gp.z) < gp.r)) continue // 雲の切れ間（地上が覗く穴）
         const jx = gx + (R() - 0.5) * step * 0.4, jz = gz + (R() - 0.5) * step * 0.4, baseY = (R() - 0.5) * 11
         const sB = (LIGHT ? 19 : 15) + R() * 9
         const gb = new THREE.IcosahedronGeometry(sB, 1); gb.scale(1, 0.46, 1); gb.translate(jx, baseY, jz); cloudTint(gb, -12, 24, seaLowC, seaHighC); seaGeos.push(gb) // 平たい底スラブ
@@ -3835,6 +3841,19 @@ export async function mountTown3d(parent, opts = {}) {
       g.userData = { ph: R() * 6.28, sway: 0.6 + R() * 0.5, rise: 0.5 + R() * 0.6, baseX: cx, baseZ: cz }
       scene.add(g); skyDrifters.push({ o: g, kind: 'lantern' })
     }
+
+    // ブロッケンの虹輪＝晴れた日に雲海の上を飛ぶと、自分の影を囲む円い虹が雲に映る（実在の現象＝静かな幻想）。
+    // 自分の真下（反太陽点に近い）に淡い分光の輪を置き、frameで追従＋高度/昼でフェード。
+    const glCv = document.createElement('canvas'); glCv.width = glCv.height = 128
+    const gctx = glCv.getContext('2d'), grg = gctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+    grg.addColorStop(0.00, 'rgba(86,92,108,0.34)'); grg.addColorStop(0.16, 'rgba(86,92,108,0.12)') // 中心＝自分の影の翳り
+    grg.addColorStop(0.30, 'rgba(255,250,235,0)')
+    grg.addColorStop(0.44, 'rgba(120,150,255,0.46)'); grg.addColorStop(0.56, 'rgba(140,236,168,0.42)') // 青→緑
+    grg.addColorStop(0.68, 'rgba(255,212,120,0.46)'); grg.addColorStop(0.80, 'rgba(255,122,110,0.44)') // 黄→赤
+    grg.addColorStop(0.93, 'rgba(255,122,110,0)'); gctx.fillStyle = grg; gctx.fillRect(0, 0, 128, 128)
+    const gloryTex = new THREE.CanvasTexture(glCv)
+    glory = new THREE.Mesh(new THREE.CircleGeometry(16, 44), new THREE.MeshBasicMaterial({ map: gloryTex, transparent: true, opacity: 0, depthWrite: false, fog: false }))
+    glory.rotation.x = -Math.PI / 2; glory.visible = false; scene.add(glory)
   }
 
   // ── 渡る鳥（はばたきながら空を弧で渡る。数羽） ──
@@ -5949,6 +5968,13 @@ export async function mountTown3d(parent, opts = {}) {
         const seaOp = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 70) / 22)) * flyAmt // y70で現れy92で満ちる（巡航では消えている）
         cloudSea.visible = seaOp > 0.02
         if (cloudSea.visible) for (const m of seaMats) m.opacity = seaOp
+      }
+      // ブロッケンの虹輪＝雲海の上を晴れた日に飛ぶと、自分の真下の雲に円い虹が映って追従する
+      if (glory) {
+        const ab = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - (SEA_Y + 8)) / 16)) // 雲海の上に出ているほど
+        const gOp = (!isNight && !SNOWY ? 1 : 0) * ab * flyAmt * 0.8
+        glory.visible = gOp > 0.02
+        if (glory.visible) { glory.position.set(active.flyPos.x, SEA_Y + 18, active.flyPos.z); glory.material.opacity = gOp }
       }
       // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）＋環境音をしぼる
       const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
