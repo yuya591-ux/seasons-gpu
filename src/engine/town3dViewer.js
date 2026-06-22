@@ -2501,6 +2501,9 @@ export async function mountTown3d(parent, opts = {}) {
           const road = (x0, z0, x1, z1, w) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w) }
           for (const av of [...avenues, Math.PI]) road(ex + Math.cos(av) * 18, ez + Math.sin(av) * 18, ex + Math.cos(av) * 118, ez + Math.sin(av) * 118, av === Math.PI ? 5.2 : 4.0) // 放射の大通り（参道は太め・外周まで延伸）
           for (const rr0 of ringRoads) { let prev = null; for (let s = 0; s <= 56; s++) { const a = s / 56 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev) road(prev.x, prev.z, px, pz, 3.8); prev = { x: px, z: pz } } } // 環状道路
+          // ── 城下の路地網（同心円の細い路地＋大通りの間の放射の路地＝路地裏。建物の列の間を縫う土の細道） ──
+          for (let rr0 = 24; rr0 <= 112; rr0 += 6.0) { if (ringRoads.some((r) => Math.abs(r - rr0) < 3)) continue; let prev = null; for (let s = 0; s <= 48; s++) { const a = s / 48 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev && angGap(a) > 0.26) road(prev.x, prev.z, px, pz, 1.7); prev = { x: px, z: pz } } } // 同心円の路地
+          for (const av of avenues) { const av2 = av + Math.PI / avenues.length; road(ex + Math.cos(av2) * 20, ez + Math.sin(av2) * 20, ex + Math.cos(av2) * 112, ez + Math.sin(av2) * 112, 1.7) } // 放射の路地（大通りの間に）
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, roadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
         roofGeos.forEach((geos, i) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, roofMats[i]); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } })
@@ -2789,6 +2792,10 @@ export async function mountTown3d(parent, opts = {}) {
           for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 4.8, py = Math.max(SEA.level, senH(px, zz)) + 0.08 // 川の東岸の街道
             if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(2.6, 0.16, len + 0.6); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } }
             prev = { x: px, z: zz, py } }
+          // ── 城下の裏道（街道に並行する裏路地）＋横道（街道から裏へ）＝谷あいの城下の路地 ──
+          const lane = (offset, w) => { let pv = null; for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + offset, py = Math.max(SEA.level, senH(px, zz)) + 0.07; if (senH(px, zz) < SEA.level + 0.5 || py > 15) { pv = null; continue } if (pv) { const ddx = px - pv.x, ddz = zz - pv.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(w, 0.14, len + 0.5); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + pv.x) / 2, (py + pv.py) / 2, (zz + pv.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } } pv = { x: px, z: zz, py } } }
+          lane(11, 1.7); lane(-7, 1.7) // 東の裏道・西岸の道
+          for (let s = 4; s <= 34; s += 6) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), x0 = sx + cl + 4, x1 = sx + cl + 12, y = Math.max(SEA.level, senH((x0 + x1) / 2, zz)); if (senH((x0 + x1) / 2, zz) < SEA.level + 0.6) continue; const bg = new THREE.BoxGeometry(8.4, 0.14, 1.6); bg.applyMatrix4(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y + 0.06, zz)); roadGeos.push(bg) } // 横道（街道→東の裏道）
           prev = null // 街道から城の平場へ登る坂道
           const r0x = sx + senValley(bz + 12) + 4.8, r0z = bz + 12
           for (let s = 0; s <= 14; s++) { const f = s / 14, px = r0x + (bx - r0x) * f, pz = r0z + (bz + 9 - r0z) * f, py = senH(px, pz) + 0.12
@@ -2957,6 +2964,9 @@ export async function mountTown3d(parent, opts = {}) {
           const road = (x0, z0, x1, z1, w) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w) }
           for (let n = -5; n <= 5; n++) { const gx = n * 19; if (Math.abs(gx) > TAISHO.r - 6) continue; road(tx + gx, tz - 84, tx + gx, tz + 90, 4.2) } // 縦の通り（建物の空けと一致）
           for (let mm = -4; mm <= 5; mm++) { const gz = mm * 19; if (Math.abs(gz) > TAISHO.r - 6) continue; road(tx - 96, tz + gz, tx + 96, tz + gz, 4.2) } // 横の通り
+          // 路地（主要街路の間に細い道＝区画を細かく割る路地裏。本物の港町の入り組んだ街路へ） ──
+          for (let n = -5; n <= 4; n++) { const gx = n * 19 + 9.5; if (Math.abs(gx) > TAISHO.r - 6) continue; road(tx + gx, tz - 82, tx + gx, tz + 88, 1.8) } // 縦の路地
+          for (let mm = -4; mm <= 4; mm++) { const gz = mm * 19 + 9.5; if (Math.abs(gz) > TAISHO.r - 6) continue; road(tx - 94, tz + gz, tx + 94, tz + gz, 1.8) } // 横の路地
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, paveMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
         // 桟橋（海へ突き出す木の桟橋）
