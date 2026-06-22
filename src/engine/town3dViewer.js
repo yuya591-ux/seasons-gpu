@@ -1939,7 +1939,7 @@ export async function mountTown3d(parent, opts = {}) {
     const g = new THREE.Group()
     const r = 1.6 + R() * 1.4
     const ci = (R() * leafBaseMats.length) | 0
-    const det = scale > 1.4 ? 2 : 1 // 近景の大木だけ細分を上げて輪郭を丸く（奥は1=軽量）
+    const det = scale > 1.4 ? 3 : 2 // 樹冠の分割を上げて輪郭を丸く＝低ポリの塊を脱す。木ごとに1メッシュ統合なので三角形増のみ・描画コール不変
     // 樹形のばらつき＝同形のロリポップ畑を脱す。縦長(杉檜風)/横広(落葉樹の傘)/標準を振る。
     const form = R()
     const tall = form > 0.68, broad = form < 0.28
