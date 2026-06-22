@@ -2528,6 +2528,20 @@ export async function mountTown3d(parent, opts = {}) {
             for (const s of [-1, 1]) for (let bx = -3; bx <= 3; bx += 2) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.7, 0.18), toon(0x6a4a30)); post.position.set(ex - 15.5 + bx, gyg + 0.7, gz + s * 1.6); town.add(post) } // 橋の欄干
           }
         }
+        // ── 参道（大手門への主通り）に提灯を連ねる（夕/夜は灯って城下の賑わい）。竿＋提灯を統合で軽量に ──
+        { const av = Math.PI, perp = av + Math.PI / 2, lm = new THREE.Matrix4(), poleGeos = [], chGeos = []
+          const chMat = (isNight || duskAmt > 0.18) ? new THREE.MeshToonMaterial({ color: 0xd8463a, gradientMap: grad, emissive: new THREE.Color(0xff7a44), emissiveIntensity: isNight ? 1.05 : 0.55 }) : toon(0xc8463a)
+          for (let rr = 27; rr <= 110; rr += 5.5) for (const side of [-1, 1]) {
+            const px = ex + Math.cos(av) * rr + Math.cos(perp) * side * 3.2, pz = ez + Math.sin(av) * rr + Math.sin(perp) * side * 3.2, py = heightAt(px, pz)
+            if (py < SEA.level + 0.8) continue
+            const pg = new THREE.CylinderGeometry(0.07, 0.09, 3.0, 5); lm.makeTranslation(px, py + 1.5, pz); pg.applyMatrix4(lm); poleGeos.push(pg) // 竿
+            const cg = new THREE.CylinderGeometry(0.3, 0.3, 0.66, 8); lm.makeTranslation(px, py + 2.9, pz); cg.applyMatrix4(lm); chGeos.push(cg) // 提灯
+          }
+          if (BufferGeometryUtils.mergeGeometries) {
+            const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x4a3a2c))); poleGeos.forEach((g) => g.dispose())
+            const cm = BufferGeometryUtils.mergeGeometries(chGeos, false); if (cm) town.add(new THREE.Mesh(cm, chMat)); chGeos.forEach((g) => g.dispose())
+          }
+        }
         // ── 二の丸御殿（城内の御殿。低く広がる入母屋の屋根）──
         { const palMat = toon(season === 'winter' ? 0xe8e4da : 0xe0d8c6), palRoof = toon(season === 'winter' ? (isNight ? 0x70787f : 0x9aa0a6) : (isNight ? 0x33373e : 0x49515b))
           const pa = 0.7, pcx = ex + Math.cos(pa) * 19.5, pcz = ez + Math.sin(pa) * 19.5, pgy = heightAt(pcx, pcz)
