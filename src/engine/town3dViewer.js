@@ -2961,6 +2961,16 @@ export async function mountTown3d(parent, opts = {}) {
             const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.0, 6), toon(0x3a3e42)); pole.position.set(lx, ly + 1.5, lz); town.add(pole)
             const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 8), isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : toon(0xf0e4c8)); lamp.position.set(lx, ly + 3.1, lz); town.add(lamp)
             if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.4, 2.4, 1); town.add(gl) } }
+          // ── 運河沿いの並木道のガス灯（水辺に灯りの列＝大正の港町の灯りの散歩道）。竿/灯は統合で軽量、夜はグローを灯す ──
+          { const cPoleG = [], cLampG = [], cm = new THREE.Matrix4(), canalZ = tz + 17, lampMat = isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : toon(0xf0e4c8)
+            for (let cx = tx - 100; cx <= tx + 26; cx += 7) for (const side of [-1, 1]) { const lx = cx, lz = canalZ + side * 5.5, ly = heightAt(lx, lz)
+              if (ly < SEA.level + 1.0) continue
+              const pg = new THREE.CylinderGeometry(0.07, 0.1, 3.0, 6); cm.makeTranslation(lx, ly + 1.5, lz); pg.applyMatrix4(cm); cPoleG.push(pg)
+              const lg = new THREE.SphereGeometry(0.26, 8, 8); cm.makeTranslation(lx, ly + 3.1, lz); lg.applyMatrix4(cm); cLampG.push(lg)
+              if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.2, 2.2, 1); town.add(gl) }
+            }
+            if (BufferGeometryUtils.mergeGeometries) { const pm = BufferGeometryUtils.mergeGeometries(cPoleG, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x3a3e42))); cPoleG.forEach((g) => g.dispose()); const lmM = BufferGeometryUtils.mergeGeometries(cLampG, false); if (lmM) town.add(new THREE.Mesh(lmM, lampMat)); cLampG.forEach((g) => g.dispose()) }
+          }
           const tKim = [0x8a3a32, 0x3a4a6a, 0x556040, 0x7a5a34, 0x6a4a5a, 0x40443a] // 大正の人々（着物＋洋装の中間色）
           for (let k = 0; k < 20; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) }
           // 大正の店の看板（横書きのホーロー/洋風看板。和洋折衷の店名）
