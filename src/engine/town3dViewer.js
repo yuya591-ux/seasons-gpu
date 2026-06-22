@@ -3697,6 +3697,79 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 空を旅する立体感：雲海・入道雲・浮島の鳥居（街townのみ。谷戸は低空 yMax74 で届かないため敷かない） ──
+  const SEA_Y = 88 // 雲海の基準高度（巡航 y30-60 の上・最高高度 y132 まで18-44u の見晴らし＝海原を見渡せる）
+  let cloudSea = null
+  const seaMats = [] // 雲海の材（高度フェードで opacity を動かす）
+  const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
+  const ISL = { x: -60, z: -440 } // 浮島の位置（雲海をここだけくぼませて据える）
+  let toriiIsland = null
+  if (kind === 'town' && BufferGeometryUtils.mergeGeometries) {
+    // 雲海＝下地の円盤（取りこぼしを埋め谷の翳りになる）＋丸い起伏の雲塊（側面に陰が出て“うねる海”に）。
+    // group ごと高度でフェード＝窓辺・巡航では消えて開けた空、高く昇ると現れて街が雲の下へ消える別世界。
+    const cloudSeaG = new THREE.Group(); cloudSeaG.position.y = SEA_Y; cloudSeaG.visible = false
+    const seaR = 500
+    const seaMk = (col) => SNOWY
+      ? new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, fog: false })
+      : new THREE.MeshToonMaterial({ color: col, gradientMap: grad, transparent: true, opacity: 0, depthWrite: false, fog: false })
+    const seaTopMat = seaMk(SNOWY ? 0xf2f3f6 : (isNight ? 0x9aa0b4 : 0xfdfcf8)) // 陽の当たる雲の白
+    const seaLowMat = seaMk(SNOWY ? 0xe2e6ec : (isNight ? 0x6b7286 : 0xe7e1d8)) // 谷の翳り（下地）
+    seaMats.push(seaTopMat, seaLowMat)
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(seaR, 56), seaLowMat); disc.rotation.x = -Math.PI / 2; disc.position.y = -6; cloudSeaG.add(disc) // 海面を必ず覆う下地
+    const seaGeos = [], step = LIGHT ? 42 : 33
+    for (let gx = -seaR; gx <= seaR; gx += step) {
+      for (let gz = -seaR; gz <= seaR; gz += step) {
+        if (Math.hypot(gx, gz) > seaR) continue
+        if (Math.hypot(gx - ISL.x, gz - ISL.z) < 42) continue // 浮島の周りはくぼませる（島が雲のくぼ地に据わる）
+        const baseY = (R() - 0.5) * 13, s = (LIGHT ? 19 : 15) + R() * 10 // 大きなうねり＋細かめの雲塊
+        const g1 = new THREE.IcosahedronGeometry(s, 1); g1.scale(1, 0.62, 1) // 丸く・あまり潰さず＝側面に陰
+        g1.translate(gx + (R() - 0.5) * step * 0.42, baseY, gz + (R() - 0.5) * step * 0.42); seaGeos.push(g1)
+        if (R() < 0.7) { const s2 = 6 + R() * 6, g2 = new THREE.IcosahedronGeometry(s2, 1); g2.scale(1, 0.72, 1); g2.translate(gx + (R() - 0.5) * step * 0.58, baseY + s * 0.4, gz + (R() - 0.5) * step * 0.58); seaGeos.push(g2) } // てっぺんのこぶ
+      }
+    }
+    const seaMerged = BufferGeometryUtils.mergeGeometries(seaGeos, false); seaGeos.forEach((g) => g.dispose())
+    if (seaMerged) cloudSeaG.add(new THREE.Mesh(seaMerged, seaTopMat))
+    scene.add(cloudSeaG); cloudSea = cloudSeaG
+    // 入道雲＝雲海から雄大に立ち上がる白い塔（下太く上細い・最高高度を越えて聳える＝縫って飛ぶ道標）。上下2メッシュに統合。
+    const towerTop = [], towerBot = []
+    const towerSpots = LIGHT ? [[-130, -250], [170, -330], [10, -500]] : [[-130, -250], [170, -330], [10, -500], [-290, -150], [330, -210], [-80, -610]]
+    for (const [tx, tz] of towerSpots) {
+      const baseY = SEA_Y - 14, topY = SEA_Y + (56 + R() * 30), layers = 9 + ((R() * 4) | 0) // 雲海(上面~114)から30-60u聳える積乱雲
+      for (let k = 0; k < layers; k++) {
+        const f = k / (layers - 1)
+        const rad = (30 - f * 20) * (0.8 + R() * 0.4) * (1 - 0.5 * Math.pow(Math.max(0, f - 0.7) / 0.3, 2)) // 下太く・上はもくもく細る（てっぺんは砧雲状に少し広がる手前で締める）
+        const puffs = 5 + ((R() * 3) | 0)
+        for (let p = 0; p < puffs; p++) {
+          const s = rad * (0.62 + R() * 0.5), ang = R() * Math.PI * 2, rr = R() * rad * 0.7
+          const geo = new THREE.IcosahedronGeometry(s, 1); geo.scale(1, 0.86, 1)
+          geo.translate(tx + Math.cos(ang) * rr, baseY + f * (topY - baseY), tz + Math.sin(ang) * rr)
+          ;(f > 0.24 ? towerTop : towerBot).push(geo)
+        }
+      }
+      towerCenters.push({ x: tx, z: tz, yTop: topY })
+    }
+    const tTop = BufferGeometryUtils.mergeGeometries(towerTop, false); towerTop.forEach((g) => g.dispose())
+    const tBot = BufferGeometryUtils.mergeGeometries(towerBot, false); towerBot.forEach((g) => g.dispose())
+    if (tTop) scene.add(new THREE.Mesh(tTop, cloudMat))
+    if (tBot) scene.add(new THREE.Mesh(tBot, cloudBot))
+    // やさしい幻想：雲海に浮かぶ鳥居の小島。fog（far132）で低空からは霞に溶けて見えず、高く旅して近づくと現れる＝発見。
+    const isl = new THREE.Group(), islR = 16
+    const grassMat = new THREE.MeshToonMaterial({ color: isNight ? 0x3c5a44 : 0x6f9a5c, gradientMap: grad })
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(islR, islR * 0.92, 2.4, 24), grassMat); isl.add(top) // 草の頂
+    const rock = new THREE.Mesh(new THREE.ConeGeometry(islR * 0.95, 18, 18), new THREE.MeshToonMaterial({ color: isNight ? 0x4a4640 : 0x7b6f60, gradientMap: grad }))
+    rock.rotation.x = Math.PI; rock.position.y = -10; isl.add(rock) // 下へ細る岩肌（雲海へ潜る）
+    const toriiMat = new THREE.MeshToonMaterial({ color: isNight ? 0x7a3026 : 0xc34a32, gradientMap: grad })
+    const th = 12, tw = 8
+    for (const sx of [-1, 1]) { const pi = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.64, th, 8), toriiMat); pi.position.set(sx * tw * 0.5, th * 0.5 + 1.2, 0); isl.add(pi) } // 柱
+    const kasa = new THREE.Mesh(new THREE.BoxGeometry(tw + 3.4, 0.95, 1.7), toriiMat); kasa.position.set(0, th + 1.4, 0); isl.add(kasa) // 笠木
+    const nuki = new THREE.Mesh(new THREE.BoxGeometry(tw + 0.6, 0.7, 1.1), toriiMat); nuki.position.set(0, th - 1.8, 0); isl.add(nuki) // 貫
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.62, 7, 6), new THREE.MeshToonMaterial({ color: 0x5a4636, gradientMap: grad })); trunk.position.set(islR * 0.5, 4.5, -3); isl.add(trunk)
+    const pine = new THREE.Mesh(new THREE.IcosahedronGeometry(4.2, 1), new THREE.MeshToonMaterial({ color: isNight ? 0x2e4a36 : 0x47704a, gradientMap: grad })); pine.position.set(islR * 0.5, 9, -3); pine.scale.y = 0.85; isl.add(pine) // 一本松
+    isl.position.set(ISL.x, SEA_Y + 20, ISL.z) // 雲のくぼ地に島が据わり、岩肌が雲へ潜る。渡りの空の奥＝高く北へ旅すると霞の中から現れる
+    isl.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } })
+    scene.add(isl); toriiIsland = isl
+  }
+
   // ── 渡る鳥（はばたきながら空を弧で渡る。数羽） ──
   const birds = []
   const birdMat = new THREE.MeshBasicMaterial({ color: isNight ? 0x223044 : 0x3a3a40, fog: true })
@@ -5796,10 +5869,20 @@ export async function mountTown3d(parent, opts = {}) {
       // 雲を抜けると白くかすむ＝いちばん近い雲の中心までの距離で白みを出す（飛行のみ）
       let nearC = 1e9
       if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
-      // 雲の芯のごく近く(9u以内)だけ軽く霞む。以前は半径15・濃さ0.82で“少し高く飛ぶと白飛び”していた→
-      // 街全体を見渡せる開放感を優先し、雲に分け入った時だけ淡く霞ませる（軽い白飛びの雰囲気は残す）。
-      const haze = isWalk ? 0 : Math.max(0, 1 - Math.sqrt(nearC) / 5.0) * flyAmt // 雲の芯のごく至近だけ・さらに控えめに（飛行中の白さの圧迫を緩める）
-      if (Math.abs(haze - cloudHazeCur) > 0.02) { cloudHazeCur = haze; cloudHaze.style.opacity = (haze * 0.14).toFixed(2) }
+      // 積雲の芯のごく近くは淡く霞む（巡航の開放感を優先＝弱め）。
+      const cumHaze = Math.max(0, 1 - Math.sqrt(nearC) / 5.0)
+      // 雲海・入道雲を突き抜けるときだけ白く包まれる手応え（高所限定＝街の一望は損なわない）。
+      let seaCross = 0, towerHaze = 0
+      if (cloudSea) { const dY = Math.abs(active.flyPos.y - (SEA_Y + 14)); seaCross = Math.max(0, 1 - dY / 16) } // 雲塊の中ほど(SEA_Y+14)で最も白く包まれる
+      for (const tc of towerCenters) { const dh = Math.hypot(tc.x - active.flyPos.x, tc.z - active.flyPos.z); if (dh < 18 && active.flyPos.y > SEA_Y - 16 && active.flyPos.y < tc.yTop + 4) towerHaze = Math.max(towerHaze, 1 - dh / 18) }
+      const hazeOp = isWalk ? 0 : Math.min(0.6, Math.max(cumHaze * 0.14, seaCross * 0.5, towerHaze * 0.55)) * flyAmt
+      if (Math.abs(hazeOp - cloudHazeCur) > 0.02) { cloudHazeCur = hazeOp; cloudHaze.style.opacity = hazeOp.toFixed(2) }
+      // 雲海の出現＝高く昇るほど淡く現れ、突き抜けると街が雲の下に消える別世界（窓辺・巡航では opacity0 で開けた空）。
+      if (cloudSea) {
+        const seaOp = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 70) / 22)) * flyAmt // y70で現れy92で満ちる（巡航では消えている）
+        cloudSea.visible = seaOp > 0.02
+        if (cloudSea.visible) for (const m of seaMats) m.opacity = seaOp
+      }
       // 高度で空気が冷たく淡くなる（高く昇るほど淡い寒色を被せる）＋環境音をしぼる
       const altT = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 34) / 46)) * flyAmt
       if (Math.abs(altT - altTintCur) > 0.02) { altTintCur = altT; altTint.style.opacity = (altT * 0.16).toFixed(2) }
