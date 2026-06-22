@@ -3922,37 +3922,7 @@ export async function mountTown3d(parent, opts = {}) {
   const placeGirl = (hx, hz, cfg) => { const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; const g = makeGirlStandee(cfg); g.position.set(hx, gy, hz); town.add(g); standees.push(g) }
   const GIRL_HAIR = ['#2b2521', '#33291f', '#241c18'], GIRL_TOP = ['#f2ede2', '#eee7d9', '#f3efe6'], GIRL_BOT = ['#37424f', '#2f3a44', '#3a3530'], GIRL_BAG = ['#9c7d56', '#7e6748', '#a98c63']
   const girlCfg = () => ({ hair: GIRL_HAIR[(R() * 3) | 0], top: GIRL_TOP[(R() * 3) | 0], bottom: GIRL_BOT[(R() * 3) | 0], bag: GIRL_BAG[(R() * 3) | 0] })
-  // ── 顔は「手描きの顔テクスチャ」を頭の前面に貼る（スタイライズド3Dの定番）。近接でも表情が読め、横/後ろからは見えない。全住人で共有。 ──
-  const makeFaceTex = (skinHex) => {
-    const c = document.createElement('canvas'); c.width = 180; c.height = 180; const x = c.getContext('2d')
-    x.lineJoin = 'round'; x.lineCap = 'round'; const OL = '#3a2c22'
-    // 肌のベース（自己発光で常に明るい＝近接でも顔が暗くならない）。縁はなだらかに透明にして頭の肌へ溶かす。
-    const sk = '#' + ('000000' + ((skinHex || 0xf6d8bd) >>> 0).toString(16)).slice(-6)
-    const g = x.createRadialGradient(90, 100, 26, 90, 98, 94); g.addColorStop(0, sk); g.addColorStop(0.68, sk); g.addColorStop(1, sk + '00')
-    x.fillStyle = g; x.beginPath(); x.ellipse(90, 99, 82, 84, 0, 0, 6.2832); x.fill() // 肌のベース（丸め＝卵型を避け頬と顎を揃える）
-    for (const s of [-1, 1]) { // やさしい中サイズのアニメ目（やや下・やや内寄せ＝額の余白を詰める）
-      const ex = 90 + s * 30, ey = 90
-      x.beginPath(); x.ellipse(ex, ey, 15, 18, 0, 0, 6.2832); x.fillStyle = '#fcf8f3'; x.fill()
-      x.beginPath(); x.ellipse(ex, ey + 1.5, 12, 15, 0, 0, 6.2832); x.fillStyle = '#7a5a3e'; x.fill()
-      x.beginPath(); x.ellipse(ex, ey + 3, 8.5, 11, 0, 0, 6.2832); x.fillStyle = '#48341f'; x.fill()
-      x.beginPath(); x.ellipse(ex, ey + 3.5, 4.2, 5.4, 0, 0, 6.2832); x.fillStyle = '#231812'; x.fill()
-      x.beginPath(); x.ellipse(ex - s * 4.5, ey - 5, 4.2, 5, 0, 0, 6.2832); x.fillStyle = '#ffffff'; x.fill()
-      x.beginPath(); x.ellipse(ex + s * 3.5, ey + 6, 2, 2.4, 0, 0, 6.2832); x.fillStyle = 'rgba(255,255,255,0.65)'; x.fill()
-      x.beginPath(); x.moveTo(ex - 16, ey - 9); x.quadraticCurveTo(ex - 2, ey - 22, ex + 16, ey - 8); x.lineWidth = 5.5; x.strokeStyle = OL; x.stroke()
-      x.beginPath(); x.moveTo(ex + s * 15, ey - 8); x.lineTo(ex + s * 21, ey - 12); x.lineWidth = 3.4; x.strokeStyle = OL; x.stroke()
-      x.beginPath(); x.moveTo(ex - 10, ey + 15); x.quadraticCurveTo(ex, ey + 18, ex + 10, ey + 14); x.lineWidth = 1.8; x.strokeStyle = 'rgba(110,80,60,0.55)'; x.stroke()
-      x.beginPath(); x.moveTo(ex - 15, ey - 27); x.quadraticCurveTo(ex, ey - 31, ex + 16, ey - 25); x.lineWidth = 4.4; x.strokeStyle = '#43321f'; x.stroke()
-    }
-    x.beginPath(); x.ellipse(90, 121, 8, 3.4, 0, 0, 6.2832); x.fillStyle = 'rgba(150,108,84,0.16)'; x.fill() // 鼻の下のやわらかい陰（鼻が浮かないよう繋ぐ）
-    x.beginPath(); x.moveTo(90, 113); x.lineTo(85.5, 122); x.quadraticCurveTo(90, 125, 94.5, 122); x.lineWidth = 2; x.strokeStyle = 'rgba(150,108,84,0.5)'; x.stroke() // 鼻
-    x.beginPath(); x.moveTo(77, 146); x.quadraticCurveTo(90, 154, 103, 146); x.lineWidth = 3.2; x.strokeStyle = '#b06a5a'; x.stroke() // 口
-    x.beginPath(); x.moveTo(81, 148); x.quadraticCurveTo(90, 151, 99, 148); x.lineWidth = 2.6; x.strokeStyle = '#e0a48f'; x.stroke()
-    for (const s of [-1, 1]) { x.beginPath(); x.ellipse(90 + s * 38, 130, 13, 8, 0, 0, 6.2832); x.fillStyle = 'rgba(233,150,127,0.38)'; x.fill() } // 頬の赤み
-    return c
-  }
-  const faceTex = new THREE.CanvasTexture(makeFaceTex()); faceTex.colorSpace = THREE.SRGBColorSpace; faceTex.anisotropy = renderer.capabilities.getMaxAnisotropy()
-  const faceMat = new THREE.MeshToonMaterial({ map: faceTex, gradientMap: grad, transparent: true, depthWrite: false, side: THREE.FrontSide, fog: true }) // 体と同じシーン光で陰影＝顔が浮かない（自己発光のMeshBasicは夕景で顔だけ光って“貼り付けたお面”に見える）
-  faceMat.emissive = new THREE.Color(0xf6d8bd); faceMat.emissiveIntensity = 0.16 // 影でも顔が暗く沈み過ぎない床（頭の肌と同じ扱い）
+  // （顔テクスチャ方式は廃止。3D住人は元の幾何の目鼻に戻し、主人公だけ2D立ち絵。）
   const makeResident = (cfg = {}) => {
     // アニメ寄りだが人に近い：自然なアーモンドの目・一体感のある体・関節（膝/肘）・接地影。約6頭身。
     const g = new THREE.Group()
@@ -4019,21 +3989,26 @@ export async function mountTown3d(parent, opts = {}) {
     }
     add(g, CY(0.05, 0.054, 0.16, 12), skin, 0, 1.45, 0) // 首（少し長く＝頭が肩にめり込まない）
     // ── 頭（小さめ＝約7頭身）＋顔（角のある輪郭：頭頂は丸く・こめかみ最大・顎へ細めて顎先を出す＝アニメの面） ──
-    const headG = new THREE.Group(); headG.position.set(0, 1.63, 0); headG.scale.setScalar(1.3); g.add(headG) // 頭を一回り大きく＝顔が読める親しみのある頭身（約5.5頭身）
-    loft([{ y: 0.1, rx: 0.04 }, { y: 0.06, rx: 0.094, rz: 0.088 }, { y: 0.0, rx: 0.104, rz: 0.095 }, { y: -0.05, rx: 0.099, rz: 0.091 }, { y: -0.097, rx: 0.082, rz: 0.08 }, { y: -0.138, rx: 0.052, rz: 0.058 }], skin, headG) // 頬と顎を揃え丸い顎＝卵型/とがり顎を避ける
+    const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); g.add(headG)
+    loft([{ y: 0.1, rx: 0.038 }, { y: 0.06, rx: 0.093, rz: 0.088 }, { y: 0.0, rx: 0.104, rz: 0.095 }, { y: -0.05, rx: 0.093, rz: 0.087 }, { y: -0.097, rx: 0.063, rz: 0.073 }, { y: -0.13, rx: 0.028, rz: 0.046 }], skin, headG) // 角のある顔の輪郭
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
-    // 顔＝手描きの顔テクスチャを頭の前面に貼る（個々の目鼻立ちを揃え近接でも表情が読める）
-    const faceP = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), faceMat); faceP.position.set(0, -0.018, 0.103); faceP.renderOrder = 2; headG.add(faceP)
+    const eyeM = toon(0x4a3a32) // 目は黒でなく濃茶＝硬さ/暗さを抑える
+    for (const s of [-1, 1]) { // 小さくシンプルな目（濃茶の小さなアーモンド＋虹彩＋キャッチライト）
+      add(headG, SP(0.016, 14, 12), eyeM, s * 0.046, -0.006, 0.099, 1.45, 0.95, 0.35)
+      add(headG, SP(0.0095, 12, 10), irisM, s * 0.046, -0.007, 0.104, 1.0, 1.0, 0.4)
+      add(headG, SP(0.0046, 8, 8), white, s * 0.046 + s * 0.004, -0.001, 0.108)
+      add(headG, BX(0.03, 0.005, 0.006), browM, s * 0.05, 0.036, 0.095).rotation.z = s * 0.1
+      add(headG, SP(0.014, 8, 8), blush, s * 0.07, -0.026, 0.085, 1.2, 0.7, 0.4)
+    }
+    add(headG, BX(0.008, 0.016, 0.01), skin, 0, -0.032, 0.105, 1, 1, 1).rotation.x = 0.2 // 鼻筋
+    add(headG, BX(0.027, 0.009, 0.009), mouthM, 0, -0.066, 0.1) // 口
     // ── 髪（hairStyle）。小さい頭に合わせた寸法 ──
     const hs = cfg.hairStyle
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
       add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代
-    else if (hs === 'bob') {
-      add(headG, SP(0.122, 18, 16), hairM, 0, 0.014, -0.034, 1.06, 1.06, 1.0) // 後頭部＋頭頂（後ろへ寄せ前の顔を出す）
-      for (const s of [-1, 1]) add(headG, SP(0.05, 12, 14), hairM, s * 0.107, -0.046, 0.004, 0.55, 1.55, 0.94) // 横の毛（頬に沿い顎で収める＝跳ね毛を抑え顔の横を縁取る）
-      for (const [hx, hz] of [[-0.076, 0.05], [-0.028, 0.072], [0.028, 0.072], [0.076, 0.05]]) add(headG, SP(0.045, 12, 10), hairM, hx, 0.078, hz, 1.1, 0.56, 0.66) // 前髪（眉の上で揃え、生え際を顔に少し重ね境目を消す）
-      const hairHiM = toon(new THREE.Color(cfg.hair || 0x241c18).lerp(new THREE.Color(0xfff0e0), 0.24).getHex())
-      add(headG, SP(0.05, 16, 8), hairHiM, 0, 0.092, -0.012, 1.8, 0.3, 0.92).renderOrder = 1 } // 髪の艶（頭頂に淡い光の帯）
+    else if (hs === 'bob') { add(headG, SP(0.125, 18, 16), hairM, 0, 0.0, -0.012, 1.04, 1.05, 1.05)
+      for (const s of [-1, 1]) add(headG, SP(0.052, 12, 12), hairM, s * 0.108, -0.06, 0.014, 0.7, 1.5, 0.95)
+      for (const [hx, hz] of [[-0.054, 0.085], [0.0, 0.097], [0.054, 0.085]]) add(headG, SP(0.038, 12, 10), hairM, hx, 0.068, hz, 1, 0.8, 0.8) }
     else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) }
     else if (hs === 'short') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.03, -0.012, 1.04, 0.95, 1.04)
       for (const [hx, hz] of [[-0.063, 0.083], [0.0, 0.095], [0.063, 0.083]]) add(headG, SP(0.029, 10, 8), hairM, hx, 0.075, hz, 1, 0.8, 0.8) }
@@ -4054,7 +4029,7 @@ export async function mountTown3d(parent, opts = {}) {
     else if (cfg.prop === 'bag') { const bm = toon(cfg.bagCol || 0x8a7256) // 斜め掛けの鞄（添付の少女）
       const strap = add(g, BX(0.028, 0.52, 0.02), bm, 0, 1.18, 0.12); strap.rotation.z = 0.52 // たすき掛けの紐
       add(g, BX(0.17, 0.2, 0.08), bm, 0.2, 0.92, 0.07, 1, 1, 1).rotation.y = 0.1 } // 鞄本体（腰）
-    addOutlines(0.0075) // 体・手足・頭に黒い主線（セル画のライン）。細い手足を黒く潰さない程度に
+    addOutlines(0.009) // 体・手足・頭に黒い主線（セル画のライン）
     // 接地影（足元の柔らかな影＝人形の浮きを消して地に立たせる）
     const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.5, 0.72, 1); shadow.renderOrder = 1; g.add(shadow)
     g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
@@ -4066,8 +4041,7 @@ export async function mountTown3d(parent, opts = {}) {
   const placeResident = (hx, hz, cfg) => { const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); const u = g.userData; u.ax = hx; u.az = hz; u.tx = hx; u.tz = hz; u.face = R() * 6.28; u.ph = R() * 6.28; u.pauseT = 0.5 + R() * 4; u.moving = false; u.speed = 0.66 + R() * 0.5; u.rad = 4 + R() * 5; g.rotation.y = u.face; town.add(g); residents.push(g) }
   const RES_MODERN = ['modern', 'modern', 'suit', 'blouse']
   for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
-  // ── 添付画像の模倣：港町の少女（白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋黒のショートボブ＋斜め掛けの鞄）。港・水辺・街角に。──
-  const harborGirl = () => ({ skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: [0x1d1916, 0x241c18, 0x2c2622][(R() * 3) | 0], iris: [0x3a2e26, 0x4a3a2c, 0x4a6a9a][(R() * 3) | 0], outfit: 'blouse', top: [0xf0ece2, 0xeae6da, 0xf2eee6][(R() * 3) | 0], bottom: [0x33373e, 0x2e3a42, 0x3a3530][(R() * 3) | 0], hairStyle: 'bob', prop: 'bag', bagCol: [0x8a7256, 0x6a5a44, 0x9a8460][(R() * 3) | 0] })
+  // ── 港町の少女（添付の模倣）＝2D立ち絵の主人公キャラ。港・水辺・街角に。──
   for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
   const pickC = (a) => a[(R() * a.length) | 0]
