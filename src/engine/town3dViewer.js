@@ -69,8 +69,12 @@ const FLY = {
   eye: 1.62,        // 立ったときの目線の高さ（地形+この高さ）
   stickRadius: 62,  // スティックの最大振れ(px)。これで全速
   stickDead: 0.14,  // 不感帯（微小な震えを無視）
-  turnRate: 1.7,    // 白猫式: 横へ倒すほど速く向き直る旋回速度(rad/s)
-  turnEase: 0.16,   // 旋回入力のスムージング（手ブレで進路が暴れない・急に曲がらない＝快適）
+  turnRate: 1.7,    // （旧・白猫式）横へ倒すほど速く向き直る旋回速度(rad/s)
+  turnEase: 0.16,   // （旧）旋回入力のスムージング
+  // 歩行（カメラ基準ポイント＆ゴー）: 倒した“画面の向き”へキビキビ向き直り、カメラは進行方向へ緩く後ろから追従。
+  walkFace: 10,     // 進行方向へ向き直る速さ(1/s)。大きいほど即座にその向きへ歩き出す＝御しやすい
+  walkCamFollow: 1.8, // カメラが進む向きへ後ろから戻る速さ(1/s)。小さくゆっくり＝急旋回せず酔わない
+  walkLookSens: 2.6, // 右ドラッグでカメラを回す感度（画面幅いっぱいのドラッグでこのrad＝360°近く向ける）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
   // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上の島・大橋を越えるxMaxまで）。
   bound: { x: 790, xMax: 790, zMin: -810, zMax: 120, yMax: 132, yFloor: 4.5 }, // Phase0で時代の島を~640へ遠ざけた汀まで飛べる（東=江戸764/西=大正-752/北=戦国-740）。zMaxはhome南の拡張ぶん
@@ -102,10 +106,15 @@ export function isTown3dActive() {
 // 見回し（スワイプ）。nx,ny は累積の相対量。乗り出すと見回せる幅が広がる。
 export function applyTown3dLook(dx, dy) {
   if (!active) return
-  // 歩行（白猫式）のときの右ドラッグ＝見回し（上下で機首・左右でオフセット、離すと戻る）。飛行はapplyTown3dSteerを使う。
+  // 歩行の右ドラッグ＝カメラを回す（横は360°持続的に回せる＝振り向ける／縦は見上げ見下ろし）。飛行はapplyTown3dSteerを使う。
   if (active.flyTarget) {
-    active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget + dy * 0.9))
-    active.lookYawOffTarget = Math.max(-1.3, Math.min(1.3, active.lookYawOffTarget + dx * 1.6))
+    if (active.mode === 'walk') {
+      active.walkCamYaw += dx * FLY.walkLookSens // カメラの向きを直接回す（クランプ/減衰なし＝後ろも向ける）
+      active.flyPitchTarget = Math.max(-0.7, Math.min(0.95, active.flyPitchTarget + dy * 0.9)) // 上下の見回し（足元〜空）
+    } else {
+      active.flyPitchTarget = Math.max(-FLY.pitchMax, Math.min(FLY.pitchMax, active.flyPitchTarget + dy * 0.9))
+      active.lookYawOffTarget = Math.max(-1.3, Math.min(1.3, active.lookYawOffTarget + dx * 1.6))
+    }
     return
   }
   const l = active.lean || 0
@@ -192,6 +201,7 @@ export function setTown3dLand(land) {
         active.onCloud = true
         const ox = active.flyPos.x - best.x, oz = active.flyPos.z - best.z // 外（雲海の眺め）を向いて立つ
         active.flyYaw = active.flyYawTarget = (Math.abs(ox) + Math.abs(oz) > 1) ? Math.atan2(ox, -oz) : 0
+        active.walkCamYaw = active.flyYaw // カメラも進む向きの後ろから始める
         active.flyPitchTarget = -0.02; active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
         active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1
         return
@@ -202,6 +212,7 @@ export function setTown3dLand(land) {
     const [sx, sz] = active.resolveSpawn(active.flyPos.x, active.flyPos.z)
     active.flyPos.x = sx; active.flyPos.z = sz
     active.flyYaw = active.flyYawTarget = active.openYaw(sx, sz) // 壁や木を正面にせず、抜けのある方へ向き直る
+    active.walkCamYaw = active.flyYaw // カメラも進む向きの後ろから始める（着地直後に背後の抜けを望む）
     active.flyPitchTarget = -0.05 // 立って街路をそっと見渡す
     active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
     active.landedFired = false // 接地した瞬間に砂ぼこり＋沈み込みを起こす
@@ -1124,7 +1135,9 @@ export async function mountTown3d(parent, opts = {}) {
     g.rotation.y = R() < 0.26 ? (R() - 0.5) * 1.5 : (R() - 0.5) * 0.5
     town.add(g)
     const foot = (w + d) * 0.25 + 0.5
-    colliders.push({ x, z, r: foot })        // 歩行の当たり判定（敷地を円で近似＋人の半径）
+    // 歩行の当たり判定＝敷地を“向き付きの矩形”で正確に。円だと近接ビル間の細い路地に円がはみ出し透明の壁になる（横長の建物で顕著）。矩形なら矩形どうしの隙間（路地）を歩ける。
+    const rot = g.rotation.y, cm = 0.42
+    colliders.push({ x, z, cos: Math.cos(rot), sin: Math.sin(rot), hw: w / 2 + cm, hd: d / 2 + cm })
     spawnAvoid.push({ x, z, r: foot + 1.0 }) // 着地は壁ぎわを避けて少し離れて降りる
     // 基礎（接地のコンクリ土台）。壁より一回り広く低い帯を建物の足元に。回転・位置を焼き込んで後で統合。
     const plH = 0.45
@@ -5098,7 +5111,8 @@ export async function mountTown3d(parent, opts = {}) {
     flyYaw: 0, flyPitch: 0, flyYawTarget: 0, flyPitchTarget: 0, // flyYaw=進路の向き（左スティックで旋回）／flyPitch=高さ角（右ドラッグ上下）
     cinema: 0, lastInputT: 0,      // オートシネマ: 無操作で最寄り名所をゆっくりオービット（操作で即復帰）
     arrivalSlow: 1,                // 目的地で自動減速する係数（霞の帯/城下でゆっくり）
-    lookYawOff: 0, lookYawOffTarget: 0, lookDragging: false, // 見回しの横オフセット（右ドラッグ。進路は変えず、離すと0へ戻る）
+    lookYawOff: 0, lookYawOffTarget: 0, lookDragging: false, // 見回しの横オフセット（飛行/窓辺の右ドラッグ。離すと0へ戻る）
+    walkCamYaw: 0,                // 歩行のカメラの向き（右ドラッグで360°持続的に回す。進む向きは別＝flyYaw）
     turnSmooth: 0,                // 旋回入力のスムージング値（手ブレを均し、急旋回を抑える＝快適な曲がり）
     vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
@@ -5152,7 +5166,12 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 歩行（散策）の当たり判定 ──
   // 建物フットプリント(円)に入らないよう、軸ごとに分けて判定＝壁ぎわをかすめて進める（引っかかって止まらない）。
   const blockedAt = (x, z) => {
-    for (const c of colliders) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
+    for (const c of colliders) { const dx = x - c.x, dz = z - c.z
+      if (c.hw !== undefined) { // 向き付き矩形（建物の敷地）＝局所座標へ回して矩形内か判定
+        const lx = dx * c.cos - dz * c.sin, lz = dx * c.sin + dz * c.cos
+        if (lx > -c.hw && lx < c.hw && lz > -c.hd && lz < c.hd) return true
+      } else if (dx * dx + dz * dz < c.r * c.r) return true // 円（木・池・塔など）
+    }
     return false
   }
   // 水際（海・川）は歩いて踏み込まない＝汀で止まる。歩行のみで使う。
@@ -5175,15 +5194,20 @@ export async function mountTown3d(parent, opts = {}) {
     for (const c of spawnAvoid) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true }
     return false
   }
+  // 着地点の開放度＝8方位で歩ける距離の最大。降りた所が箱詰め（密集の谷間）なら低い。
+  const maxClearAt = (x, z) => { let best = 0; for (let a = 0; a < 8; a++) { const yaw = a / 8 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw); let d = 1.0; for (; d < 14; d += 1.4) { if (blockedAt(x + hx * d, z + hz * d)) break } if (d > best) best = d } return best }
   active.resolveSpawn = (x, z) => {
-    if (!spawnBad(x, z)) return [x, z]
-    for (let r = 1.5; r <= 18; r += 1.5) {
+    // 「建物/水を避ける」だけでなく「歩いて出られる開けた所」を選ぶ＝降りた途端に透明の壁で詰まらない。
+    let best = null, bestClear = -1
+    const consider = (nx, nz) => { if (spawnBad(nx, nz)) return false; const c = maxClearAt(nx, nz); if (c > bestClear) { bestClear = c; best = [nx, nz] } return c >= 9 } // 9u以上歩ける所なら即採用
+    if (consider(x, z)) return [x, z]
+    for (let r = 1.5; r <= 20; r += 1.5) {
       for (let a = 0; a < 12; a++) {
         const nx = x + Math.cos(a / 12 * 6.2832) * r, nz = z + Math.sin(a / 12 * 6.2832) * r
-        if (!spawnBad(nx, nz)) return [nx, nz]
+        if (consider(nx, nz)) return [nx, nz]
       }
     }
-    return [x, z]
+    return best || [x, z] // どこも狭ければ、せめて最も開けた所へ
   }
   // 着地時に最も視界の抜ける向き（街路や建物の隙間の奥）を選ぶ＝壁や木立を正面にしない。
   active.openYaw = (x, z) => {
@@ -6166,18 +6190,22 @@ export async function mountTown3d(parent, opts = {}) {
       const prevYaw = active.flyYaw
       let dvX, dvY = 0, dvZ, cpit, spit, camYaw
       if (isWalk) {
-        // 歩行＝白猫式ポイント＆ゴー（左スティックで旋回＋前後、カメラ追従、右ドラッグで見回し）。
+        // 歩行＝カメラ基準ポイント＆ゴー：左スティックを倒した“画面の向き”へ素早く向き直って歩く。
+        // 右ドラッグでカメラ(walkCamYaw)を360°回せる。カメラは進む向きへ緩く後ろから追従＝自然に背後へ回る。
         const mvMag = Math.min(1, Math.hypot(active.moveX, active.moveY))
-        const turnAmt = mvMag > 0.001 ? Math.atan2(active.moveX, active.moveY) : 0
-        const turnTarget = mvMag > 0.05 ? Math.max(-1, Math.min(1, turnAmt / 1.3)) * mvMag : 0
-        active.turnSmooth += (turnTarget - active.turnSmooth) * FLY.turnEase
-        active.flyYaw += active.turnSmooth * FLY.turnRate * dt
-        if (!active.lookDragging) active.lookYawOffTarget *= 0.86
+        const cy = active.walkCamYaw
+        if (mvMag > 0.02) {
+          const stickAng = Math.atan2(active.moveX, active.moveY) // 画面基準（上=前=0／右=+）
+          const moveWorld = cy + stickAng                         // カメラ基準を世界の進行方向へ
+          let d = moveWorld - active.flyYaw; d = Math.atan2(Math.sin(d), Math.cos(d))
+          active.flyYaw += d * Math.min(1, dt * FLY.walkFace)     // 倒した向きへキビキビ向き直る
+          if (!active.lookDragging) { let cd = active.flyYaw - cy; cd = Math.atan2(Math.sin(cd), Math.cos(cd)); active.walkCamYaw = cy + cd * Math.min(1, dt * FLY.walkCamFollow) } // カメラは進む向きへ緩く後ろから
+        }
         active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.lookEase
-        active.lookYawOff += (active.lookYawOffTarget - active.lookYawOff) * FLY.lookEase
+        active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
-        camYaw = active.flyYaw + active.lookYawOff
-        const throttle = mvMag * (0.55 + 0.45 * Math.max(0, Math.cos(turnAmt)))
+        camYaw = active.walkCamYaw // カメラは見回しで回した向き（進む向きflyYawとは別＝倒した方へ歩きつつ景色は保てる）
+        const throttle = mvMag
         dvX = Math.sin(active.flyYaw) * throttle * FLY.walkSpeed
         dvZ = -Math.cos(active.flyYaw) * throttle * FLY.walkSpeed
       } else {
@@ -6637,6 +6665,19 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
     window.__town3dFaceWalk = (y) => { if (active) { active.flyYaw = active.flyYawTarget = y || 0 } } // 検証用: 歩行の向き(rad)を直接指定
+    window.__town3dLook = (dx, dy) => applyTown3dLook(dx || 0, dy || 0) // 検証用: 見回しドラッグ(画面比)。歩行=横でカメラ回転/縦で上下
+    window.__town3dProbe = (x, z) => { // 検証用: その地点が当たり判定で塞がれているか＋近くのコライダー
+      const blocked = blockedAt(x, z)
+      const near = []
+      for (const c of colliders) { const dx = x - c.x, dz = z - c.z; const d = Math.hypot(dx, dz); if (d < 8) near.push(c.hw !== undefined ? { rect: 1, d: +d.toFixed(1), hw: +c.hw.toFixed(1), hd: +c.hd.toFixed(1) } : { circ: 1, d: +d.toFixed(1), r: +c.r.toFixed(1) }) }
+      near.sort((a, b) => a.d - b.d)
+      return { blocked, near: near.slice(0, 6), nColliders: colliders.length }
+    }
+    window.__town3dClear = (x, z) => { // 検証用: 16方位の通行可能距離（openYawの中身）
+      const out = []
+      for (let a = 0; a < 16; a++) { const yaw = a / 16 * 6.2832; const hx = Math.sin(yaw), hz = -Math.cos(yaw); let d = 1.0; for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break } out.push(+d.toFixed(1)) }
+      return out
+    }
     window.__town3dSoundCounts = () => ({ chime: chimeCount, wing: wingCount }) // 検証用: 鈴・羽音の発火数
     window.__town3dPalProbe = () => ({ duskAmt: +duskAmt.toFixed(2), isNight, snowy: SNOWY, skyTop: '#' + skyTop.getHexString(), skyBright: +skyBright.toFixed(3) }) // 検証用: 時間帯
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
@@ -6646,7 +6687,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
-      yaw: +active.flyYaw.toFixed(2), pitch: +active.flyPitch.toFixed(2),
+      yaw: +active.flyYaw.toFixed(2), camYaw: +(active.walkCamYaw || 0).toFixed(2), pitch: +active.flyPitch.toFixed(2),
       vel: +Math.hypot(active.vel.x, active.vel.y, active.vel.z).toFixed(2), mvX: +active.moveX.toFixed(2), mvY: +active.moveY.toFixed(2), bank: +active.bankCur.toFixed(2),
     })
     window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2) } } // 検証用: 描画コール/三角形/オブジェクト数

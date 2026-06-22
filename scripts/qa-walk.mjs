@@ -1,30 +1,42 @@
-// 着地して歩く一人称視点＝接地レベルの造形・密度・整合を点検。複数シーン・複数地点。
-// 実フロー通り 窓あけ→乗り出し（枠が消える）→空へ→着地、で撮る（枠の残りを避ける）。
+// 歩行の操作性＋当たり判定の検証: 移動の追従/向き直り/見回しでカメラ360°/路地の通行
 import { chromium } from 'playwright'
 const port = process.env.PORT || '4801'
-const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(600)
-await page.addStyleTag({ content: '.ui{display:none !important}' })
-
-async function walkShot(scene, label, pose) {
-  await page.evaluate((s) => window.__applyScene(s), scene)
-  await page.waitForTimeout(2300)
-  await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTimeout(400)
-  await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(900)
-  await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(300)
-  await page.evaluate((p) => { window.__town3dFlyPose(p[0], p[1], p[2], p[3], p[4]) }, pose)
-  await page.waitForTimeout(400)
-  await page.evaluate(() => { window.__town3dLand(true) }); await page.waitForTimeout(1800)
-  const dbg = await page.evaluate(() => window.__town3dDbg && window.__town3dDbg())
-  await page.screenshot({ path: `scripts/_shots/walk-${label}.png` })
-  console.log(label, JSON.stringify(dbg))
-}
-await walkShot('kitaterao-window-3d', 'summer-road', [0, 7, -8, 3.14, -0.03])
-await walkShot('kitaterao-window-3d-night', 'night-road', [0, 7, -8, 3.14, -0.03])
-await walkShot('kitaterao-window-3d', 'summer-far', [0, 7, -30, 3.14, -0.03])
-await browser.close()
-console.log('walk done')
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.6 })
+const errs = []
+p.on('pageerror', (e) => errs.push(String(e)))
+p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
+await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(() => {})
+await p.waitForTimeout(800)
+await p.evaluate(() => window.__applyScene('kitaterao-window-3d-sunset'))
+await p.waitForTimeout(2600)
+const dbg = () => p.evaluate(() => window.__town3dDbg())
+// 住宅街の上空へ行き、着地して歩く
+await p.evaluate(() => window.__town3dFly(true)); await p.waitForTimeout(700)
+await p.evaluate(() => window.__town3dCruise(false))
+await p.evaluate(() => window.__town3dFlyPose(-20, 24, -20, 0.2, -0.1)); await p.waitForTimeout(700)
+await p.evaluate(() => window.__town3dLand(true)); await p.waitForTimeout(1800)
+const d0 = await dbg(); console.log('着地:', JSON.stringify(d0))
+// 前進: move(0,1)を数秒。距離が伸びれば「透明の壁で即詰まり」ではない
+await p.evaluate(() => window.__town3dMove(0, 1)); await p.waitForTimeout(2600)
+const d1 = await dbg()
+await p.evaluate(() => window.__town3dMove(0, 0)); await p.waitForTimeout(300)
+const dist = Math.hypot(d1.x - d0.x, d1.z - d0.z)
+console.log('前進2.6s 後:', JSON.stringify(d1), ' 進んだ距離=', dist.toFixed(1))
+await p.screenshot({ path: 'scripts/_shots/walk-fwd.png' })
+// 向き直り: カメラ基準で右(move 1,0)を倒すと flyYaw が camYaw+~90°へ素早く向く
+const before = await dbg()
+await p.evaluate(() => window.__town3dMove(1, 0)); await p.waitForTimeout(500)
+const after = await dbg()
+console.log('右倒し0.5s: yaw', before.yaw, '→', after.yaw, ' camYaw', before.camYaw, '→', after.camYaw)
+await p.evaluate(() => window.__town3dMove(0, 0)); await p.waitForTimeout(200)
+// 見回しでカメラを大きく回す（右ドラッグ相当を数回）＝360°向ける
+let cam0 = (await dbg()).camYaw
+for (let i = 0; i < 6; i++) await p.evaluate(() => window.__town3dLook(0.5, 0))
+await p.waitForTimeout(200)
+let cam1 = (await dbg()).camYaw
+console.log('見回し(右0.5×6): camYaw', cam0, '→', cam1, ' (差=', (cam1 - cam0).toFixed(2), 'rad)')
+await p.screenshot({ path: 'scripts/_shots/walk-look.png' })
+console.log(errs.length ? 'ERR ' + errs.slice(0, 4).join(' | ') : 'no errors')
+await b.close()
