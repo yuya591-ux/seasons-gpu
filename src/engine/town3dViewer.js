@@ -165,6 +165,7 @@ export function setTown3dFly(on) {
       active.flyPitchTarget = 0.18 // 歩きから飛び立つ＝視線を少し上げてふわりと
     }
     active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0
+    active.onCloud = false // 雲上のくつろぎ場所から飛び立ったら以後は通常の空
     active.cruise = true // スキームA: 飛び立ったら自動巡航から
     active.mode = 'fly'
     active.flyTarget = 1
@@ -180,6 +181,19 @@ export function setTown3dLand(land) {
   if (!active || !active.flyEnabled) return
   if (land) {
     if (active.mode === 'window') return // 窓辺から直接は歩けない（空を経由）
+    // 雲上のくつろぎ場所が近く・かつ雲海の上にいるなら、地上でなく“雲上の浮島”へ降り立つ
+    const cr = active.cloudRest
+    if (cr && active.flyPos.y > cr.minY && Math.hypot(active.flyPos.x - cr.x, active.flyPos.z - cr.z) < 95) {
+      const dx = active.flyPos.x - cr.x, dz = active.flyPos.z - cr.z, d = Math.hypot(dx, dz)
+      if (d > cr.rad - 3) { const k = (cr.rad - 4) / Math.max(d, 0.001); active.flyPos.x = cr.x + dx * k; active.flyPos.z = cr.z + dz * k } // 縁の内側へ寄せる
+      active.onCloud = true
+      const ox = active.flyPos.x - cr.x, oz = active.flyPos.z - cr.z // 外（雲海の眺め）を向いて立つ
+      active.flyYaw = active.flyYawTarget = (Math.abs(ox) + Math.abs(oz) > 1) ? Math.atan2(ox, -oz) : 0
+      active.flyPitchTarget = -0.02; active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
+      active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1
+      return
+    }
+    active.onCloud = false
     // いまの真下の安全な地点へ着地（建物/樹冠に埋もれないよう退避）し、街路の抜ける方を向く
     const [sx, sz] = active.resolveSpawn(active.flyPos.x, active.flyPos.z)
     active.flyPos.x = sx; active.flyPos.z = sz
@@ -3704,6 +3718,7 @@ export async function mountTown3d(parent, opts = {}) {
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
+  let cloudRestInfo = null // 雲上のくつろぎ場所（降り立って佇める浮島）。active生成後に active.cloudRest へ渡す
   if (kind === 'town' && BufferGeometryUtils.mergeGeometries) {
     // 雲の頂点に「陽の当たる暖白い頂 → 翳る冷たい底」の階調を焼く（法線頼みでなく確実に“雲らしい”立体陰影＝水彩調）。
     const cloudTint = (geo, y0, y1, lo, hi) => {
@@ -3750,6 +3765,34 @@ export async function mountTown3d(parent, opts = {}) {
       isles.push({ x: 10, z: -380, r: 38, g }) }
     for (const il of isles) { il.g.position.set(il.x, SEA_Y + 18, il.z); il.g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(il.g) }
 
+    // 雲上のくつろぎ場所＝降り立って佇める大きな浮島。東屋に腰かけ、雲海・鯨・灯籠を眺めて整う“休息”。空の旅の目的地。
+    const REST = { x: -20, z: -290, topY: SEA_Y + 22, rad: 24 }
+    { const g = makeFloatIsle(REST.rad), gy = 1.2 // 草の頂上面(local +1.2)を歩く面に
+      const stoneMat = tn(isNight ? 0x646670 : 0xb7b1a4)
+      const pave = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 0.4, 22), stoneMat); pave.position.y = gy + 0.05; g.add(pave) // 石畳の中央
+      const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640), azRoof = tn(isNight ? 0x3a3f4a : 0x6b5347)
+      for (const [px, pz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 5, 7), woodMat); post.position.set(px, gy + 2.7, pz); g.add(post) } // 東屋の柱
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.5, 11.4), woodMat); beam.position.y = gy + 5.2; g.add(beam)
+      const azr = new THREE.Mesh(new THREE.ConeGeometry(9.6, 3.6, 4), azRoof); azr.rotation.y = Math.PI / 4; azr.position.y = gy + 7.1; g.add(azr) // 寄棟屋根
+      const bench0 = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 1.6), woodMat); bench0.position.set(0, gy + 0.9, 4.2); g.add(bench0) // 縁台（腰かけて眺める）
+      for (const lx of [-2.6, 2.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.4), woodMat); leg.position.set(lx, gy + 0.45, 4.2); g.add(leg) }
+      const lantStone = tn(isNight ? 0x707280 : 0x9a948a)
+      for (const [lx, lz] of [[-15, 6], [14, -8]]) { // 石灯籠2基（夜ほのかに灯る）
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.0, 6), lantStone); base.position.set(lx, gy + 0.5, lz); g.add(base)
+        const fire = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0x000000), emissiveIntensity: isNight ? 1.0 : 0 })); fire.position.set(lx, gy + 1.8, lz); g.add(fire)
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(1.0, 0.7, 6), lantStone); cap.position.set(lx, gy + 2.7, lz); g.add(cap)
+      }
+      const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 7, 7), tn(0x5a4636)); tk.position.set(-16, gy + 3.5, -10); g.add(tk) // 木陰の一本
+      const can = new THREE.Mesh(new THREE.IcosahedronGeometry(5.5, 1), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-16, gy + 9, -10); can.scale.y = 0.85; g.add(can)
+      const trMat = tn(isNight ? 0x7a3026 : 0xc34a32), th = 9, tw = 6 // 鳥居（空からの入口）
+      for (const sx of [-1, 1]) { const pi = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, th, 8), trMat); pi.position.set(sx * tw * 0.5 + 17, gy + th * 0.5, 10); g.add(pi) }
+      const kasa2 = new THREE.Mesh(new THREE.BoxGeometry(tw + 2.6, 0.8, 1.4), trMat); kasa2.position.set(17, gy + th + 0.4, 10); g.add(kasa2)
+      g.position.set(REST.x, REST.topY - gy, REST.z) // 草の頂上面(world)= REST.topY ＝歩く面
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } })
+      scene.add(g)
+      cloudRestInfo = { x: REST.x, z: REST.z, topY: REST.topY, rad: REST.rad - 2.5, minY: SEA_Y - 6 } // 着地判定/歩行拘束に使う
+    }
+
     // 雲海＝下地の円盤（取りこぼしを埋め谷の翳りになる）＋「平たい底＋もくもくの頂」の雲塊（頂点階調で立体的な雲に）。
     // group ごと高度でフェード＝窓辺・巡航では消えて開けた空、高く昇ると現れて街が雲の下へ消える別世界。
     const cloudSeaG = new THREE.Group(); cloudSeaG.position.y = SEA_Y; cloudSeaG.visible = false
@@ -3768,6 +3811,7 @@ export async function mountTown3d(parent, opts = {}) {
       for (let gz = -seaR; gz <= seaR; gz += step) {
         if (Math.hypot(gx, gz) > seaR) continue
         if (isles.some((il) => Math.hypot(gx - il.x, gz - il.z) < il.r)) continue // 島の周りはくぼませる（雲のくぼ地に据わる）
+        if (Math.hypot(gx - REST.x, gz - REST.z) < REST.rad + 22) continue // くつろぎ場所の周りもくぼませる
         if (gaps.some((gp) => Math.hypot(gx - gp.x, gz - gp.z) < gp.r)) continue // 雲の切れ間（地上が覗く穴）
         const jx = gx + (R() - 0.5) * step * 0.4, jz = gz + (R() - 0.5) * step * 0.4, baseY = (R() - 0.5) * 11
         const sB = (LIGHT ? 19 : 15) + R() * 9
@@ -4857,6 +4901,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     return best
   }
+  active.cloudRest = cloudRestInfo // 雲上のくつろぎ場所（着地判定/歩行拘束）。townのみ非null
 
   const startT = performance.now() // THREE.Clock は非推奨→performance.now 差分で経過秒を出す（警告解消・依存削減）
   let lastT = 0
@@ -5855,13 +5900,20 @@ export async function mountTown3d(parent, opts = {}) {
 
       const b = bound
       if (isWalk) {
-        tryWalk(active.flyPos, active.vel.x * dt, active.vel.z * dt) // 当たり判定つきで水平移動
-        const eyeY = heightAt(active.flyPos.x, active.flyPos.z) + FLY.eye
+        const cr = active.onCloud ? active.cloudRest : null
+        if (cr) { // 雲上のくつろぎ場所＝地形の当たり判定は無視し、円い縁の内側を自由に歩く
+          let nx = active.flyPos.x + active.vel.x * dt, nz = active.flyPos.z + active.vel.z * dt
+          const dx = nx - cr.x, dz = nz - cr.z, d = Math.hypot(dx, dz)
+          if (d > cr.rad) { nx = cr.x + dx / d * cr.rad; nz = cr.z + dz / d * cr.rad } // 縁から落ちない
+          active.flyPos.x = nx; active.flyPos.z = nz
+        } else tryWalk(active.flyPos, active.vel.x * dt, active.vel.z * dt) // 当たり判定つきで水平移動
+        const groundY = cr ? cr.topY : heightAt(active.flyPos.x, active.flyPos.z)
+        const eyeY = groundY + FLY.eye
         const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
-        active.flyPos.y += (eyeY - active.flyPos.y) * ky // 着地はやわらかく・以降は地形に沿う
+        active.flyPos.y += (eyeY - active.flyPos.y) * ky // 着地はやわらかく・以降は面に沿う
         if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 接地した瞬間＝砂ぼこり＋沈み込み
           active.landedFired = true; active.landDustT = 0.7; active.dipT = 0.42
-          landDust.position.set(active.flyPos.x, heightAt(active.flyPos.x, active.flyPos.z) + 0.06, active.flyPos.z); landDust.visible = true
+          landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true
         }
         // 足音: 歩いた距離を貯め、一歩ぶん進むごとに鳴らす（止まっている間は鳴らない）
         const hstep = Math.hypot(active.vel.x, active.vel.z) * dt
@@ -5942,7 +5994,7 @@ export async function mountTown3d(parent, opts = {}) {
       // 着地の沈み込み（とんと沈んで戻る＝接地の手応え）
       if (active.dipT > 0) { active.dipT -= dt; const pp = 1 - Math.max(0, active.dipT) / 0.42; camY -= Math.sin(pp * Math.PI) * 0.6 }
       // 自分の影が真下の地面を走る（高度で大きさ・濃さが変わる＝飛んでいる手応え）
-      const gY = heightAt(active.flyPos.x, active.flyPos.z)
+      const gY = active.onCloud && active.cloudRest ? active.cloudRest.topY : heightAt(active.flyPos.x, active.flyPos.z)
       const alt = Math.max(0, active.flyPos.y - gY)
       flyerShadow.visible = flyAmt > 0.5
       flyerShadow.position.set(active.flyPos.x, gY + 0.06, active.flyPos.z)
