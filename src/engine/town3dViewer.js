@@ -2768,6 +2768,15 @@ export async function mountTown3d(parent, opts = {}) {
             prev = { x: px, z: pz, py } }
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, mtRoadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
+        // ── 街道沿いの松明（夕/夜に灯り、谷あいの城下に火の灯りが連なる）。江戸の参道提灯に対応する戦国の夜の灯り。 ──
+        if (isNight || duskAmt > 0.18) { const torchFire = new THREE.MeshBasicMaterial({ color: isNight ? 0xffae4a : 0xe07a2a, fog: true }), tPoleMat = toon(0x3a2e20)
+          for (let s = 2; s <= 38; s += 3) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 7.0, py = senH(px, zz)
+            if (py < SEA.level + 0.6 || py > 14) continue
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.0, 4), tPoleMat); pole.position.set(px, py + 1.0, zz); town.add(pole)
+            const fire = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 6), torchFire); fire.position.set(px, py + 2.2, zz); town.add(fire)
+            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.6 : 0.26, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(px, py + 2.2, zz); glow.scale.set(1.8, 1.8, 1); town.add(glow)
+          }
+        }
         // ── 棚田（西の尾根の谷側斜面に、等高線に沿って段々に連なる水田）。段に高さをスナップして水平な田を連ね、
         //    谷側に石の畦(擁壁)を立てる＝バラけた板でなく「階段状に揃う棚田」。夏春は水鏡、秋は刈田、冬は雪。統合で軽量。 ──
         { const isWaterSeason = season === 'summer' || season === 'spring'
