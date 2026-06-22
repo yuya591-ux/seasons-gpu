@@ -688,6 +688,7 @@ export async function mountTown3d(parent, opts = {}) {
   const doorFrameGeos = [] // 戸枠・玄関庇（暖色の木）。戸を引き締め、庇の影で入口が立体に＝目線の生活感
   const fixtureGeos = []   // 雨樋・メーター箱（灰の金属/樹脂）。建物正面の生活設備＝目線で「昭和の建物」の年季
   const potGeos = [], plantGeos = [], crateGeos = [] // 玄関脇の鉢植え（素焼き鉢＋緑）・積んだケース＝路地の生活の散らかり（エモい）。小さく低い＝俯瞰で棒にならない
+  const eaveGeos = [] // 軒（のき）の張り出し（瓦屋根の家）。深い軒の陰影＝箱を脱す作り込み。統合で描画コール不変
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -1096,11 +1097,11 @@ export async function mountTown3d(parent, opts = {}) {
       // 切妻 or 寄棟の瓦屋根（色ごとの質感テクスチャを共有）
       const rMat = roofMats[(R() * roofMats.length) | 0]
       if (R() < 0.6) {
-        const rg = new THREE.CylinderGeometry(d * 0.62, d * 0.62, w, 3, 1)
+        const rg = new THREE.CylinderGeometry(d * 0.72, d * 0.72, w + 0.7, 3, 1) // 軒を深く張り出す（庇の陰影＝箱を脱す）。妻側も少し出す
         rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
-        const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.y = 0.7; roof.castShadow = true; g.add(roof)
+        const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.y = 0.66; roof.castShadow = true; g.add(roof)
       } else {
-        const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.74, d * 0.62, 4); rg.rotateY(Math.PI / 4)
+        const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.84, d * 0.62, 4); rg.rotateY(Math.PI / 4) // 寄棟の四方の軒を深く
         const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
       }
       // 太陽熱温水器（昭和の屋根の象徴。一部の家に＝平たい集熱パネル＋横長の貯湯タンク。屋根に傾けて乗せる）
@@ -1161,6 +1162,14 @@ export async function mountTown3d(parent, opts = {}) {
     pg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
     pg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
     plinthGeos.push(pg)
+    // 軒裏（のきうら）の陰影板＝壁の上端に張り出す暗い板。深い軒の陰影で「箱＋屋根」を作り込んだ家並みに。瓦屋根の家のみ。
+    if (type === 'house') {
+      const eg = new THREE.BoxGeometry(w + 0.7, 0.12, d + 0.7)
+      eg.applyMatrix4(new THREE.Matrix4().makeTranslation(0, h - 0.04, 0))
+      eg.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
+      eg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
+      eaveGeos.push(eg)
+    }
     // 接地階の玄関（前面 +z 面）＝戸＋戸枠＋小庇＋上がり段。歩いて通り過ぎると「住んでいる家」に。回転・位置を焼き込み統合。
     if (h > 2.6) {
       const isHouse = type === 'house'
@@ -1364,6 +1373,9 @@ export async function mountTown3d(parent, opts = {}) {
     const crm = crateGeos.length && BufferGeometryUtils.mergeGeometries(crateGeos, false)
     if (crm) { const crates = new THREE.Mesh(crm, toon(0x6a7a86)); crates.castShadow = true; crates.receiveShadow = true; town.add(crates) } // 積んだケース（くすんだ青灰）
     crateGeos.forEach((g) => g.dispose())
+    const evm = eaveGeos.length && BufferGeometryUtils.mergeGeometries(eaveGeos, false)
+    if (evm) { const eaves = new THREE.Mesh(evm, toon(0x44392c)); eaves.castShadow = true; eaves.receiveShadow = true; town.add(eaves) } // 軒裏の陰影（暗い木）
+    eaveGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
