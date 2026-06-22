@@ -3814,10 +3814,11 @@ export async function mountTown3d(parent, opts = {}) {
       { x: 40, z: -298, r: 12, topY: SEA_Y + 20, kind: 'teahouse' },  // 茶屋
       { x: -62, z: -270, r: 12, topY: SEA_Y + 24, kind: 'lookout' },  // 見晴らし台
       { x: -2, z: -336, r: 11, topY: SEA_Y + 19, kind: 'shrine' },    // 小さな祠
+      { x: 30, z: -256, r: 12, topY: SEA_Y + 21, kind: 'onsen' },     // 雲の温泉（露天＝湯けむり）
     ]
     const cwBridges = []
     const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6 }) }
-    link(0, 1); link(0, 2); link(0, 3) // 中心から各島へ吊り橋
+    link(0, 1); link(0, 2); link(0, 3); link(0, 4) // 中心から各島へ吊り橋
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
       const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
@@ -3858,16 +3859,34 @@ export async function mountTown3d(parent, opts = {}) {
         for (const lx of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.1), woodMat); leg.position.set(lx, GY + 0.45, 3); g.add(leg) }
         const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 6, 7), tn(0x5a4636)); tk.position.set(-5, GY + 3, -4); g.add(tk)
         const can = new THREE.Mesh(new THREE.IcosahedronGeometry(4.6, 1), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-5, GY + 7, -4); can.scale.y = 0.85; g.add(can)
-      } else { // shrine（小さな祠＋鳥居）
+      } else if (n.kind === 'shrine') { // 小さな祠＋鳥居
         const trMat = tn(isNight ? 0x7a3026 : 0xc34a32), th = 7, tw = 5
         for (const sx of [-1, 1]) { const pi = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, th, 8), trMat); pi.position.set(sx * tw * 0.5, GY + th * 0.5, 4); g.add(pi) }
         const kasa = new THREE.Mesh(new THREE.BoxGeometry(tw + 2, 0.7, 1.2), trMat); kasa.position.set(0, GY + th + 0.3, 4); g.add(kasa)
         const hond = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 2.4), tn(isNight ? 0x5a4636 : 0x7a5d44)); hond.position.set(0, GY + 1.7, -2); g.add(hond)
         const hroof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 4), tn(isNight ? 0x3a3f4a : 0x49545f)); hroof.rotation.y = Math.PI / 4; hroof.position.set(0, GY + 3.6, -2); g.add(hroof)
+      } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
+        const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
+        for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
+        const water = new THREE.Mesh(new THREE.CylinderGeometry(poolR - 0.4, poolR - 0.4, 0.3, 24), new THREE.MeshToonMaterial({ color: isNight ? 0x5e8088 : 0xaad8d6, gradientMap: grad, emissive: new THREE.Color(isNight ? 0x244442 : 0x000000), emissiveIntensity: isNight ? 0.5 : 0 })); water.position.y = GY + 0.25; g.add(water) // 温かい湯の面
+        const lantStone = tn(isNight ? 0x707280 : 0x9a948a)
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.9, 6), lantStone); base.position.set(8, GY + 0.45, -3); g.add(base)
+        const fire = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 1.0), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0x000000), emissiveIntensity: isNight ? 1.0 : 0 })); fire.position.set(8, GY + 1.5, -3); g.add(fire)
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.65, 6), lantStone); cap.position.set(8, GY + 2.35, -3); g.add(cap)
       }
       g.position.set(n.x, n.topY - GY, n.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(g); cloudObjs.push(g)
     }
     cloudWalkInfo = { nodes: cwNodes.map((n) => ({ x: n.x, z: n.z, r: n.r - 2.5, topY: n.topY })), bridges: cwBridges, minY: SEA_Y - 6 }
+    // 雲の温泉の湯けむり（ふわふわ立ちのぼる白い湯気）。skyDriftersで更新＝低空では自動的に止まる。
+    { const on = cwNodes[4], steam = new THREE.Group()
+      const stCv = document.createElement('canvas'); stCv.width = stCv.height = 48
+      const stx = stCv.getContext('2d'), stg = stx.createRadialGradient(24, 24, 0, 24, 24, 24)
+      stg.addColorStop(0, 'rgba(255,255,255,0.85)'); stg.addColorStop(1, 'rgba(255,255,255,0)'); stx.fillStyle = stg; stx.fillRect(0, 0, 48, 48)
+      const stTex = new THREE.CanvasTexture(stCv)
+      for (let i = 0; i < (LIGHT ? 8 : 14); i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stTex, color: isNight ? 0xd2d8dc : 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: true }))
+        sp.userData = { x0: (R() - 0.5) * 7, z0: (R() - 0.5) * 7, ph: R(), spd: 0.6 + R() * 0.6 }; sp.scale.set(3, 4, 1); steam.add(sp) }
+      steam.position.set(on.x, on.topY + 0.4, on.z); scene.add(steam); skyDrifters.push({ o: steam, kind: 'steam' })
+    }
 
     // 雲海＝下地の円盤（取りこぼしを埋め谷の翳りになる）＋「平たい底＋もくもくの頂」の雲塊（頂点階調で立体的な雲に）。
     // group ごと高度でフェード＝窓辺・巡航では消えて開けた空、高く昇ると現れて街が雲の下へ消える別世界。
@@ -6409,6 +6428,13 @@ export async function mountTown3d(parent, opts = {}) {
             if (pf.position.y < u.botY) { pf.position.set(pf.userData.x0, u.topY, pf.userData.z0) }
             const f = (pf.position.y - u.botY) / (u.topY - u.botY); pf.scale.set(0.5 + f * 0.5, 1.5 * (0.4 + f * 0.6), 0.5 * (0.5 + f * 0.5)) } // 底ほど細る（薄れて消える）
         }
+      } else if (d.kind === 'steam') { // 雲の温泉の湯けむり：上昇しながら揺れ・広がり・薄れ、下から湧き直す
+        for (const sp of d.o.children) { const u = sp.userData
+          u.ph += dt * u.spd * 0.12; if (u.ph > 1) u.ph -= 1
+          const h = u.ph * 9
+          sp.position.set(u.x0 + Math.sin(u.ph * 6.28 + u.x0) * 1.3, 0.4 + h, u.z0)
+          sp.material.opacity = Math.sin(u.ph * Math.PI) * 0.4
+          const sc = 2.6 + u.ph * 3.4; sp.scale.set(sc, sc * 1.15, 1) }
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
