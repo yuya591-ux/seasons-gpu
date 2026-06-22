@@ -1702,6 +1702,41 @@ export async function mountTown3d(parent, opts = {}) {
     }
     prevAnchors = anchors
   }
+  // ── 路地裏の電線網（住宅街の上に二次的な電柱と電線を張り巡らす＝日本の街並みの象徴・郷愁の決め手）。垂れる電線が交差する空。 ──
+  if (kind !== 'yato') { const secPoleGeos = [], secWireGeos = [], secLampGeos = [], secGlowGeos = [], wM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0)
+    const lampNight = isNight || duskAmt > 0.16 // 夕暮れ以降は裏通りに灯りが点る
+    const areas2 = [SHRINE, STATION, PARK, MOROOKA, TOWER, TEMPLE, SCHOOL, FUN, DOWNTOWN, STADIUM, HARBOR]
+    const skipP = (x, z) => { if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.2) return true; if (Math.abs(x - RIVER.x) < RIVER.bankW + 1) return true; if (Math.abs(x) < 4.5 && z > -98 && z < 28) return true; for (const a of areas2) if (Math.hypot(x - a.x, z - a.z) < a.r + 1) return true; return false }
+    const wireSeg = (v1, v2) => { const len = v1.distanceTo(v2); if (len < 0.2) return; const wg = new THREE.CylinderGeometry(0.05, 0.05, len, 4); tmpQ.setFromUnitVectors(UP, v2.clone().sub(v1).normalize()); wM.makeRotationFromQuaternion(tmpQ).setPosition((v1.x + v2.x) / 2, (v1.y + v2.y) / 2, (v1.z + v2.z) / 2); wg.applyMatrix4(wM); secWireGeos.push(wg) }
+    const poleLine = (x0, z0, x1, z1, n) => { const perpA = Math.atan2(x1 - x0, z1 - z0) + Math.PI / 2, cx = Math.cos(perpA), cz = Math.sin(perpA); let prev = null, pc = 0
+      for (let i = 0; i <= n; i++) { const f = i / n, px = x0 + (x1 - x0) * f, pz = z0 + (z1 - z0) * f, py = heightAt(px, pz)
+        if (py < SEA.level + 0.8 || skipP(px, pz)) { prev = null; continue }
+        const ph = 8.5
+        const pg = new THREE.CylinderGeometry(0.15, 0.19, ph, 6); wM.makeTranslation(px, py + ph / 2, pz); pg.applyMatrix4(wM); secPoleGeos.push(pg)
+        const ag = new THREE.BoxGeometry(1.7, 0.13, 0.13); wM.makeRotationY(perpA).setPosition(px, py + ph - 0.85, pz); ag.applyMatrix4(wM); secPoleGeos.push(ag)
+        const topY = py + ph - 0.7
+        if (prev) for (const off of [-0.78, 0.78]) { const v1 = new THREE.Vector3(prev.x + cx * off, prev.y, prev.z + cz * off), v2 = new THREE.Vector3(px + cx * off, topY, pz + cz * off), mid = v1.clone().lerp(v2, 0.5); mid.y -= 0.45; wireSeg(v1, mid); wireSeg(mid, v2) } // 2本の電線（少し垂れる）
+        if (lampNight && pc % 3 === 0) { // 三本に一本の電柱に街灯（点在する灯りが裏通りを描く＝郷愁）
+          const lx = px + cx * 0.95, lz = pz + cz * 0.95, ly = py + ph - 1.5
+          const lg = new THREE.SphereGeometry(0.2, 7, 5); wM.makeTranslation(lx, ly, lz); lg.applyMatrix4(wM); secLampGeos.push(lg)
+          const gg = new THREE.SphereGeometry(0.62, 9, 7); wM.makeTranslation(lx, ly, lz); gg.applyMatrix4(wM); secGlowGeos.push(gg)
+        }
+        pc++
+        prev = { x: px, y: topY, z: pz }
+      }
+    }
+    poleLine(-50, 24, -50, -118, 16); poleLine(-104, 20, -104, -118, 15) // 南北の電線
+    poleLine(-185, -28, 58, -28, 26); poleLine(-185, -76, 58, -76, 26); poleLine(-185, 14, 58, 14, 24) // 東西の電線（南北の線と交差して網に）
+    if (BufferGeometryUtils.mergeGeometries) {
+      const pm = BufferGeometryUtils.mergeGeometries(secPoleGeos, false); if (pm) { const mesh = new THREE.Mesh(pm, poleMat); mesh.castShadow = true; town.add(mesh) } secPoleGeos.forEach((g) => g.dispose())
+      const wm2 = BufferGeometryUtils.mergeGeometries(secWireGeos, false); if (wm2) town.add(new THREE.Mesh(wm2, wireMat)); secWireGeos.forEach((g) => g.dispose())
+      if (secLampGeos.length) {
+        const lm = BufferGeometryUtils.mergeGeometries(secLampGeos, false); if (lm) town.add(new THREE.Mesh(lm, new THREE.MeshBasicMaterial({ color: 0xffd79a, fog: true })))
+        const gm = BufferGeometryUtils.mergeGeometries(secGlowGeos, false); if (gm) town.add(new THREE.Mesh(gm, new THREE.MeshBasicMaterial({ color: 0xffcf8a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })))
+        secLampGeos.forEach((g) => g.dispose()); secGlowGeos.forEach((g) => g.dispose())
+      }
+    }
+  }
   // ── カーブミラー（坂の角の凸面鏡。日本の生活道路の象徴＝本物感） ──
   for (const [mx, mz, face] of [[4.3, -20, -1], [-4.6, -50, 1]]) {
     const gy = heightAt(mx, mz)
