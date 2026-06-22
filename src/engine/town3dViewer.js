@@ -3939,7 +3939,7 @@ export async function mountTown3d(parent, opts = {}) {
     else { cx = (R() - 0.5) * 940; cz = -150 - R() * 360 }                                                                       // 渡りの空（広く低く）
     for (let j = 0; j < n; j++) {
       const s = 4 + R() * 7, up = Math.pow(R(), 0.6) // 上ほど房が多い＝盛り上がる頂・底は平ら
-      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), up < 0.25 ? cloudBot : topMat)
+      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 2), up < 0.25 ? cloudBot : topMat) // 分割を上げて積雲を丸く（同じパフ＝描画コール不変）
       puff.position.set((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11); puff.scale.y = 0.58; g.add(puff)
     }
     g.position.set(cx, 54 + R() * 34, cz)
