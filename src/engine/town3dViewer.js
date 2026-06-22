@@ -286,6 +286,8 @@ export async function mountTown3d(parent, opts = {}) {
   const onScene = typeof opts.onScene === 'function' ? opts.onScene : () => {} // 場面（部屋/窓/飛行/歩行・速度・高度・地形・時代の近さ）を外へ伝える（BGMの下地）
   const onSeaBird = typeof opts.onSeaBird === 'function' ? opts.onSeaBird : () => {} // 海の上で時々かもめが鳴く（海らしさ＋渡りの退屈しのぎ）
   const onPurr = typeof opts.onPurr === 'function' ? opts.onPurr : () => {} // 窓辺の猫を撫でるとゴロゴロ鳴る（0..1）
+  const onFlockWing = typeof opts.onFlockWing === 'function' ? opts.onFlockWing : () => {} // 渡りの群れに近づいて飛ぶと羽音
+  const onChime = typeof opts.onChime === 'function' ? opts.onChime : () => {} // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -3726,6 +3728,8 @@ export async function mountTown3d(parent, opts = {}) {
   let rainbowArch = null // 雲海の上にかかる、くぐれる虹のアーチ
   const THERMALS = [] // 上昇気流の柱（暖かい街・丘・雲の塔・くつろぎ群島の上）。巡航中ふわっと持ち上げる＝ソアリング
   let gustT = 6 + Math.random() * 10, gustAmt = 0, gustVX = 0, gustVZ = 0, gustUp = 0 // そよ風/突風＝空気が生きている
+  let chimeT = 6 // 静かな瞬間の鈴の間合い
+  let chimeCount = 0, wingCount = 0 // 検証用カウンタ（鈴・羽音の発火数）
   // 雲上の歩行面の高さ＝島の上(平ら)か橋の上(端点間を補間＋たわみ)。歩ける範囲外は null。
   const cloudSurfaceY = (x, z) => {
     if (!cloudWalkInfo) return null
@@ -6235,6 +6239,10 @@ export async function mountTown3d(parent, opts = {}) {
     if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) active.climb = 0 }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
+    // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
+    { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12)
+      // 実時計 t で計る（休息中は描画が間引かれ dt が頭打ちになるため、dt 積算だと鈴が遅れる）
+      if (calm) { if (t >= chimeT) { chimeT = t + 8 + R() * 10; onChime(); chimeCount++ } } else chimeT = t + 4 + R() * 4 }
     // 操作ゲージの塗りを今の値で更新（＋寄る/速く/上昇で上がる向き）。高さは見渡せる実用域(汀〜90)で正規化。
     zoomGauge.set((3.0 - active.zoomTarget) / 2.6)
     speedGauge.set((active.speedMul - 0.35) / 1.35)
@@ -6349,6 +6357,10 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.position.x += 3.0 * dt; if (d.o.position.x > 360) d.o.position.x = -360
         d.o.position.y = d.o.userData.baseY + Math.sin(t * 0.22) * 1.6
         const flap = Math.sin(t * 6.5) * 0.5; for (const w of d.o.userData.wings) w.rotation.z = -w.userData.side * flap
+        if (active && active.mode !== 'window' && (active.flyP || 0) > 0.6) { // 群れに近づいて飛ぶと羽音（間隔をあけて＝並走の手応え）
+          const dd = Math.hypot(d.o.position.x - active.flyPos.x, d.o.position.y - active.flyPos.y, d.o.position.z - active.flyPos.z)
+          if (dd < 32) { d.wingT = (d.wingT || 0) - dt; if (d.wingT <= 0) { d.wingT = 0.5 + R() * 0.3; onFlockWing(); wingCount++ } }
+        }
       } else if (d.kind === 'fall') { // 雲の滝：各房が落ちて、底で薄れ、上から湧き直す
         const u = d.o.userData
         for (const pf of d.o.children) { pf.position.y -= pf.userData.spd * dt
@@ -6378,6 +6390,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
     window.__town3dFaceWalk = (y) => { if (active) { active.flyYaw = active.flyYawTarget = y || 0 } } // 検証用: 歩行の向き(rad)を直接指定
+    window.__town3dSoundCounts = () => ({ chime: chimeCount, wing: wingCount }) // 検証用: 鈴・羽音の発火数
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)

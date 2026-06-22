@@ -640,6 +640,37 @@ export function createAudio(opts) {
         try { o.start(at); o.stop(at + 0.38) } catch { /* 無視 */ }
       }
     },
+    /** 渡りの群れに並走したときの羽音（大きな鳥のゆったりした羽ばたきの空気＝かもめより低く柔らかく）。 */
+    flockWing() {
+      if (!ctx || muted) return
+      const t0 = now()
+      for (let f = 0; f < 2; f++) { // ゆったり2打
+        const at = t0 + f * 0.14 + Math.random() * 0.03
+        const len = Math.floor(0.07 * ctx.sampleRate)
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate); const d = buf.getChannelData(0)
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.4)
+        const src = ctx.createBufferSource(); src.buffer = buf
+        const bp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.02, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.11)
+        if (bp) { bp.type = 'bandpass'; bp.frequency.value = 480 + Math.random() * 240; bp.Q.value = 0.7; src.connect(bp).connect(g) } else src.connect(g) // 低めの帯＝大きな翼の風切り
+        if (ctx.createStereoPanner) { const pan = ctx.createStereoPanner(); pan.pan.value = (Math.random() - 0.5) * 0.8; g.connect(pan).connect(master) } else g.connect(master)
+        try { src.start(at); src.stop(at + 0.13) } catch { /* 無視 */ }
+      }
+    },
+    /** 静かな瞬間の鈴（雲上で休む/止空で佇むとき、ふと澄んだ音が満ちる＝整う）。高く澄んだ正弦＋倍音の長い余韻、A短ペンタの音。 */
+    chime() {
+      if (!ctx || muted || !ctx.createOscillator) return
+      const t0 = now() + 0.02
+      const notes = [659.3, 880, 987.8, 1318.5] // E5 A5 B5 E6（鈴のように高く澄む・どの場面でも濁らない）
+      const f0 = notes[(Math.random() * notes.length) | 0]
+      for (const [mul, amp, dec] of [[1, 0.034, 2.8], [2.01, 0.013, 1.9], [3.0, 0.007, 1.2]]) { // 基音＋倍音で鈴の澄んだ響き
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f0 * mul
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(amp, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dec)
+        let node = o.connect(g)
+        if (ctx.createStereoPanner) { const pan = ctx.createStereoPanner(); pan.pan.value = (Math.random() - 0.5) * 0.5; node.connect(pan).connect(master) } else node.connect(master)
+        try { o.start(t0); o.stop(t0 + dec + 0.1) } catch { /* 無視 */ }
+      }
+    },
     /** 見回しの角度(yaw)で音場を左右に動かす（右を向くと音は左へ＝視覚と一致）。聴覚にも窓の外の広がりを。 */
     setLookPan(yaw) {
       lookPan = Math.max(-0.45, Math.min(0.45, -(yaw || 0) * 0.16))

@@ -168,6 +168,8 @@ function start() {
           onScene: (c) => { if (!sleepFading) audio.setMusicBed(c) }, // 場面に応じて生成BGMの下地を静かに変える
           onSeaBird: () => { if (!sleepFading) audio.seaBird() }, // 海の上で時々かもめが鳴く
           onPurr: (v) => { if (!sleepFading) audio.setPurr(v) }, // 窓辺の猫を撫でるとゴロゴロ鳴る
+          onFlockWing: () => { if (!sleepFading) audio.flockWing() }, // 渡りの群れに並走すると羽音
+          onChime: () => { if (!sleepFading) audio.chime() }, // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
 
 
 
