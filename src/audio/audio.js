@@ -587,6 +587,7 @@ export function createAudio(opts) {
       // 素材ごとの音色: 舗装=やや硬く明るい / 土・草=柔らかく低い / 木=乾いて少し響く
       const s = surf === 'grass' ? { f: 420, fr: 130, gain: 0.04, dec: 0.10 }
         : surf === 'wood' ? { f: 660, fr: 220, gain: 0.05, dec: 0.16 }
+        : surf === 'snow' ? { f: 540, fr: 170, gain: 0.036, dec: 0.085 } // 雪=やわらかく低く・短く・静か（踏みしめのキュッ）
         : { f: 700, fr: 240, gain: 0.055, dec: 0.12 } // hard(舗装・既定)
       const len = Math.floor((surf === 'wood' ? 0.11 : 0.09) * ctx.sampleRate)
       const buf = ctx.createBuffer(1, len, ctx.sampleRate)

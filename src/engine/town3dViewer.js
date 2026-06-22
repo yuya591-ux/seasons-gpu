@@ -6379,7 +6379,8 @@ export async function mountTown3d(parent, opts = {}) {
         if (active.walkDist > 2.1) { active.walkDist = 0
           // 足元の素材で足音を変える: 谷戸=土・草／公園=草／川辺の遊歩道=木／その他=舗装。
           let surf = 'hard'
-          if (kind === 'yato') surf = 'grass'
+          if (weather === 'snow') surf = 'snow' // 雪は一面を覆う＝どこでも雪の踏みしめ
+          else if (kind === 'yato') surf = 'grass'
           else { const fx = active.flyPos.x, fz = active.flyPos.z
             if (Math.hypot(fx - PARK.x, fz - PARK.z) < PARK.r || Math.hypot(fx - MOROOKA.x, fz - MOROOKA.z) < MOROOKA.r) surf = 'grass'
             else if (Math.abs(fx - RIVER.x) < RIVER.bankW + 1.5) surf = 'wood' }
