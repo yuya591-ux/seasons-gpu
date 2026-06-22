@@ -188,6 +188,15 @@ body {
   transition: opacity 0.5s ease;
   background: linear-gradient(to bottom, rgba(206, 224, 240, 0.92), rgba(214, 228, 240, 0.45) 58%, rgba(220, 230, 242, 0.18));
 }
+/* 異時代の街に近づくとその時代の色で画面全体をそっと染める（別世界に入る気配） */
+.town3d-era {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.7s ease, background-color 0.7s ease;
+}
 /* 雲を抜けるときの白いかすみ（雲の中＝高度の手応え） */
 .town3d-cloudhaze {
   position: absolute;

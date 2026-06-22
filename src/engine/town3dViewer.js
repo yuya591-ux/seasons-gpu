@@ -5537,6 +5537,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 高く昇るほど空気が冷たく淡くなる（高度の実感）。淡い寒色をうっすら被せる。
   const altTint = document.createElement('div'); altTint.className = 'town3d-alt'; stage.appendChild(altTint)
   let altTintCur = -1
+  // 異時代の街に近づくと画面全体がその時代の色に染まる（別世界に入る気配）。frameで色・濃さを更新。
+  const eraGrade = document.createElement('div'); eraGrade.className = 'town3d-era'; stage.appendChild(eraGrade)
+  let eraGradeCur = -1, eraColCur = ''
   // とまる／すすむ トグル（飛行のときだけ・下中央）。タップでその場ホバリング⇄自動巡航。ボタンは1つだけ＝迷わない。
   const cruiseBtn = document.createElement('button'); cruiseBtn.className = 'town3d-cruise'; cruiseBtn.textContent = 'とまる'
   stage.appendChild(cruiseBtn)
@@ -5892,10 +5895,16 @@ export async function mountTown3d(parent, opts = {}) {
       const skyWarm = flyAmt * 0.5 * (1 - 0.6 * Math.max(edoP, senP, taiP))
       skyUniTop.value.copy(skyTop0).lerp(SKY_WARM_TOP, skyWarm)
       skyUniBot.value.copy(skyHor0).lerp(SKY_WARM_BOT, skyWarm)
+      // 別世界グレード: 近づいた時代の色で画面全体をそっと染める（近景まで時代の空気に＝霧だけでは出ない「入る」気配）。
+      const eMax = Math.max(edoP, senP, taiP)
+      const eraCol = eMax < 0.05 ? '' : (edoP >= senP && edoP >= taiP ? (isNight ? '92,76,50' : '226,170,82') : (senP >= taiP ? (isNight ? '40,52,68' : '74,102,130') : (isNight ? '78,56,66' : '216,154,122')))
+      const eraOp = Math.min(0.26, eMax * 0.36) // 通常合成の控えめな色フィルム＝別世界の空気（濃すぎると安いフィルタになる）
+      if (Math.abs(eraOp - eraGradeCur) > 0.02 || eraCol !== eraColCur) { eraGradeCur = eraOp; eraColCur = eraCol; if (eraCol) eraGrade.style.backgroundColor = `rgb(${eraCol})`; eraGrade.style.opacity = eraOp.toFixed(2) }
     } else if (active.fogTouched) {
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
       skyUniTop.value.copy(skyTop0); skyUniBot.value.copy(skyHor0) // 窓辺に戻ったら空の色を基準へ復元
+      if (eraGradeCur > 0.001) { eraGradeCur = 0; eraGrade.style.opacity = '0' } // 別世界グレードも解く
     }
     // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
     if (flyAmt > 0.02) {
