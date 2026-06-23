@@ -1029,44 +1029,28 @@ export async function mountTown3d(parent, opts = {}) {
   const roofMats = roofCols.map((c) => mottleMat(c, 60, 0.13, [3, 2]))
   // 屋上・壁の雑多な設備（室外機/水タンク/塔屋/アンテナ）の共有マテリアル＝見下ろしの密度＝実写の生活感。
   const acMat = toon(0xd8d4c6), tankMat = toon(0x6e6a64), phMat = toon(0x8a8478), antMat = toon(0x46464c)
-  // 屋上に干す布団の色（くすんだ生活色・上から見下ろす窓に映える彩り）。共有マテリアルで描画数を抑える。
-  const futonMats = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xd8c8a0, 0xb0b8a8, 0xd0cabc].map(toon)
-  // 屋上のささやかな緑（プランター菜園・鉢＝俯瞰で映える生活の緑）。共有マテリアル。
-  const gardenMats = [0x6a8a4a, 0x7e9850, 0x5c7c42].map(toon)
-  // 陸屋根の屋上に雑多な設備を載せる（共有マテリアルで描画数を抑える）。
+  // 屋上に干す布団の色（くすんだ生活色・上から見下ろす窓に映える彩り）。
+  const futonCols = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xd8c8a0, 0xb0b8a8, 0xd0cabc]
+  // 屋上のささやかな緑（プランター菜園・鉢＝俯瞰で映える生活の緑）。
+  const gardenCols = [0x6a8a4a, 0x7e9850, 0x5c7c42]
+  // 屋上設備は色を頂点色で焼いて1棟あたり1メッシュへ統合＝描画コール削減（実機の重さ対策）。混在材質を束ねる共有トゥーン材。
+  const clutterMat = toon(0xffffff); clutterMat.vertexColors = true
+  const colGeo = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = c.r; a[i + 1] = c.g; a[i + 2] = c.b }; geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); return geo }
+  const bakeColGeo = (arr, geo, hex, lx, ly, lz) => { geo.translate(lx, ly, lz); arr.push(colGeo(geo, hex)) }
+  const acGeos = [] // 全建物の壁の室外機＋太陽熱温水器を1メッシュへ統合（頂点色で焼く）＝描画コール削減
+  // 陸屋根の屋上に雑多な設備を載せる（1棟＝1メッシュに統合して描画数を抑える）。
   function addRoofClutter(g, w, d, h) {
-    const ph = new THREE.Mesh(new THREE.BoxGeometry(w * 0.3, 1.6, d * 0.3), phMat) // 塔屋（階段室）
-    ph.position.set((R() - 0.5) * w * 0.4, h + 0.8, (R() - 0.5) * d * 0.4); ph.castShadow = true; g.add(ph)
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(d * 0.15, d * 0.15, 1.3, 8), tankMat) // 水タンク
-    tank.position.set(w * 0.28, h + 0.9, -d * 0.2); tank.castShadow = true; g.add(tank)
+    const cg = [] // 屋上設備を1メッシュへ統合（色は頂点色で焼く）＝1棟あたり多数→1の描画コール
+    bakeColGeo(cg, new THREE.BoxGeometry(w * 0.3, 1.6, d * 0.3), 0x8a8478, (R() - 0.5) * w * 0.4, h + 0.8, (R() - 0.5) * d * 0.4) // 塔屋（階段室）
+    bakeColGeo(cg, new THREE.CylinderGeometry(d * 0.15, d * 0.15, 1.3, 8), 0x6e6a64, w * 0.28, h + 0.9, -d * 0.2) // 水タンク
     const nAc = 1 + ((R() * 2) | 0) // 室外機 1〜2
-    for (let i = 0; i < nAc; i++) {
-      const ac = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.5), acMat)
-      ac.position.set((R() - 0.5) * w * 0.6, h + 0.55, (R() - 0.5) * d * 0.6); ac.castShadow = true; g.add(ac)
-    }
-    if (R() < 0.55) { // アンテナ（細い支柱）
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 4), antMat)
-      pole.position.set(-w * 0.3, h + 1.5, d * 0.25); g.add(pole)
-    }
-    // 屋上に布団を干す（平らな色面＝窓から見下ろすと映える生活の彩り。昭和平成の風物詩）。晴天の昼夕のみ・雪は除く。
-    if (!SNOW && R() < 0.5) {
-      const nf = 1 + ((R() * 3) | 0)
-      for (let i = 0; i < nf; i++) {
-        const fw = w * 0.26 + R() * w * 0.16, fd = d * 0.34 + R() * d * 0.12
-        const fut = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.09, fd), futonMats[(R() * futonMats.length) | 0])
-        fut.position.set((R() - 0.5) * w * 0.5, h + 0.07, (R() - 0.5) * d * 0.45); fut.castShadow = true; g.add(fut)
-      }
-    }
-    // 屋上のささやかな菜園（プランターの緑が点々＝俯瞰で映える生活の緑）。雪は除く・一部の屋上に。
-    if (!SNOW && R() < 0.24) {
-      const gm = gardenMats[(R() * gardenMats.length) | 0]
-      const ng = 2 + ((R() * 2) | 0)
-      const bx = (R() - 0.5) * w * 0.4, bz = (R() - 0.5) * d * 0.4 // 一角にまとめて並べる
-      for (let i = 0; i < ng; i++) {
-        const pl = new THREE.Mesh(new THREE.BoxGeometry(0.5 + R() * 0.28, 0.17, 0.32), gm)
-        pl.position.set(bx + (R() - 0.5) * 0.5, h + 0.1, bz + i * 0.42 - 0.2); pl.castShadow = true; g.add(pl)
-      }
-    }
+    for (let i = 0; i < nAc; i++) bakeColGeo(cg, new THREE.BoxGeometry(0.9, 0.6, 0.5), 0xd8d4c6, (R() - 0.5) * w * 0.6, h + 0.55, (R() - 0.5) * d * 0.6)
+    if (R() < 0.55) bakeColGeo(cg, new THREE.CylinderGeometry(0.04, 0.04, 2.2, 4), 0x46464c, -w * 0.3, h + 1.5, d * 0.25) // アンテナ
+    // 屋上に布団を干す（窓から見下ろすと映える生活の彩り）。晴天の昼夕のみ・雪は除く。
+    if (!SNOW && R() < 0.5) { const nf = 1 + ((R() * 3) | 0); for (let i = 0; i < nf; i++) { const fw = w * 0.26 + R() * w * 0.16, fd = d * 0.34 + R() * d * 0.12; bakeColGeo(cg, new THREE.BoxGeometry(fw, 0.09, fd), futonCols[(R() * futonCols.length) | 0], (R() - 0.5) * w * 0.5, h + 0.07, (R() - 0.5) * d * 0.45) } }
+    // 屋上のささやかな菜園（プランターの緑が点々）。雪は除く・一部の屋上に。
+    if (!SNOW && R() < 0.24) { const ng = 2 + ((R() * 2) | 0), bx = (R() - 0.5) * w * 0.4, bz = (R() - 0.5) * d * 0.4; for (let i = 0; i < ng; i++) bakeColGeo(cg, new THREE.BoxGeometry(0.5 + R() * 0.28, 0.17, 0.32), gardenCols[(R() * gardenCols.length) | 0], bx + (R() - 0.5) * 0.5, h + 0.1, bz + i * 0.42 - 0.2) }
+    if (cg.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(cg, false); if (m) { const me = new THREE.Mesh(m, clutterMat); me.castShadow = true; g.add(me) } cg.forEach((x) => x.dispose()) }
   }
   // 壁面の縦グラデを頂点色で（足元=接地のAOで翳り→上=空の光で明るい）。平らな箱面の一様さを破り、
   // 接地感と大気の奥行きを足して「低ポリの箱」感を脱す。頂点色なので描画コストは増えない。
@@ -1084,6 +1068,7 @@ export async function mountTown3d(parent, opts = {}) {
   function house(x, z, w, d, h, type) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
+    const propL = [] // 室外機/太陽熱温水器の建物-local素片（回転確定後にグローバル統合）
     const wm = toon(wallCols[(R() * wallCols.length) | 0]) // 壁は軽量な拡散材（多数あるため性能優先）
     wm.vertexColors = true // 壁面の縦グラデ（接地AO＋空の光）を頂点色で乗せる
     const rep = Math.max(1, Math.round(w / 2.6)), repV = Math.max(1, Math.round(h / 2.4))
@@ -1115,18 +1100,14 @@ export async function mountTown3d(parent, opts = {}) {
         const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.84, d * 0.62, 4); rg.rotateY(Math.PI / 4) // 寄棟の四方の軒を深く
         const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
       }
-      // 太陽熱温水器（昭和の屋根の象徴。一部の家に＝平たい集熱パネル＋横長の貯湯タンク。屋根に傾けて乗せる）
+      // 太陽熱温水器（昭和の屋根の象徴）＋壁際の室外機。建物-local空間の素片を溜め、回転確定後にグローバル統合する
+      // （R()の順序は従来どおり＝街の見た目は不変。描画コールだけ減らす）。
       if (R() < 0.28) {
-        const sg = new THREE.Group(); sg.position.set((R() - 0.5) * w * 0.28, h + d * 0.3, (R() - 0.5) * d * 0.15); sg.rotation.x = -0.5
-        sg.add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.08, d * 0.42), toon(0x2a3848))) // 集熱パネル(濃紺)
-        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, w * 0.48, 8), toon(0xc8c4ba)); tank.rotation.z = Math.PI / 2; tank.position.set(0, 0.22, -d * 0.18); sg.add(tank) // 貯湯タンク
-        g.add(sg)
+        const sx2 = (R() - 0.5) * w * 0.28, sy2 = h + d * 0.3, sz2 = (R() - 0.5) * d * 0.15, tiltM = new THREE.Matrix4().makeRotationX(-0.5), sgM = new THREE.Matrix4().makeTranslation(sx2, sy2, sz2)
+        const panel = new THREE.BoxGeometry(w * 0.5, 0.08, d * 0.42); panel.applyMatrix4(tiltM); panel.applyMatrix4(sgM); propL.push({ geo: colGeo(panel, 0x2a3848) }) // 集熱パネル(濃紺)
+        const tank = new THREE.CylinderGeometry(0.17, 0.17, w * 0.48, 8); tank.rotateZ(Math.PI / 2); tank.translate(0, 0.22, -d * 0.18); tank.applyMatrix4(tiltM); tank.applyMatrix4(sgM); propL.push({ geo: colGeo(tank, 0xc8c4ba) }) // 貯湯タンク
       }
-      // 壁際の室外機（どの家にもある生活感）
-      if (R() < 0.85) {
-        const ac = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 0.45), acMat)
-        ac.position.set(w * 0.5 + 0.22, 0.5, (R() - 0.5) * d * 0.5); ac.castShadow = true; g.add(ac)
-      }
+      if (R() < 0.85) { const ac = new THREE.BoxGeometry(0.8, 0.55, 0.45); ac.translate(w * 0.5 + 0.22, 0.5, (R() - 0.5) * d * 0.5); propL.push({ geo: colGeo(ac, 0xd8d4c6) }) } // 壁際の室外機
     } else if (type === 'apt') {
       // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.5, d * 1.04), toon(0x8a8478)); cap.position.y = h + 0.25; cap.castShadow = true; g.add(cap)
@@ -1134,16 +1115,21 @@ export async function mountTown3d(parent, opts = {}) {
       const floors = Math.max(2, Math.round(h / 2.8))
       const balMat = toon(0xbcb6a8), railMat = toon(0x68686c)
       const futCols = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xb0b8a8, 0xd8c8a0] // 布団・洗濯物のくすんだ色
+      // 各階のベランダ床/手すり/布団は同材質なので1棟ごとに統合＝集合住宅1棟あたり描画コールを十数→3に（性能：実機の重さ対策）。
+      const slabGeos = [], railGeos = [], futGeos = []
       for (let f = 1; f < floors; f++) {
         const yy = f * (h / floors)
-        const slab = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.18, 0.85), balMat); slab.position.set(0, yy, d / 2 + 0.38); g.add(slab)
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.5, 0.1), railMat); rail.position.set(0, yy + 0.32, d / 2 + 0.78); g.add(rail)
-        // 手すりに布団／洗濯物を干す（時々）＝平成の集合住宅の生活感・ほのかな彩り
-        if (R() < 0.4) {
-          const fw = w * 0.28 + R() * w * 0.32
-          const fut = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.66, 0.12), toon(futCols[(R() * futCols.length) | 0]))
-          fut.position.set((R() - 0.5) * (w * 0.55), yy + 0.12, d / 2 + 0.85); g.add(fut)
+        const sg2 = new THREE.BoxGeometry(w * 0.96, 0.18, 0.85); sg2.translate(0, yy, d / 2 + 0.38); slabGeos.push(sg2)
+        const rg2 = new THREE.BoxGeometry(w * 0.96, 0.5, 0.1); rg2.translate(0, yy + 0.32, d / 2 + 0.78); railGeos.push(rg2)
+        if (R() < 0.4) { // 手すりに布団／洗濯物を干す（生活感）。色は頂点色で焼いて統合
+          const fw = w * 0.28 + R() * w * 0.32, fg2 = new THREE.BoxGeometry(fw, 0.66, 0.12); fg2.translate((R() - 0.5) * (w * 0.55), yy + 0.12, d / 2 + 0.85)
+          const fcol = new THREE.Color(futCols[(R() * futCols.length) | 0]); const fa = new Float32Array(fg2.attributes.position.count * 3); for (let i = 0; i < fa.length; i += 3) { fa[i] = fcol.r; fa[i + 1] = fcol.g; fa[i + 2] = fcol.b }; fg2.setAttribute('color', new THREE.BufferAttribute(fa, 3)); futGeos.push(fg2)
         }
+      }
+      if (BufferGeometryUtils.mergeGeometries) {
+        if (slabGeos.length) { const m = BufferGeometryUtils.mergeGeometries(slabGeos, false); if (m) { const me = new THREE.Mesh(m, balMat); me.castShadow = true; g.add(me) } slabGeos.forEach((x) => x.dispose()) }
+        if (railGeos.length) { const m = BufferGeometryUtils.mergeGeometries(railGeos, false); if (m) g.add(new THREE.Mesh(m, railMat)); railGeos.forEach((x) => x.dispose()) }
+        if (futGeos.length) { const m = BufferGeometryUtils.mergeGeometries(futGeos, false); if (m) { const fm = toon(0xffffff); fm.vertexColors = true; g.add(new THREE.Mesh(m, fm)) } futGeos.forEach((x) => x.dispose()) }
       }
     } else { // mid: 陸屋根＋屋上設備（塔屋・水タンク・室外機・アンテナ）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(0x9a9488)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
@@ -1160,6 +1146,8 @@ export async function mountTown3d(parent, opts = {}) {
     g.position.set(x, gy, z)
     // 屋根の向きを散らす（碁盤の同一方向を崩す）。多くは街路にゆるく沿い、時々大きく振れて棟の向きが変わる。
     g.rotation.y = R() < 0.26 ? (R() - 0.5) * 1.5 : (R() - 0.5) * 0.5
+    // 溜めた室外機/太陽熱温水器を建物の回転・位置で焼き込み、グローバル統合用の acGeos へ（1棟ごとの別メッシュを廃す）。
+    if (propL.length) { const rM = new THREE.Matrix4().makeRotationY(g.rotation.y), wM = new THREE.Matrix4().makeTranslation(x, gy, z); for (const pr of propL) { pr.geo.applyMatrix4(rM); pr.geo.applyMatrix4(wM); acGeos.push(pr.geo) } }
     town.add(g)
     const foot = (w + d) * 0.25 + 0.5
     // 歩行の当たり判定＝敷地を“向き付きの矩形”で正確に。円だと近接ビル間の細い路地に円がはみ出し透明の壁になる（横長の建物で顕著）。矩形なら矩形どうしの隙間（路地）を歩ける。
@@ -1401,6 +1389,9 @@ export async function mountTown3d(parent, opts = {}) {
     const bdm = bandGeos.length && BufferGeometryUtils.mergeGeometries(bandGeos, false)
     if (bdm) { const bands = new THREE.Mesh(bdm, toon(season === 'winter' ? 0xb4b0a6 : 0x9a948a)); bands.castShadow = true; bands.receiveShadow = true; town.add(bands) } // 中間スラブの見切り（コンクリ色）
     bandGeos.forEach((g) => g.dispose())
+    const acm = acGeos.length && BufferGeometryUtils.mergeGeometries(acGeos, false)
+    if (acm) { const acs = new THREE.Mesh(acm, clutterMat); acs.castShadow = true; acs.receiveShadow = true; town.add(acs) } // 室外機・太陽熱温水器（頂点色で焼いた統合メッシュ）
+    acGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
@@ -6917,6 +6908,39 @@ export async function mountTown3d(parent, opts = {}) {
       for (const tr of treesArr) { const d = Math.hypot(tr.position.x - active.flyPos.x, tr.position.z - active.flyPos.z); if (d < bd) { bd = d; best = tr } }
       const leaf = best && best.children[0]
       return { dist: +bd.toFixed(2), faded: !!(best && best.userData.fadeMat && leaf.material === best.userData.fadeMat), opacity: leaf && leaf.material.transparent ? +leaf.material.opacity.toFixed(2) : 1 }
+    }
+    window.__town3dDraw = () => { // 検証用: 実シーンを直接描画して本当の描画コール/三角形/プログラム数を得る（composerの最終1枚でなく）
+      if (!active || !active.camera) return null
+      const ar = renderer.info.autoReset; renderer.info.autoReset = false; renderer.info.reset()
+      renderer.render(scene, active.camera)
+      const r = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, progs: renderer.info.programs ? renderer.info.programs.length : -1, texMem: renderer.info.memory.textures, geoMem: renderer.info.memory.geometries }
+      renderer.info.autoReset = ar; return r
+    }
+    window.__town3dAttribute = () => { // 検証用: カテゴリを隠して描画コールの差分を測る＝各カテゴリの描画コール寄与
+      if (!active || !active.camera) return null
+      const ar = renderer.info.autoReset; renderer.info.autoReset = false
+      const measure = () => { renderer.info.reset(); renderer.render(scene, active.camera); return renderer.info.render.calls }
+      const base = measure()
+      const cat = (objs) => { const vis = (objs || []).filter((o) => o && o.visible); vis.forEach((o) => { o.visible = false }); const c = measure(); vis.forEach((o) => { o.visible = true }); return base - c }
+      const out = { base, residents: cat(residents), critters: cat(critters.map((c) => c.g)), cityWalkers: cat(cityWalkers.map((c) => c.g)), trees: cat(treesArr), clouds: cat(clouds), birds: cat(birds), skyDrifters: cat(skyDrifters.map((d) => d.o || d)), townChildren: town.children.length }
+      renderer.info.autoReset = ar; return out
+    }
+    window.__town3dMeshHisto = () => { // 検証用: town直下の各childが持つ可視メッシュ数のヒストグラム＝メッシュ(描画コール)の集中箇所
+      let totalMesh = 0, totalSprite = 0, lines = 0; const perChild = []
+      const countMesh = (o) => { let n = 0; o.traverse((c) => { if (c.visible && (c.isMesh || c.isPoints)) n++ }); return n }
+      for (const ch of town.children) { if (!ch.visible) continue; const n = countMesh(ch); totalMesh += n; perChild.push(n) }
+      scene.traverse((o) => { if (o.visible && o.isSprite) totalSprite++; if (o.visible && o.isLine) lines++ })
+      perChild.sort((a, b) => b - a)
+      // バケツ: 1メッシュのchild数、2-4、5-9、10+。10+の合計メッシュ数も。
+      const buckets = { one: 0, few: 0, mid: 0, heavy: 0 }; let heavyMeshSum = 0
+      for (const n of perChild) { if (n <= 1) buckets.one++; else if (n <= 4) buckets.few++; else if (n <= 9) buckets.mid++; else { buckets.heavy++; heavyMeshSum += n } }
+      // 上位childの位置（どの構造物か特定用）
+      const withPos = town.children.filter((c) => c.visible).map((c) => ({ n: countMesh(c), x: +c.position.x.toFixed(0), z: +c.position.z.toFixed(0) })).sort((a, b) => b.n - a.n).slice(0, 18)
+      return { townChildren: town.children.length, totalMeshInTown: totalMesh, totalSprite, lines, buckets, heavyMeshSum, topChildren: withPos }
+    }
+    window.__town3dLoad = () => { // 検証用: 毎フレーム更新される配列の件数（CPU負荷の実体）
+      const n = (a) => Array.isArray(a) ? a.length : (a && a.size) || 0
+      return { residents: n(residents), critters: n(critters), cityWalkers: n(cityWalkers), birds: n(birds), skyDrifters: n(skyDrifters), balloons: n(balloons), townSmoke: n(townSmoke), senMist: n(senMist), clouds: n(clouds), trees: n(treesArr), adBalloons: n(adBalloons) }
     }
     window.__town3dHeights = (x, z) => ({ heightAt: +heightAt(x, z).toFixed(2), senH: +senH(x, z).toFixed(2), SEAlevel: SEA.level }) // 検証用: 地点の地形高・戦国地形高・海面
     window.__town3dWaterScan = (cx, cz, rad = 60, step = 4) => { // 検証用: 範囲内の水面メッシュと、その上に乗る/水没する地物を集計（水上の家の特定）
