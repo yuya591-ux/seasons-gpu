@@ -1038,6 +1038,7 @@ export async function mountTown3d(parent, opts = {}) {
   const colGeo = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = c.r; a[i + 1] = c.g; a[i + 2] = c.b }; geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); return geo }
   const bakeColGeo = (arr, geo, hex, lx, ly, lz) => { geo.translate(lx, ly, lz); arr.push(colGeo(geo, hex)) }
   const acGeos = [] // 全建物の壁の室外機＋太陽熱温水器を1メッシュへ統合（頂点色で焼く）＝描画コール削減
+  const bldgOutlineGeos = [] // 現代homeの建物の輪郭線を1メッシュへ統合（523本→数本＝最大の描画コール削減。時代の輪郭は群に残す）
   // 陸屋根の屋上に雑多な設備を載せる（1棟＝1メッシュに統合して描画数を抑える）。
   function addRoofClutter(g, w, d, h) {
     const cg = [] // 屋上設備を1メッシュへ統合（色は頂点色で焼く）＝1棟あたり多数→1の描画コール
@@ -1088,7 +1089,7 @@ export async function mountTown3d(parent, opts = {}) {
     body.position.y = h / 2
     body.castShadow = true; body.receiveShadow = true
     g.add(body)
-    if (h > 4.6 || type !== 'house') g.add(addOutline(body)) // 大きめの建物のみ輪郭（性能配慮・小さな家は省く）
+    const wantOutline = h > 4.6 || type !== 'house' // 大きめの建物のみ輪郭（小さな家は省く）。輪郭は回転確定後にグローバル統合（描画コール削減）
     if (type === 'house') {
       // 切妻 or 寄棟の瓦屋根（色ごとの質感テクスチャを共有）
       const rMat = roofMats[(R() * roofMats.length) | 0]
@@ -1148,6 +1149,8 @@ export async function mountTown3d(parent, opts = {}) {
     g.rotation.y = R() < 0.26 ? (R() - 0.5) * 1.5 : (R() - 0.5) * 0.5
     // 溜めた室外機/太陽熱温水器を建物の回転・位置で焼き込み、グローバル統合用の acGeos へ（1棟ごとの別メッシュを廃す）。
     if (propL.length) { const rM = new THREE.Matrix4().makeRotationY(g.rotation.y), wM = new THREE.Matrix4().makeTranslation(x, gy, z); for (const pr of propL) { pr.geo.applyMatrix4(rM); pr.geo.applyMatrix4(wM); acGeos.push(pr.geo) } }
+    // 建物の輪郭線を本体ジオメトリから焼き込み統合（背面ハルを OUTLINE 倍に膨らませる）。属性を position/normal に揃えて混在ジオメトリでも統合可に。
+    if (wantOutline) { const og = bodyGeo.clone().toNonIndexed(); if (og.getAttribute('uv')) og.deleteAttribute('uv'); if (og.getAttribute('color')) og.deleteAttribute('color'); og.scale(OUTLINE, OUTLINE, OUTLINE); og.translate(0, h / 2, 0); og.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y)); og.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z)); bldgOutlineGeos.push(og) }
     town.add(g)
     const foot = (w + d) * 0.25 + 0.5
     // 歩行の当たり判定＝敷地を“向き付きの矩形”で正確に。円だと近接ビル間の細い路地に円がはみ出し透明の壁になる（横長の建物で顕著）。矩形なら矩形どうしの隙間（路地）を歩ける。
@@ -1392,6 +1395,9 @@ export async function mountTown3d(parent, opts = {}) {
     const acm = acGeos.length && BufferGeometryUtils.mergeGeometries(acGeos, false)
     if (acm) { const acs = new THREE.Mesh(acm, clutterMat); acs.castShadow = true; acs.receiveShadow = true; town.add(acs) } // 室外機・太陽熱温水器（頂点色で焼いた統合メッシュ）
     acGeos.forEach((g) => g.dispose())
+    const olm = bldgOutlineGeos.length && BufferGeometryUtils.mergeGeometries(bldgOutlineGeos, false)
+    if (olm) { const outs = new THREE.Mesh(olm, outlineMat); outs.renderOrder = -1; outs.castShadow = false; outs.receiveShadow = false; outs.frustumCulled = false; town.add(outs) } // 現代homeの建物輪郭（523本→1メッシュ）
+    bldgOutlineGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
@@ -6025,7 +6031,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す。
     // 近く（見える範囲）の住人だけ更新＝遠い時代エリアの人々を毎フレーム動かさない＝滑らかさを守りつつ人を増やせる。
     for (const r of residents) { const u = r.userData
-      const rdx = r.position.x - active.flyPos.x, rdz = r.position.z - active.flyPos.z; if (rdx * rdx + rdz * rdz > 19600) continue // 140uより遠い住人はスキップ（見えない＝負荷を割かない）
+      const rdx = r.position.x - active.flyPos.x, rdz = r.position.z - active.flyPos.z, rd2 = rdx * rdx + rdz * rdz
+      const rvis = rd2 < 12100 // 110uより遠い住人は描画しない（点でしか見えないのにメッシュ多数＝描画コール節約）
+      if (r.visible !== rvis) r.visible = rvis
+      if (rd2 > 19600) continue // 140uより遠い住人は更新もスキップ（再び近づく時に自然な位置にいるよう110〜140uは更新だけ続ける）
       if (u.moving) {
         const dx = u.tx - r.position.x, dz = u.tz - r.position.z, d = Math.hypot(dx, dz)
         if (d < 0.28) { u.moving = false; u.pauseT = 1.5 + R() * 4 } // 着いた→ひと休み
@@ -6922,7 +6931,12 @@ export async function mountTown3d(parent, opts = {}) {
       const measure = () => { renderer.info.reset(); renderer.render(scene, active.camera); return renderer.info.render.calls }
       const base = measure()
       const cat = (objs) => { const vis = (objs || []).filter((o) => o && o.visible); vis.forEach((o) => { o.visible = false }); const c = measure(); vis.forEach((o) => { o.visible = true }); return base - c }
-      const out = { base, residents: cat(residents), critters: cat(critters.map((c) => c.g)), cityWalkers: cat(cityWalkers.map((c) => c.g)), trees: cat(treesArr), clouds: cat(clouds), birds: cat(birds), skyDrifters: cat(skyDrifters.map((d) => d.o || d)), townChildren: town.children.length }
+      // 特殊構造物（学校/観覧車/公園/寺/駅/展望塔/副都心）を位置で拾って寄与を測る
+      const near = (cx, cz, r) => town.children.filter((c) => c.visible && Math.hypot(c.position.x - cx, c.position.z - cz) < r)
+      // 輪郭線メッシュ（outlineMat）の寄与＋本数
+      const outs = []; town.traverse((o) => { if (o.isMesh && o.material === outlineMat && o.visible) outs.push(o) }); const outlineN = outs.length
+      const catOut = () => { outs.forEach((o) => { o.visible = false }); const c = measure(); outs.forEach((o) => { o.visible = true }); return base - c }
+      const out = { base, residents: cat(residents), critters: cat(critters.map((c) => c.g)), cityWalkers: cat(cityWalkers.map((c) => c.g)), trees: cat(treesArr), clouds: cat(clouds), birds: cat(birds), skyDrifters: cat(skyDrifters.map((d) => d.o || d)), winRoom: cat([winRoom]), school: cat(near(54, -18, 9)), ferris: cat(near(-26, -66, 11)), park: cat(near(16, -27, 10)), temple: cat(near(40, -74, 12)), downtown: cat(near(-118, -56, 30)), outlines: catOut(), outlineN, townChildren: town.children.length }
       renderer.info.autoReset = ar; return out
     }
     window.__town3dMeshHisto = () => { // 検証用: town直下の各childが持つ可視メッシュ数のヒストグラム＝メッシュ(描画コール)の集中箇所
