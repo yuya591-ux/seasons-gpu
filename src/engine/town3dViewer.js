@@ -872,7 +872,7 @@ export async function mountTown3d(parent, opts = {}) {
     town.add(back); town.add(panel); return panel
   }
   // ── 生きもの（街/時代/季節で最適化・水彩のやさしい色）──
-  const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.22, 7), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) }
+  const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.2, 7), new THREE.MeshToonMaterial({ color: col, gradientMap: grad, side: THREE.DoubleSide, transparent: true, opacity: 0.82, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) } // 羽は陰影付き(toon)＋わずかに透過＝霧/夕の中で煌々と浮かない
   const mkDragonfly = (cx, cy, cz) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(0x46665a)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
   // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーンで佇む。
   const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
@@ -3055,8 +3055,8 @@ export async function mountTown3d(parent, opts = {}) {
         // ── 谷の霧（低くたなびく霞の帯＝「霧の谷あい」のエモさ）。柔らかな billboard を谷底に数枚。 ──
         { const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mx = mc.getContext('2d'); const mg2 = mx.createRadialGradient(32, 32, 2, 32, 32, 32); mg2.addColorStop(0, 'rgba(255,255,255,0.55)'); mg2.addColorStop(0.6, 'rgba(248,250,252,0.28)'); mg2.addColorStop(1, 'rgba(248,250,252,0)'); mx.fillStyle = mg2; mx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
           const mistCol = isNight ? 0x9aa4b2 : season === 'autumn' ? 0xe6dccb : 0xeef2f4
-          for (let s = 0; s < 9; s++) { const zz = sz + 24 - s * 6.5, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 16, py = Math.max(SEA.level + 1, senH(px, zz)) + 2.4 + R() * 2
-            const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.32 + R() * 0.16, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(26 + R() * 12, 9 + R() * 4, 1); town.add(m); senMist.push(m) } // ゆっくり漂わせる
+          for (let s = 0; s < 7; s++) { const zz = sz + 24 - s * 7.5, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 16, py = Math.max(SEA.level + 1, senH(px, zz)) + 1.6 + R() * 1.6
+            const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.13 + R() * 0.1, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(22 + R() * 10, 7 + R() * 3, 1); town.add(m); senMist.push(m) } // 薄くたなびく霞（街を覆い隠さない程度＝情緒だけ残す）
         }
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
           for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py < SEA.level + 0.8 || py > 13) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
@@ -3272,16 +3272,18 @@ export async function mountTown3d(parent, opts = {}) {
       }
       // ── 別世界の演出: 時代の気配（舞う粒子）＋霞の帯（くぐると世界が変わる関門）──
       {
+        // 粒子用の柔らかい円テクスチャ（map無しのPointsMaterialは「四角い点」になり昼間に眼障りになる＝必ず丸くする）
+        const fdc = document.createElement('canvas'); fdc.width = fdc.height = 32; const fdx = fdc.getContext('2d'); const fdg = fdx.createRadialGradient(16, 16, 0, 16, 16, 16); fdg.addColorStop(0, 'rgba(255,255,255,1)'); fdg.addColorStop(0.5, 'rgba(255,255,255,0.55)'); fdg.addColorStop(1, 'rgba(255,255,255,0)'); fdx.fillStyle = fdg; fdx.fillRect(0, 0, 32, 32); const fxDot = new THREE.CanvasTexture(fdc)
         const mkFx = (cx, cz, count, spread, col, sz) => {
           const g = new THREE.BufferGeometry(), pos = new Float32Array(count * 3), ph = new Float32Array(count)
           for (let i = 0; i < count; i++) { pos[i * 3] = cx + (R() - 0.5) * spread; pos[i * 3 + 1] = SEA.level + 4 + R() * 46; pos[i * 3 + 2] = cz + (R() - 0.5) * spread; ph[i] = R() * 6.28 }
           g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-          const m = new THREE.PointsMaterial({ color: col, size: sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true })
+          const m = new THREE.PointsMaterial({ map: fxDot, color: col, size: sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true, blending: isNight ? THREE.AdditiveBlending : THREE.NormalBlending })
           const pts = new THREE.Points(g, m); pts.frustumCulled = false; town.add(pts)
           return { pts, g, m, ph, y0: SEA.level + 4, yH: 46 }
         }
         edoFx = mkFx(EDO.x, EDO.z, 160, 200, isNight ? 0xffe0a0 : 0xf2bcce, isNight ? 2.5 : 2.1) // 江戸: 夜=蛍/昼=桜の花びら（大きくゆっくり＝ノスタルジー）
-        senFx = mkFx(SENGOKU.x, SENGOKU.z, 130, 110, isNight ? 0xffb060 : 0xd8b89a, 2.2)          // 戦国: 篝火の火の粉（昇る）
+        senFx = mkFx(SENGOKU.x, SENGOKU.z, 130, 110, isNight ? 0xffb060 : 0xcaa978, 2.0)          // 戦国: 夜=篝火の火の粉（昇る）/昼=淡い暖色の塵
         taiFx = mkFx(TAISHO.x, TAISHO.z, 150, 170, isNight ? 0xffd2a0 : 0xf0c2a4, 2.3)             // 大正: 夜=ガス灯の灯の粉/昼=潮風に舞う花びら
         const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mcx = mc.getContext('2d'); const mg = mcx.createRadialGradient(32, 32, 1, 32, 32, 32); mg.addColorStop(0, 'rgba(255,255,255,0.8)'); mg.addColorStop(1, 'rgba(255,255,255,0)'); mcx.fillStyle = mg; mcx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
         const mistMat = new THREE.SpriteMaterial({ map: mistTex, color: 0xeef2f6, transparent: true, opacity: 0.42, depthWrite: false, fog: true })
@@ -4578,8 +4580,8 @@ export async function mountTown3d(parent, opts = {}) {
     const g = new THREE.Group()
     const outfit = cfg.outfit || 'modern'
     const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x33302b)
-    skin.emissive = new THREE.Color(cfg.skin); skin.emissiveIntensity = 0.16 // 顔が影側でも暗く沈まないよう肌をわずかに自己発光（のっぺりさせず読める明るさに）
-    const white = new THREE.MeshBasicMaterial({ color: 0xf6f1ea, fog: true }), dark = toon(0x2c2622), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xc08274), browM = toon(cfg.hair), blush = toon(0xe2a596)
+    skin.emissive = new THREE.Color(cfg.skin); skin.emissiveIntensity = 0.08 // 顔が影側でも暗く沈まないよう肌をわずかに自己発光（強いと霧/夕の中で煌々と浮くので控えめに）
+    const white = toon(0xe6e0d4), dark = toon(0x2c2622), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xc08274), browM = toon(cfg.hair), blush = toon(0xe2a596) // 襟/白目は陰影付き(toon)＝MeshBasicの煌々とした白で霧の谷に浮かない
     const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
     const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 14), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 16), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
     const add = (p, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx !== undefined) m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); m.castShadow = true; p.add(m); return m }
@@ -6263,7 +6265,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
     if (flyAmt > 0.02) {
       const fp = active.flyPos, dEdo = Math.hypot(fp.x - EDO.x, fp.z - EDO.z), dSen = Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z), dTai = Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z)
-      const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (1.2 + (i % 5) * 0.32); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.45 + fx.ph[i]) * dt * 0.9) } p.needsUpdate = true; fx.m.opacity = Math.min(0.8, prox * 0.95) }
+      const updFx = (fx, prox, fall) => { if (!fx) return; const p = fx.g.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + fall * dt * (1.2 + (i % 5) * 0.32); if (fall < 0 && y < fx.y0) y = fx.y0 + fx.yH; else if (fall > 0 && y > fx.y0 + fx.yH) y = fx.y0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * 0.45 + fx.ph[i]) * dt * 0.9) } p.needsUpdate = true; fx.m.opacity = Math.min(isNight ? 0.82 : 0.34, prox * 0.95) } // 昼は淡い陽炎/塵程度（明色の粒で景色を白く濁らせない）。夜は篝火・蛍の粉として映える
       updFx(edoFx, flyAmt * Math.max(0, 1 - dEdo / 130), isNight ? 0.38 : -0.95) // 夜の蛍はゆらり昇る/昼の桜はゆっくり散る
       updFx(senFx, flyAmt * Math.max(0, 1 - dSen / 130), 1.05) // 火の粉はゆっくり昇る
       updFx(taiFx, flyAmt * Math.max(0, 1 - dTai / 130), isNight ? 0.42 : -0.7) // 大正: 夜の灯の粉は昇る/昼の花びらは散る
@@ -6871,10 +6873,10 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dLook = (dx, dy) => applyTown3dLook(dx || 0, dy || 0) // 検証用: 見回しドラッグ(画面比)。歩行=横でカメラ回転/縦で上下
     window.__town3dFlash = (v) => triggerTown3dFlash(v || 0.85) // 検証用: 遠雷の稲光を手動発火
     window.__town3dEraCull = () => eraCull.map((e) => ({ n: e.grp.children.length, vis: e.vis })) // 検証用: 時代群の捕捉数・表示状態
-    window.__town3dTransparent = (x, z, rad = 60) => { // 検証用: 指定位置の近くの「半透明メッシュ」を列挙（白い箱の正体特定用）
+    window.__town3dTransparent = (x, y, z, rad = 30) => { // 検証用: 指定3D点の近くの全メッシュ/スプライトを列挙（白い箱の正体特定）
       const out = []; const wp = new THREE.Vector3()
-      scene.traverse((o) => { if (o.isMesh && o.material && o.material.transparent && o.material.opacity < 0.95 && o.visible) { o.getWorldPosition(wp); const d = Math.hypot(wp.x - x, wp.z - z); if (d < rad && wp.y > 1 && wp.y < 40) { const g = o.geometry; out.push({ d: +d.toFixed(0), y: +wp.y.toFixed(1), op: +o.material.opacity.toFixed(2), col: o.material.color ? '#' + o.material.color.getHexString() : '?', type: g.type, blend: o.material.blending }) } } })
-      out.sort((a, b) => a.d - b.d); return { n: out.length, near: out.slice(0, 8) }
+      scene.traverse((o) => { if ((o.isMesh || o.isSprite) && o.material && o.visible) { o.getWorldPosition(wp); const d = Math.hypot(wp.x - x, wp.y - y, wp.z - z); if (d < rad) { const m = o.material; out.push({ d: +d.toFixed(0), y: +wp.y.toFixed(1), op: +(m.opacity ?? 1).toFixed(2), tr: !!m.transparent, col: m.color ? '#' + m.color.getHexString() : '?', type: o.isSprite ? 'Sprite' : o.geometry.type, par: o.parent && o.parent.type }) } } })
+      out.sort((a, b) => a.d - b.d); return { n: out.length, near: out.slice(0, 12) }
     }
     window.__town3dProbe = (x, z) => { // 検証用: その地点が当たり判定で塞がれているか＋近くのコライダー
       const blocked = blockedAt(x, z)
@@ -6894,6 +6896,12 @@ export async function mountTown3d(parent, opts = {}) {
       for (const tr of treesArr) { const d = Math.hypot(tr.position.x - active.flyPos.x, tr.position.z - active.flyPos.z); if (d < bd) { bd = d; best = tr } }
       const leaf = best && best.children[0]
       return { dist: +bd.toFixed(2), faded: !!(best && best.userData.fadeMat && leaf.material === best.userData.fadeMat), opacity: leaf && leaf.material.transparent ? +leaf.material.opacity.toFixed(2) : 1 }
+    }
+    window.__town3dPick = (u, v) => { // 検証用: 画面座標(u,v=0..1)からレイキャストして当たったメッシュを列挙（白い四角の正体特定）
+      if (!active || !active.camera) return null
+      const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(u * 2 - 1, -(v * 2 - 1)), active.camera)
+      const hits = rc.intersectObjects(scene.children, true).filter((h) => h.object.visible && h.object.material)
+      return hits.slice(0, 6).map((h) => { const o = h.object, m = o.material; return { d: +h.distance.toFixed(1), y: +h.point.y.toFixed(1), col: m.color ? '#' + m.color.getHexString() : '?', op: +(m.opacity ?? 1).toFixed(2), type: o.isSprite ? 'Sprite' : o.geometry.type, par: o.parent && o.parent.type, nm: o.name || (o.parent && o.parent.name) || '' } })
     }
     window.__town3dSoundCounts = () => ({ chime: chimeCount, wing: wingCount }) // 検証用: 鈴・羽音の発火数
     window.__town3dPalProbe = () => ({ duskAmt: +duskAmt.toFixed(2), isNight, snowy: SNOWY, skyTop: '#' + skyTop.getHexString(), skyBright: +skyBright.toFixed(3) }) // 検証用: 時間帯
