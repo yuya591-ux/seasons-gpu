@@ -4013,6 +4013,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (bathNight) for (const [hx, hz] of [[-8, -52], [16, -44], [-34, -60], [6, -30]]) { const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) continue; mkSmoke(hx, gy + 4.2, hz, 4, { rise: 6.5, drift: 2.2, maxSc: 1.3, op: 0.14 }) } // 細く淡く
   }
   let lastCloudHi = true // 雲海の世界の表示状態（変化時だけ visible を書き換える）
+  let lastDeep = false // 雲海の奥深く（街が雲に隠れる高度）か。街を丸ごと隠して負荷半減
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
   let rainbowArch = null // 雲海の上にかかる、くぐれる虹のアーチ
@@ -5952,7 +5953,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!restIdle && drawDt > 0.001 && drawDt < 0.4) {
       if (drawDt > 0.047) { adQLow++; adQOk = 0 } else if (drawDt < 0.038) { adQOk++; adQLow = 0 } else { if (adQLow) adQLow--; if (adQOk) adQOk-- }
       if (adQLow >= 16 && curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR - 0.12); applySize(); adQLow = 0; adQOk = 0 } // 重い→解像度を譲る
-      else if (adQOk >= 120 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.08); applySize(); adQOk = 0 } // 長く安定→鮮やかさを戻す
+      else if (adQOk >= 40 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.22); applySize(); adQOk = 0 } // 安定したら素早く鮮やかさを戻す（重い所を抜けたら数秒で回復＝荒いまま固定しない）
     }
     const dt = Math.min(0.05, t - lastT); lastT = t
     // 時代エリアの距離カリング：遠い時は群ごと非表示（海/霧で見えない距離で切替＝ポップ無し・基礎負荷ダウン）。
@@ -6813,6 +6814,9 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
     if (cloudHi !== lastCloudHi) { lastCloudHi = cloudHi; for (const o of cloudObjs) o.visible = cloudHi } // 低空では雲海の静的要素も一括で隠す（描画コール節約・見た目は霧で不変）
+    // 雲海の奥深く（雲の層の上＝眼下の街は雲deckに隠れる高度）では街を丸ごと非表示＝「雲海＋街」の二重描画を解消し負荷を半減（雲海の重さ対策）。ヒステリシスでチラつき防止。
+    const deepCloud = cloudHi && active.flyPos.y > (lastDeep ? SEA_Y + 2 : SEA_Y + 10)
+    if (deepCloud !== lastDeep) { lastDeep = deepCloud; town.visible = !deepCloud }
     // 銭湯の煙：低空（窓辺・街）でだけ立ちのぼる。各房が位相をずらして上昇→広がり→薄れ、上で湧き直す＝街の生きた動き。
     for (const sm of townSmoke) {
       if (cloudHi) { if (sm.visible) sm.visible = false; continue }
