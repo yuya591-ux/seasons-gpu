@@ -919,6 +919,9 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i < 1 + (R() < 0.5 ? 1 : 0); i++) { const br = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.48, 10), wood); br.position.set(0.5 + i * 0.4, 0.24, 0.42); br.castShadow = true; g.add(br); for (const by of [0.11, -0.11]) { const bd = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.014, 4, 10), band); bd.rotation.x = Math.PI / 2; bd.position.set(0.5 + i * 0.4, 0.24 + by, 0.42); g.add(bd) } } // 樽
     town.add(g); return g
   }
+  // 灯りの地明かり（提灯/ガス灯の足元の暖かい光だまり）。夕夜に道を照らす＝降り立った夜の情緒。
+  const poolCv = document.createElement('canvas'); poolCv.width = poolCv.height = 64; const pcx = poolCv.getContext('2d'); const pgr = pcx.createRadialGradient(32, 32, 1, 32, 32, 32); pgr.addColorStop(0, 'rgba(255,200,130,0.9)'); pgr.addColorStop(0.55, 'rgba(255,180,100,0.32)'); pgr.addColorStop(1, 'rgba(255,170,90,0)'); pcx.fillStyle = pgr; pcx.fillRect(0, 0, 64, 64); const poolTex = new THREE.CanvasTexture(poolCv)
+  const lightPool = (x, gy, z, r, op) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 16), new THREE.MeshBasicMaterial({ map: poolTex, color: 0xffba66, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: true })); m.rotation.x = -Math.PI / 2; m.position.set(x, gy + 0.06, z); town.add(m); return m }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
@@ -3015,6 +3018,7 @@ export async function mountTown3d(parent, opts = {}) {
             const cho = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.46, 10), chouMat); cho.position.set(px - side * 0.6, gh + 1.95, zz); cho.castShadow = true; town.add(cho) // 提灯本体
             for (const by of [0.15, -0.15]) { const bd = new THREE.Mesh(new THREE.CylinderGeometry(0.172, 0.172, 0.04, 10), bandMat); bd.position.set(px - side * 0.6, gh + 1.95 + by, zz); town.add(bd) } // 上下の白帯
             if (lglow > 0.05) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xffb060, transparent: true, opacity: lglow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px - side * 0.6, gh + 1.95, zz); gl.scale.set(1.5, 1.5, 1); town.add(gl) }
+            if (lglow > 0.12) lightPool(px - side * 0.6, gh, zz, 1.3, lglow * 0.5) // 足元の灯りだまり
           }
         }
         // ── 街道沿いの床店（市の屋台）＋犬猫＝降り立った時に出会う城下の賑わい。──
@@ -3294,7 +3298,7 @@ export async function mountTown3d(parent, opts = {}) {
               const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.3, 8), ironMat); base.position.set(px, py + 0.15, pz); town.add(base) // 台座
               const glass = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.34, 0.24), lampGlass); glass.position.set(px, py + 3.12, pz); town.add(glass) // ランプ箱
               const cap = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.22, 6), ironMat); cap.position.set(px, py + 3.42, pz); town.add(cap) // 笠
-              if (lampGlow > 0.12) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gtex, color: 0xffcf8a, transparent: true, opacity: lampGlow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px, py + 3.12, pz); gl.scale.set(1.9, 1.9, 1); town.add(gl) } }
+              if (lampGlow > 0.12) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gtex, color: 0xffcf8a, transparent: true, opacity: lampGlow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px, py + 3.12, pz); gl.scale.set(1.9, 1.9, 1); town.add(gl); lightPool(px, py, pz, 1.7, lampGlow * 0.5) } } // 足元の灯りだまり
             const postMat = toon(0xc0392b)
             for (let k = 0; k < 2; k++) { const a = R() * 6.28, r2 = 12 + R() * 20, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
               const pb = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 1.2, 12), postMat); pb.position.set(px, py + 0.6, pz); pb.castShadow = true; town.add(pb) // 丸ポストの胴
