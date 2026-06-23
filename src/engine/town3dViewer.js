@@ -623,6 +623,7 @@ export async function mountTown3d(parent, opts = {}) {
   const homeBldgs = [] // 現代homeの建物本体（frameで fog.farより遠い建物を描画カリング＝見た目不変で描画コール減）。house()が積み外側frameが読むのでmount冒頭=外側スコープで宣言
   let fishJumps = [] // 海面で時々跳ねる魚＋波紋
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
+  let nearFall = null   // 歩く人に追従する近景の舞い散り（降り立つとどこでも桜吹雪/落ち葉の中へ）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -4913,6 +4914,14 @@ export async function mountTown3d(parent, opts = {}) {
     const mat = new THREE.PointsMaterial({ color: season === 'spring' ? 0xf2bcd0 : 0xd07e2a, size: season === 'spring' ? 0.8 : 0.92, transparent: true, opacity: 0.92, sizeAttenuation: true, fog: true, depthWrite: false })
     const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
     seasonFall = { pts, pos, spd, phs, N, bx, bz, R0, floor, swirl: season === 'spring' ? 2.2 : 2.8 }
+    // 歩く人に追従する近景の層（カメラ周りの箱で循環。降り立つとどこでも花びら/落ち葉が舞う＝散歩の没入）。
+    const nN = LIGHT ? 34 : 60, nHX = 13, nHY = 11
+    const npos = new Float32Array(nN * 3), nspd = new Float32Array(nN), nphs = new Float32Array(nN)
+    for (let i = 0; i < nN; i++) { npos[i * 3] = (R() - 0.5) * nHX * 2; npos[i * 3 + 1] = R() * nHY; npos[i * 3 + 2] = (R() - 0.5) * nHX * 2; nspd[i] = 0.55 + R() * 0.8; nphs[i] = R() * 6.28 }
+    const ngeo = new THREE.BufferGeometry(); ngeo.setAttribute('position', new THREE.BufferAttribute(npos, 3))
+    const nmat = new THREE.PointsMaterial({ color: season === 'spring' ? 0xf4c2d6 : 0xd8813a, size: season === 'spring' ? 0.5 : 0.58, transparent: true, opacity: 0, sizeAttenuation: true, fog: true, depthWrite: false })
+    const npts = new THREE.Points(ngeo, nmat); npts.frustumCulled = false; npts.visible = false; scene.add(npts)
+    nearFall = { pts: npts, mat: nmat, pos: npos, spd: nspd, phs: nphs, N: nN, HX: nHX, HY: nHY, swirl: season === 'spring' ? 2.4 : 3.0 }
   }
 
   // ── 鯉のぼり（春。真鯉・緋鯉・子鯉が風になびく）。街のみ・春のみ。 ──
@@ -6327,6 +6336,24 @@ export async function mountTown3d(parent, opts = {}) {
       }
       f.pts.geometry.attributes.position.needsUpdate = true
     }
+    if (nearFall) { // 歩く人に追従する近景の舞い散り（カメラ周りで循環。歩くと濃く＝桜吹雪/落ち葉の中に降り立つ）
+      const op = flyAmt * (isWalk ? 0.82 : 0.16)
+      nearFall.pts.visible = op > 0.02
+      if (nearFall.pts.visible) {
+        const f = nearFall, mp = f.pos
+        for (let i = 0; i < f.N; i++) {
+          const k = i * 3
+          mp[k + 1] -= f.spd[i] * dt
+          mp[k] += Math.sin(t * 0.7 + f.phs[i]) * f.swirl * dt
+          mp[k + 2] += Math.cos(t * 0.5 + f.phs[i]) * f.swirl * 0.4 * dt
+          if (mp[k] - camX > f.HX) mp[k] -= 2 * f.HX; else if (mp[k] - camX < -f.HX) mp[k] += 2 * f.HX
+          if (mp[k + 2] - camZ > f.HX) mp[k + 2] -= 2 * f.HX; else if (mp[k + 2] - camZ < -f.HX) mp[k + 2] += 2 * f.HX
+          if (mp[k + 1] < camY - 2.5) mp[k + 1] = camY + f.HY * 0.5 + Math.random() * 3 // 足元より下に抜けたら頭上へ
+        }
+        f.pts.geometry.attributes.position.needsUpdate = true
+        f.mat.opacity = Math.min(0.88, op)
+      }
+    }
     // 鳥がはばたきながら空を渡る。自機が近いと驚いて上へ逃げ、羽ばたきが大きくなる（＋羽音）。
     const flyerAloft = active && (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.5
     birdFlushCool = Math.max(0, birdFlushCool - dt)
@@ -6780,12 +6807,13 @@ export async function mountTown3d(parent, opts = {}) {
       const overSeaT = isWalk ? 0 : (heightAt(active.flyPos.x, active.flyPos.z) < SEA.level + 0.5 ? 1 : 0) * flyAmt // 水面の上か
       const dHomeT = isWalk ? 0 : Math.min(1, Math.max(0, (Math.hypot(active.flyPos.x, active.flyPos.z) - 80) / 90)) * flyAmt // homeから離れたか
       altDuck01 = Math.max(altT, overSeaT, dHomeT)
-      // 夕暮れ・夜の光の粒（暗い空ほど見え、カメラ周辺を漂い流れる）
-      const moteOp = duskAmt * flyAmt * 0.4
-      motes.visible = moteOp > 0.015
+      // 光の粒（夕夜=蛍/塵の暖かい光。昼の歩行=陽だまりに舞う埃）。カメラ周辺を漂い流れ、降り立つと足元〜目線に寄り集まる。
+      const dayMote = flyAmt * (isWalk ? 0.17 : 0.045) * (1 - duskAmt * 0.5) // 昼も薄く舞う＝降り立った時に空気が生きる（歩行で濃く）
+      const moteOp = Math.min(0.46, duskAmt * flyAmt * 0.4 + dayMote)
+      motes.visible = moteOp > 0.012
       if (motes.visible) {
         const mp = moteGeo.attributes.position.array
-        const HX = 36, HY = 24, HZ = 36
+        const HX = isWalk ? 17 : 36, HY = isWalk ? 9 : 24, HZ = isWalk ? 17 : 36 // 歩くと近く低く密に＝足元の空気
         for (let i = 0; i < moteN; i++) {
           mp[i * 3] += Math.sin(t * 0.3 + i) * 0.004
           mp[i * 3 + 1] += Math.cos(t * 0.22 + i * 1.3) * 0.003 + 0.004 // ゆるく昇る
@@ -6796,6 +6824,8 @@ export async function mountTown3d(parent, opts = {}) {
         }
         moteGeo.attributes.position.needsUpdate = true
         moteMat.opacity = moteOp
+        moteMat.size = isWalk ? 0.6 : 0.5
+        moteMat.color.setRGB(1, 0.99 - duskAmt * 0.07, 0.94 - duskAmt * 0.18) // 昼=淡い白／夕夜=暖色
       }
       // 高空を速く飛ぶと飛行機雲を引く（後ろへ。一定距離ごとに一粒を撒く）
       if (!isWalk && active.flyPos.y > 38 && speedMag > FLY.speed * 0.45) {
