@@ -2987,13 +2987,14 @@ export async function mountTown3d(parent, opts = {}) {
         }
         // ── 街道（谷底の川の東岸に沿う道）＋城の平場へ登る坂道。senHに沿わせ統合で軽量。 ──
         { const mtRoadMat = toon(season === 'winter' ? 0xc2c6c2 : 0x6e6450), roadGeos = [], rM = new THREE.Matrix4(); let prev = null
-          for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 4.8, py = Math.max(SEA.level, senH(px, zz)) + 0.08 // 川の東岸の街道
-            if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(2.6, 0.16, len + 0.6); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } }
+          for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 4.8, gh = senH(px, zz), py = gh + 0.08 // 川の東岸の街道
+            if (gh < SEA.level + 1.2 || gh > 15) { prev = null; continue } // 水際/海の上には道を敷かない（地面の高さに沿わせる）
+            if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3 && len < 6) { const bg = new THREE.BoxGeometry(2.6, 0.16, len + 0.6); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } }
             prev = { x: px, z: zz, py } }
           // ── 城下の裏道（街道に並行する裏路地）＋横道（街道から裏へ）＝谷あいの城下の路地 ──
-          const lane = (offset, w) => { let pv = null; for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + offset, py = Math.max(SEA.level, senH(px, zz)) + 0.07; if (senH(px, zz) < SEA.level + 0.5 || py > 15) { pv = null; continue } if (pv) { const ddx = px - pv.x, ddz = zz - pv.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(w, 0.14, len + 0.5); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + pv.x) / 2, (py + pv.py) / 2, (zz + pv.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } } pv = { x: px, z: zz, py } } }
+          const lane = (offset, w) => { let pv = null; for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + offset, gh = senH(px, zz), py = gh + 0.07; if (gh < SEA.level + 1.2 || py > 15) { pv = null; continue } if (pv) { const ddx = px - pv.x, ddz = zz - pv.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(w, 0.14, len + 0.5); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + pv.x) / 2, (py + pv.py) / 2, (zz + pv.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } } pv = { x: px, z: zz, py } } }
           lane(11, 1.7); lane(-7, 1.7) // 東の裏道・西岸の道
-          for (let s = 4; s <= 34; s += 6) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), x0 = sx + cl + 4, x1 = sx + cl + 12, y = Math.max(SEA.level, senH((x0 + x1) / 2, zz)); if (senH((x0 + x1) / 2, zz) < SEA.level + 0.6) continue; const bg = new THREE.BoxGeometry(8.4, 0.14, 1.6); bg.applyMatrix4(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y + 0.06, zz)); roadGeos.push(bg) } // 横道（街道→東の裏道）
+          for (let s = 4; s <= 34; s += 6) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), x0 = sx + cl + 4, x1 = sx + cl + 12, y = senH((x0 + x1) / 2, zz); if (y < SEA.level + 1.2) continue; const bg = new THREE.BoxGeometry(8.4, 0.14, 1.6); bg.applyMatrix4(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y + 0.06, zz)); roadGeos.push(bg) } // 横道（街道→東の裏道）
           prev = null // 街道から城の平場へ登る坂道
           const r0x = sx + senValley(bz + 12) + 4.8, r0z = bz + 12
           for (let s = 0; s <= 14; s++) { const f = s / 14, px = r0x + (bx - r0x) * f, pz = r0z + (bz + 9 - r0z) * f, py = senH(px, pz) + 0.12
@@ -3030,8 +3031,8 @@ export async function mountTown3d(parent, opts = {}) {
         }
         // ── 鳥居の参道（南の河口から谷を遡って城へ向かう朱の鳥居） ──
         { const toriiM = toon(0xb5432f)
-          for (let s = 0; s < 5; s++) { const zz = sz + 26 - s * 8, cl = senValley(zz), px = sx + cl + 4.8, py = Math.max(SEA.level, senH(px, zz))
-            if (py < SEA.level) continue
+          for (let s = 0; s < 5; s++) { const zz = sz + 26 - s * 8, cl = senValley(zz), px = sx + cl + 4.8, py = senH(px, zz)
+            if (py < SEA.level + 1.2) continue // 水際/海の上には鳥居を建てない
             for (const sgn of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 3.0, 6), toriiM); post.position.set(px + sgn * 1.5, py + 1.5, zz); town.add(post) }
             const lintel = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.34, 0.3), toriiM); lintel.position.set(px, py + 3.05, zz); town.add(lintel)
             const lintel2 = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.22, 0.24), toriiM); lintel2.position.set(px, py + 2.55, zz); town.add(lintel2) }
@@ -3082,12 +3083,15 @@ export async function mountTown3d(parent, opts = {}) {
         // ── 谷の霧（低くたなびく霞の帯＝「霧の谷あい」のエモさ）。柔らかな billboard を谷底に数枚。 ──
         { const mc = document.createElement('canvas'); mc.width = mc.height = 64; const mx = mc.getContext('2d'); const mg2 = mx.createRadialGradient(32, 32, 2, 32, 32, 32); mg2.addColorStop(0, 'rgba(255,255,255,0.55)'); mg2.addColorStop(0.6, 'rgba(248,250,252,0.28)'); mg2.addColorStop(1, 'rgba(248,250,252,0)'); mx.fillStyle = mg2; mx.fillRect(0, 0, 64, 64); const mistTex = new THREE.CanvasTexture(mc)
           const mistCol = isNight ? 0x9aa4b2 : season === 'autumn' ? 0xe6dccb : 0xeef2f4
-          for (let s = 0; s < 7; s++) { const zz = sz + 24 - s * 7.5, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 16, py = Math.max(SEA.level + 1, senH(px, zz)) + 1.6 + R() * 1.6
-            const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.13 + R() * 0.1, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(22 + R() * 10, 7 + R() * 3, 1); town.add(m); senMist.push(m) } // 薄くたなびく霞（街を覆い隠さない程度＝情緒だけ残す）
+          for (let s = 0; s < 6; s++) { const zz = sz + 24 - s * 8.5, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 16, py = Math.max(SEA.level + 1, senH(px, zz)) + 0.6 + R() * 1.0
+            const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.11 + R() * 0.08, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(20 + R() * 9, 5 + R() * 2.5, 1); town.add(m); senMist.push(m) } // 谷底にひくく漂う川霧（家を覆い隠さず＝俯瞰でも washy にならない）
         }
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
           for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py > 13 || !senInland(px, pz)) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
-          for (let j = 0; j < 10; j++) { const z0 = sz + 20 - j * 4.4, cl = senValley(z0), wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); wg.position.set(sx + cl + 4.8, Math.max(SEA.level, senH(sx + cl + 4.8, z0)), z0); town.add(wg); cityWalkers.push({ g: wg, road: true, x0: sx + cl + 4.8, z0, len: 8 + R() * 6, sp: 0.05 + R() * 0.04, ph: R() * 2, fn: (u) => { const zz = z0 - u; const c2 = senValley(zz); const xx = sx + c2 + 4.8; return { x: xx, y: Math.max(SEA.level, senH(xx, zz)), z: zz } } }) } // 街道を行き交う旅人（初期位置を置く＝遠方時に原点へ取り残されない）
+          for (let j = 0; j < 10; j++) { const z0 = sz + 20 - j * 4.4, cl = senValley(z0); if (senH(sx + cl + 4.8, z0) < SEA.level + 1.2) continue // 街道が陸地の所だけに旅人を置く（水際/海の上を歩かせない）
+            const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); wg.position.set(sx + cl + 4.8, senH(sx + cl + 4.8, z0), z0); town.add(wg)
+            // 旅人は地面の高さに沿って歩く。水際に踏み込む手前(senH<SEA.level+1)で折り返す＝海の上を歩かない。
+            cityWalkers.push({ g: wg, road: true, x0: sx + cl + 4.8, z0, len: 8 + R() * 6, sp: 0.05 + R() * 0.04, ph: R() * 2, fn: (u) => { const zz = z0 - u, c2 = senValley(zz), xx = sx + c2 + 4.8, gh = senH(xx, zz); if (gh < SEA.level + 1) { const c3 = senValley(z0), x3 = sx + c3 + 4.8; return { x: x3, y: senH(x3, z0), z: z0 } } return { x: xx, y: gh, z: zz } } }) } // 街道を行き交う旅人
           const sgmei = ['酒', '鍛冶', '旅籠', '飯', '馬', '薬'] // 城下の店（質素な木の掛看板）
           for (let k = 0; k < 6; k++) { const zz = sz + 20 - k * 6, cl = senValley(zz), side = k % 2 ? 1 : -1, px = sx + cl + side * 6.5, pz = zz + (R() - 0.5) * 2, py = senH(px, pz); if (py > 12 || !senInland(px, pz)) continue; mkSignV(px, py + 1.1, pz, side > 0 ? -Math.PI / 2 : Math.PI / 2, sgmei[k], 0xcfc3a8, 0x2e2418) } } // 城下の店の看板
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
