@@ -275,7 +275,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 描き込み品質（設定/自動品質）でtown3dも重さを調整＝低性能端末の発熱・カクつきを抑える（従来は品質設定を無視していた）。
   const QUAL = opts.quality || 'standard'
   const LIGHT = QUAL === 'light'
-  const PR_CAP = LIGHT ? 1.25 : QUAL === 'soft' ? 2 : 1.6
+  const PR_CAP = LIGHT ? 1.15 : QUAL === 'soft' ? 1.6 : 1.4 // 解像度(DPR)の上限。ピクセル塗り＝発熱は解像度の二乗で効くので、見た目をFXAAで保ちつつ上限を控えめに（発熱対策・2026-06）
   const PR_FLOOR = LIGHT ? 0.82 : 0.96 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）。高DPR端末で「荒すぎる」のを防ぐため一段引き上げ
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
@@ -283,6 +283,7 @@ export async function mountTown3d(parent, opts = {}) {
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
   let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
   let lastDDT = 0 // 直近の描画間隔（検証用）
+  let idleLowApplied = false, idlePrevPR = 0 // 「眺めている時」の追加省電力: 静止＆無操作で解像度も一段下げる（発熱対策）。復帰時に元へ戻す
   let lastJsMs = 0 // 毎フレームのJS処理時間ms（検証用・CPU負荷）
   let bcFrame = 0 // フレーム数（初回の影焼き後にhome建物の霧カリングを始める）
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
@@ -5011,7 +5012,7 @@ export async function mountTown3d(parent, opts = {}) {
       import('three/examples/jsm/shaders/FXAAShader.js'),
     ])
     if (my !== token) return
-    const crt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }) // MSAAを保ったままFXAAも掛ける
+    const crt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 2 }) // MSAAは2x（4xはモバイルで帯域・発熱が重く、FXAA併用なので2xで十分・2026-06）
     composer = new EffectComposer(renderer, crt)
     composer.addPass(new RenderPass(scene, camera))
     fxaaPass = new ShaderPass(FXAAShader)
@@ -6141,7 +6142,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 能動的に飛んで動く時（巡航・操舵・昇降・速い移動）は30fpsを保つので滑らかさは損なわない。
     const stillNow = Math.hypot(active.vel.x, active.vel.z) < 0.8 && (active.climb || 0) === 0
     const restIdle = stillNow && (performance.now() - (active.lastInputT || 0)) > 3500
-    if (t - lastDraw < (restIdle ? 0.045 : 0.032)) return
+    // 「眺めている時」は解像度も一段下げる＝動かないので体感劣化ゼロで発熱を抑える（このアプリの主用途）。操作再開で即元へ。
+    if (restIdle && !idleLowApplied) { idlePrevPR = curPR; if (curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR * 0.8); applySize() } idleLowApplied = true }
+    else if (!restIdle && idleLowApplied) { if (idlePrevPR > 0 && Math.abs(idlePrevPR - curPR) > 0.001) { curPR = Math.min(qCap, idlePrevPR); applySize() } idleLowApplied = false }
+    if (t - lastDraw < (restIdle ? 0.06 : 0.032)) return // 眺めている時は約16fpsへ（動きはクロック基準で滑らか）／能動時は約30fps
     const drawDt = lastDraw < 0 ? 0.033 : t - lastDraw // 実際の描画間隔（カク付き検知）
     lastDraw = t
     const _js0 = performance.now() // 毎フレームのJS処理時間を測る（検証用・CPU負荷）
