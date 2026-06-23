@@ -338,7 +338,7 @@ export function createAudio(opts) {
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 560; hp.Q.value = 0.5 // 低音の唸り(ぶー)を完全に断つ
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 0.5 // 高くて広い帯＝空気を切る「ひゅーー」の芯（速度で更に上へ。低い唸りにならない）
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now()); g.gain.linearRampToValueAtTime(0.001, now() + 8) // 静止/地上はほぼ無音。setFlyWindが飛行速度で膨らませる
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0, now()) // 静止/地上は完全無音（録画のAGCで増幅されるノイズ漏れを断つ）。setFlyWindが飛行速度で膨らませる
     src.connect(hp).connect(bp).connect(g).connect(master)
     windNode = { src, g, bp, hp } // g/bp は飛行速度で風を膨らませる（setFlyWind）ために保持
     try {
@@ -399,12 +399,15 @@ export function createAudio(opts) {
       try { o.start() } catch { /* 無視 */ }
       oscs.push(o)
     }
-    bedNodes = { lp, bedGain, oscs }
-    // ごくゆっくりした音量の呼吸だけ（カットオフのうねりは廃止＝脈打つワウ感を出さない）。
+    // ごくゆっくりした音量の呼吸（カットオフのうねりは廃止＝脈打つワウ感を出さない）。
+    // 重要: 呼吸LFOの深さ(lfo2G)は「現在の音量に比例」させる＝無音時(gain≈0)は呼吸も0で完全に消える。
+    // 固定深さだと無音化しても±が残り、録画のAGCで微小な正弦和音が「機械音」に増幅されてしまう（実機FB）。
+    let lfo2G = null
     try {
       const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.05
-      const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.004; lfo2.connect(lfo2G).connect(bedGain.gain); lfo2.start() // ±0.004だけ膨らみ縮む静かな呼吸
+      lfo2G = ctx.createGain(); lfo2G.gain.value = 0.0; lfo2.connect(lfo2G).connect(bedGain.gain); lfo2.start() // 深さは setMusicBed で gain*0.3 に追従（無音時は0）
     } catch { /* LFO非対応でも下地は鳴る */ }
+    bedNodes = { lp, bedGain, oscs, lfo2G }
   }
   // 場面（ctx）からBGMの目標（音量・音色・和音）を決め、数秒かけて滑らかに移す。
   // ctx = { off?, mode:'window'|'fly'|'walk', flyAmt, speed, altitude, terrain:'sea'|'mountain'|'land', edoP, senP, taiP, night }
@@ -440,9 +443,11 @@ export function createAudio(opts) {
     }
     // 【実機FB2回目（2026-06-21）「空中/着地後もブーーーと鳴り続けて不快」】＝持続するシンセのパッド(正弦の和音)
     // がドローンに聞こえる。ユーザーが繰り返し嫌うため、当面は完全無音化＝自然音(風・鳥・虫・波)だけにする。
-    gain = 0.0001
+    // 【画面録画FB（2026-06-23）「録画で変な機械音」】＝0.0001でも残響＋呼吸LFOの±が録画のAGCで増幅されていた。
+    // 真の0にして、呼吸LFOの深さもgainに比例(=0)させ、合成パッドを完全に止める。
+    gain = 0.0
     // 細かな変化は無視（無駄なスケジューリングを抑える）。
-    if (Math.abs(gain - bedState.gain) > 0.0012) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.8) } catch { /* 無視 */ } }
+    if (Math.abs(gain - bedState.gain) > 0.0008) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.8); if (bedNodes.lfo2G) bedNodes.lfo2G.gain.setTargetAtTime(gain * 0.3, t, 1.8) } catch { /* 無視 */ } }
     if (Math.abs(cut - bedState.cut) > 24) { bedState.cut = cut; try { bedNodes.lp.frequency.setTargetAtTime(cut, t, 2.4) } catch { /* 無視 */ } }
     if (voice !== bedState.voice) {
       bedState.voice = voice
@@ -566,7 +571,7 @@ export function createAudio(opts) {
       const t = now()
       const e = v * v // 加速の手応え＝速いほど一気に風が増す
       try {
-        windNode.g.gain.setTargetAtTime(v < 0.06 ? 0.0008 : (0.003 + e * 0.05), t, 0.4) // 静止/低速はほぼ無音。速いほど明確に「ひゅーー」
+        windNode.g.gain.setTargetAtTime(v < 0.06 ? 0.0 : (0.003 + e * 0.05), t, 0.4) // 静止/低速は完全無音（録画AGCのノイズ増幅を断つ）。速いほど明確に「ひゅーー」
         windNode.bp.frequency.setTargetAtTime(1500 + v * 1700, t, 0.4)   // 常に高い帯(1.5〜3.2kHz)＝低い唸りにならず空気を切る笛に
         if (windNode.hp) windNode.hp.frequency.setTargetAtTime(520 + v * 900, t, 0.4) // 速いほど低音を更に削いで澄む
       } catch { /* 無視 */ }
@@ -578,7 +583,7 @@ export function createAudio(opts) {
       if (Math.abs(v - purrV) < 0.03 && v > 0.001) return
       purrV = v
       if (v > 0.001 && !purrNode) startPurr()
-      if (purrNode) { try { purrNode.pg.gain.setTargetAtTime(Math.max(0.0001, v * 0.045), now(), 0.18) } catch { /* 無視 */ } }
+      if (purrNode) { try { purrNode.pg.gain.setTargetAtTime(v < 0.02 ? 0.0 : v * 0.045, now(), 0.18) } catch { /* 無視 */ } } // 撫で終わりは真の無音へ（残る低音が録画AGCで増幅されるのを防ぐ）
     },
     /** 猫の鳴き声「にゃーん」＝基音のグライド(me→ow)＋フォルマントの母音。素材ゼロの合成。タップ反応で鳴く。 */
     meow(pitch, kind) {
