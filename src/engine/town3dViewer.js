@@ -1039,6 +1039,7 @@ export async function mountTown3d(parent, opts = {}) {
   const bakeColGeo = (arr, geo, hex, lx, ly, lz) => { geo.translate(lx, ly, lz); arr.push(colGeo(geo, hex)) }
   const acGeos = [] // 全建物の壁の室外機＋太陽熱温水器を1メッシュへ統合（頂点色で焼く）＝描画コール削減
   const bldgOutlineGeos = [] // 現代homeの建物の輪郭線を1メッシュへ統合（523本→数本＝最大の描画コール削減。時代の輪郭は群に残す）
+  const roofGeosByMat = roofMats.map(() => []) // 家の瓦屋根を材質ごとに統合（~250メッシュ→材質数個）＝描画コール削減
   // 陸屋根の屋上に雑多な設備を載せる（1棟＝1メッシュに統合して描画数を抑える）。
   function addRoofClutter(g, w, d, h) {
     const cg = [] // 屋上設備を1メッシュへ統合（色は頂点色で焼く）＝1棟あたり多数→1の描画コール
@@ -1070,6 +1071,7 @@ export async function mountTown3d(parent, opts = {}) {
     const gy = heightAt(x, z)
     const g = new THREE.Group()
     const propL = [] // 室外機/太陽熱温水器の建物-local素片（回転確定後にグローバル統合）
+    const roofL = [] // 瓦屋根の建物-local素片（回転確定後に材質ごとへグローバル統合）
     const wm = toon(wallCols[(R() * wallCols.length) | 0]) // 壁は軽量な拡散材（多数あるため性能優先）
     wm.vertexColors = true // 壁面の縦グラデ（接地AO＋空の光）を頂点色で乗せる
     const rep = Math.max(1, Math.round(w / 2.6)), repV = Math.max(1, Math.round(h / 2.4))
@@ -1091,15 +1093,16 @@ export async function mountTown3d(parent, opts = {}) {
     g.add(body)
     const wantOutline = h > 4.6 || type !== 'house' // 大きめの建物のみ輪郭（小さな家は省く）。輪郭は回転確定後にグローバル統合（描画コール削減）
     if (type === 'house') {
-      // 切妻 or 寄棟の瓦屋根（色ごとの質感テクスチャを共有）
-      const rMat = roofMats[(R() * roofMats.length) | 0]
+      // 切妻 or 寄棟の瓦屋根（色ごとの質感テクスチャを共有）。建物-local空間で焼き、回転確定後に材質ごとへグローバル統合。
+      const ri = (R() * roofMats.length) | 0
       if (R() < 0.6) {
         const rg = new THREE.CylinderGeometry(d * 0.72, d * 0.72, w + 0.7, 3, 1) // 軒を深く張り出す（庇の陰影＝箱を脱す）。妻側も少し出す
-        rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
-        const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.y = 0.66; roof.castShadow = true; g.add(roof)
+        rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2); rg.scale(1, 0.66, 1); rg.translate(0, h + d * 0.30, 0)
+        roofL.push({ geo: rg, ri })
       } else {
-        const rg = new THREE.ConeGeometry(Math.max(w, d) * 0.84, d * 0.62, 4); rg.rotateY(Math.PI / 4) // 寄棟の四方の軒を深く
-        const roof = new THREE.Mesh(rg, rMat); roof.position.y = h + d * 0.30; roof.scale.set(w / Math.max(w, d), 1, d / Math.max(w, d)); roof.castShadow = true; g.add(roof)
+        const mx = Math.max(w, d), rg = new THREE.ConeGeometry(mx * 0.84, d * 0.62, 4); rg.rotateY(Math.PI / 4) // 寄棟の四方の軒を深く
+        rg.scale(w / mx, 1, d / mx); rg.translate(0, h + d * 0.30, 0)
+        roofL.push({ geo: rg, ri })
       }
       // 太陽熱温水器（昭和の屋根の象徴）＋壁際の室外機。建物-local空間の素片を溜め、回転確定後にグローバル統合する
       // （R()の順序は従来どおり＝街の見た目は不変。描画コールだけ減らす）。
@@ -1151,6 +1154,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (propL.length) { const rM = new THREE.Matrix4().makeRotationY(g.rotation.y), wM = new THREE.Matrix4().makeTranslation(x, gy, z); for (const pr of propL) { pr.geo.applyMatrix4(rM); pr.geo.applyMatrix4(wM); acGeos.push(pr.geo) } }
     // 建物の輪郭線を本体ジオメトリから焼き込み統合（背面ハルを OUTLINE 倍に膨らませる）。属性を position/normal に揃えて混在ジオメトリでも統合可に。
     if (wantOutline) { const og = bodyGeo.clone().toNonIndexed(); if (og.getAttribute('uv')) og.deleteAttribute('uv'); if (og.getAttribute('color')) og.deleteAttribute('color'); og.scale(OUTLINE, OUTLINE, OUTLINE); og.translate(0, h / 2, 0); og.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y)); og.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z)); bldgOutlineGeos.push(og) }
+    // 瓦屋根を建物の回転・位置で焼き込み、材質ごとのグローバル配列へ（1棟ごとの別メッシュを廃す）。
+    if (roofL.length) { const rM = new THREE.Matrix4().makeRotationY(g.rotation.y), wM = new THREE.Matrix4().makeTranslation(x, gy, z); for (const r of roofL) { r.geo.applyMatrix4(rM); r.geo.applyMatrix4(wM); roofGeosByMat[r.ri].push(r.geo) } }
     town.add(g)
     const foot = (w + d) * 0.25 + 0.5
     // 歩行の当たり判定＝敷地を“向き付きの矩形”で正確に。円だと近接ビル間の細い路地に円がはみ出し透明の壁になる（横長の建物で顕著）。矩形なら矩形どうしの隙間（路地）を歩ける。
@@ -1398,6 +1403,7 @@ export async function mountTown3d(parent, opts = {}) {
     const olm = bldgOutlineGeos.length && BufferGeometryUtils.mergeGeometries(bldgOutlineGeos, false)
     if (olm) { const outs = new THREE.Mesh(olm, outlineMat); outs.renderOrder = -1; outs.castShadow = false; outs.receiveShadow = false; outs.frustumCulled = false; town.add(outs) } // 現代homeの建物輪郭（523本→1メッシュ）
     bldgOutlineGeos.forEach((g) => g.dispose())
+    for (let i = 0; i < roofGeosByMat.length; i++) { const arr = roofGeosByMat[i]; if (!arr.length) continue; const rm = BufferGeometryUtils.mergeGeometries(arr, false); if (rm) { const roofs = new THREE.Mesh(rm, roofMats[i]); roofs.castShadow = true; roofs.receiveShadow = true; town.add(roofs) } arr.forEach((g) => g.dispose()) } // 家の瓦屋根（材質ごとに統合）
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
