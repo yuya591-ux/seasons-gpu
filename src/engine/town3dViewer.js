@@ -73,6 +73,8 @@ const FLY = {
   bankEase: 0.07,   // バンクの追従（ゆっくり傾く）
   // 目線・スティック
   eye: 1.62,        // 立ったときの目線の高さ（地形+この高さ）
+  jumpForce: 6.4,   // ジャンプの初速(u/s)。重力と合わせて小気味よい一段ジャンプに
+  gravity: 19,      // 落下の重力(u/s^2)。jumpForce6.4/gravity19＝跳び上がり~1.08u・滞空~0.67s
   stickRadius: 62,  // スティックの最大振れ(px)。これで全速
   stickDead: 0.14,  // 不感帯（微小な震えを無視）
   turnRate: 1.7,    // （旧・白猫式）横へ倒すほど速く向き直る旋回速度(rad/s)
@@ -6009,6 +6011,12 @@ export async function mountTown3d(parent, opts = {}) {
   const cruiseBtn = document.createElement('button'); cruiseBtn.className = 'town3d-cruise'; cruiseBtn.textContent = 'とまる'
   stage.appendChild(cruiseBtn)
   let cruiseShown = false
+  // ジャンプボタン（歩行の右下）。ボタン／右側タップで跳ぶ。連打しても押すたびにフラッシュ＝押下判定が見える（実際の跳躍は接地時のみ＝二段ジャンプはしない）。
+  const jumpBtn = document.createElement('button'); jumpBtn.className = 'town3d-jump'; jumpBtn.type = 'button'; jumpBtn.setAttribute('aria-label', 'ジャンプ'); jumpBtn.textContent = 'JUMP'; stage.appendChild(jumpBtn)
+  let jumpShown = false, jumpFlashClr = null
+  const flashJumpBtn = () => { jumpBtn.classList.remove('jump--press'); void jumpBtn.offsetWidth; jumpBtn.classList.add('jump--press'); if (jumpFlashClr) clearTimeout(jumpFlashClr); jumpFlashClr = setTimeout(() => jumpBtn.classList.remove('jump--press'), 180) } // 押すたびに再生（連打でも毎回光る）
+  const triggerJump = () => { if (!active || active.mode !== 'walk') return; active.jumpQueued = true; flashJumpBtn(); active.lastInputT = performance.now(); active.cinema = 0 }
+  jumpBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); triggerJump() })
   cruiseBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation() }) // 長押しのテキスト選択/メニューを抑止
   cruiseBtn.addEventListener('click', (e) => {
     e.stopPropagation()
@@ -6606,10 +6614,19 @@ export async function mountTown3d(parent, opts = {}) {
           else { if (cloudSurfaceY(nx, active.flyPos.z) != null) active.flyPos.x = nx; if (cloudSurfaceY(active.flyPos.x, nz) != null) active.flyPos.z = nz } // 縁に沿って滑る
         } else tryWalk(active.flyPos, active.vel.x * dt, active.vel.z * dt) // 当たり判定つきで水平移動
         const groundY = onCl ? (cloudSurfaceY(active.flyPos.x, active.flyPos.z) ?? active.flyPos.y - FLY.eye) : heightAt(active.flyPos.x, active.flyPos.z)
-        const eyeY = groundY + FLY.eye
+        // ── ジャンプ（重力）。jumpY=地面からの高さ。接地中にジャンプ要求があれば発射。空中の連打は二段ジャンプにしない。──
+        const grounded = (active.jumpY || 0) <= 0.001
+        if (active.jumpQueued) { if (grounded && active.flyP > 0.6) { active.jumpVel = FLY.jumpForce; active.jumpY = 0.0001 } active.jumpQueued = false } // 要求は1フレームで消費（連打でも溜まらない＝確実に1回ずつ判定）
+        if ((active.jumpY || 0) > 0 || active.jumpVel) {
+          active.jumpVel = (active.jumpVel || 0) - FLY.gravity * dt
+          active.jumpY = Math.max(0, (active.jumpY || 0) + active.jumpVel * dt)
+          if (active.jumpY <= 0 && active.jumpVel < 0) { active.jumpVel = 0; active.landDustT = 0.5; active.dipT = 0.28; landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true } // 着地＝砂ぼこり＋沈み込み
+        }
+        const eyeY = groundY + FLY.eye + (active.jumpY || 0)
         const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
-        active.flyPos.y += (eyeY - active.flyPos.y) * ky // 着地はやわらかく・以降は面に沿う
-        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 接地した瞬間＝砂ぼこり＋沈み込み
+        if ((active.jumpY || 0) > 0.001) active.flyPos.y = eyeY // ジャンプ中は地面追従でなく直接（弾む手応え）
+        else active.flyPos.y += (eyeY - active.flyPos.y) * ky // 接地はやわらかく・以降は面に沿う
+        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 降り立った瞬間＝砂ぼこり＋沈み込み
           active.landedFired = true; active.landDustT = 0.7; active.dipT = 0.42
           landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true
         }
@@ -6825,6 +6842,8 @@ export async function mountTown3d(parent, opts = {}) {
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
     const showCruise = active.mode === 'fly' && active.flyP > 0.4
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
+    const showJump = active.mode === 'walk' && active.flyP > 0.5 // ジャンプボタンは歩行のときだけ出す
+    if (showJump !== jumpShown) { jumpShown = showJump; jumpBtn.classList.toggle('jump--show', showJump) }
     const showZoom = active.mode === 'window' || active.flyP > 0.4 // 部屋の中（窓辺）でも空/地上でもズームボタンを出す
     if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
     const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
@@ -7155,6 +7174,8 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatReact = (n) => { if (winCat) { winCat.react = n || 'roll'; winCat.reactDur = 2.4; winCat.reactT = 2.4; winCat.wakeHold = 2.5; winCat.alert = 1; winCat.lastReact = -1 } } // 検証用: 猫の反応を手動発火
     window.__town3dCatBat = () => { batTheToy() } // 検証用: 毛糸玉をバット（転がす）
+    window.__town3dJump = () => { triggerJump() } // 検証用: ジャンプ発火
+    window.__town3dJumpState = () => active ? { mode: active.mode, jumpY: +(active.jumpY || 0).toFixed(2), jumpVel: +(active.jumpVel || 0).toFixed(2), y: +active.flyPos.y.toFixed(2), btnShown: jumpBtn.classList.contains('jump--show') } : null
     window.__town3dToyPos = () => winCat && winCat.toyG ? { x: +winCat.toyG.position.x.toFixed(2), y: +winCat.toyG.position.y.toFixed(2), z: +winCat.toyG.position.z.toFixed(2), vx: +winCat.toyVX.toFixed(2) } : null
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
@@ -7194,6 +7215,7 @@ export async function mountTown3d(parent, opts = {}) {
   const dom = renderer.domElement
   dom.style.touchAction = 'none' // スクロール/ピンチに操作を奪われない
   let lookId = null, lookLX = 0, lookLY = 0          // 見回し中のポインタ（歩行）
+  let lookDownT = 0, lookDX0 = 0, lookDY0 = 0, lookMoved = false // 右側の「タップ(ジャンプ)」と「ドラッグ(見回し)」を見分ける
   let stickId = null, stickOX = 0, stickOY = 0       // 移動スティック中のポインタ＋発生原点（歩行）
   let steerId = null, steerLX = 0, steerLY = 0       // 飛行のドラッグ操舵中のポインタ（スキームA）
   let pettingId = null                               // 窓辺の猫を撫でているポインタ（猫に触れて始まる）
@@ -7263,7 +7285,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (!active) return
     active.lastInputT = performance.now(); active.cinema = 0 // 触れたらオートシネマは即解除
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (pointers.size === 2) { // 2本指＝ピンチでズーム開始。単指の操舵/移動は解除する。
+    // 歩行は左スティック＋右視点の同時操作が要なので2本指をピンチにしない（ズームは＋/−ボタン）。飛行/窓辺は2本指＝ピンチ。
+    if (pointers.size === 2 && active.mode !== 'walk') { // 2本指＝ピンチでズーム開始。単指の操舵/移動は解除する。
       const p = [...pointers.values()]
       pinchD0 = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
       pinchZoom0 = active.zoomTarget
@@ -7286,13 +7309,14 @@ export async function mountTown3d(parent, opts = {}) {
       triggerCatReaction(petNDC.x) // 触れるたびに違う仕草で反応＝遊べる（hitCatでpetNDCが入っている）
     } else if (lookId === null) {
       lookId = e.pointerId; lookLX = e.clientX; lookLY = e.clientY // 歩行の右半分/窓辺＝見回し
+      lookDownT = performance.now(); lookDX0 = e.clientX; lookDY0 = e.clientY; lookMoved = false // タップ(ジャンプ)判定の起点
       active.lookDragging = true
     }
   }
   const onMove = (e) => {
     if (!active) return
     if (pointers.has(e.pointerId)) { active.lastInputT = performance.now(); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }) }
-    if (pointers.size >= 2) { // ピンチ＝ズーム（指を開く=寄り／閉じる=引き）。止まっても飛んでも自在に引ける。
+    if (pointers.size >= 2 && active.mode !== 'walk') { // ピンチ＝ズーム（指を開く=寄り／閉じる=引き）。歩行は同時操作優先でピンチ無効。
       const p = [...pointers.values()]
       const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1
       active.zoomTarget = Math.max(0.4, Math.min(3.0, pinchZoom0 * (pinchD0 / d)))
@@ -7305,6 +7329,7 @@ export async function mountTown3d(parent, opts = {}) {
     } else if (e.pointerId === stickId) setStick(e.clientX - stickOX, e.clientY - stickOY)
     else if (e.pointerId === pettingId && winCat) { winCat.petActive = 1; winCat.petAmt = Math.min(1, winCat.petAmt + 0.03); const rr = stage.getBoundingClientRect(); winCat.lookXTarget = Math.max(-0.5, Math.min(0.5, ((e.clientX - rr.left) / rr.width) * 2 - 1)) } // なでる手の動きでより喜ぶ＋手の方を見る
     else if (e.pointerId === lookId) {
+      if (Math.abs(e.clientX - lookDX0) > 9 || Math.abs(e.clientY - lookDY0) > 9) lookMoved = true // 一定以上動いたらドラッグ（タップでなく見回し）
       // 横は素直に（右ドラッグ＝右を向く＝マリオ等のゲームと同じ向き）。縦はそのまま（下ドラッグ＝見上げる＝景色を引き寄せる手触り・ユーザー好み）。
       applyTown3dLook((e.clientX - lookLX) / w * 1.0, (e.clientY - lookLY) / h * 1.0)
       lookLX = e.clientX; lookLY = e.clientY
@@ -7316,7 +7341,10 @@ export async function mountTown3d(parent, opts = {}) {
     if (e.pointerId === steerId) steerId = null
     if (e.pointerId === stickId) { stickId = null; hideStick() }
     if (e.pointerId === pettingId) { pettingId = null; if (winCat) winCat.petActive = 0 } // 手を離す＝撫で終わり（余韻はゆっくり冷める）
-    if (e.pointerId === lookId) { lookId = null; if (active) active.lookDragging = false }
+    if (e.pointerId === lookId) {
+      if (active && active.mode === 'walk' && !lookMoved && (performance.now() - lookDownT) < 280) triggerJump() // 右側を素早くタップ＝ジャンプ（ドラッグは見回し）
+      lookId = null; if (active) active.lookDragging = false
+    }
   }
   // どんな操作（ボタンのタップ含む）でもオートシネマの無操作タイマーを更新（ボタンはstopPropagationするのでcaptureで拾う）
   const markInput = () => { if (active) { active.lastInputT = performance.now(); if (active.cinema > 0) active.cinema = 0 } }

@@ -54,6 +54,14 @@ function start() {
   const scene = pickNowScene()
   const settings = state.settings
 
+  // iPhone特有のズーム（連打＝ダブルタップ拡大／二本指のピンチ拡大）を堅牢に無効化。
+  // touch-action/viewportだけではiOS Safariが拡大することがあるため、JSでも止める（アプリ内のズームはポインタ操作で別途実装）。
+  document.addEventListener('gesturestart', (e) => e.preventDefault()) // iOSのピンチ拡大ジェスチャ
+  document.addEventListener('gesturechange', (e) => e.preventDefault())
+  let lastTouchEnd = 0
+  document.addEventListener('touchend', (e) => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n }, { passive: false }) // 連打＝ダブルタップ拡大を止める（ポインタイベントは生きるので操作・連打判定は通る）
+  document.addEventListener('dblclick', (e) => e.preventDefault())
+
   // モーション過敏への配慮: OS設定 prefers-reduced-motion に追従して“息づかい”の揺れを止める
   const mqReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
   const applyReduceMotion = () => renderer.setReduceMotion(!!(mqReduce && mqReduce.matches))

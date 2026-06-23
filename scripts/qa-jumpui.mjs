@@ -1,0 +1,15 @@
+import { chromium } from 'playwright'
+const port = process.env.PORT || '4801'
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 720, height: 1280 }, deviceScaleFactor: 2 })
+await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(()=>{})
+await p.waitForTimeout(800)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-sunset'))
+await p.waitForTimeout(2600)
+await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
+await p.evaluate(()=>window.__town3dFlyPose(0,10,-30,0,-0.05)); await p.waitForTimeout(500)
+await p.evaluate(()=>window.__town3dLand(true)); await p.waitForTimeout(4500)
+await p.screenshot({ path:'scripts/_shots/jumpui.png' })
+console.log('state:', JSON.stringify(await p.evaluate(()=>window.__town3dJumpState())))
+await b.close()
