@@ -888,7 +888,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // ── 生きもの（街/時代/季節で最適化・水彩のやさしい色）──
   const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.2, 7), new THREE.MeshToonMaterial({ color: col, gradientMap: grad, side: THREE.DoubleSide, transparent: true, opacity: 0.82, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) } // 羽は陰影付き(toon)＋わずかに透過＝霧/夕の中で煌々と浮かない
-  const mkDragonfly = (cx, cy, cz) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(0x46665a)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
+  const mkDragonfly = (cx, cy, cz, bodyCol = 0x46665a) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(bodyCol)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
   // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーンで佇む。
   const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 3, 6), toon(col)); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
@@ -3376,11 +3376,13 @@ export async function mountTown3d(parent, opts = {}) {
           if (geos.length) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
       }
       // ── 生きもの（街/時代/季節で最適化）。蝶/蜻蛉はふわふわ舞い、犬猫馬は街に佇む＝生気と不自然さの解消 ──
-      { const flyOK = season === 'spring' || season === 'summer', dartOK = season === 'summer' && weather !== 'rain'
+      { const flyOK = season === 'spring' || season === 'summer', dartOK = (season === 'summer' || season === 'autumn') && weather !== 'rain'
         const flyCols = season === 'spring' ? [0xf6d0e0, 0xfaf0c0, 0xf2f2ee, 0xeed8a8] : [0xf2ead0, 0xe8e2c0, 0xf6e8b0, 0xeec8a0]
+        const dartCol = season === 'autumn' ? 0xc2452a : 0x46665a // 秋＝赤とんぼ／夏＝青緑の蜻蛉
         for (const [cx, cz, kind] of [[0, 0, 'home'], [EDO.x, EDO.z, 'edo'], [SENGOKU.x, SENGOKU.z, 'sengoku'], [TAISHO.x, TAISHO.z, 'taisho']]) {
-          if (flyOK && !isNight) for (let k = 0; k < 5; k++) { const a = R() * 6.28, r = 14 + R() * 34, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkButterfly(px, py + 2.2 + R() * 2, pz, flyCols[k % flyCols.length]) } // 蝶（春夏の昼）
-          if (dartOK && kind !== 'sengoku') for (let k = 0; k < 3; k++) { const a = R() * 6.28, r = 16 + R() * 22, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkDragonfly(px, py + 1.6, pz) } // 蜻蛉（夏・水辺）
+          if (flyOK && !isNight) for (let k = 0; k < 5; k++) { const a = R() * 6.28, r = 14 + R() * 34, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkButterfly(px, py + 1.4 + R() * 2.0, pz, flyCols[k % flyCols.length]) } // 蝶（春夏の昼・目線寄りに低く）
+          // 蜻蛉（夏=水辺の青緑／秋=野山を群れる赤とんぼ）。秋は戦国の棚田の上にも舞い、現代は数を増やす＝降り立つと出会える。
+          if (dartOK && (kind !== 'sengoku' || season === 'autumn')) { const dN = season === 'autumn' ? (kind === 'home' ? 7 : 4) : 3; for (let k = 0; k < dN; k++) { const a = R() * 6.28, r = 14 + R() * 24, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkDragonfly(px, py + 1.4 + R() * 0.8, pz, dartCol) } }
           const animals = kind === 'sengoku' ? [[0x5a4030, 1.1]] : kind === 'edo' ? [[0x5a4030, 1.1], [0xc8c0b4, 0.55], [0x6a6258, 0.5]] : kind === 'taisho' ? [[0xc8c0b4, 0.55], [0x4a4038, 0.5], [0xddd6c8, 0.55]] : [[0xc8c0b4, 0.55], [0x5a5a5e, 0.5], [0x8a7a5a, 0.55]] // 戦国=馬/江戸=馬犬猫/大正=犬猫/現代=犬猫
           for (const [col, sc] of animals) { const a = R() * 6.28, r = 12 + R() * 26, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; mkQuad(px, py, pz, R() * 6.28, col, sc) }
         }
