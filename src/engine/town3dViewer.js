@@ -282,6 +282,7 @@ export async function mountTown3d(parent, opts = {}) {
   let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
   let lastDDT = 0 // 直近の描画間隔（検証用）
   let lastJsMs = 0 // 毎フレームのJS処理時間ms（検証用・CPU負荷）
+  let bcFrame = 0 // フレーム数（初回の影焼き後にhome建物の霧カリングを始める）
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
   let composer = null, fxaaPass = null // FXAA（輪郭をなめらかに＝解像度を上げずにくっきり）。読み込み失敗時はnullで通常描画にフォールバック
@@ -616,6 +617,7 @@ export async function mountTown3d(parent, opts = {}) {
   let tug = null // 湾を行き来するタグボート
   let ferry = null // 湾を渡る連絡船
   let balloons = [] // 空を漂う熱気球
+  const homeBldgs = [] // 現代homeの建物本体（frameで fog.farより遠い建物を描画カリング＝見た目不変で描画コール減）。house()が積み外側frameが読むのでmount冒頭=外側スコープで宣言
   let fishJumps = [] // 海面で時々跳ねる魚＋波紋
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
@@ -1149,6 +1151,7 @@ export async function mountTown3d(parent, opts = {}) {
       awn.position.set(0, sh, d / 2 + 0.36); awn.castShadow = true; g.add(awn)
     }
     g.position.set(x, gy, z)
+    homeBldgs.push(g) // 霧の彼方の描画カリング対象
     // 屋根の向きを散らす（碁盤の同一方向を崩す）。多くは街路にゆるく沿い、時々大きく振れて棟の向きが変わる。
     g.rotation.y = R() < 0.26 ? (R() - 0.5) * 1.5 : (R() - 0.5) * 0.5
     // 溜めた室外機/太陽熱温水器を建物の回転・位置で焼き込み、グローバル統合用の acGeos へ（1棟ごとの別メッシュを廃す）。
@@ -6009,6 +6012,11 @@ export async function mountTown3d(parent, opts = {}) {
     const dt = Math.min(0.05, t - lastT); lastT = t
     // 時代エリアの距離カリング：遠い時は群ごと非表示（海/霧で見えない距離で切替＝ポップ無し・基礎負荷ダウン）。
     for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz); const want = d < (e.vis ? 330 : 295); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
+    // 現代home建物の霧距離カリング：fog.farより遠い建物は完全に霧で見えない＝隠しても見た目不変で描画コール減。
+    // 影は初回に全建物で焼く(autoUpdate=false)ので、影焼き後(数フレーム後)から開始。窓辺(fog.far≈132)で特に効く。
+    bcFrame++
+    if (bcFrame > 3 && homeBldgs.length) { const ff = scene.fog.far + 6, ff2 = ff * ff
+      for (const b of homeBldgs) { const bdx = b.position.x - active.flyPos.x, bdz = b.position.z - active.flyPos.z; const vis = bdx * bdx + bdz * bdz < ff2; if (b.visible !== vis) b.visible = vis } }
     // ステージ実寸が変わったら（飛行で枠が変わる／回転／レイアウト変化）即 aspect を直す＝「横に伸びる」を自動補正
     if (stage.clientWidth !== lastStageW || stage.clientHeight !== lastStageH) applySize()
     // 車が通りを行き交う
