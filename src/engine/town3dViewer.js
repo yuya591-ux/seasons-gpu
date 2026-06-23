@@ -2895,7 +2895,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         // ── 川（谷を南北に蛇行し、南の河口で海へ注ぐ。水辺に城下町が沿う）──
-        { const rmat = new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x33414e : 0x6f93a4, fog: true }), rgeos = [], rM = new THREE.Matrix4(); let prev = null
+        { const rmat = new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x2c3842 : 0x52666c, fog: true }), rgeos = [], rM = new THREE.Matrix4(); let prev = null // 落ち着いた深い水色（明るい青を抑え「町が水に乗る」印象を弱める）
           for (let s = 0; s <= 42; s++) { const zz = sz + 36 - s * 2.5, cl = senValley(zz), px = sx + cl, gh = senH(px, zz), py = Math.max(SEA.level - 0.1, gh) - 0.04
             if (gh > 8.5) break // 谷頭で止める（川が山へ登って見えるのを防ぐ＝水源は山の中）
             const wdt = Math.max(2.2, 5.0 - Math.max(0, gh - 1) * 0.45) // 上流ほど細る（水の主張を抑え川幅を絞る）
@@ -2938,7 +2938,11 @@ export async function mountTown3d(parent, opts = {}) {
           const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.8 : 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(fx, fy + 2.0, fz); glow.scale.set(2.6, 2.6, 1); town.add(glow) } // 篝火
         // 城下（山裾に密集する侍屋敷・町家。高さ/大きさ/色を変えて作り分け、メッシュ統合で軽く）
         const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根
-        const sgWA = [], sgWB = [], sgR = [], sgR2 = [], sgL = [], sgM = new THREE.Matrix4()
+        // 商品化レベルへ：壁の色を4種に（タン/淡い/焼杉の黒板/漆喰の白蔵）＋茅葺屋根で町並みに多様性と質感を出す。
+        const samWall3 = facadeMat('sama', isNight ? 0x33302c : 0x55483a), samWall4 = mottleMat(season === 'winter' ? 0xe4ded2 : (isNight ? 0xb8b2a4 : 0xd8d0bf), 130, 0.1, [1.5, 1.5]) // 焼杉の黒板／漆喰の白壁(土蔵)
+        const samRoofT = mottleMat(season === 'winter' ? 0xcfc8b6 : (isNight ? 0x3e352a : 0x6e5d44), 90, 0.18, [2, 1.4]) // 茅葺(かやぶき)の屋根
+        samWall3.vertexColors = true; samWall4.vertexColors = true
+        const sgWA = [], sgWB = [], sgWC = [], sgWD = [], sgR = [], sgR2 = [], sgRT = [], sgL = [], sgM = new THREE.Matrix4()
         // 城下町＝谷底の川沿いに、街道に沿って不規則な列で家々が並ぶ（的模様の同心円を脱す）。senHに載せ谷底〜中腹のみ。
         for (let s = 0; s < 46; s++) {
           const zz = sz + 30 - s * 2.1, cl = senValley(zz) // 谷沿いに長く（列を伸ばし賑わう城下町に）
@@ -2953,19 +2957,33 @@ export async function mountTown3d(parent, opts = {}) {
               if (py > 18 || !senInland(px, pz, 1.6)) continue // 谷底〜中腹まで（斜面も登る城下町）。汀に接する縁は除外＝水に浮く家を根絶。高い尾根や城の平場も除く
               if (Math.hypot(px - bx, pz - bz) < 11) continue // 城の平場は空ける
               const a = (side > 0 ? -Math.PI / 2 : Math.PI / 2) + (R() - 0.5) * 0.5 // 街道に面して列の向きが揃う
-              const tt = R(), two = tt < 0.2, big = tt > 0.86, white = R() < 0.25
+              const tt = R(), two = tt < 0.2, big = tt > 0.86
+              const wpick = R(), thatch = !big && R() < 0.32 // 茅葺は小〜中の家に（大店は瓦）
+              const wgeoArr = wpick < 0.4 ? sgWA : wpick < 0.6 ? sgWB : wpick < 0.82 ? sgWC : sgWD // タン/淡/焼杉/漆喰の4種
               const hw = big ? 3.0 + R() * 1.2 : 2.0 + R() * 1.0, hd = big ? 2.4 + R() * 0.9 : 1.6 + R() * 0.8
               const hh = two ? 2.6 + R() * 0.9 : big ? 2.0 + R() * 0.5 : 1.3 + R() * 0.6
-              sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); bakeAO(bg, hh); bg.applyMatrix4(sgM); (white ? sgWB : sgWA).push(bg)
-              const rh = two ? 1.3 : 0.85
-              sgM.makeRotationY(a).setPosition(px, py + hh + rh / 2 - 0.05, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.78, rh, 4); rg.applyMatrix4(sgM); (R() < 0.4 ? sgR2 : sgR).push(rg) // 軒を深く張り出す（侍屋敷の作り込み）
+              sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); bakeAO(bg, hh); bg.applyMatrix4(sgM); wgeoArr.push(bg)
+              const rh = thatch ? (two ? 1.9 : 1.4) : (two ? 1.3 : 0.85) // 茅葺は厚く高い屋根
+              sgM.makeRotationY(a).setPosition(px, py + hh + rh / 2 - 0.05, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * (thatch ? 0.86 : 0.78), rh, thatch ? 5 : 4); rg.applyMatrix4(sgM); (thatch ? sgRT : R() < 0.4 ? sgR2 : sgR).push(rg) // 茅葺は厚い寄棟／瓦は深い軒
               if (isNight && R() < 0.5) { sgM.makeRotationY(a).setPosition(px - side * hw * 0.45, py + hh * (two ? 0.6 : 0.45), pz); const lg = new THREE.BoxGeometry(0.5, 0.45, 0.12); lg.applyMatrix4(sgM); sgL.push(lg) }
             }
           }
         }
         const sgLit = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true })
         samWall.vertexColors = true; samWall2.vertexColors = true // 壁の接地AO
-        for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgR2, samRoof2], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
+        for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgWC, samWall3], [sgWD, samWall4], [sgR, samRoof], [sgR2, samRoof2], [sgRT, samRoofT], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（壁4種＋瓦/茅葺・夜は灯り窓）
+        // ── 街道沿いの提灯（紅い掛け提灯＝賑わいと夕夜の温かい灯り）。城下町の活気。 ──
+        { const poleMat = toon(0x3a2e20), chouMat = toon(isNight ? 0xd2503e : 0xc23a2e), bandMat = toon(0xeae0cc)
+          const lglow = isNight ? 0.85 : 0.18 + duskAmt * 0.5 // 夜は煌々と・夕はほのか
+          for (let s = 2; s < 44; s += 3) { const zz = sz + 30 - s * 2.1, cl = senValley(zz), side = (s % 6 < 3) ? 1 : -1, px = sx + cl + side * 5.6, gh = senH(px, zz)
+            if (gh < SEA.level + 1.4 || gh > 14 || !senInland(px, zz, 1.4)) continue
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 5), poleMat); pole.position.set(px, gh + 1.2, zz); pole.castShadow = true; town.add(pole)
+            const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.7, 4), poleMat); arm.rotation.z = Math.PI / 2; arm.position.set(px - side * 0.3, gh + 2.3, zz); town.add(arm)
+            const cho = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.46, 10), chouMat); cho.position.set(px - side * 0.6, gh + 1.95, zz); cho.castShadow = true; town.add(cho) // 提灯本体
+            for (const by of [0.15, -0.15]) { const bd = new THREE.Mesh(new THREE.CylinderGeometry(0.172, 0.172, 0.04, 10), bandMat); bd.position.set(px - side * 0.6, gh + 1.95 + by, zz); town.add(bd) } // 上下の白帯
+            if (lglow > 0.05) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xffb060, transparent: true, opacity: lglow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px - side * 0.6, gh + 1.95, zz); gl.scale.set(1.5, 1.5, 1); town.add(gl) }
+          }
+        }
         // ── 棚田（斜面の段々の水田）＝山城の城下の象徴。裸の斜面を耕地で埋め「散歩したくなる」山里に。季節で青田/黄金/雪。統合で軽量。──
         { const paddyCol = season === 'winter' ? 0xe2e6e8 : season === 'autumn' ? 0xc6a64e : season === 'spring' ? 0x8caa62 : 0x6f9a60
           const paddyMat = new THREE.MeshToonMaterial({ color: paddyCol, gradientMap: grad, fog: true }), azeMat = toon(season === 'winter' ? 0xaeb2aa : 0x6a5f48)
