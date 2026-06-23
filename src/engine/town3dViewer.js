@@ -893,6 +893,22 @@ export async function mountTown3d(parent, opts = {}) {
     for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.7 * sc, 5), toon(col)); leg.position.set(lx * sc, 0.35 * sc, lz * sc); g.add(leg) }
     const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), toon(col)); tail.position.set(-0.55 * sc, 0.8 * sc, 0); tail.rotation.z = 0.7; g.add(tail)
     town.add(g); return g }
+  // 屋台/床店（市の賑わい＝着地の散歩で出会う活気）。柱＋差し掛け屋根＋商品台＋籠＋色とりどりの品＋暖簾。
+  const makeStall = (x, gy, z, rot, opts = {}) => {
+    const g = new THREE.Group(); g.position.set(x, gy, z); g.rotation.y = rot
+    const w = opts.w || 2.2, d = opts.d || 1.4, ph = 1.85
+    const postMat = toon(opts.postCol || 0x6a4f38)
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, ph, 5), postMat); p.position.set(sx * w / 2, ph / 2, sz * d / 2); p.castShadow = true; g.add(p) } // 4本の柱
+    const rk = opts.roof || 'cloth'
+    const roofMat = rk === 'reed' ? toon(0x8a7340) : rk === 'wood' ? toon(0x5a4a38) : toon(opts.roofCol || 0xb84a3e) // 布=朱/葦簀=茶/板=濃茶
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.08, d + 0.7), roofMat); roof.position.set(0, ph + 0.06, -0.12); roof.rotation.x = -0.16; roof.castShadow = true; g.add(roof) // 差し掛けの屋根（前へ傾く）
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d * 0.62), toon(0x7a5e44)); counter.position.set(0, 0.82, d * 0.16); counter.castShadow = true; g.add(counter) // 商品台
+    const goods = opts.goods || [0xc8702e, 0x7a8a3a, 0xb04030, 0xd0a850, 0x9a5a3a]
+    for (let i = 0; i < 6; i++) { const c = goods[(R() * goods.length) | 0]; const it = new THREE.Mesh(new THREE.SphereGeometry(0.06 + R() * 0.05, 7, 6), toon(c)); it.position.set((R() - 0.5) * w * 0.82, 0.92, d * 0.16 + (R() - 0.5) * d * 0.32); it.scale.y = 0.8 + R() * 0.4; g.add(it) } // 色とりどりの品（野菜/魚/陶器/反物）
+    for (const bx of [-w * 0.3, w * 0.32]) { const bk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.13, 8), toon(0x9a7a4a)); bk.position.set(bx, 0.93, d * 0.16); g.add(bk) } // 籠
+    if (opts.noren !== undefined) { const nr = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, 0.42, 0.03), toon(opts.noren)); nr.position.set(0, ph - 0.32, d / 2 + 0.18); g.add(nr) } // 軒先の暖簾
+    town.add(g); return g
+  }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
@@ -2703,6 +2719,11 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < 13; k++) { const a2 = (k / 13) * 6.28 + 0.3; if (angGap(a2) < 0.34) continue; const r2 = 22 + R() * 9, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue
             mkSignV(px, py + 1.4, pz, a2 + Math.PI / 2 + (R() - 0.5) * 0.4, yago[k % yago.length], season === 'winter' ? 0xeae0cc : 0xe6d8b8, 0x3a2a1a) } } // 城下の店の看板
         for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(kimono[(j * 2 + 1) % kimono.length])); wb.position.y = 0.4; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); wh.position.y = 0.95; wg.add(wh); wg.position.set(ex + Math.cos(ang) * r0, heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), ez + Math.sin(ang) * r0); town.add(wg); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人（初期位置を置く＝遠方時に原点へ取り残されない）
+        // ── 城下の市の床店＋犬猫＝降り立った時に出会う江戸の賑わい。 ──
+        { const edoGoods = [0xc8702e, 0x7a8a3a, 0xb04030, 0xd0a850, 0x9a5a3a, 0x5a7a8a]
+          for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28 + 0.3, r2 = 27 + R() * 15, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
+            makeStall(px, py, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, { roof: R() < 0.5 ? 'reed' : 'cloth', roofCol: R() < 0.5 ? 0xb84a3e : 0x4a5a6a, goods: edoGoods, noren: R() < 0.5 ? 0x2a4a6a : 0x8a3a2a }) }
+          for (let k = 0; k < 3; k++) { const a = R() * 6.28, r2 = 25 + R() * 16, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xc8b89a : 0x4a4038, 0.6 + R() * 0.12) } }
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
         // 城下に木立を散らす（家々の合間・辻・空き地を緑で埋める＝home並みの緑量へ）。統合で軽量（1本ごとのドローコールを増やさない）。
         { const leafC = season === 'spring' ? 0x7faa4e : season === 'autumn' ? 0xcf8a38 : season === 'winter' ? 0xcdd6cc : 0x5a7e44
@@ -2985,6 +3006,17 @@ export async function mountTown3d(parent, opts = {}) {
             if (lglow > 0.05) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xffb060, transparent: true, opacity: lglow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px - side * 0.6, gh + 1.95, zz); gl.scale.set(1.5, 1.5, 1); town.add(gl) }
           }
         }
+        // ── 街道沿いの床店（市の屋台）＋犬猫＝降り立った時に出会う城下の賑わい。──
+        { const senGoods = [0xc8702e, 0x7a8a3a, 0x9a5a3a, 0xb8a050, 0x6a7a8a, 0xa84838] // 野菜/魚/陶器/俵/反物
+          for (let s = 5; s < 40; s += 5) { const zz = sz + 30 - s * 2.1, cl = senValley(zz), side = (s % 10 < 5) ? 1 : -1, px = sx + cl + side * 7.2, gh = senH(px, zz)
+            if (gh < SEA.level + 1.4 || gh > 13 || !senInland(px, zz, 1.4)) continue
+            makeStall(px, gh, zz, side > 0 ? -Math.PI / 2 : Math.PI / 2, { roof: R() < 0.5 ? 'reed' : 'cloth', roofCol: R() < 0.5 ? 0xa84838 : 0x4a5a3a, goods: senGoods, noren: R() < 0.5 ? 0x3a4a6a : 0x6a3a30 })
+          }
+          // 城下の犬猫（街道をうろつく）
+          for (let k = 0; k < 3; k++) { const zz = sz + 24 - k * 8 - R() * 4, cl = senValley(zz), px = sx + cl + (R() < 0.5 ? 6 : -6) + (R() - 0.5) * 2, gh = senH(px, zz)
+            if (gh < SEA.level + 1.4 || !senInland(px, zz, 1.4)) continue
+            mkQuad(px, gh, zz, R() * 6.28, k === 0 ? 0xc8b89a : 0x6a5a48, 0.62 + R() * 0.12) }
+        }
         // ── 棚田（斜面の段々の水田）＝山城の城下の象徴。裸の斜面を耕地で埋め「散歩したくなる」山里に。季節で青田/黄金/雪。統合で軽量。──
         { const paddyCol = season === 'winter' ? 0xe2e6e8 : season === 'autumn' ? 0xc6a64e : season === 'spring' ? 0x8caa62 : 0x6f9a60
           const paddyMat = new THREE.MeshToonMaterial({ color: paddyCol, gradientMap: grad, fog: true }), azeMat = toon(season === 'winter' ? 0xaeb2aa : 0x6a5f48)
@@ -3233,6 +3265,11 @@ export async function mountTown3d(parent, opts = {}) {
           }
           const tKim = [0x8a3a32, 0x3a4a6a, 0x556040, 0x7a5a34, 0x6a4a5a, 0x40443a] // 大正の人々（着物＋洋装の中間色）
           for (let k = 0; k < 6; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
+          // ── 港町の市の屋台＋犬猫＝降り立った大正の賑わい。 ──
+          { const taiGoods = [0xc85038, 0x6a8a9a, 0xd0a040, 0x9a5a3a, 0xb87050, 0x7a8a4a]
+            for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.28 + 0.5, r2 = 16 + R() * 22, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
+              makeStall(px, py, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, { roof: 'cloth', roofCol: [0xc23a4a, 0x3a7a6a, 0xd0a040][(R() * 3) | 0], goods: taiGoods, noren: 0xd8d0c0 }) }
+            for (let k = 0; k < 2; k++) { const a = R() * 6.28, r2 = 14 + R() * 20, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xddd6c8 : 0x5a5a5e, 0.58 + R() * 0.12) } }
           // 大正の店の看板（横書きのホーロー/洋風看板。和洋折衷の店名）
           const tenmei = [['カフエー', 0x9a3a34], ['珈琲', 0x4a3a2a], ['寫眞館', 0x3a4a5a], ['洋食', 0xb24a3a], ['郵便局', 0xc04030], ['銀行', 0x4a5a4a], ['時計店', 0x3a4a44], ['理髪', 0x3a5a6a], ['書肆', 0x6a4a3a], ['牛乳', 0xcfc4aa], ['商會', 0x7a5a3a]]
           for (let k = 0; k < 11; k++) { const a = (k / 11) * 6.28 + 0.2, r2 = 12 + R() * 30, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.4 || Math.hypot(px - (tx + 6), pz - (tz - 4)) < 6) continue
