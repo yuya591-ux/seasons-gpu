@@ -2939,6 +2939,25 @@ export async function mountTown3d(parent, opts = {}) {
         const sgLit = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true })
         samWall.vertexColors = true; samWall2.vertexColors = true // 壁の接地AO
         for (const [geos, mat] of [[sgWA, samWall], [sgWB, samWall2], [sgR, samRoof], [sgR2, samRoof2], [sgL, sgLit]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== sgLit; mesh.receiveShadow = mat !== sgLit; town.add(mesh) } geos.forEach((g) => g.dispose()) } } // 城下の侍屋敷（夜は灯り窓）
+        // ── 棚田（斜面の段々の水田）＝山城の城下の象徴。裸の斜面を耕地で埋め「散歩したくなる」山里に。季節で青田/黄金/雪。統合で軽量。──
+        { const paddyCol = season === 'winter' ? 0xe2e6e8 : season === 'autumn' ? 0xc6a64e : season === 'spring' ? 0x8caa62 : 0x6f9a60
+          const paddyMat = new THREE.MeshToonMaterial({ color: paddyCol, gradientMap: grad, fog: true }), azeMat = toon(season === 'winter' ? 0xaeb2aa : 0x6a5f48)
+          const paddyGeos = [], azeGeos = [], pM = new THREE.Matrix4()
+          for (let gx = -52; gx <= 52; gx += 3.8) for (let gz = -52; gz <= 52; gz += 3.8) {
+            const px = sx + gx + (R() - 0.5) * 1.3, pz = sz + gz + (R() - 0.5) * 1.3, py = senH(px, pz)
+            if (py < SEA.level + 1.4 || py > 15) continue // 下〜中腹の斜面のみ（高い尾根は森/岩のまま）
+            const cl = senValley(pz); if (Math.abs(px - sx - cl) < 7.5) continue // 谷底の川/街道は空ける
+            if (Math.hypot(px - bx, pz - bz) < 16) continue // 城の平場は空ける
+            if (R() < 0.28) continue // 不揃いに（家や辻の隙間）
+            const fw = 3.0 + R() * 1.3
+            const fg = new THREE.BoxGeometry(fw, 0.12, fw); pM.makeTranslation(px, py + 0.05, pz); fg.applyMatrix4(pM); paddyGeos.push(fg) // 水を張った田の段（水平）
+            const ag = new THREE.BoxGeometry(fw + 0.25, 0.55, 0.28); pM.makeTranslation(px, py - 0.16, pz + fw / 2); ag.applyMatrix4(pM); azeGeos.push(ag) // 畦（下側の段差の擁壁）
+          }
+          if (BufferGeometryUtils.mergeGeometries) {
+            const pm = paddyGeos.length && BufferGeometryUtils.mergeGeometries(paddyGeos, false); if (pm) { const mesh = new THREE.Mesh(pm, paddyMat); mesh.receiveShadow = true; town.add(mesh) } paddyGeos.forEach((g) => g.dispose())
+            const am = azeGeos.length && BufferGeometryUtils.mergeGeometries(azeGeos, false); if (am) { const mesh = new THREE.Mesh(am, azeMat); mesh.receiveShadow = true; mesh.castShadow = true; town.add(mesh) } azeGeos.forEach((g) => g.dispose())
+          }
+        }
         // ── 街道（谷底の川の東岸に沿う道）＋城の平場へ登る坂道。senHに沿わせ統合で軽量。 ──
         { const mtRoadMat = toon(season === 'winter' ? 0xc2c6c2 : 0x6e6450), roadGeos = [], rM = new THREE.Matrix4(); let prev = null
           for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 4.8, py = Math.max(SEA.level, senH(px, zz)) + 0.08 // 川の東岸の街道
