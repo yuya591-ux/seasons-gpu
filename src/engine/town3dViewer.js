@@ -873,7 +873,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // ── 生きもの（街/時代/季節で最適化・水彩のやさしい色）──
   const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.22, 7), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) }
-  const mkDragonfly = (cx, cy, cz) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 5), toon(0x4a6a5a)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.16), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.55, side: THREE.DoubleSide, fog: true })); w.position.set(0, 0.05, s * 0.18); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) }
+  const mkDragonfly = (cx, cy, cz) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(0x46665a)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
   // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーンで佇む。
   const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 3, 6), toon(col)); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
@@ -6068,7 +6068,11 @@ export async function mountTown3d(parent, opts = {}) {
     if (seaUniforms) seaUniforms.uTime.value = t // 海面のうねり・きらめきの位相
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
     for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
-    for (const c of critters) { const a = t * 0.55 + c.ph // 蝶/蜻蛉がふわふわ舞う
+    for (const c of critters) {
+      const dxc = c.cx - active.flyPos.x, dyc = c.cy - active.flyPos.y, dzc = c.cz - active.flyPos.z // 近い時だけ＝目線で舞い、俯瞰では消す（白い羽が点に見えるのを防ぐ・軽量）
+      if (dxc * dxc + dyc * dyc + dzc * dzc > 2025) { if (c.g.visible) c.g.visible = false; continue }
+      if (!c.g.visible) c.g.visible = true
+      const a = t * 0.55 + c.ph // 蝶/蜻蛉がふわふわ舞う
       if (c.type === 'fly') { c.g.position.set(c.cx + Math.cos(a) * c.rad, c.cy + Math.sin(a * 1.7) * 0.7, c.cz + Math.sin(a * 0.8) * c.rad); c.g.rotation.y = a; const f = Math.sin(t * 9 + c.ph) * 1.2; c.g.children.forEach((w) => { w.rotation.y = w.userData.side * f }) }
       else { c.g.position.set(c.cx + Math.cos(a * 1.5) * c.rad, c.cy + Math.sin(a * 2.2) * 0.4, c.cz + Math.sin(a * 1.2) * c.rad); c.g.rotation.y = a * 1.5 + Math.PI / 2 } }
     if (crane) { // クレーンのトロリーが横行し、フックが上下する（荷役）
@@ -6848,6 +6852,11 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dLook = (dx, dy) => applyTown3dLook(dx || 0, dy || 0) // 検証用: 見回しドラッグ(画面比)。歩行=横でカメラ回転/縦で上下
     window.__town3dFlash = (v) => triggerTown3dFlash(v || 0.85) // 検証用: 遠雷の稲光を手動発火
     window.__town3dEraCull = () => eraCull.map((e) => ({ n: e.grp.children.length, vis: e.vis })) // 検証用: 時代群の捕捉数・表示状態
+    window.__town3dTransparent = (x, z, rad = 60) => { // 検証用: 指定位置の近くの「半透明メッシュ」を列挙（白い箱の正体特定用）
+      const out = []; const wp = new THREE.Vector3()
+      scene.traverse((o) => { if (o.isMesh && o.material && o.material.transparent && o.material.opacity < 0.95 && o.visible) { o.getWorldPosition(wp); const d = Math.hypot(wp.x - x, wp.z - z); if (d < rad && wp.y > 1 && wp.y < 40) { const g = o.geometry; out.push({ d: +d.toFixed(0), y: +wp.y.toFixed(1), op: +o.material.opacity.toFixed(2), col: o.material.color ? '#' + o.material.color.getHexString() : '?', type: g.type, blend: o.material.blending }) } } })
+      out.sort((a, b) => a.d - b.d); return { n: out.length, near: out.slice(0, 8) }
+    }
     window.__town3dProbe = (x, z) => { // 検証用: その地点が当たり判定で塞がれているか＋近くのコライダー
       const blocked = blockedAt(x, z)
       const near = []
