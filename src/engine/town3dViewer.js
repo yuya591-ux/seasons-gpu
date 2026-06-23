@@ -2618,10 +2618,10 @@ export async function mountTown3d(parent, opts = {}) {
             const sec = Math.floor((((a % 6.2832) + 6.2832) % 6.2832) / (6.2832 / nSec))
             let ci = (sec * 2 + (sec % 2)) % roofPalette.length; if (R() < 0.22) ci = (ci + 1) % roofPalette.length; if (kura) ci = 2 // 街区基調＋時々隣色で揺らぐ。土蔵は杉皮
             const rh = two ? 1.6 : kura ? 1.0 : oodana ? 1.3 : 1.0
-            if (kura || oodana) { // 土蔵・大店は寄棟（四角錐）
-              tmpM.makeRotationY(a + Math.PI / 4).setPosition(hx, hy + hh + rh / 2 - 0.05, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.64, rh, 4); rg.applyMatrix4(tmpM); roofGeos[ci].push(rg)
-            } else { // 町家は街路に平行な切妻（ridgeを接線方向 a+π/2 へ・庇が両側に出る平入り）
-              const rg = gableUnit.clone(); tmpM.makeScale(hw * 1.04, rh, hd * 1.14); rotM.makeRotationY(a + Math.PI / 2); tmpM.premultiply(rotM); tmpM.setPosition(hx, hy + hh - 0.05, hz); rg.applyMatrix4(tmpM); roofGeos[ci].push(rg)
+            if (kura || oodana) { // 土蔵・大店は寄棟（四角錐）。軒を深く張り出す
+              tmpM.makeRotationY(a + Math.PI / 4).setPosition(hx, hy + hh + rh / 2 - 0.05, hz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.76, rh, 4); rg.applyMatrix4(tmpM); roofGeos[ci].push(rg)
+            } else { // 町家は街路に平行な切妻（ridgeを接線方向 a+π/2 へ・庇が両側に深く出る平入り）
+              const rg = gableUnit.clone(); tmpM.makeScale(hw * 1.12, rh, hd * 1.3); rotM.makeRotationY(a + Math.PI / 2); tmpM.premultiply(rotM); tmpM.setPosition(hx, hy + hh - 0.05, hz); rg.applyMatrix4(tmpM); roofGeos[ci].push(rg)
             }
             if (isNight && R() < 0.5) { tmpM.makeRotationY(a).setPosition(hx + Math.cos(a) * (hw * 0.45), hy + hh * (two ? 0.62 : 0.45), hz + Math.sin(a) * (hw * 0.45)); const lg = new THREE.BoxGeometry(0.5, 0.5, 0.12); lg.applyMatrix4(tmpM); litG.push(lg) }
           }
@@ -2914,7 +2914,7 @@ export async function mountTown3d(parent, opts = {}) {
               const hh = two ? 2.6 + R() * 0.9 : big ? 2.0 + R() * 0.5 : 1.3 + R() * 0.6
               sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); bakeAO(bg, hh); bg.applyMatrix4(sgM); (white ? sgWB : sgWA).push(bg)
               const rh = two ? 1.3 : 0.85
-              sgM.makeRotationY(a).setPosition(px, py + hh + rh / 2 - 0.05, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.66, rh, 4); rg.applyMatrix4(sgM); (R() < 0.4 ? sgR2 : sgR).push(rg) // 切妻も列に揃える
+              sgM.makeRotationY(a).setPosition(px, py + hh + rh / 2 - 0.05, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * 0.78, rh, 4); rg.applyMatrix4(sgM); (R() < 0.4 ? sgR2 : sgR).push(rg) // 軒を深く張り出す（侍屋敷の作り込み）
               if (isNight && R() < 0.5) { sgM.makeRotationY(a).setPosition(px - side * hw * 0.45, py + hh * (two ? 0.6 : 0.45), pz); const lg = new THREE.BoxGeometry(0.5, 0.45, 0.12); lg.applyMatrix4(sgM); sgL.push(lg) }
             }
           }
