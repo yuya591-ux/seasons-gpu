@@ -689,6 +689,7 @@ export async function mountTown3d(parent, opts = {}) {
   const fixtureGeos = []   // 雨樋・メーター箱（灰の金属/樹脂）。建物正面の生活設備＝目線で「昭和の建物」の年季
   const potGeos = [], plantGeos = [], crateGeos = [] // 玄関脇の鉢植え（素焼き鉢＋緑）・積んだケース＝路地の生活の散らかり（エモい）。小さく低い＝俯瞰で棒にならない
   const eaveGeos = [] // 軒（のき）の張り出し（瓦屋根の家）。深い軒の陰影＝箱を脱す作り込み。統合で描画コール不変
+  const bandGeos = [] // 中層ビルの中間スラブの見切り（各階の境の水平段差）＝のっぺりの高い箱に階層感。統合で描画コール不変
 
   // 谷のプロファイル: 手前(z>0)=自分の急な丘で高い → 谷底(z≈-30)で低い → 奥(z<-55)で向かいの丘・山が上がる。
   // 坂を7割登った高台から、谷へ下って広がる街を見下ろす立体感。
@@ -1170,6 +1171,17 @@ export async function mountTown3d(parent, opts = {}) {
       eg.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
       eaveGeos.push(eg)
     }
+    // 中間スラブの見切り（各階の境の水平段差）＝のっぺりした高い箱に階層感。中層ビルのみ（集合住宅は前面にベランダの段差が既にある）。
+    if (type === 'mid' && h > 5) {
+      const nfl = Math.max(2, Math.round(h / 2.8))
+      for (let f = 1; f < nfl; f++) {
+        const bgm = new THREE.BoxGeometry(w + 0.16, 0.13, d + 0.16)
+        bgm.applyMatrix4(new THREE.Matrix4().makeTranslation(0, f * (h / nfl), 0))
+        bgm.applyMatrix4(new THREE.Matrix4().makeRotationY(g.rotation.y))
+        bgm.applyMatrix4(new THREE.Matrix4().makeTranslation(x, gy, z))
+        bandGeos.push(bgm)
+      }
+    }
     // 接地階の玄関（前面 +z 面）＝戸＋戸枠＋小庇＋上がり段。歩いて通り過ぎると「住んでいる家」に。回転・位置を焼き込み統合。
     if (h > 2.6) {
       const isHouse = type === 'house'
@@ -1376,6 +1388,9 @@ export async function mountTown3d(parent, opts = {}) {
     const evm = eaveGeos.length && BufferGeometryUtils.mergeGeometries(eaveGeos, false)
     if (evm) { const eaves = new THREE.Mesh(evm, toon(0x44392c)); eaves.castShadow = true; eaves.receiveShadow = true; town.add(eaves) } // 軒裏の陰影（暗い木）
     eaveGeos.forEach((g) => g.dispose())
+    const bdm = bandGeos.length && BufferGeometryUtils.mergeGeometries(bandGeos, false)
+    if (bdm) { const bands = new THREE.Mesh(bdm, toon(season === 'winter' ? 0xb4b0a6 : 0x9a948a)); bands.castShadow = true; bands.receiveShadow = true; town.add(bands) } // 中間スラブの見切り（コンクリ色）
+    bandGeos.forEach((g) => g.dispose())
   }
 
   // ── 川（街の左手の谷筋）。空を映す水面＋護岸＋橋＝飛んで川沿いを渡れる水辺のランドマーク。──
