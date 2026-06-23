@@ -3994,6 +3994,9 @@ export async function mountTown3d(parent, opts = {}) {
   const mkCloud = (col) => SNOWY ? new THREE.MeshBasicMaterial({ color: col, fog: false }) : new THREE.MeshToonMaterial({ color: col, gradientMap: grad, fog: false })
   const cloudMat = mkCloud(SNOWY ? 0xf6f4f0 : 0xfbfaf6)       // 陽の当たる白（雪天は少し落として白飛びを抑える）
   const cloudBot = mkCloud(isNight ? 0x767e92 : (SNOWY ? 0xe6e9ee : 0xe9e4dc)) // 影になる雲底（やわらかな陰。雪天は淡い冷灰でほぼ均一＝明るい空に溶ける）
+  const cloudVC = mkCloud(0xffffff); cloudVC.vertexColors = true // 雲のパフを群ごとに1メッシュへ統合（色は頂点色で焼く）＝描画コール削減
+  // 色を頂点色で焼くヘルパ（colGeoは町造形ブロック内＝この外側スコープからは見えないので別途定義）。
+  const cloudCol = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = c.r; a[i + 1] = c.g; a[i + 2] = c.b }; geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); return geo }
   // 雲は高い空に置く（街を見渡す巡航高度の上）。低いと飛んで街を見渡す時に雲が邪魔になる（実機FB）。
   // 高くしても窓辺で見上げれば見え、ぐっと高く飛べば雲に分け入れる＝双方の良いとこ取り。light端末は控えめ。
   // 積雲を全世界(現代＋江戸/戦国/大正の空＋渡りの空)に散らす。地域でほのかに色を変える(戦国=冷/大正=暖)。
@@ -4008,11 +4011,13 @@ export async function mountTown3d(parent, opts = {}) {
     else if (region === 2) { cx = SENGOKU.x + (R() - 0.5) * 200; cz = SENGOKU.z + (R() - 0.5) * 200; topMat = mkCloud(isNight ? 0x6c7488 : 0xdfe2ea) } // 戦国＝冷たく重い雲
     else if (region === 3) { cx = TAISHO.x + (R() - 0.5) * 220; cz = TAISHO.z + (R() - 0.5) * 200; topMat = mkCloud(isNight ? 0x8a7a82 : 0xf4e7d6) } // 大正＝暖かなセピアの雲
     else { cx = (R() - 0.5) * 940; cz = -150 - R() * 360 }                                                                       // 渡りの空（広く低く）
+    const puffGeos = []
     for (let j = 0; j < n; j++) {
       const s = 4 + R() * 7, up = Math.pow(R(), 0.6) // 上ほど房が多い＝盛り上がる頂・底は平ら
-      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 2), up < 0.25 ? cloudBot : topMat) // 分割を上げて積雲を丸く（同じパフ＝描画コール不変）
-      puff.position.set((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11); puff.scale.y = 0.58; g.add(puff)
+      const pg = new THREE.IcosahedronGeometry(s, 2); pg.scale(1, 0.58, 1); pg.translate((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11) // 分割を上げて積雲を丸く
+      puffGeos.push(cloudCol(pg, (up < 0.25 ? cloudBot : topMat).color.getHex())) // 色を頂点色で焼く（雲底=翳り/雲頂=地域色）
     }
+    if (puffGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(puffGeos, false); if (m) g.add(new THREE.Mesh(m, cloudVC)); puffGeos.forEach((x) => x.dispose()) } // 群内のパフを1メッシュへ統合
     g.position.set(cx, 54 + R() * 34, cz)
     scene.add(g); clouds.push(g)
   }
