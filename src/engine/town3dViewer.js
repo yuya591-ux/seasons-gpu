@@ -281,6 +281,7 @@ export async function mountTown3d(parent, opts = {}) {
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
   let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
   let lastDDT = 0 // 直近の描画間隔（検証用）
+  let lastJsMs = 0 // 毎フレームのJS処理時間ms（検証用・CPU負荷）
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
   let composer = null, fxaaPass = null // FXAA（輪郭をなめらかに＝解像度を上げずにくっきり）。読み込み失敗時はnullで通常描画にフォールバック
@@ -5994,6 +5995,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (t - lastDraw < (restIdle ? 0.045 : 0.032)) return
     const drawDt = lastDraw < 0 ? 0.033 : t - lastDraw // 実際の描画間隔（カク付き検知）
     lastDraw = t
+    const _js0 = performance.now() // 毎フレームのJS処理時間を測る（検証用・CPU負荷）
     // ── 自動品質調整：能動飛行中、描画が30fpsに間に合わない状態が続いたら解像度を一段下げて「常に滑らか」を死守。
     //    安定が長く続けば鮮やかさ(qCap)へ少しずつ戻す。ヒステリシスで頻繁な切替を防ぐ。restIdle/タブ復帰の巨大gapは無視。
     lastDDT = drawDt
@@ -6888,6 +6890,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 「いつもと違う光景」定期イベントを進め、各タイムスケールで時々起こす
     updateFx(dt)
     scheduleFx(dt)
+    lastJsMs = lastJsMs * 0.9 + (performance.now() - _js0) * 0.1 // 毎フレームのJS処理時間（移動平均・検証用）
     // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に。輪郭のギザギザはFXAAでなめらかに（発熱をほぼ増やさず）。
     if (composer) { try { composer.render() } catch (e) { composer = null; renderer.render(scene, camera) } } else renderer.render(scene, camera)
   }
@@ -6965,7 +6968,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     window.__town3dLoad = () => { // 検証用: 毎フレーム更新される配列の件数（CPU負荷の実体）
       const n = (a) => Array.isArray(a) ? a.length : (a && a.size) || 0
-      return { residents: n(residents), critters: n(critters), cityWalkers: n(cityWalkers), birds: n(birds), skyDrifters: n(skyDrifters), balloons: n(balloons), townSmoke: n(townSmoke), senMist: n(senMist), clouds: n(clouds), trees: n(treesArr), adBalloons: n(adBalloons) }
+      return { jsMs: +lastJsMs.toFixed(2), residents: n(residents), critters: n(critters), cityWalkers: n(cityWalkers), birds: n(birds), skyDrifters: n(skyDrifters), balloons: n(balloons), townSmoke: n(townSmoke), senMist: n(senMist), clouds: n(clouds), trees: n(treesArr), adBalloons: n(adBalloons) }
     }
     window.__town3dHeights = (x, z) => ({ heightAt: +heightAt(x, z).toFixed(2), senH: +senH(x, z).toFixed(2), SEAlevel: SEA.level }) // 検証用: 地点の地形高・戦国地形高・海面
     window.__town3dWaterScan = (cx, cz, rad = 60, step = 4) => { // 検証用: 範囲内の水面メッシュと、その上に乗る/水没する地物を集計（水上の家の特定）
