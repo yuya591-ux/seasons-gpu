@@ -2240,7 +2240,7 @@ export async function mountTown3d(parent, opts = {}) {
       const deck = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 3.6, 0.6, 18), deckMat); deck.position.y = deckY; deck.castShadow = true; deck.receiveShadow = true; grp.add(deck)
       // 手すり（リングの上桟＋細い縦桟）
       const rail = new THREE.Mesh(new THREE.TorusGeometry(3.9, 0.07, 6, 26), railMat); rail.rotation.x = Math.PI / 2; rail.position.y = deckY + 1.0; grp.add(rail)
-      for (let i = 0; i < 20; i++) { const a = i / 20 * 6.283; const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.0, 0.07), railMat); post.position.set(Math.cos(a) * 3.9, deckY + 0.5, Math.sin(a) * 3.9); grp.add(post) }
+      { const postGeos = []; for (let i = 0; i < 20; i++) { const a = i / 20 * 6.283; const pg = new THREE.BoxGeometry(0.07, 1.0, 0.07); pg.translate(Math.cos(a) * 3.9, deckY + 0.5, Math.sin(a) * 3.9); postGeos.push(pg) } if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(postGeos, false); if (m) grp.add(new THREE.Mesh(m, railMat)); postGeos.forEach((x) => x.dispose()) } } // 手すり縦桟を1メッシュへ統合
       // 展望室（ガラスの小部屋）と窓帯
       const cab = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.9, 3.0, 18), concrete); cab.position.y = deckY + 0.3 + 1.6; cab.castShadow = true; grp.add(cab)
       const glass = new THREE.Mesh(new THREE.CylinderGeometry(2.73, 2.82, 1.7, 18), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xffce86 }) : toon(0x444c52)); glass.position.y = deckY + 0.3 + 1.9; grp.add(glass) // 夕夜は灯る展望室
@@ -2384,12 +2384,14 @@ export async function mountTown3d(parent, opts = {}) {
       const clkRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.08, 6, 22), trimMat); clkRing.position.set(0, 7.2, cfz + 0.01); grp.add(clkRing)
       const hh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.04), toon(0x33312c)); hh.position.set(0, 7.35, cfz + 0.02); grp.add(hh)
       const mh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.72, 0.04), toon(0x33312c)); mh.position.set(0.18, 7.25, cfz + 0.02); mh.rotation.z = -0.9; grp.add(mh)
-      // 校庭のトラック（白線の楕円。地面に沿わせ段差なく敷く）
-      for (let i = 0; i < 48; i++) {
-        const a = i / 48 * 6.283, lx = Math.cos(a) * 7, lz = 4 + Math.sin(a) * 5
-        const gy = heightAt(cx + lx, cz + lz) - baseY
-        const seg = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 0.34), toon(0xeae3d4)); seg.position.set(lx, gy + 0.06, lz); seg.rotation.y = -a + Math.PI / 2; grp.add(seg)
-      }
+      // 校庭のトラック（白線の楕円。地面に沿わせ段差なく敷く）。48本を1メッシュへ統合（描画コール削減）。
+      { const trackGeos = []
+        for (let i = 0; i < 48; i++) {
+          const a = i / 48 * 6.283, lx = Math.cos(a) * 7, lz = 4 + Math.sin(a) * 5
+          const gy = heightAt(cx + lx, cz + lz) - baseY
+          const sgg = new THREE.BoxGeometry(1.0, 0.06, 0.34); sgg.rotateY(-a + Math.PI / 2); sgg.translate(lx, gy + 0.06, lz); trackGeos.push(sgg)
+        }
+        if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(trackGeos, false); if (m) grp.add(new THREE.Mesh(m, toon(0xeae3d4))); trackGeos.forEach((x) => x.dispose()) } }
       // プール（水色の長方形＋低いコンクリ縁）。校庭の右手。
       {
         const plx = 10.5, plz = 2, pgy = heightAt(cx + plx, cz + plz) - baseY
@@ -2465,7 +2467,7 @@ export async function mountTown3d(parent, opts = {}) {
       }
       // 低い柵（遊園地の縁。街側のゲート寄りは空ける）
       const fenceMat = toon(0xd6dde0)
-      for (let i = 0; i < 22; i++) { const a = i / 22 * 6.283; if (Math.sin(a) > 0.45) continue; const px = fx + Math.cos(a) * (FUN.r - 1), pz = fz + Math.sin(a) * (FUN.r - 1); const gy = heightAt(px, pz); const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), fenceMat); post.position.set(px, gy + 0.5, pz); town.add(post) }
+      { const fenceGeos = []; for (let i = 0; i < 22; i++) { const a = i / 22 * 6.283; if (Math.sin(a) > 0.45) continue; const px = fx + Math.cos(a) * (FUN.r - 1), pz = fz + Math.sin(a) * (FUN.r - 1); const gy = heightAt(px, pz); const pg = new THREE.BoxGeometry(0.12, 1.0, 0.12); pg.translate(px, gy + 0.5, pz); fenceGeos.push(pg) } if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(fenceGeos, false); if (m) town.add(new THREE.Mesh(m, fenceMat)); fenceGeos.forEach((x) => x.dispose()) } } // 遊園地の柵を1メッシュへ統合
       // ベンチ×2
       for (const bp of [[fx - 6, fz + 4, 1.2], [fx + 3, fz + 8, -0.6]]) {
         const gy = heightAt(bp[0], bp[1]); const bg = new THREE.Group(); bg.position.set(bp[0], gy, bp[1]); bg.rotation.y = bp[2]; town.add(bg)
