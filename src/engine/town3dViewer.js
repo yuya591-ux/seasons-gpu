@@ -556,13 +556,15 @@ export async function mountTown3d(parent, opts = {}) {
         else { grad.addColorStop(0, '#867f78'); grad.addColorStop(1, '#574f49') }
         g.fillStyle = grad
         g.fillRect(px, py, pw, ph)
+        // 窓が壁の奥にへこんで付く内側の陰（上・左の縁＝庇/方立の落とす影）。奥行きを強めて平らな板を脱す。
+        g.fillStyle = 'rgba(30,27,33,0.26)'; g.fillRect(px, py + 1.3, pw, 2.0); g.fillRect(px, py, 1.9, ph) // 上(ハイライトの下)・左の内側の陰
         // 十字桟（上下・左右に割れて見える立体の窓）
         g.fillStyle = 'rgba(214,214,220,0.5)'
         g.fillRect(px, py + ph * 0.5 - 0.6, pw, 1.2)
         g.fillRect(px + pw * 0.5 - 0.6, py, 1.2, ph)
         // 上辺の空映りのハイライト＋窓台の影（下）＝窓がへこんで付いて見える
-        g.fillStyle = 'rgba(255,255,255,0.28)'; g.fillRect(px, py, pw, 1.4)
-        g.fillStyle = 'rgba(60,58,64,0.34)'; g.fillRect(px - 2, py + ph + 1.4, pw + 4, 2)
+        g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(px, py, pw, 1.4)
+        g.fillStyle = 'rgba(54,52,58,0.42)'; g.fillRect(px - 2, py + ph + 1.2, pw + 4, 2.4) // 窓台の影を濃く＝へこみを強調
       }
     }
     const t = new THREE.CanvasTexture(c)
