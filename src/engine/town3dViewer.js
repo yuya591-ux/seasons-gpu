@@ -274,7 +274,7 @@ export async function mountTown3d(parent, opts = {}) {
   const QUAL = opts.quality || 'standard'
   const LIGHT = QUAL === 'light'
   const PR_CAP = LIGHT ? 1.25 : QUAL === 'soft' ? 2 : 1.6
-  const PR_FLOOR = LIGHT ? 0.72 : 0.85 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）
+  const PR_FLOOR = LIGHT ? 0.82 : 0.96 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）。高DPR端末で「荒すぎる」のを防ぐため一段引き上げ
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
@@ -682,6 +682,14 @@ export async function mountTown3d(parent, opts = {}) {
     const channel = Math.max(0, 1 - vd / 5); land -= channel * channel * 3 // 川そのものはもう少し深く
     land += Math.sin(dz * 0.12 + dx * 0.05) * 1.2 * Math.min(1, vd / 20) // 斜面のゆるい起伏（尾根筋）
     return land * coast - 0.5
+  }
+  // 戦国の「汀(みぎわ)でない陸地か」判定＝海に接する浅い縁に物を置くと水に浮いて見えるのを根絶する。
+  // senH が minH 以上で、かつ前後左右の近傍が海面近くまで落ちていない（＝汀に接していない内陸）こと。
+  // 島の汀の地形は海面(-10)まで下がらず約-0.5〜+2の浅い棚＝相対閾値では効かないので「絶対高」で判定する。
+  const senInland = (x, z, minH = 1.6) => {
+    if (senH(x, z) < minH) return false
+    for (const [ox, oz] of [[6, 0], [-6, 0], [0, 6], [0, -6], [5, 5], [-5, -5], [5, -5], [-5, 5]]) if (senH(x + ox, z + oz) < 0.4) return false // 近傍が汀/海(低い棚/島の穴)＝縁なので置かない
+    return true
   }
   // 全建物の基礎（接地のコンクリ土台）。house() が積み、最後に1メッシュへ統合＝接地感を出しつつ1ドローコール。
   const plinthGeos = []
@@ -2918,12 +2926,14 @@ export async function mountTown3d(parent, opts = {}) {
         for (let s = 0; s < 46; s++) {
           const zz = sz + 30 - s * 2.1, cl = senValley(zz) // 谷沿いに長く（列を伸ばし賑わう城下町に）
           for (const side of [-1, 1]) {
-            const ranks = 2 + ((R() * 3) | 0) // 川の両側に2〜4列（密に・不揃い）
+            const ranks = 3 + ((R() * 3) | 0) // 川の両側に3〜5列（密に・不揃い）
             for (let rank = 0; rank < ranks; rank++) {
-              if (R() < 0.11) continue // 抜け（空き地・辻）で不規則に（減らして密に）
-              const off = 5.0 + rank * 4.0 + R() * 1.3
+              if (R() < 0.1) continue // 抜け（空き地・辻）で不規則に（減らして密に）
+              const off = 4.8 + rank * 3.3 + R() * 1.1 // 道4.8/家8/裏道11/家14…の街区が組めるよう行間を詰める
+              const lo = side * off // 川中心からのローカル横位置。道（街道+4.8/東裏道+11/西道-7）の回廊には建てない＝道を塞がない
+              if (Math.abs(lo - 4.8) < 2.1 || Math.abs(lo - 11) < 1.6 || Math.abs(lo + 7) < 1.6) continue
               const px = sx + cl + side * off + (R() - 0.5) * 1.6, pz = zz + (R() - 0.5) * 1.8, py = senH(px, pz)
-              if (py < SEA.level + 0.7 || py > 18) continue // 谷底〜中腹まで（斜面も登る城下町。高い尾根や城の平場は除く）
+              if (py > 18 || !senInland(px, pz, 1.6)) continue // 谷底〜中腹まで（斜面も登る城下町）。汀に接する縁は除外＝水に浮く家を根絶。高い尾根や城の平場も除く
               if (Math.hypot(px - bx, pz - bz) < 11) continue // 城の平場は空ける
               const a = (side > 0 ? -Math.PI / 2 : Math.PI / 2) + (R() - 0.5) * 0.5 // 街道に面して列の向きが揃う
               const tt = R(), two = tt < 0.2, big = tt > 0.86, white = R() < 0.25
@@ -2945,7 +2955,7 @@ export async function mountTown3d(parent, opts = {}) {
           const paddyGeos = [], azeGeos = [], pM = new THREE.Matrix4()
           for (let gx = -52; gx <= 52; gx += 3.8) for (let gz = -52; gz <= 52; gz += 3.8) {
             const px = sx + gx + (R() - 0.5) * 1.3, pz = sz + gz + (R() - 0.5) * 1.3, py = senH(px, pz)
-            if (py < SEA.level + 1.4 || py > 15) continue // 下〜中腹の斜面のみ（高い尾根は森/岩のまま）
+            if (py > 15 || !senInland(px, pz, 1.6)) continue // 下〜中腹の斜面のみ（汀の縁は除外＝水に浮く田を根絶。高い尾根は森/岩のまま）
             const cl = senValley(pz); if (Math.abs(px - sx - cl) < 7.5) continue // 谷底の川/街道は空ける
             if (Math.hypot(px - bx, pz - bz) < 16) continue // 城の平場は空ける
             if (R() < 0.28) continue // 不揃いに（家や辻の隙間）
@@ -3049,7 +3059,7 @@ export async function mountTown3d(parent, opts = {}) {
                 prev = { x: px, y: py, z: pz } } }
             // 杉に囲む（寺の周りに濃い杉木立）
             { const folM2 = toon(season === 'winter' ? 0x6f7a72 : 0x33502d), trunkM2 = toon(0x46382a)
-              for (let k = 0; k < 12; k++) { const a = k / 12 * 6.2832, rr = 9 + R() * 4, px = tX + Math.cos(a) * rr, pz = tZ + Math.sin(a) * rr, py = senH(px, pz); if (py < SEA.level + 1) continue; const s = 1.0 + R() * 0.4; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5), trunkM2); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.4 * s, 4.0 * s, 6), folM2); fo.position.set(px, py + 2.9 * s, pz); fo.castShadow = true; town.add(fo) } }
+              for (let k = 0; k < 12; k++) { const a = k / 12 * 6.2832, rr = 9 + R() * 4, px = tX + Math.cos(a) * rr, pz = tZ + Math.sin(a) * rr, py = senH(px, pz); if (!senInland(px, pz, 1.6)) continue; const s = 1.0 + R() * 0.4; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5), trunkM2); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.4 * s, 4.0 * s, 6), folM2); fo.position.set(px, py + 2.9 * s, pz); fo.castShadow = true; town.add(fo) } }
           }
         }
         // ── 谷の霧（低くたなびく霞の帯＝「霧の谷あい」のエモさ）。柔らかな billboard を谷底に数枚。 ──
@@ -3059,12 +3069,12 @@ export async function mountTown3d(parent, opts = {}) {
             const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.13 + R() * 0.1, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(22 + R() * 10, 7 + R() * 3, 1); town.add(m); senMist.push(m) } // 薄くたなびく霞（街を覆い隠さない程度＝情緒だけ残す）
         }
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
-          for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py < SEA.level + 0.8 || py > 13) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
+          for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py > 13 || !senInland(px, pz)) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
           for (let j = 0; j < 10; j++) { const z0 = sz + 20 - j * 4.4, cl = senValley(z0), wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); wg.position.set(sx + cl + 4.8, Math.max(SEA.level, senH(sx + cl + 4.8, z0)), z0); town.add(wg); cityWalkers.push({ g: wg, road: true, x0: sx + cl + 4.8, z0, len: 8 + R() * 6, sp: 0.05 + R() * 0.04, ph: R() * 2, fn: (u) => { const zz = z0 - u; const c2 = senValley(zz); const xx = sx + c2 + 4.8; return { x: xx, y: Math.max(SEA.level, senH(xx, zz)), z: zz } } }) } // 街道を行き交う旅人（初期位置を置く＝遠方時に原点へ取り残されない）
           const sgmei = ['酒', '鍛冶', '旅籠', '飯', '馬', '薬'] // 城下の店（質素な木の掛看板）
-          for (let k = 0; k < 6; k++) { const zz = sz + 20 - k * 6, cl = senValley(zz), side = k % 2 ? 1 : -1, px = sx + cl + side * 6.5, pz = zz + (R() - 0.5) * 2, py = senH(px, pz); if (py < SEA.level + 1 || py > 12) continue; mkSignV(px, py + 1.1, pz, side > 0 ? -Math.PI / 2 : Math.PI / 2, sgmei[k], 0xcfc3a8, 0x2e2418) } } // 城下の店の看板
+          for (let k = 0; k < 6; k++) { const zz = sz + 20 - k * 6, cl = senValley(zz), side = k % 2 ? 1 : -1, px = sx + cl + side * 6.5, pz = zz + (R() - 0.5) * 2, py = senH(px, pz); if (py > 12 || !senInland(px, pz)) continue; mkSignV(px, py + 1.1, pz, side > 0 ? -Math.PI / 2 : Math.PI / 2, sgmei[k], 0xcfc3a8, 0x2e2418) } } // 城下の店の看板
         { const folC = season === 'spring' ? 0xeeb6cc : season === 'autumn' ? 0xcf7034 : season === 'winter' ? 0xdfe4e7 : 0x5c7e48
-          for (let k = 0; k < 9; k++) { const zz = sz + 20 - R() * 40, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 22, pz = zz + (R() - 0.5) * 4, py = senH(px, pz); if (py < SEA.level + 1 || py > 12) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
+          for (let k = 0; k < 9; k++) { const zz = sz + 20 - R() * 40, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 22, pz = zz + (R() - 0.5) * 4, py = senH(px, pz); if (py > 12 || !senInland(px, pz, 1.6)) continue; const s = 0.8 + R() * 0.3; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.4 * s, 5), toon(0x6a4f38)); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 0), toon(folC)); fo.position.set(px, py + 1.9 * s, pz); fo.castShadow = true; town.add(fo) } } // 四季の木立（桜/紅葉/雪/緑）
       }
       // ── 西の海の向こうの大正の港町（赤レンガ倉庫・時計塔・看板建築・桟橋・蒸気船・ガス灯）。海を渡るとやがて霞から現れる ──
       {
@@ -6235,10 +6245,13 @@ export async function mountTown3d(parent, opts = {}) {
       const edoP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - EDO.x, fp.z - EDO.z) / 255)
       const senP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 255)
       const taiP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) / 255)
-      const clear = flyAmt * (0.55 + 1.9 * Math.max(edoP, senP, taiP)) // 飛ぶと少し晴れ(白いモヤの圧迫を緩める)、目的地に近いほど大きく晴れて街が広く見える
-      // 霧の「始まり(near)」を大きく奥へ押し出す＝今飛んでいる近距離はくっきり見える（実機FB「飛行中に近くの海面まで白い」）。
-      // far は据え置きで遠景(home/別の島)は隠したまま＝共視界は維持。near<far を保証。
-      scene.fog.near = FOG.near * (1 + clear * 3.6); scene.fog.far = Math.max(scene.fog.near + 20, FOG.far * (1 + clear))
+      const eraMax = Math.max(edoP, senP, taiP)
+      const clear = flyAmt * (0.55 + 1.9 * eraMax) // 飛ぶと少し晴れ(白いモヤの圧迫を緩める)、目的地に近いほど大きく晴れて街が広く見える
+      // 実機FB「現代home上空が全体に乳白色のもやで曇る」→ home上空(時代から遠い)でだけ霧を大きく奥へ晴らして街をくっきり見せる。
+      // この追加の晴らしは時代に近づくと(eraMaxが上がると)消える＝時代付近の far は従来どおりで共視界(470離れた島)は維持。
+      const homeClarity = flyAmt * (1 - eraMax)
+      // 霧の「始まり(near)」を大きく奥へ押し出す＝今飛んでいる近距離はくっきり見える（実機FB「飛行中に近くの海面まで白い」）。near<far を保証。
+      scene.fog.near = FOG.near * (1 + clear * 3.6 + homeClarity * 1.7); scene.fog.far = Math.max(scene.fog.near + 20, FOG.far * (1 + clear) + homeClarity * 110)
       TMP_FOGC.copy(baseFogCol)
       TMP_FOGC.lerp(FLIGHT_WARM, flyAmt * 0.4) // 渡りの霧を冷たい白から懐かしい琥珀色へ＝エモい/ノスタルジックに
       if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.56) // 近づく霞を時代の色(金茶)へ＝白い空虚でなく空気のある遠景
@@ -6896,6 +6909,15 @@ export async function mountTown3d(parent, opts = {}) {
       for (const tr of treesArr) { const d = Math.hypot(tr.position.x - active.flyPos.x, tr.position.z - active.flyPos.z); if (d < bd) { bd = d; best = tr } }
       const leaf = best && best.children[0]
       return { dist: +bd.toFixed(2), faded: !!(best && best.userData.fadeMat && leaf.material === best.userData.fadeMat), opacity: leaf && leaf.material.transparent ? +leaf.material.opacity.toFixed(2) : 1 }
+    }
+    window.__town3dHeights = (x, z) => ({ heightAt: +heightAt(x, z).toFixed(2), senH: +senH(x, z).toFixed(2), SEAlevel: SEA.level }) // 検証用: 地点の地形高・戦国地形高・海面
+    window.__town3dWaterScan = (cx, cz, rad = 60, step = 4) => { // 検証用: 範囲内の水面メッシュと、その上に乗る/水没する地物を集計（水上の家の特定）
+      const waters = [], wp = new THREE.Vector3()
+      scene.traverse((o) => { if (o.isMesh && o.material && o.visible && o.material.map === (seaTex || null) && o.material.map) { o.getWorldPosition(wp); waters.push({ y: +wp.y.toFixed(2), type: o.geometry.type, par: o.parent && o.parent.type }) } })
+      // 地形が海面下になるセルの割合
+      let below = 0, tot = 0, minH = 1e9, maxH = -1e9
+      for (let x = cx - rad; x <= cx + rad; x += step) for (let z = cz - rad; z <= cz + rad; z += step) { const h = heightAt(x, z); if (h < -900) continue; tot++; if (h < SEA.level + 0.2) below++; if (h < minH) minH = h; if (h > maxH) maxH = h }
+      return { SEAlevel: SEA.level, nWaters: waters.length, watersY: [...new Set(waters.map(w => w.y))].slice(0, 12), terrain: { minH: +minH.toFixed(2), maxH: +maxH.toFixed(2), belowSeaPct: +(below / Math.max(1, tot) * 100).toFixed(0) } }
     }
     window.__town3dPick = (u, v) => { // 検証用: 画面座標(u,v=0..1)からレイキャストして当たったメッシュを列挙（白い四角の正体特定）
       if (!active || !active.camera) return null
