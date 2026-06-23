@@ -380,7 +380,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.toneMappingExposure = isNight ? 1.25 : 1.0
   // 別世界感の演出の基準値＋時代ごとの空気の色（江戸=金茶／戦国=青墨）。飛行時に近さで混ぜる。
   const baseFogCol = scene.fog.color.clone(), baseExposure = renderer.toneMappingExposure
-  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x2a323e : 0x586374), TAISHO_FOGC = new THREE.Color(isNight ? 0x4a3640 : 0xd6a684), TMP_FOGC = new THREE.Color() // 江戸=金茶/戦国=青墨/大正=暖かなセピア薔薇（時代ごとに別世界の空気）
+  const EDO_FOGC = new THREE.Color(isNight ? 0x5a4c34 : 0xc6a064), SEN_FOGC = new THREE.Color(isNight ? 0x2a323e : 0x707075), TAISHO_FOGC = new THREE.Color(isNight ? 0x4a3640 : 0xd6a684), TMP_FOGC = new THREE.Color() // 江戸=金茶/戦国=昼は中立の霧灰(青みを抜き水っぽさ解消)・夜は青墨/大正=暖かなセピア薔薇
   // 渡りの空気: 飛行中は霧を「冷たい白」から「懐かしい琥珀色の夕景」へ寄せる＝白いモヤの圧迫感を脱しエモい/ノスタルジックに（実機FB）
   const FLIGHT_WARM = new THREE.Color(isNight ? 0x3a3446 : 0xe0c49a)
   // 飛行中の空ドームの暖色（昼=黄昏の琥珀、夜=ぶどう色の宵）。霧の FLIGHT_WARM と揃えて世界全体を懐かしい色へ。
@@ -6317,10 +6317,10 @@ export async function mountTown3d(parent, opts = {}) {
       TMP_FOGC.copy(baseFogCol)
       TMP_FOGC.lerp(FLIGHT_WARM, flyAmt * 0.4) // 渡りの霧を冷たい白から懐かしい琥珀色へ＝エモい/ノスタルジックに
       if (edoP > 0.001) TMP_FOGC.lerp(EDO_FOGC, edoP * 0.56) // 近づく霞を時代の色(金茶)へ＝白い空虚でなく空気のある遠景
-      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * 0.72) // 戦国は冷たく薄暗い別世界へ
+      if (senP > 0.001) TMP_FOGC.lerp(SEN_FOGC, senP * (isNight ? 0.72 : 0.58)) // 戦国は別世界の空気へ（昼は控えめにして washy を防ぐ・夜は冷たく薄暗く）
       if (taiP > 0.001) TMP_FOGC.lerp(TAISHO_FOGC, taiP * 0.58) // 大正は暖かなセピア薔薇の港町の空気へ
       scene.fog.color.copy(TMP_FOGC)
-      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * 0.14 + taiP * 0.03) // 戦国=暗い山城/江戸=明るい城下/大正=ほの明るい港町で差別化
+      renderer.toneMappingExposure = baseExposure * (1 - edoP * 0.03 - senP * (isNight ? 0.14 : 0.07) + taiP * 0.03) // 戦国=夜は暗い山城/昼は控えめに翳らす(washy回避)・江戸=明るい城下/大正=ほの明るい港町
       // 空ドームも飛行中は黄昏の暖色へ寄せる＝世界全体が懐かしい色になり、白いモヤの孤独感でなく心地よい郷愁に。
       // 時代に着いたらその色が勝つよう、純粋な「渡りの空」は近接していない時(街色 prox が低い時)ほど強く効かせる。
       const skyWarm = flyAmt * 0.5 * (1 - 0.6 * Math.max(edoP, senP, taiP))
