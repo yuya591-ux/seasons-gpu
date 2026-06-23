@@ -1689,6 +1689,24 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 足元の野花（草地に咲く近景＝降り立った時の季節感）。茎＋花を頂点色で1メッシュへ統合＝軽量。 ──
+  if (!SNOW) {
+    const flowerGeos = []
+    const flCols = season === 'spring' ? [0xf0a8c4, 0xf6e07a, 0xf6f1ea, 0xc6a8e0, 0xf2b86a]      // 春＝菜の花/れんげ/桜草
+      : season === 'autumn' ? [0xe07aa0, 0xf2f0ea, 0xd0688a, 0xe8a24e, 0xc8506e]                 // 秋＝コスモス/小菊
+      : [0xf7f1e4, 0xf6e07a, 0xf3f3ef, 0xeec25e, 0xf0d2da]                                       // 夏＝白詰草/たんぽぽ
+    const oneFlower = (fx, fz) => {
+      const fy = heightAt(fx, fz); if (fy < SEA.level + 0.6) return // 水際は避ける
+      const h = 0.26 + R() * 0.34
+      bakeColGeo(flowerGeos, new THREE.CylinderGeometry(0.018, 0.024, h, 3).toNonIndexed(), 0x5e7a44, fx, fy + h / 2, fz) // 茎（IcosahedronGeometryが非インデックスなので合わせる）
+      const head = new THREE.IcosahedronGeometry(0.07 + R() * 0.05, 0).toNonIndexed(); head.scale(1, 0.7, 1)
+      bakeColGeo(flowerGeos, head, flCols[(R() * flCols.length) | 0], fx, fy + h, fz)                      // 花
+    }
+    for (let i = 0; i < 56; i++) { const a = R() * 6.28, r = 7.5 + R() * 6.5, fx = PARK.x + Math.cos(a) * r, fz = PARK.z + Math.sin(a) * r; oneFlower(fx, fz) } // 公園のまわりの花野
+    for (let i = 0; i < 30; i++) { const side = R() < 0.5 ? -1 : 1, fx = side * (5 + R() * 4), fz = -6 - R() * 70; oneFlower(fx, fz) }                          // 街路の植え込みの足元
+    if (flowerGeos.length && BufferGeometryUtils.mergeGeometries) { const fm = BufferGeometryUtils.mergeGeometries(flowerGeos, false); if (fm) town.add(new THREE.Mesh(fm, clutterMat)); flowerGeos.forEach((x) => x.dispose()) }
+  }
+
   // ── 路沿いの小さな商店（庇＋袖看板。夕/夜は看板が灯る＝商店街の生活感） ──
   for (const sc of [[-5.6, -16, 0xcabfa6, 0xb0704a], [6, -30, 0xc0baa8, 0x5e7a5e], [-6, -48, 0xc6bdac, 0xa65a68], [5.6, -60, 0xc4bca8, 0xb09a58]]) { // 庇/看板はくすんだ郷愁色（原色のデバッグ感を排す）
     const sx = sc[0], sz = sc[1], gy = heightAt(sx, sz), facing = sx < 0 ? 1 : -1
