@@ -580,6 +580,28 @@ export function createAudio(opts) {
       if (v > 0.001 && !purrNode) startPurr()
       if (purrNode) { try { purrNode.pg.gain.setTargetAtTime(Math.max(0.0001, v * 0.045), now(), 0.18) } catch { /* 無視 */ } }
     },
+    /** 猫の鳴き声「にゃーん」＝基音のグライド(me→ow)＋フォルマントの母音。素材ゼロの合成。タップ反応で鳴く。 */
+    meow(pitch, kind) {
+      if (!ctx || !ctx.createOscillator) return
+      try {
+        const t = now(), base = 360 * (pitch || 1)
+        const osc = ctx.createOscillator(); osc.type = 'sawtooth' // 声帯の基音（倍音豊か）
+        if (kind === 'short') { // 「にゃっ」短い甘え声
+          osc.frequency.setValueAtTime(base * 1.05, t); osc.frequency.linearRampToValueAtTime(base * 1.3, t + 0.05); osc.frequency.linearRampToValueAtTime(base * 1.0, t + 0.16)
+        } else { // 「にゃーん」上がって下がる
+          osc.frequency.setValueAtTime(base * 0.9, t); osc.frequency.linearRampToValueAtTime(base * 1.5, t + 0.09); osc.frequency.linearRampToValueAtTime(base * 0.85, t + 0.42)
+        }
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4 // 口の開き（母音フォルマント）
+        bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + 0.1); bp.frequency.linearRampToValueAtTime(720, t + 0.42)
+        const bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 2600; bp2.Q.value = 3 // 第2フォルマント（鼻にかかる）
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t)
+        const dur = kind === 'short' ? 0.22 : 0.55, peak = 0.055
+        g.gain.linearRampToValueAtTime(peak, t + 0.05); g.gain.setTargetAtTime(0.0001, t + dur * 0.5, dur * 0.28)
+        osc.connect(bp); bp.connect(bp2); bp2.connect(g); g.connect(master)
+        try { const vib = ctx.createOscillator(); vib.frequency.value = 22; const vg = ctx.createGain(); vg.gain.value = base * 0.045; vib.connect(vg).connect(osc.frequency); vib.start(t); vib.stop(t + dur + 0.1) } catch { /* 震え無しでも鳴る */ }
+        osc.start(t); osc.stop(t + dur + 0.1)
+      } catch { /* 無視 */ }
+    },
     /** 散策の足音（地上を歩くときだけ・ごく控えめ）。素材別に質感を変える＝舗装/土・草/木の遊歩道。 */
     footstep(surf) {
       if (!ctx) return
