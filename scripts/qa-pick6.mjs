@@ -9,11 +9,9 @@ await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-sunset'))
 await p.waitForTimeout(2600)
 await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
 await p.evaluate(()=>window.__town3dCruise(false))
-// 川を間近で見下ろす（護岸と川幅の確認）
-for (const [name,x,z,yaw,pit] of [['close',144,-650,1.4,-0.25],['walk',146,-648,-0.4,-0.05]]){
-  const y = await p.evaluate(([x,z])=>window.__town3dHeights(x,z).heightAt + 2.0, [x,z])
-  await p.evaluate(([x,y,z,yaw,pit])=>window.__town3dFlyPose(x,y,z,yaw,pit),[x,y,z,yaw,pit]); await p.waitForTimeout(800)
-  await p.screenshot({ path:`scripts/_shots/river-${name}.png` })
-}
-console.log('done')
+const y = await p.evaluate(()=>window.__town3dHeights(150,-652).heightAt + 2.4)
+await p.evaluate(([y])=>window.__town3dFlyPose(150,y,-652,0.4,0),[y]); await p.waitForTimeout(800)
+const pts=[[0.3,0.92],[0.45,0.85],[0.2,0.8],[0.5,0.95],[0.35,0.7]]
+const out = await p.evaluate((pts)=>pts.map(([u,v])=>({uv:[u,v],hit:(window.__town3dPick(u,v)||[]).slice(0,2)})), pts)
+console.log('cam y',y.toFixed(1)); console.log(JSON.stringify(out))
 await b.close()

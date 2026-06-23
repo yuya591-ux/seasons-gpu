@@ -665,14 +665,14 @@ export async function mountTown3d(parent, opts = {}) {
   // 戦国＝「霧の谷あいの城下町」の地形（単一の急な円錐を脱し、川の谷＋両側のなだらかな尾根＋背後の山並みへ作り替え）。
   // 南(+z=現代/海の側)に河口が開き、川が谷を南北に蛇行。谷底に城下町、東の尾根の中腹の平場(bluff)に城。
   // 起伏は意図配置のガウス丘の和＝放射対称でなく自然。海(SEA.level)へ向け裾が落ちる。メッシュ/配置/heightAt が共有。
-  const senR = 80
+  const senR = 96 // 島を広げ町の周りに緑の陸地の余白を作る（町のすぐ外に海が見えて「水の上の町」に見えるのを防ぐ）
   const senValley = (dz) => Math.sin((dz + 10) * 0.02) * 9 + Math.sin(dz * 0.05) * 4 // 川筋の蛇行（中心xのオフセット）
   const senBluff = { dx: 28, dz: -8 } // 城の建つ東尾根の中腹の平場（中央でなく片側）
   // 尾根・峰のガウス丘 [dx, dz, 高さ, σx, σz]。等間隔を避け、東西の尾根＋背後(北)の高い山並み。
   const SEN_HILLS = [[38, -40, 15, 18, 28], [senBluff.dx, senBluff.dz, 13, 30, 36], [-44, -28, 15, 26, 32], [-28, 16, 9, 28, 28], [6, -66, 21, 40, 22], [50, -64, 16, 24, 20], [-46, -58, 15, 28, 22]]
   const senH = (x, z) => {
     const dx = x - SENGOKU.x, dz = z - SENGOKU.z
-    const ex = dx / 74, ez = (dz - 4) / 88, env = ex * ex + ez * ez // 南北に長い島の輪郭
+    const ex = dx / 82, ez = (dz - 4) / 108, env = ex * ex + ez * ez // 南北に長い島の輪郭（広げて町の外に緑の余白＝海を遠ざける）
     if (env > 1.3) return -999 // 島の外＝海（呼び元で無視）
     const coast = Math.pow(Math.max(0, 1 - env), 0.72) // 縁で海へ落ちる（平場ぎみ→汀で急落）
     let land = 3 // 谷底の低い土地（海面より少し上）
@@ -2858,13 +2858,13 @@ export async function mountTown3d(parent, opts = {}) {
           const cHigh = new THREE.Color(season === 'winter' ? 0xe6eaeb : 0x827e66) // 高所の岩肌/雪
           const tmpC = new THREE.Color()
           for (let i = 0; i <= RINGS; i++) {
-            const rr = Math.pow(i / RINGS, 1.05) * senR * 1.26
+            const rr = Math.pow(i / RINGS, 1.05) * senR * 1.42
             for (let j = 0; j <= SEG; j++) {
               const ang = (j / SEG) * Math.PI * 2
               const px = sx + Math.cos(ang) * rr, pz = sz + Math.sin(ang) * rr
               let y = senH(px, pz); if (y < -990) y = SEA.floor - 1.5
               vpos.push(Math.cos(ang) * rr, y, Math.sin(ang) * rr)
-              const hT = Math.max(0, Math.min(1, (y - 2) / 22)) // 谷底(緑)〜尾根(岩)
+              const hT = Math.max(0, Math.min(1, (y - 11) / 24)) // 谷底〜中腹は緑のまま(町の地面が水色に見えるのを防ぐ)、高い尾根だけ岩/雪へ
               tmpC.copy(cBase).lerp(cHigh, hT * hT) // 高所ほど岩/雪
               const sh = 0.84 + 0.16 * (0.5 + 0.5 * Math.sin(ang * 3.0 + rr * 0.12)) // 尾根筋のわずかな明暗（水彩のムラ）
               vcol.push(tmpC.r * sh, tmpC.g * sh, tmpC.b * sh)
@@ -2889,10 +2889,18 @@ export async function mountTown3d(parent, opts = {}) {
         { const rmat = new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x33414e : 0x6f93a4, fog: true }), rgeos = [], rM = new THREE.Matrix4(); let prev = null
           for (let s = 0; s <= 42; s++) { const zz = sz + 36 - s * 2.5, cl = senValley(zz), px = sx + cl, gh = senH(px, zz), py = Math.max(SEA.level - 0.1, gh) - 0.04
             if (gh > 8.5) break // 谷頭で止める（川が山へ登って見えるのを防ぐ＝水源は山の中）
-            const wdt = Math.max(2.6, 6.4 - Math.max(0, gh - 1) * 0.5) // 上流ほど細る
+            const wdt = Math.max(2.2, 5.0 - Math.max(0, gh - 1) * 0.45) // 上流ほど細る（水の主張を抑え川幅を絞る）
             if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); const bg = new THREE.PlaneGeometry(wdt, len + 1.1); bg.rotateX(-Math.PI / 2); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rM); rgeos.push(bg) }
             prev = { x: px, z: zz, py } }
           if (rgeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(rgeos, false); if (m) { const rmesh = new THREE.Mesh(m, rmat); town.add(rmesh) } rgeos.forEach((g) => g.dispose()) }
+          // ── 石垣の護岸（川の両岸に低い石積み）。水が水路に収まり「家が水の上に浮く」印象を断つ＝城下町の川辺。統合で軽量。──
+          const bankMat = mottleMat(season === 'winter' ? 0x8e8f88 : 0x6f685a, 130, 0.14, [2, 1]), bgeos = [], bM = new THREE.Matrix4(), pvb = { '-1': null, '1': null }
+          for (let s = 0; s <= 42; s++) { const zz = sz + 36 - s * 2.5, cl = senValley(zz), px = sx + cl, gh = senH(px, zz); if (gh > 8.5) break
+            const wdt = Math.max(2.2, 5.0 - Math.max(0, gh - 1) * 0.45), wy = Math.max(SEA.level - 0.1, gh)
+            for (const side of [-1, 1]) { const exx = px + side * (wdt / 2 + 0.25), ezz = zz, key = side < 0 ? '-1' : '1', pe = pvb[key]
+              if (pe) { const ddx = exx - pe.x, ddz = ezz - pe.z, len = Math.hypot(ddx, ddz); if (len > 0.3 && len < 7) { const bnkH = Math.min(2.2, Math.max(0.55, senH(exx, ezz) - wy + 0.5)); const bg = new THREE.BoxGeometry(0.55, bnkH, len + 0.35); bM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((exx + pe.x) / 2, wy + bnkH / 2 - 0.18, (ezz + pe.z) / 2); bg.applyMatrix4(bM); bgeos.push(bg) } }
+              pvb[key] = { x: exx, z: ezz } } }
+          if (bgeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bgeos, false); if (m) { const bmesh = new THREE.Mesh(m, bankMat); bmesh.castShadow = true; bmesh.receiveShadow = true; town.add(bmesh) } bgeos.forEach((g) => g.dispose()) }
         }
         // ── 城は中央の急峰でなく、東尾根の中腹の平場(bluff)に建つ＝「真ん中に城が奇妙」を解消。石垣の段に天守。──
         const sWall = mottleMat(season === 'winter' ? 0x6e665c : 0x4a3f30, 150, 0.16, [1.4, 1.4]), sRoof = mottleMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x232730 : 0x34383f), 150, 0.12, [1.8, 1.8]) // 黒い板張りの木目＋黒瓦の濃淡（冬は雪化粧）

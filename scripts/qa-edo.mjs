@@ -1,37 +1,25 @@
-// 海を渡って向こう岸の城下町（天守）が霞から現れるか確認。東(+x)へ近づきながら数カット。
 import { chromium } from 'playwright'
 const port = process.env.PORT || '4801'
-const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(700)
-await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
-await page.waitForTimeout(2400)
-await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTimeout(400)
-await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(500)
-await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
-await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
-const E = Math.PI / 2 // 東(+x)を向く
-const shoot = async (x, y, pit, name) => { await page.evaluate(([x, y, e, p]) => window.__town3dFlyPose(x, y, -46, e, p), [x, y, E, pit]); await page.waitForTimeout(800); await page.screenshot({ path: `scripts/_shots/${name}.png` }) }
-await shoot(255, 38, -0.05, 'edo-far')   // 渡りの途中＝霞の向こうにうっすら(dEdo≈215)
-await shoot(330, 32, -0.08, 'edo-mid')   // 近づく＝天守が立ち上がる(dEdo≈140)
-await shoot(405, 28, -0.10, 'edo-near')  // 目前＝城下町まで見える(dEdo≈65)
-await shoot(420, 40, -0.20, 'edo-top')   // 上から見下ろし
-await shoot(360, 92, -0.46, 'edo-grand')  // 高所から城下町全景
-await shoot(341, 24, -0.03, 'edo-veil')   // 霞の帯をくぐる関門（白いベール, dEdo≈129）
-await page.evaluate(([e]) => window.__town3dFlyPose(430, 12, -30, e, -0.02), [E]); await page.waitForTimeout(800); await page.screenshot({ path: 'scripts/_shots/edo-market.png' }) // 市場・屋台・人々を低空で
-await shoot(210, 19, -0.06, 'edo-crossing')  // 渡りの低空＝帆船・島影
-await shoot(280, 21, -0.05, 'edo-crossing2')
-// 夜（城下の灯り）
-await page.evaluate(() => window.__applyScene('kitaterao-window-3d-night'))
-await page.waitForTimeout(2400)
-await page.evaluate(() => { window.__town3dWindow(true) }); await page.waitForTimeout(400)
-await page.evaluate(() => { window.__town3dLean(true) }); await page.waitForTimeout(500)
-await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(800)
-await page.evaluate(() => { window.__town3dCruise(false) }); await page.waitForTimeout(200)
-await shoot(330, 32, -0.08, 'edo-night-mid')
-await shoot(405, 28, -0.10, 'edo-night-near')
-console.log('edo shots done')
-await browser.close()
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 1100, height: 620 }, deviceScaleFactor: 2 })
+await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(()=>{})
+await p.waitForTimeout(800)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-sunset'))
+await p.waitForTimeout(2600)
+await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
+await p.evaluate(()=>window.__town3dCruise(false))
+const E=[640,-46]
+// 城の足元・遠景・俯瞰
+const shots = [
+  ['far',   640-70, 30, -46, 1.3, 0.05],
+  ['mid',   640-40, 26, -46, 1.3, 0.1],
+  ['base',  640-22, 18, -46, 1.3, 0.0],
+  ['town',  640-60, 24, -10, 1.0, 0.0],
+]
+for (const [name,x,y,z,yaw,pit] of shots){
+  await p.evaluate(([x,y,z,yaw,pit])=>window.__town3dFlyPose(x,y,z,yaw,pit),[x,y,z,yaw,pit]); await p.waitForTimeout(800)
+  await p.screenshot({ path:`scripts/_shots/edo-${name}.png` })
+}
+console.log('castle ground:', JSON.stringify(await p.evaluate(()=>[[640,-46],[630,-46],[650,-46],[640,-36]].map(([x,z])=>({x,z,h:window.__town3dHeights(x,z).heightAt})))))
+await b.close()
