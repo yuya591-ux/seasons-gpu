@@ -5250,7 +5250,7 @@ export async function mountTown3d(parent, opts = {}) {
       // ひげ（左右3本ずつ・細く）
       for (const s of [-1, 1]) for (const dy of [-0.018, 0, 0.018]) { const w = hAdd(CY(0.0018, 0.14, 4), whisk, s * 0.12, -0.03 + dy, 0.1); w.rotation.z = s * 1.45; w.rotation.y = -s * (0.2 + dy * 6) }
       const catShadow = floorShadow(0.5, 1.62, 0.78, 0.6) // 猫の接地影（移動について回る）
-      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, eyesClosed, eyesOpen, hit, catShadow, y0: 0.78, headX0: -0.46, headY0: 0.33, baseY: FY + 0.02, homeX: 0.5, homeZ: 1.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1, alert: 0, alertTarget: 0, petAmt: 0, petActive: 0, wakeT: 26 + R() * 40, wakeHold: 0, purr: 0, relocT: 38 + R() * 50, relocP: 1, x0: 0.5, z0: 1.62, rot0: 0.38, x1: 0.5, z1: 1.62, rot1: 0.38 }
+      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, eyesClosed, eyesOpen, hit, catShadow, y0: 0.78, headX0: -0.46, headY0: 0.33, baseY: FY + 0.02, homeX: 0.5, homeZ: 1.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1, alert: 0, alertTarget: 0, petAmt: 0, petActive: 0, wakeT: 26 + R() * 40, wakeHold: 0, purr: 0, relocT: 38 + R() * 50, relocP: 1, x0: 0.5, z0: 1.62, rot0: 0.38, x1: 0.5, z1: 1.62, rot1: 0.38, react: null, reactT: 0, reactDur: 1, lastReact: -1, playful: 0, lookX: 0, lookXTarget: 0, blinkT: 3 + R() * 4, blink: 0, mouthG: null }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -6818,7 +6818,28 @@ export async function mountTown3d(parent, opts = {}) {
         c.body.scale.x = 1.5 * (1 + st * 0.4 + (mv > 0 && mv < 1 ? 0.14 : 0))
         c.body.scale.z = 1.22 * (1 - st * 0.12)
         if (c.catShadow) { c.catShadow.position.x = c.g.position.x; c.catShadow.position.z = c.g.position.z }
-      } else { c.body.scale.x = 1.5; c.body.scale.z = 1.22; if (Math.abs(c.g.position.y - c.baseY) > 0.0005) c.g.position.y = c.baseY } }
+      } else { c.body.scale.x = 1.5; c.body.scale.z = 1.22; if (Math.abs(c.g.position.y - c.baseY) > 0.0005) c.g.position.y = c.baseY }
+      // ── 遊べる反応（タップ/触れるたびに違う仕草）＋ご機嫌の減衰＋まばたき＋頭が手を追う ──
+      c.playful = Math.max(0, c.playful - dt * 0.09) // ご機嫌はゆっくり冷める
+      c.lookXTarget *= (1 - Math.min(1, dt * 0.6)) // 見ている方向は徐々に正面へ戻る
+      c.lookX += (c.lookXTarget - c.lookX) * Math.min(1, dt * 5)
+      if (c.alert > 0.2 && !reloc) c.headG.rotation.y = c.lookX * c.alert // 起きている時こちら(触れた方)を見る
+      if (c.alert > 0.5) { c.blinkT -= dt; if (c.blinkT < 0) { c.blinkT = 2.6 + R() * 4; c.blink = 0.13 } } // たまにまばたき
+      if (c.blink > 0) { c.blink -= dt; for (const e of c.eyesOpen) e.visible = false; for (const e of c.eyesClosed) e.visible = true }
+      if (c.reactT > 0 && !reloc) { c.reactT -= dt
+        const p = 1 - c.reactT / c.reactDur, env = Math.sin(Math.min(1, Math.max(0, p)) * Math.PI) // 0→1→0 の山
+        switch (c.react) {
+          case 'stretch': { const b = Math.sin(Math.min(1, p / 0.45) * Math.PI); c.body.scale.x = 1.5 * (1 + b * 0.5); c.body.scale.z = 1.22 * (1 - b * 0.14); c.headG.rotation.x = c.headX0 + c.alert * 0.34 + b * 0.5; c.g.position.y = c.baseY + b * 0.015; break } // ぐーっと伸び
+          case 'roll': { c.g.rotation.z = Math.sin(p * Math.PI) * 0.95; c.g.position.y = c.baseY + env * 0.03; break } // ごろん（お腹を見せる）
+          case 'tailUp': { c.tail.rotation.z = (0.4 - c.alert * 0.28) - env * 0.85; c.tail.rotation.y = Math.sin(t * 9) * 0.4 * env; c.g.position.y = c.baseY + env * 0.012; break } // しっぽぴん＋ご機嫌
+          case 'wiggle': { c.g.rotation.z = Math.sin(p * Math.PI * 7) * 0.1 * env; c.tail.rotation.z = (0.4 - c.alert * 0.28) - env * 0.55; break } // おしりふりふり
+          case 'earFlick': { const e2 = Math.sin(p * Math.PI * 6) * 0.32 * env; c.ears[0].rotation.x = c.ears0[0] + e2; c.ears[1].rotation.x = c.ears0[1] - e2; c.headG.rotation.z = Math.sin(p * Math.PI * 2) * 0.3 * env; break } // 耳ぴくぴく＋首かしげ
+          case 'shake': { c.headG.rotation.y = c.lookX * c.alert + Math.sin(p * Math.PI * 8) * 0.34 * env; break } // ぶるっと頭を振る
+          case 'yawn': { const yb = Math.sin(Math.min(1, p / 0.5) * Math.PI); c.headG.rotation.x = c.headX0 + c.alert * 0.34 - yb * 0.32; c.body.scale.y = c.y0 * (1 + yb * 0.08); break } // あくび
+          default: { c.headG.rotation.x = c.headX0 + c.alert * 0.34 + Math.sin(p * Math.PI) * 0.08; break } // lookback: じっと見つめる
+        }
+        if (c.reactT <= 0) { c.react = null; c.g.rotation.z = 0; c.ears[0].rotation.x = c.ears0[0]; c.ears[1].rotation.x = c.ears0[1]; c.headG.rotation.z = 0 } // 反応終わり＝姿勢を戻す
+      } }
     // CSSの窓枠（外枠frame2・ガラスglass・中央桟cross・窓台sill）は、3Dの室内窓枠と二重像になる（窓に窓が
     // 重なるバグ）。3D枠が完全な窓を担うのでCSS窓枠は全て隠す。室内の薄暗がりroomVigと水彩オーバーレイは残す。
     glass.style.opacity = '0'
@@ -7015,6 +7036,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
     window.__town3dResFace = (i, ya) => { if (residents[i]) { const u = residents[i].userData; residents[i].rotation.y = ya; u.face = ya; u.moving = false; u.pauseT = 999; for (const a of u.arms) a.rotation.x = 0; for (const l of u.legs) l.rotation.x = 0 } } // 検証用: 住人を止めて向きを固定（顔の確認）
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
+    window.__town3dCatReact = (n) => { if (winCat) { winCat.react = n || 'roll'; winCat.reactDur = 2.4; winCat.reactT = 2.4; winCat.wakeHold = 2.5; winCat.alert = 1; winCat.lastReact = -1 } } // 検証用: 猫の反応を手動発火
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
     window.__town3dResFront = (i, dist = 4, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
@@ -7064,6 +7086,27 @@ export async function mountTown3d(parent, opts = {}) {
     petRay.setFromCamera(petNDC, camera)
     return petRay.intersectObject(winCat.hit).length > 0
   }
+  // 窓辺の猫の「遊べる反応」。タップ/触れるたびに違う仕草を返す＝撫でるだけでなく構って遊べる。
+  const CAT_REACTIONS = [
+    { n: 'lookback', dur: 2.4 }, // 起きてこちらをじっと見つめる
+    { n: 'stretch', dur: 2.4 },  // ぐーっと伸びをする
+    { n: 'roll', dur: 2.7 },     // ごろんと寝返り（お腹を見せる）
+    { n: 'tailUp', dur: 2.3 },   // しっぽをぴんと立ててご機嫌
+    { n: 'wiggle', dur: 1.9 },   // おしりふりふり（じゃれる前のため）
+    { n: 'earFlick', dur: 1.4 }, // 耳をぴくぴく＋首をかしげる
+    { n: 'shake', dur: 1.2 },    // ぶるっと頭を振る
+    { n: 'yawn', dur: 2.0 },     // ふわぁとあくび
+  ]
+  const triggerCatReaction = (nx) => { const c = winCat; if (!c) return
+    c.playful = Math.min(1, c.playful + 0.34) // 構うほどご機嫌＝活発に
+    if (nx !== undefined) { c.lookXTarget = Math.max(-0.5, Math.min(0.5, nx)) } // 触れた方を見る
+    if (c.reactT > c.reactDur * 0.4) return // 反応の出始めは上書きしない（連打で固まらない）
+    let pool = CAT_REACTIONS.map((_, i) => i)
+    if (c.playful > 0.5) pool = pool.concat([1, 2, 3, 4]) // ご機嫌なら活発な仕草(stretch/roll/tailUp/wiggle)を重く
+    let idx; let tries = 0; do { idx = pool[(Math.random() * pool.length) | 0]; tries++ } while (idx === c.lastReact && tries < 6)
+    c.lastReact = idx; c.react = CAT_REACTIONS[idx].n; c.reactDur = CAT_REACTIONS[idx].dur; c.reactT = c.reactDur
+    c.wakeHold = Math.max(c.wakeHold, c.reactDur) // 反応の間は起きている
+  }
   const aloftNow = () => active && (active.mode === 'fly' || active.mode === 'walk')
   const setStick = (dx, dy) => {
     let nx = dx / FLY.stickRadius, ny = -dy / FLY.stickRadius // 上方向(画面上)を前進(+)に
@@ -7104,6 +7147,7 @@ export async function mountTown3d(parent, opts = {}) {
       showStick(lx, e.clientY - rect.top); setStick(0, 0)
     } else if (pettingId === null && hitCat(e.clientX, e.clientY)) {
       pettingId = e.pointerId; winCat.petActive = 1 // 窓辺の猫に触れた＝撫でる（見回しでなく猫を構う）
+      triggerCatReaction(petNDC.x) // 触れるたびに違う仕草で反応＝遊べる（hitCatでpetNDCが入っている）
     } else if (lookId === null) {
       lookId = e.pointerId; lookLX = e.clientX; lookLY = e.clientY // 歩行の右半分/窓辺＝見回し
       active.lookDragging = true
@@ -7123,7 +7167,7 @@ export async function mountTown3d(parent, opts = {}) {
       applyTown3dSteer((e.clientX - steerLX) / w, (e.clientY - steerLY) / h) // 飛行のドラッグ操舵
       steerLX = e.clientX; steerLY = e.clientY
     } else if (e.pointerId === stickId) setStick(e.clientX - stickOX, e.clientY - stickOY)
-    else if (e.pointerId === pettingId && winCat) { winCat.petActive = 1; winCat.petAmt = Math.min(1, winCat.petAmt + 0.03) } // なでる手の動きでより喜ぶ
+    else if (e.pointerId === pettingId && winCat) { winCat.petActive = 1; winCat.petAmt = Math.min(1, winCat.petAmt + 0.03); const rr = stage.getBoundingClientRect(); winCat.lookXTarget = Math.max(-0.5, Math.min(0.5, ((e.clientX - rr.left) / rr.width) * 2 - 1)) } // なでる手の動きでより喜ぶ＋手の方を見る
     else if (e.pointerId === lookId) {
       // 横は素直に（右ドラッグ＝右を向く＝マリオ等のゲームと同じ向き）。縦はそのまま（下ドラッグ＝見上げる＝景色を引き寄せる手触り・ユーザー好み）。
       applyTown3dLook((e.clientX - lookLX) / w * 1.0, (e.clientY - lookLY) / h * 1.0)
