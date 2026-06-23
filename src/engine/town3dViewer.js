@@ -3225,17 +3225,18 @@ export async function mountTown3d(parent, opts = {}) {
         // 屋根色のパレット（瓦の赤茶/いぶし茶/スレート青鼠）。俯瞰で一色だった屋根に多様さを。
         const tRoofPal = isNight ? [0x4a3832, 0x423a32, 0x3e444a] : [0x9a5642, 0x6e5a48, 0x5d666e]
         const tRoofMats = tRoofPal.map((c) => mottleMat(c, 150, 0.12, [1.8, 1.8]))
-        const taiFac = [{ x: tx + 33, z: tz - 42, r: 14 }, { x: tx + 42, z: tz + 46, r: 13 }] // 公園/学校の区画（建物を空ける）
+        const taiFac = [{ x: tx + 33, z: tz - 42, r: 14 }, { x: tx + 42, z: tz + 46, r: 13 }, { x: tx - 48, z: tz + 30, r: 12 }, { x: tx - 30, z: tz - 50, r: 10 }, { x: tx + 70, z: tz + 8, r: 9 }] // 公園/学校＋緑地の区画（建物を空け、緑と広場で密集を割る＝閉鎖感対策）
         const twBuckets = tWallPal.map(() => []), trBuckets = tRoofPal.map(() => []), twC = [], tlit = [], plT = [], tmM = new THREE.Matrix4()
         // 港町の町並み＝完全な碁盤の目の均一さを脱す: 主要街路は残しつつ、街区内は密に詰め、
         // 中心(時計塔)ほど高い看板建築、外周は低い住宅、合間に長屋（横長の連棟）を混ぜ、高さ・大きさ・向きを散らす。
-        for (let gx = -94; gx <= 94; gx += 3.7) for (let gz = -78; gz <= 84; gz += 3.7) {
-          const onAveX = ((gx + 760) % 19) < 3.7, onAveZ = ((gz + 760) % 19) < 3.7 // 主要街路（約19間隔）だけ道に空ける
+        const TGRID = 4.3 // 街区の升目を広げ密集を緩める（大正の閉鎖感対策＝空も地上も呼吸できる港町へ）
+        for (let gx = -94; gx <= 94; gx += TGRID) for (let gz = -78; gz <= 84; gz += TGRID) {
+          const onAveX = ((gx + 760) % 19) < TGRID, onAveZ = ((gz + 760) % 19) < TGRID // 主要街路（約19間隔）は広めに空ける
           if (onAveX && onAveZ) continue
           const hx = tx + gx + (R() - 0.5) * 1.5, hz = tz + gz + (R() - 0.5) * 1.5, hy = heightAt(hx, hz)
-          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 5 || taishoCanal(hx, hz) < 5.0 || taiFac.some((f) => Math.hypot(hx - f.x, hz - f.z) < f.r)) continue // 海/時計塔/運河/公園・学校は空ける
-          if (Math.abs(hz - tz) < 2.9 && Math.abs(hx - tx) < 92) continue // 路面電車の通り道(z=tz, 大通り)は完全に空ける＝電車が家を貫通しない
-          if ((onAveX || onAveZ) ? R() < 0.5 : R() < 0.12) continue // 街路沿いは間引き、街区内は密に
+          if (hy < SEA.level + 1.2 || Math.hypot(hx - (tx + 6), hz - (tz - 4)) < 9 || taishoCanal(hx, hz) < 6.0 || taiFac.some((f) => Math.hypot(hx - f.x, hz - f.z) < f.r)) continue // 海/時計塔前の広場/運河/公園・緑地は空ける（広場と運河を広く）
+          if (Math.abs(hz - tz) < 4.6 && Math.abs(hx - tx) < 92) continue // 大通り(路面電車の並木道)を広く空ける＝歩いて気持ちいい目抜き通り
+          if ((onAveX || onAveZ) ? R() < 0.58 : R() < 0.26) continue // 街路沿いはよく空け、街区内も適度に間引く＝路地と中庭で呼吸する町並み
           const dc = Math.hypot(gx - 6, gz + 4), central = Math.max(0, 1 - dc / 42) // 時計塔＝商業中心からの近さ
           const tt = R(), tall = tt < 0.1 + central * 0.24, longya = !tall && tt > 0.62 && tt < 0.8, isBrick = R() < 0.26 + central * 0.12
           let hw, hd, hh, ang = R() < 0.5 ? 0 : Math.PI / 2
@@ -3253,6 +3254,12 @@ export async function mountTown3d(parent, opts = {}) {
         const plinthMatT = mottleMat(season === 'winter' ? 0xbcc0c2 : 0x908a80, 120, 0.12, [2, 1]) // 港町の石畳の土台
         const tMerge = [...twBuckets.map((g, i) => [g, tWallMats[i]]), ...trBuckets.map((g, i) => [g, tRoofMats[i]]), [twC, brick], [plT, plinthMatT], [tlit, tlitMat]]
         for (const [geos, mat] of tMerge) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== tlitMat; mesh.receiveShadow = mat !== tlitMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
+        // ── 緑で密集を割る（俯瞰の単調な屋根の海に緑の筋と面を、地上の閉鎖感を解く）。並木＋新緑地の木立＋時計塔広場の植栽。 ──
+        { const tput = (px, pz, sc) => { if (heightAt(px, pz) > SEA.level + 1.1 && taishoCanal(px, pz) > 4) tree(px, pz, sc) }
+          for (let gx = -84; gx <= 84; gx += 14) for (const sd of [-1, 1]) tput(tx + gx + (R() - 0.5) * 1.6, tz + sd * 6.4, 1.0 + R() * 0.4)     // 目抜き通りの並木
+          for (const f of taiFac.slice(2)) { const nT = 3 + ((f.r / 4) | 0); for (let i = 0; i < nT; i++) { const a = R() * 6.28, rr = 2 + R() * (f.r - 3); tput(f.x + Math.cos(a) * rr, f.z + Math.sin(a) * rr, 0.9 + R() * 0.6) } } // 新緑地を木立に
+          for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28; tput(tx + 6 + Math.cos(a) * 7.6, tz - 4 + Math.sin(a) * 7.6, 0.85 + R() * 0.3) } // 時計塔広場をぐるりと並木
+        }
         // ── 港町の街路（碁盤の目の道＝区画整理された大正の町。石畳の道）。地形に沿わせ統合で軽量。 ──
         { const paveMat = mottleMat(season === 'winter' ? 0xc4c8c6 : 0x8e8a84, 100, 0.1, [3, 1]), roadGeos = [], rM = new THREE.Matrix4()
           const seg = (x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, py = heightAt(px, pz); if (py < SEA.level + 0.6 || taishoCanal(px, pz) < 4) return; const bg = new THREE.BoxGeometry(w, 0.16, len + 0.9); rM.makeRotationY(Math.atan2(dx, dz)).setPosition(px, py + 0.09, pz); bg.applyMatrix4(rM); roadGeos.push(bg) }
