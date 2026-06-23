@@ -3056,7 +3056,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         // ── 街道（谷底の川の東岸に沿う道）＋城の平場へ登る坂道。senHに沿わせ統合で軽量。 ──
-        { const mtRoadMat = toon(season === 'winter' ? 0xc2c6c2 : 0x6e6450), roadGeos = [], rM = new THREE.Matrix4(); let prev = null
+        { const mtRoadMat = mottleMat(season === 'winter' ? 0xc2c6c2 : 0x6e6450, 100, 0.18, [2, 4]), roadGeos = [], rM = new THREE.Matrix4(); let prev = null // 土の路面（石/轍のムラ＝歩く道の質感）
           for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 4.8, gh = senH(px, zz), py = gh + 0.08 // 川の東岸の街道
             if (gh < SEA.level + 1.2 || gh > 15) { prev = null; continue } // 水際/海の上には道を敷かない（地面の高さに沿わせる）
             if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3 && len < 6) { const bg = new THREE.BoxGeometry(2.6, 0.16, len + 0.6); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } }
