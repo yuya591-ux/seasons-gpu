@@ -4037,6 +4037,15 @@ export async function mountTown3d(parent, opts = {}) {
       const sm = hbStem.length && BufferGeometryUtils.mergeGeometries(hbStem, false); if (sm) town.add(new THREE.Mesh(sm, toon(0x4a6a3a))); hbStem.forEach((g) => g.dispose())
       const hm = hbHead.length && BufferGeometryUtils.mergeGeometries(hbHead, false); if (hm) town.add(new THREE.Mesh(hm, toon(0xd23a26))); hbHead.forEach((g) => g.dispose())
     }
+    // 野花（春＝れんげ/夏＝白詰草が畦に咲く＝故郷の春夏の足元の彩り）。茎(緑)＋花を統合で軽量。
+    if ((season === 'spring' || season === 'summer') && BufferGeometryUtils.mergeGeometries) {
+      const yfStem = [], yfHead = [], yfCol = season === 'spring' ? 0xf0a6c2 : 0xf4efe2 // 春=れんげの桃／夏=白詰草の白
+      for (let i = 0; i < 48; i++) { const side = R() < 0.5 ? -1 : 1, fx = side * (10 + R() * 4.5), fz = -3 - R() * 40, fy = heightAt(fx, fz); if (fy < SEA.level + 0.5) continue
+        const sg = new THREE.CylinderGeometry(0.016, 0.02, 0.3, 3).toNonIndexed(); sg.translate(fx, fy + 0.15, fz); yfStem.push(sg)
+        const hg = new THREE.IcosahedronGeometry(0.075 + R() * 0.04, 0).toNonIndexed(); hg.scale(1, 0.7, 1); hg.translate(fx, fy + 0.3, fz); yfHead.push(hg) }
+      const sm2 = yfStem.length && BufferGeometryUtils.mergeGeometries(yfStem, false); if (sm2) town.add(new THREE.Mesh(sm2, toon(0x5e7a44))); yfStem.forEach((g) => g.dispose())
+      const hm2 = yfHead.length && BufferGeometryUtils.mergeGeometries(yfHead, false); if (hm2) town.add(new THREE.Mesh(hm2, toon(yfCol))); yfHead.forEach((g) => g.dispose())
+    }
     // ── 朝靄（谷戸の朝・棚田とせせらぎに低くたなびく霧の薄衣）。大きく柔らかい横長スプライトを谷底に低く敷く。
     // 谷戸の朝の情景の核。やわらかい白の薄veil＝近景の硬い造形を少し溶かし、霞(fog)と地続きの大気感を出す。冬は省略（雪で別の趣）。
     if (weather !== 'snow') {
