@@ -5318,6 +5318,7 @@ export async function mountTown3d(parent, opts = {}) {
   let winPendulum = null // 振り子柱時計（振り子が静かに揺れる）
   let winDust = null // 窓の光に舞うほこり（昼の“居る部屋”の空気感）
   let winCat = null // 窓辺の日だまりで丸くなって眠る猫（呼吸でそっと上下）
+  let winFurin = null // 夏の風鈴（窓辺に吊るして揺れる。窓をあけると風でそっと鳴る）
   let winRefl = null // 窓ガラスへの室内の映り込み（夕/夜ほど強い・窓をあけると消える）
   let winRainGlass = null // 雨天の窓ガラスに伝う雨粒・流れ（窓辺で“雨が降っている”手応え。下へ流れる）
   {
@@ -5440,6 +5441,19 @@ export async function mountTown3d(parent, opts = {}) {
       const reflMat = new THREE.MeshBasicMaterial({ map: reflTex, transparent: true, opacity: reflBase, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); winRoomMats.push(reflMat)
       const refl = new THREE.Mesh(new THREE.PlaneGeometry(owW - 0.06, owH - 0.12), reflMat); refl.position.set(0, WINCY, 0.215); refl.renderOrder = 5; winRoom.add(refl)
       winRefl = { mat: reflMat, base: reflBase } }
+    // ── 夏の風鈴（窓辺に吊るして揺れる＝夏の風物詩。窓をあけると風でそっと鳴る）。室内サブ群＝素のMeshBasic＋roomWarmで採光に馴染ませる。──
+    if (season === 'summer') {
+      const fm = (col, ds) => { const m = new THREE.MeshBasicMaterial({ color: col, fog: false, side: ds ? THREE.DoubleSide : THREE.FrontSide }); if (roomWarm) m.color.multiply(roomWarm); winRoomMats.push(m); return m }
+      const fg = new THREE.Group(); fg.position.set(owW * 0.3, oT - 0.05, 0.3); winRoom.add(fg) // 窓の右上・ガラスの手前。上端が支点で揺れる
+      const glassCol = fm(0xbcd6e0, true), woodCol = fm(0x7a6248), paperCol = fm(0xeef2f6), clapCol = fm(0xcfc6b6)
+      const fa = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.renderOrder = 6; fg.add(m) }
+      fa(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 4), woodCol, -0.15)                    // 吊り紐
+      fa(new THREE.CylinderGeometry(0.075, 0.11, 0.13, 14, 1, true), glassCol, -0.36)         // 釣鐘（ガラスの鈴）
+      fa(new THREE.SphereGeometry(0.075, 12, 6, 0, 6.2832, 0, Math.PI / 2), glassCol, -0.30)  // 鈴の天
+      fa(new THREE.SphereGeometry(0.026, 7, 5), clapCol, -0.45)                               // 舌（短冊を吊る玉）
+      fa(new THREE.BoxGeometry(0.07, 0.17, 0.008), paperCol, -0.57)                           // 短冊（紙片）
+      winFurin = fg
+    }
     // ── 雨天の窓ガラス: 伝う雨粒＋下へ流れる滴＝窓辺で「雨が降っている」手応え（仕様の核心。半透明＝街は透ける）。 ──
     if (weather === 'rain') {
       const rgTex = cv(256, 256, (x) => {
@@ -7426,6 +7440,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
     if (winRoom.visible && winPendulum) winPendulum.rotation.x = Math.sin(t * 2.0) * 0.16 // 柱時計の振り子が静かに時を刻む
     if (winRoom.visible && winDust) { for (let i = 0; i < winDust.base.length; i++) { const b = winDust.base[i]; winDust.arr[i * 3] = b.x0 + Math.sin(t * b.sp + b.ph) * b.amp * 3; winDust.arr[i * 3 + 1] = b.y0 + Math.sin(t * b.sp * 0.7 + b.ph * 1.7) * b.amp * 4; winDust.arr[i * 3 + 2] = b.z0 + Math.cos(t * b.sp * 0.5 + b.ph) * b.amp * 3 } winDust.geo.attributes.position.needsUpdate = true } // 窓の光にほこりがゆらゆら舞う
+    if (winRoom.visible && winFurin) winFurin.rotation.z = Math.sin(t * 1.6) * 0.12 + Math.sin(t * 2.7 + 1.3) * 0.05 // 風鈴がそよ風にゆれる（二重サインで自然に）
     if (winRoom.visible && winCat) { const c = winCat // 猫: 眠る・たまに目を覚ます・撫でられると喜ぶ＝生きている気配
       // 覚醒度 alert（0=眠り/1=ぱっちり）。撫でている間=1、たまに自発的に目を覚ます。
       c.wakeT -= dt

@@ -528,6 +528,27 @@ export function createAudio(opts) {
     staNode.bright.frequency.setTargetAtTime(640 + a * a * 3200, t, 0.7)  // 遠=こもったベル／近=澄んだベル
     staState.amt = a
   }
+  //  夏の風鈴（窓をあけると風でそっと鳴る）。素材ゼロの合成（高いガラスの鈴＝非整数倍音）。夏の情景＋窓開け時だけ風まかせに鳴る。
+  let furinNode = null
+  function startFurin() {
+    if (!ctx || furinNode || !ctx.createOscillator) return
+    const fg = ctx.createGain(); fg.gain.value = 1; fg.connect(master); furinNode = { fg, timer: null }
+    const chime = () => {
+      const t = now() + 0.02, f0 = 2080 + Math.random() * 280
+      for (const [mul, g0, dec] of [[1, 0.12, 1.4], [2.41, 0.06, 1.0], [3.86, 0.028, 0.7]]) { // ガラスの鈴＝非整数倍音
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f0 * mul
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(g0, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dec)
+        o.connect(g).connect(fg); try { o.start(t); o.stop(t + dec + 0.1) } catch { /* 無視 */ }
+      }
+    }
+    const tick = () => {
+      if (!furinNode) return
+      const summer = currentScene && currentScene.axes && currentScene.axes.season === 'summer'
+      if (summer && windowOpenAmt > 0.5 && Math.random() < 0.7) chime() // 夏に窓をあけた時だけ・風まかせで時々
+      furinNode.timer = setTimeout(tick, 2800 + Math.random() * 4500) // ~2.8-7.3秒ごと（風まかせ）
+    }
+    tick()
+  }
   // 海の近さ・川の近さ・人混みの近さ・夏祭り・駅(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
   function setAmbience(sea, river, crowd, fest, sta) {
     setFestival(fest)  // 夏祭りの囃子（場所への近さで満ち引き）
@@ -693,6 +714,7 @@ export function createAudio(opts) {
       startWater() // 場所に応じた水の音（波/せせらぎ）の源を立ち上げる（音量0＝setAmbienceが近さで満ち引き）
       startFestival() // 夏祭りの囃子の源を立ち上げる（音量0＝祭りに近づくと満ちる。離れている間は音符を作らない）
       startStation() // 駅の音の源を立ち上げる（音量0＝駅に近づくと発車ベル・電車の音が満ちる）
+      startFurin() // 夏の風鈴の源を立ち上げる（夏に窓をあけた時だけ風まかせに鳴る）
       // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
       // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
