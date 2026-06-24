@@ -3952,6 +3952,20 @@ export async function mountTown3d(parent, opts = {}) {
       const gateRoof = new THREE.Mesh(makeHipRoof(8.2, 3.4, 5.0, 1.5), thatchMat)
       gateRoof.position.set(0, 2.0, 5.8); gateRoof.castShadow = true; g.add(gateRoof)
       const gateOpen = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.7, 0.3), toon(0x241f18)); gateOpen.position.set(0, 0.95, 6.95); g.add(gateOpen) // 門の通り口（陰）
+      // ── 旧家の作り込み（土蔵・縁側・井戸・庭）＝実在の横溝屋敷らしい屋敷構え。群の局所座標（×1.5）。──
+      const kura = new THREE.Mesh(new RoundedBoxGeometry(3.6, 3.0, 3.0, 1, 0.1), toon(0xeae3d4)); kura.position.set(-7.4, 1.5, 0.8); kura.castShadow = true; kura.receiveShadow = true; g.add(kura) // 土蔵（白漆喰）
+      const kuraSkirt = new THREE.Mesh(new THREE.BoxGeometry(3.7, 1.2, 3.1), toon(0x3a4048)); kuraSkirt.position.set(-7.4, 0.6, 0.8); g.add(kuraSkirt) // 海鼠壁の腰（黒っぽい）
+      const kuraRoof = new THREE.Mesh(makeHipRoof(4.4, 3.8, 2.4, 1.1), toon(season === 'winter' ? 0xb8bcc0 : 0x5a5650)); kuraRoof.position.set(-7.4, 3.0, 0.8); kuraRoof.castShadow = true; g.add(kuraRoof) // 瓦の寄棟
+      const engawa = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.18, 1.3), toon(0x8a6a44)); engawa.position.set(0.4, 0.55, 3.7); engawa.castShadow = true; g.add(engawa) // 縁側（主屋の谷側の濡れ縁）
+      for (const ex of [-3, 0, 3]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 5), toon(0x6a5238)); post.position.set(ex + 0.4, 0.28, 4.2); g.add(post) } // 縁の束
+      { const wx = 4.6, wz = 4.4 // 井戸（石組み＋小屋根）
+        const well = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.95, 8), toon(0x8a857a)); well.position.set(wx, 0.47, wz); well.castShadow = true; g.add(well)
+        const wtop = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.12, 8), toon(0x241f18)); wtop.position.set(wx, 0.95, wz); g.add(wtop) // 水面の陰
+        for (const px of [-0.62, 0.62]) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 5), toon(0x6a5238)); pole.position.set(wx + px, 1.32, wz); g.add(pole) } // 屋根の柱
+        const wroof = new THREE.Mesh(new THREE.ConeGeometry(0.92, 0.5, 4), toon(0x5a5248)); wroof.position.set(wx, 2.35, wz); wroof.rotation.y = Math.PI / 4; wroof.castShadow = true; g.add(wroof) }
+      { const pineTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.5, 6), toon(0x5a4632)); pineTrunk.position.set(-3.6, 0.75, 4.7); pineTrunk.rotation.z = 0.2; pineTrunk.castShadow = true; g.add(pineTrunk) // 庭の松
+        for (const [px, py, pz, s] of [[-3.9, 1.8, 4.7, 0.9], [-3.2, 1.6, 5.0, 0.7], [-3.7, 2.2, 4.5, 0.6]]) { const pf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), toon(season === 'winter' ? 0x6a7a66 : 0x46663e)); pf.position.set(px, py, pz); pf.scale.y = 0.55; pf.castShadow = true; g.add(pf) } // 松の葉（平たい層＝手入れされた庭木）
+        for (const [sx, sz, sr] of [[-1.5, 5.0, 0.42], [-2.3, 5.3, 0.3]]) { const stone = new THREE.Mesh(new THREE.IcosahedronGeometry(sr, 0), toon(0x8a857c)); stone.position.set(sx, sr * 0.5, sz); stone.scale.y = 0.6; g.add(stone) } } // 庭石
     }
     // 屋敷林（屋敷を「後ろから」抱く高木の木立）。主屋(z=-18)の手前を空け、背後と側面奥にのみ立てる。
     for (const c of [[-8, -26], [8, -25], [-6, -31], [7, -30], [0, -33], [-11, -28], [11, -27]]) tree(c[0], c[1], 1.3 + R() * 0.5)
@@ -4013,6 +4027,15 @@ export async function mountTown3d(parent, opts = {}) {
       const flyCols = season === 'spring' ? [0xf6d0e0, 0xfaf0c0, 0xf2f2ee] : [0xf2ead0, 0xf6e8b0, 0xeec8a0]
       if (flyOK && !isNight) for (let k = 0; k < 5; k++) { const a = R() * 6.28, r = 6 + R() * 15, px = Math.cos(a) * r, pz = -16 + Math.sin(a) * r * 0.8, py = heightAt(px, pz); if (py < SEA.level + 0.5) continue; mkButterfly(px, py + 1.2 + R() * 1.3, pz, flyCols[k % flyCols.length]) }
       if (dartOK && !isNight) for (let k = 0; k < 6; k++) { const a = R() * 6.28, r = 5 + R() * 15, px = Math.cos(a) * r, pz = -16 + Math.sin(a) * r * 0.8, py = heightAt(px, pz); if (py < SEA.level + 0.5) continue; mkDragonfly(px, py + 1.2 + R() * 0.8, pz, season === 'autumn' ? 0xc2452a : 0x46665a) }
+    }
+    // 彼岸花（秋の畦に咲く真紅＝谷戸の秋の象徴）。茎(緑)＋花(紅)を統合で軽量。
+    if (season === 'autumn' && BufferGeometryUtils.mergeGeometries) {
+      const hbStem = [], hbHead = []
+      for (let i = 0; i < 44; i++) { const fx = (R() - 0.5) * 26, fz = -4 - R() * 40, fy = heightAt(fx, fz); if (fy < SEA.level + 0.4) continue
+        const sg = new THREE.CylinderGeometry(0.022, 0.028, 0.55, 3).toNonIndexed(); sg.translate(fx, fy + 0.27, fz); hbStem.push(sg)
+        const hg = new THREE.IcosahedronGeometry(0.11, 0).toNonIndexed(); hg.scale(1, 0.55, 1); hg.translate(fx, fy + 0.55, fz); hbHead.push(hg) }
+      const sm = hbStem.length && BufferGeometryUtils.mergeGeometries(hbStem, false); if (sm) town.add(new THREE.Mesh(sm, toon(0x4a6a3a))); hbStem.forEach((g) => g.dispose())
+      const hm = hbHead.length && BufferGeometryUtils.mergeGeometries(hbHead, false); if (hm) town.add(new THREE.Mesh(hm, toon(0xd23a26))); hbHead.forEach((g) => g.dispose())
     }
     // ── 朝靄（谷戸の朝・棚田とせせらぎに低くたなびく霧の薄衣）。大きく柔らかい横長スプライトを谷底に低く敷く。
     // 谷戸の朝の情景の核。やわらかい白の薄veil＝近景の硬い造形を少し溶かし、霞(fog)と地続きの大気感を出す。冬は省略（雪で別の趣）。
