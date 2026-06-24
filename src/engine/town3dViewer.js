@@ -320,8 +320,9 @@ export async function mountTown3d(parent, opts = {}) {
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
   const sunCol = new THREE.Color(pal.sunGlow || '#ffe6c2')
   // 空気遠近の霞（遠景を空色へやわらかく溶かす＝絵画的な奥行き。手前は鮮明）。雪は濃く冷たく。
+  const isNight0 = (skyTop.r + skyTop.g + skyTop.b) < 0.7 // 夜判定（isNightは後で定義されるためfog色用にここで先に算出）
   const fogCol = weather === 'snow'
-    ? skyHorizon.clone().lerp(new THREE.Color(isNight ? 0x39424f : 0xc8d2de), isNight ? 0.42 : 0.5).getHex() // 雪霞は純白でなく淡い青灰に＝白飛びを止める（評価 美術-M5）。夜は暗い青墨へ＝明るい灰だと暗い夜空ドームと継ぎ目になる（評価3）
+    ? skyHorizon.clone().lerp(new THREE.Color(isNight0 ? 0x39424f : 0xc8d2de), isNight0 ? 0.42 : 0.5).getHex() // 雪霞は純白でなく淡い青灰に＝白飛びを止める（評価 美術-M5）。夜は暗い青墨へ＝明るい灰だと暗い夜空ドームと継ぎ目になる（評価3）
     : skyHorizon.clone().lerp(skyTop, 0.52).getHex() // 空色へ溶かす空気の層（俯瞰の霞）
   // 空気遠近の霞（調整可）: near=ここから霞み始める, far=ここで空に溶ける。手前へ寄せて遠景〜中景を
   // やわらかな大気に溶かし、「高台から街を眺める」水彩調の奥行きを出す（手前は鮮明に保つ）。
