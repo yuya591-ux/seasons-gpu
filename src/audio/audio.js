@@ -367,7 +367,7 @@ export function createAudio(opts) {
   //  海の近く・低空で「波」が、川/運河の近くで「せせらぎ」が満ちる。setAmbience(海,川) が近さで音量を上下する。
   //  未使用時は完全に 0（録音のAGCで増幅されるノイズ漏れを断つ＝以前の機械音の教訓）。低音の唸りはハイパスで断つ。
   let waterNode = null
-  const waterState = { sea: 0, river: 0 }
+  const waterState = { sea: 0, river: 0, crowd: 0 }
   function startWater() {
     if (!ctx || waterNode || !ctx.createBiquadFilter) return
     const len = Math.floor(2 * ctx.sampleRate)
@@ -387,7 +387,14 @@ export function createAudio(opts) {
     const rbp = ctx.createBiquadFilter(); rbp.type = 'bandpass'; rbp.frequency.value = 2300; rbp.Q.value = 0.7
     const rg = ctx.createGain(); rg.gain.value = 0.0
     rsrc.connect(rhp).connect(rbp).connect(rg).connect(master)
-    waterNode = { wg, rg, wAmp: null, rAmp: null }
+    // 人混みのざわめき：人声の中域(低音の歪み無し)。スローLFOで“ざわざわ”と満ち引き。
+    const csrc = ctx.createBufferSource(); csrc.buffer = buf; csrc.loop = true
+    const chp = ctx.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = 360; chp.Q.value = 0.5
+    const cbp = ctx.createBiquadFilter(); cbp.type = 'bandpass'; cbp.frequency.value = 650; cbp.Q.value = 0.7 // 人声の帯
+    const clp = ctx.createBiquadFilter(); clp.type = 'lowpass'; clp.frequency.value = 1600
+    const cg = ctx.createGain(); cg.gain.value = 0.0
+    csrc.connect(chp).connect(cbp).connect(clp).connect(cg).connect(master)
+    waterNode = { wg, rg, cg, wAmp: null, rAmp: null, cAmp: null }
     try { // 波のスウェル（寄せて返す）。LFOの振幅(wAmp)は setAmbience が海の近さで持たせる＝海に近いほど大きく寄せる。
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11      // 約9秒周期の大きなうねり
       const wAmp = ctx.createGain(); wAmp.gain.value = 0; lfo.connect(wAmp).connect(wg.gain); lfo.start()
@@ -395,21 +402,28 @@ export function createAudio(opts) {
       const wAmp2 = ctx.createGain(); wAmp2.gain.value = 0; lfo2.connect(wAmp2).connect(wg.gain); lfo2.start()
       const rlfo = ctx.createOscillator(); rlfo.frequency.value = 0.21    // せせらぎのごく僅かな揺らぎ
       const rAmp = ctx.createGain(); rAmp.gain.value = 0; rlfo.connect(rAmp).connect(rg.gain); rlfo.start()
-      waterNode.wAmp = wAmp; waterNode.wAmp2 = wAmp2; waterNode.rAmp = rAmp
+      const clfo = ctx.createOscillator(); clfo.frequency.value = 0.27    // ざわめきの満ち引き
+      const cAmp = ctx.createGain(); cAmp.gain.value = 0; clfo.connect(cAmp).connect(cg.gain); clfo.start()
+      const clfo2 = ctx.createOscillator(); clfo2.frequency.value = 0.16
+      const cAmp2 = ctx.createGain(); cAmp2.gain.value = 0; clfo2.connect(cAmp2).connect(cg.gain); clfo2.start()
+      waterNode.wAmp = wAmp; waterNode.wAmp2 = wAmp2; waterNode.rAmp = rAmp; waterNode.cAmp = cAmp; waterNode.cAmp2 = cAmp2
     } catch { /* LFO非対応でもベース音量で鳴る */ }
-    try { wsrc.start(); rsrc.start() } catch { /* 無視 */ }
+    try { wsrc.start(); rsrc.start(); csrc.start() } catch { /* 無視 */ }
   }
-  // 海の近さ(0..1)・川の近さ(0..1)で水の音量を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
-  function setAmbience(sea, river) {
+  // 海の近さ・川の近さ・人混みの近さ(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
+  function setAmbience(sea, river, crowd) {
     if (!waterNode) return
     const t = now()
-    const s = Math.max(0, Math.min(1, sea || 0)), r = Math.max(0, Math.min(1, river || 0))
+    const s = Math.max(0, Math.min(1, sea || 0)), r = Math.max(0, Math.min(1, river || 0)), cw = Math.max(0, Math.min(1, crowd || 0))
     waterNode.wg.gain.setTargetAtTime(s <= 0.01 ? 0 : s * 0.05, t, 1.3)        // 波のベース音量
     if (waterNode.wAmp) waterNode.wAmp.gain.setTargetAtTime(s <= 0.01 ? 0 : s * 0.03, t, 1.3)  // 寄せて返すうねりの深さ
     if (waterNode.wAmp2) waterNode.wAmp2.gain.setTargetAtTime(s <= 0.01 ? 0 : s * 0.018, t, 1.3)
     waterNode.rg.gain.setTargetAtTime(r <= 0.01 ? 0 : r * 0.04, t, 1.1)        // せせらぎ
     if (waterNode.rAmp) waterNode.rAmp.gain.setTargetAtTime(r <= 0.01 ? 0 : r * 0.012, t, 1.1)
-    waterState.sea = s; waterState.river = r
+    waterNode.cg.gain.setTargetAtTime(cw <= 0.01 ? 0 : cw * 0.028, t, 1.2)     // 人混みのざわめき（控えめ）
+    if (waterNode.cAmp) waterNode.cAmp.gain.setTargetAtTime(cw <= 0.01 ? 0 : cw * 0.012, t, 1.2)
+    if (waterNode.cAmp2) waterNode.cAmp2.gain.setTargetAtTime(cw <= 0.01 ? 0 : cw * 0.008, t, 1.2)
+    waterState.sea = s; waterState.river = r; waterState.crowd = cw
   }
 
   // ── 生成的なBGMの下地（素材ゼロ・合成パッド）。CC0/オフライン原則と完全整合。
@@ -767,7 +781,7 @@ export function createAudio(opts) {
       }
     },
     getLookPan() { return lookPan }, // 検証/連携用
-    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2) } }, // 検証用: BGM下地＋水音の状態
+    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2), crowd: +waterState.crowd.toFixed(2) } }, // 検証用: BGM下地＋水音/ざわめきの状態
     isStarted() {
       return started
     },

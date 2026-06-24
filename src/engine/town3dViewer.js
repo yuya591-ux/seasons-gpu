@@ -626,6 +626,7 @@ export async function mountTown3d(parent, opts = {}) {
   let fishJumps = [] // 海面で時々跳ねる魚＋波紋
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   let nearFall = null   // 歩く人に追従する近景の舞い散り（降り立つとどこでも桜吹雪/落ち葉の中へ）
+  let crowdCenters = [] // 人だまりの中心（駅前/商店街/副都心/競技場/祭り等）＝近づくとざわめきが満ちる（音）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -4611,6 +4612,7 @@ export async function mountTown3d(parent, opts = {}) {
     { x: DOWNTOWN.x - 10, z: DOWNTOWN.z - 6, n: 4, rad: 3.2 },        // 副都心の通り
     { x: STADIUM.x, z: STADIUM.z + 18, n: 6, rad: 4.4 },             // 競技場のゲート前（観客）
   ]
+  crowdCenters = crowdSpots.map((s) => ({ x: s.x, z: s.z, r: s.rad + 9 })) // 音のざわめき用（人だまりの少し広めの範囲）
   for (const s of crowdSpots) for (let i = 0; i < (LIGHT ? Math.ceil(s.n * 0.5) : s.n); i++) {
     const g = makePeep()
     const hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
@@ -6984,7 +6986,9 @@ export async function mountTown3d(parent, opts = {}) {
       { const dz = fp.z - SENGOKU.z; if (Math.abs(dz) < SENGOKU.r) rivD = Math.min(rivD, Math.abs((fp.x - SENGOKU.x) - senValley(dz))) } // 戦国の谷の川
       const rivLow = Math.max(0, Math.min(1, (30 - Math.max(0, fp.y - SEA.level)) / 24)) // 川・運河は低空/地上でだけ聞こえる
       const riverAmt = Math.max(0, Math.min(1, (8 - rivD) / 8)) * rivLow * outAmt * (1 - seaAmt) // 川の近く（海の時は波を優先）
-      onAmbience(seaAmt, riverAmt) }
+      let crowdAmt = 0; for (const c of crowdCenters) { const d = Math.hypot(fp.x - c.x, fp.z - c.z); if (d < c.r) crowdAmt = Math.max(crowdAmt, 1 - d / c.r) } // 人だまりの近さ
+      crowdAmt *= rivLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
+      onAmbience(seaAmt, riverAmt, crowdAmt) }
     // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
     { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12)
       // 実時計 t で計る（休息中は描画が間引かれ dt が頭打ちになるため、dt 積算だと鈴が遅れる）
