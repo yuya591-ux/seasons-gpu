@@ -1830,25 +1830,35 @@ export async function mountTown3d(parent, opts = {}) {
     sg.position.set(sx + facing * 2.25, gy + 2.9, sz + 1.5); town.add(sg)
   }
 
-  // ── 大きなランドマーク（大型スーパー＝平らな大箱＋駐車場＋屋上看板） ──
+  // ── 大きなランドマーク（大型スーパー）。歩行目線でも商品化レベルの店構え＝ガラスの店先＋自動ドア＋庇＋外壁の継ぎ目＋屋上設備＋駐車場。 ──
   {
-    const x = 24, z = -20, gy = heightAt(x, z)
+    const x = 24, z = -20, gy = heightAt(x, z), lit = duskAmt > 0.25
     const g = new THREE.Group()
-    const body = new THREE.Mesh(new THREE.BoxGeometry(20, 9, 14), toon(0xe0d8c8))
-    body.position.y = 4.5; body.castShadow = true; body.receiveShadow = true; g.add(body)
-    const sign = new THREE.Mesh(new THREE.BoxGeometry(16, 2.2, 0.6), toon(0xc23a2c))
-    sign.position.set(0, 9.6, 7.1); g.add(sign)
-    // 屋上の看板塔（街から見える大きな看板）
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(12, 3.2, 0.8), toon(0xd23a4a))
-    tower.position.set(0, 11.4, 0); g.add(tower)
-    // 駐車場（店の手前の舗装）＋駐車中の車
-    const lot = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 13), toon(0x63636b))
-    lot.position.set(0, 0.15, 15); lot.receiveShadow = true; g.add(lot)
+    const wallMat = mottleMat(0xdcd4c6, 90, 0.06, [4, 2]), trimMat = toon(0xcfc6b6), glassMat = toon(0x3b4a55)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(20, 9, 14), wallMat); body.position.y = 4.5; body.castShadow = true; body.receiveShadow = true; g.add(body)
+    for (const yy of [3.0, 6.2]) { const seam = new THREE.Mesh(new THREE.BoxGeometry(20.1, 0.16, 14.1), trimMat); seam.position.y = yy; g.add(seam) } // 外壁パネルの継ぎ目（大面ののっぺり解消）
+    const para = new THREE.Mesh(new THREE.BoxGeometry(20.5, 0.6, 14.5), trimMat); para.position.y = 9.2; g.add(para) // 屋上のパラペット
+    // 1階の店先（+z面＝駐車場側）。ガラスのカーテンウォール＋柱割り＋自動ドア＋庇。夜は店内が灯る。
+    const fz = 7.05
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(18, 3.4, 0.25), lit ? new THREE.MeshBasicMaterial({ color: 0xffe7ad, fog: true }) : glassMat); glass.position.set(0, 2.0, fz); g.add(glass)
+    for (let i = 0; i <= 6; i++) { const mul = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.6, 0.34), trimMat); mul.position.set(-9 + i * 3, 2.0, fz + 0.05); g.add(mul) } // 方立（柱割り）
+    const door = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.6, 0.22), toon(0x2b3640)); door.position.set(0, 1.5, fz - 0.12); g.add(door) // 自動ドア
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.3, 2.0), trimMat); canopy.position.set(0, 3.55, fz + 0.9); canopy.castShadow = true; g.add(canopy) // 玄関の庇
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(16, 2.2, 0.6), toon(0xc23a2c)); sign.position.set(0, 7.5, fz + 0.1); g.add(sign) // 店名の赤帯
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(12, 3.2, 0.8), toon(0xd23a4a)); tower.position.set(0, 11.4, 0); tower.castShadow = true; g.add(tower) // 屋上の看板塔
+    for (const sx of [-10.06, 10.06]) { const sw = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.6, 9), glassMat); sw.position.set(sx, 6.2, 0); g.add(sw) } // 側面の窓の帯
+    for (let i = 0; i < 3; i++) { const ac = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 2.0), toon(0xbfc2c0)); ac.position.set(-5 + i * 5, 9.8, -3); ac.castShadow = true; g.add(ac) } // 屋上の空調
+    // 駐車場（舗装＋白線）＋車＋カート置き場
+    const lot = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 13), mottleMat(0x65656d, 80, 0.05, [4, 3])); lot.position.set(0, 0.15, 15); lot.receiveShadow = true; g.add(lot)
+    const lineGeos = []
+    for (let i = 0; i <= 6; i++) { const lg = new THREE.BoxGeometry(0.16, 0.04, 3.6); lg.translate(-9 + i * 3, 0.32, 12.6); lineGeos.push(lg) }
+    if (BufferGeometryUtils.mergeGeometries) { const lm = BufferGeometryUtils.mergeGeometries(lineGeos, false); if (lm) g.add(new THREE.Mesh(lm, toon(0xe6e2d8))); lineGeos.forEach((q) => q.dispose()) } // 駐車枠の白線（統合）
     const pcols = [0xb0564a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a]
-    for (let i = 0; i < 12; i++) {
-      const car = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 3.2), toon(pcols[i % pcols.length]))
-      car.position.set(-9.5 + (i % 6) * 3.8, 0.8, 12.5 + ((i / 6) | 0) * 4.5); car.castShadow = true; g.add(car)
-    }
+    for (let i = 0; i < (LIGHT ? 7 : 11); i++) { const car = new THREE.Mesh(new RoundedBoxGeometry(1.7, 1.0, 3.2, 2, 0.24), toon(pcols[i % pcols.length])); car.position.set(-9 + (i % 6) * 3, 0.8, 12.6 + ((i / 6) | 0) * 4.6); car.castShadow = true; g.add(car) }
+    { const corral = new THREE.Group(); corral.position.set(8.5, 0, 19.5); g.add(corral) // カート置き場（屋根＋支柱＋カートの列）
+      const croof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 4), trimMat); croof.position.y = 2.2; corral.add(croof)
+      for (const cx2 of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 6), trimMat); post.position.set(cx2, 1.1, 0); corral.add(post) }
+      for (let k = 0; k < 4; k++) { const cart = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.9), toon(0x9aa0a4)); cart.position.set(0, 0.5, -1.2 + k * 0.45); corral.add(cart) } }
     g.position.set(x, gy, z); g.rotation.y = -0.3; town.add(g)
   }
   // ── パチンコ屋（建物＋縦長の袖看板。夜/夕にだけネオンが煌々と灯る。昼は派手にしない） ──
@@ -7578,6 +7588,7 @@ export async function mountTown3d(parent, opts = {}) {
       for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); x.putImageData(img, 0, 0); rt.dispose()
       return c.toDataURL()
     }
+    window.__town3dGroundAt = (x, z) => heightAt(x, z) // 検証用: 地面の高さ（カメラを地中に潜らせない/正しい歩行目線に置く）
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
