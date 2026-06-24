@@ -652,6 +652,8 @@ export async function mountTown3d(parent, opts = {}) {
   const TEMPLE = { x: 40, z: -74, r: 14 }
   // 学校（校舎と校庭）。街の右手の一角。時計塔・トラック・桜並木＝町の馴染みの場所。
   const SCHOOL = { x: 54, z: -18, r: 13 }
+  // やまゆりホーム（地域の福祉施設）。公園と学校の間の馴染みの場所。前庭の広場で夏は「サマフェス」（模擬店＋ステージ）。
+  const YAMAYURI = { x: 36, z: -37, r: 14 }
   // 遊園地（既存の観覧車を中心に）。メリーゴーラウンド・遊具・ゲート＝明るい賑わいの目的地。
   const FUN = { x: -26, z: -66, r: 13 }
   // 副都心（拡張した西の一角＝ガラスの高層ビル街）。旗艦homeの現代的な核＝街のスカイライン。飛んでいく目的地。
@@ -987,6 +989,50 @@ export async function mountTown3d(parent, opts = {}) {
     }
     colliders.push({ x: fx, z: fz, r: 2.6 }); spawnAvoid.push({ x: fx, z: fz, r: 7 })
     festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: この祭りに近づくと囃子が満ちる
+  }
+  // ── やまゆりホームの「サマフェス」（前庭の広場で。ステージ＋模擬店＋見物の人＝盆踊りと別の地域の催し）。──
+  const makeSummerFes = (fx, fz) => {
+    const lit = isNight || duskAmt > 0.3, woodMat = toon(0x9a7048)
+    // ステージ（低い木の台＋背幕＋袖の柱／スピーカー）。広場の奥(-z)に据える。
+    const stz = fz - 4.5, stY = heightAt(fx, stz)
+    const stage = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.6, 3), woodMat); stage.position.set(fx, stY + 0.3, stz); stage.castShadow = true; town.add(stage)
+    const bc = document.createElement('canvas'); bc.width = 160; bc.height = 48; const bx = bc.getContext('2d')
+    const bgr = bx.createLinearGradient(0, 0, 0, 48); bgr.addColorStop(0, '#2b4a6e'); bgr.addColorStop(1, '#1c3350'); bx.fillStyle = bgr; bx.fillRect(0, 0, 160, 48)
+    bx.fillStyle = '#e8d9a0'; bx.font = 'bold 26px serif'; bx.textAlign = 'center'; bx.textBaseline = 'middle'; bx.fillText('夏まつり', 80, 25) // 一般的な幕（固有意匠は模さない）
+    const btex = new THREE.CanvasTexture(bc); const banner = new THREE.Mesh(new THREE.BoxGeometry(6.6, 2.5, 0.12), lit ? new THREE.MeshBasicMaterial({ map: btex, fog: true }) : new THREE.MeshToonMaterial({ map: btex, gradientMap: grad, fog: true })); banner.position.set(fx, stY + 1.95, stz - 1.4); banner.castShadow = true; town.add(banner)
+    for (const sx of [-3.5, 3.5]) { const g = new THREE.Group(); g.position.set(fx + sx, stY, stz - 0.2); town.add(g); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 3, 6), toon(0x4a4640)).translateY(1.5)); const sp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.4), toon(0x2a2724)); sp.position.y = 2.5; g.add(sp) } // 袖のスピーカー
+    // ステージの演者×2（手を振る。frameで腕が動く）
+    const yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], skinMat = toon(0xf0c49c)
+    for (let i = 0; i < 2; i++) { const px = fx + (i ? 1.4 : -1.4), pz = stz + 0.3, d = new THREE.Group(); d.position.set(px, stY + 0.6, pz); d.rotation.y = Math.PI; town.add(d) // 客席(+z)を向く
+      d.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i])).translateY(0.6))
+      d.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat).translateY(1.4))
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), toon(yukataCols[i])); arm.position.set(0.22, 1.15, 0.1); arm.rotation.z = -0.9; d.add(arm)
+      festDancers.push({ d, arm, ph: i * 1.4, y0: stY + 0.6 }) }
+    // 提灯の列（広場を囲むポール間に渡す。色ごとに統合）
+    const lanLit = [0xffd27a, 0xff8a6a, 0x8ac0e8], lanCols = [toon(0xe8a838), toon(0xc0392b), toon(0x3a8ac0)], lanGeos = [[], [], []], poleGeos = []
+    const ring = [[-8, 4], [-8, -3], [8, -3], [8, 4], [0, 7]]
+    for (let i = 0; i < ring.length; i++) { const px = fx + ring[i][0], pz = fz + ring[i][1], py = heightAt(px, pz); const pg = new THREE.CylinderGeometry(0.07, 0.09, 4, 6); pg.translate(px, py + 2, pz); poleGeos.push(pg)
+      const n = (i + 1) % ring.length, nx = fx + ring[n][0], nz = fz + ring[n][1], ny = heightAt(nx, nz)
+      for (let k = 1; k <= 4; k++) { const tt = k / 5, lx = px + (nx - px) * tt, lz = pz + (nz - pz) * tt, ly = (py + 4) + ((ny + 4) - (py + 4)) * tt - 0.5 - Math.sin(tt * Math.PI) * 0.4; const lg = new THREE.CylinderGeometry(0.17, 0.17, 0.32, 8); lg.scale(1, 1.15, 1); lg.translate(lx, ly, lz); lanGeos[k % 3].push(lg) } }
+    if (BufferGeometryUtils.mergeGeometries) { const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x6a5a48))); poleGeos.forEach((g) => g.dispose())
+      for (let c = 0; c < 3; c++) if (lanGeos[c].length) { const lm = BufferGeometryUtils.mergeGeometries(lanGeos[c], false); if (lm) town.add(new THREE.Mesh(lm, lit ? new THREE.MeshBasicMaterial({ color: lanLit[c], fog: true }) : lanCols[c])); lanGeos[c].forEach((g) => g.dispose()) } }
+    // 模擬店×3（野菜販売・ゲーム・わたあめ＝地域のサマフェスらしく）
+    const fesWords = ['やさい', 'ゲーム', 'わたあめ'], fesPos = [[-7, 2], [7, 1], [-4, 7]], awnCols = [0x3a7a5e, 0xc0453a, 0xc89030]
+    for (let s = 0; s < 3; s++) { const sx = fx + fesPos[s][0], sz = fz + fesPos[s][1], sgy = heightAt(sx, sz), g = new THREE.Group(); g.position.set(sx, sgy, sz); g.rotation.y = Math.atan2(fx - sx, fz - sz); town.add(g)
+      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 1.3), toon(0xcdb185)), { castShadow: true }).translateY(0.5))
+      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.6), toon(awnCols[s])), { castShadow: true }).translateY(2.0))
+      for (const bxp of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.0, 6), toon(0x8a6a48)); post.position.set(bxp, 1.0, 0); g.add(post) }
+      const scv = document.createElement('canvas'); scv.width = 64; scv.height = 24; const scx = scv.getContext('2d'); scx.fillStyle = '#f0ece0'; scx.fillRect(0, 0, 64, 24); scx.fillStyle = '#1f6e4a'; scx.font = 'bold 15px sans-serif'; scx.textAlign = 'center'; scx.textBaseline = 'middle'; scx.fillText(fesWords[s], 32, 12)
+      const stex = new THREE.CanvasTexture(scv); const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.68, 0.06), lit ? new THREE.MeshBasicMaterial({ map: stex, fog: true }) : new THREE.MeshToonMaterial({ map: stex, gradientMap: grad, fog: true })); sign.position.set(0, 1.5, 0.72); g.add(sign)
+      const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.32, 8), lit ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : toon(0xc0392b)); lan.position.set(-1.2, 1.7, 0.66); g.add(lan)
+      colliders.push({ x: sx, z: sz, r: 1.5 }) }
+    // 見物の人（ステージを向いて集まる）
+    for (let i = 0; i < (LIGHT ? 8 : 14); i++) { const ang = (R() - 0.5) * 2.2, rad = 2.6 + R() * 4.2, cx2 = fx + Math.sin(ang) * rad, cz2 = fz + 1.5 + Math.cos(ang) * rad * 0.6, cgy = heightAt(cx2, cz2)
+      const d = new THREE.Group(); d.position.set(cx2, cgy, cz2); d.rotation.y = Math.atan2(fx - cx2, stz - cz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d) // ステージを向く
+      d.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])).translateY(0.6))
+      d.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat).translateY(1.4)) }
+    colliders.push({ x: fx, z: stz, r: 3.6 }); spawnAvoid.push({ x: fx, z: fz, r: 8 })
+    festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: サマフェスにも近づくと囃子が満ちる
   }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
@@ -1351,6 +1397,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r) continue // 寺の境内は空ける
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r) continue // 学校の敷地は空ける
+      if (Math.hypot(x - YAMAYURI.x, z - YAMAYURI.z) < YAMAYURI.r) continue // やまゆりホームの敷地は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r) continue // 遊園地は空ける
       if (Math.hypot(x - DOWNTOWN.x, z - DOWNTOWN.z) < DOWNTOWN.r) continue // 副都心（高層ビル街）は専用に建てる
       if (Math.hypot(x - STADIUM.x, z - STADIUM.z) < STADIUM.r) continue // 競技場は専用に建てる
@@ -2160,6 +2207,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r) continue // 展望塔の足元は空ける
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r - 2) continue // 寺は専用の木立で囲む
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
+      if (Math.hypot(x - YAMAYURI.x, z - YAMAYURI.z) < YAMAYURI.r - 1) continue // やまゆりホームの前庭は専用に
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.5) continue // 海・汀には木を生やさない
       if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 工業地帯には木を生やさない
@@ -2489,6 +2537,44 @@ export async function mountTown3d(parent, opts = {}) {
       spawnAvoid.push({ x: cx, z: cz - 7, r: 9 })
       // 夏の夜祭り（校庭の盆踊り）＝獅子ヶ谷小学校の核の記憶。夏の夕夜・日替わりで開催。id=1
       if (festOn(1)) makeFestival(cx, cz + 4, 0.62) // 校庭の真ん中（トラックの内側）にやぐらを立てる
+    }
+
+    // ── やまゆりホーム（地域の福祉施設）。馴染みの場所。前庭の広場で夏は「サマフェス」（模擬店＋ステージ）。──
+    {
+      const hx = YAMAYURI.x, hz = YAMAYURI.z, baseY = heightAt(hx, hz)
+      const wallMat = toon(0xe8ddcb), roofMat = toon(0x9a8a6e), winMat = toon(0x3e4c54), trimMat = toon(0xcdbfa4)
+      const lit = isNight || duskAmt > 0.3
+      const grp = new THREE.Group(); grp.position.set(hx, baseY, hz); town.add(grp)
+      const mk = (w, h, d, x, y, z, mat, sh) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); if (sh) { m.castShadow = true; m.receiveShadow = true }; grp.add(m); return m }
+      const bw = 13, bd = 6, bh = 7, bcz = -4 // 本棟は奥(-z)、前面(+z)を街へ向ける
+      mk(bw + 0.4, 1.8, bd + 0.4, 0, -0.6, bcz, trimMat)          // 基礎（傾斜のすき間を隠す）
+      mk(bw, bh, bd, 0, bh / 2, bcz, wallMat, true)               // 本体（2階建て）
+      mk(bw + 0.5, 0.5, bd + 0.6, 0, bh + 0.2, bcz, roofMat)      // 陸屋根の庇
+      mk(bw + 0.2, 0.28, bd + 0.2, 0, bh / 2, bcz, trimMat)       // 階の境の帯
+      const fzf = bcz + bd / 2 // 前面(+z)
+      for (let fl = 0; fl < 2; fl++) { mk(bw - 1.4, 1.5, 0.12, 0, 2.0 + fl * 3.0, fzf + 0.02, winMat); mk(bw - 1.0, 0.16, 0.24, 0, 1.2 + fl * 3.0, fzf + 0.05, trimMat) } // 窓の帯＋窓台（2階）
+      if (lit) { // 夜は一部の部屋に暖かな灯り（福祉施設＝夜も人の気配）
+        const winLit = new THREE.MeshBasicMaterial({ color: 0xf6cd84, fog: true })
+        for (let i = 0; i < 6; i++) { const lw = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.95), winLit); lw.position.set(-4.4 + (i % 3) * 4.4 + (R() - 0.5) * 0.6, 2.0 + (i < 3 ? 0 : 3.0), fzf + 0.1); grp.add(lw) }
+        lightPool(hx, heightAt(hx, hz + fzf + 2), hz + fzf + 2, 3.2, 0.5) // 玄関の足元の灯りだまり
+      }
+      mk(bw - 1.0, 0.1, 0.12, 0, 3.45, fzf + 0.45, trimMat)       // 2階のバルコニーの手すり（福祉施設らしく）
+      for (let i = 0; i < 7; i++) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 5), trimMat); r.position.set(-3 + i, 3.2, fzf + 0.45); grp.add(r) }
+      // 玄関の車寄せ（ひさし＋柱）。前面中央。
+      const pz = fzf + 1.6
+      mk(4.4, 0.25, 2.6, 0, 3.05, pz - 0.5, roofMat)
+      for (const px of [-1.8, 1.8]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.05, 8), trimMat); post.position.set(px, 1.5, pz + 0.6); post.castShadow = true; grp.add(post) }
+      mk(2.4, 2.3, 0.1, 0, 1.15, fzf + 0.06, winMat)              // 玄関のガラス戸
+      // 名板（玄関脇の縦サイン。固有のロゴは用いず素朴な施設名）
+      const nc = document.createElement('canvas'); nc.width = 30; nc.height = 120; const ncx = nc.getContext('2d'); ncx.fillStyle = '#f4efe2'; ncx.fillRect(0, 0, 30, 120); ncx.fillStyle = '#3a5a78'; ncx.font = 'bold 15px serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; const nm = 'やまゆりホーム'; for (let i = 0; i < nm.length; i++) ncx.fillText(nm[i], 15, 13 + i * 16)
+      const ntex = new THREE.CanvasTexture(nc); const plate = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.9, 0.08), new THREE.MeshToonMaterial({ map: ntex, gradientMap: grad, fog: true })); plate.position.set(-2.8, 1.55, pz + 0.7); grp.add(plate)
+      // 前庭の広場（舗装）＝サマフェスの会場
+      const yz = hz + 4, yard = new THREE.Mesh(new THREE.CircleGeometry(8.8, 26), mottleMat(0xbfb39a, 80, 0.08, [3, 3])); yard.rotation.x = -Math.PI / 2; yard.position.set(hx, heightAt(hx, yz) + 0.05, yz); yard.receiveShadow = true; town.add(yard)
+      // 入口を挟む木立＋低い植栽
+      tree(hx - 7.2, hz + 1, 0.9); tree(hx + 7.2, hz + 1, 0.95)
+      colliders.push({ x: hx, z: hz + bcz, r: 7 }); spawnAvoid.push({ x: hx, z: hz + bcz, r: 8 })
+      // サマフェス（前庭の広場で。夏の夕夜・日替わりで開催。id=2）
+      if (festOn(2)) makeSummerFes(hx, hz + 6)
     }
 
     // ── 遊園地（観覧車のまわり）。ゲート・回転木馬・旗・柵・ベンチ＝明るい賑わいの目的地。──

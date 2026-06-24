@@ -17,6 +17,8 @@ const shots = [
   ['fest-school', [44, 13, 0, 54, 2.5, -14, 58]],   // 校庭の盆踊りを斜め上から
   ['fest-park', [6, 13, -22, 16, 2.5, -36, 58]],     // 公園の祭りを斜め上から
   ['fest-school-eye', [54, 4, 2, 54, 3, -14, 62]],   // 校庭を地上目線で
+  ['fest-yamayuri', [36, 17, -33, 36, 0, -35, 74]],  // やまゆりホーム＋サマフェスを真上から
+  ['fest-yamayuri-eye', [36, 2.6, -29.5, 36, 2.4, -36, 60]], // 前庭に立ってステージを見る
 ]
 for (const [name, args] of shots) {
   const url = await p.evaluate((a) => window.__town3dShotAt(...a), args)
