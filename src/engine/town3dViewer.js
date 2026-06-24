@@ -3989,6 +3989,31 @@ export async function mountTown3d(parent, opts = {}) {
       const beak = addAt(g, new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 4), toon(0xd8b048)), 0, 1.22, 0.34); beak.rotation.x = Math.PI * 0.5
       town.add(g)
     }
+    // ── 谷戸の暮らしの彩り（柿の木・竹林・棚田を舞う蝶/赤とんぼ）＝故郷の谷戸の季節感と生命感 ──
+    // 柿の木（暮らしの象徴。秋は橙の実が実る）。屋敷/農家のそばに数本。実は統合で軽量。
+    { const kakiFruitMat = season === 'autumn' ? toon(0xe0742a) : null, fruitGeos = []
+      for (const [kx, kz] of [[-13, -15], [13, -21], [-15, -31], [12, -9], [-12, -41]]) {
+        const gy = heightAt(kx, kz); if (gy < SEA.level + 0.5) continue
+        tree(kx, kz, 0.85 + R() * 0.3)
+        if (kakiFruitMat) for (let i = 0; i < 10; i++) { const a = R() * 6.28, rr = 0.7 + R() * 0.8; const frg = new THREE.SphereGeometry(0.12, 6, 5); frg.translate(kx + Math.cos(a) * rr, gy + 2.3 + R() * 1.1, kz + Math.sin(a) * rr); fruitGeos.push(frg) }
+      }
+      if (fruitGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(fruitGeos, false); if (m) town.add(new THREE.Mesh(m, kakiFruitMat)); fruitGeos.forEach((g) => g.dispose()) }
+    }
+    // 竹林（里山の縁の竹藪＝獅子ヶ谷の谷戸らしさ）。東の斜面の縁に群れる。竿/葉は統合で軽量。
+    { const caneMat = toon(season === 'winter' ? 0x8a9a7a : 0x6f9a52), bleafMat = toon(season === 'autumn' ? 0xaa9a48 : (season === 'winter' ? 0x8a9a82 : 0x5e8a48)), caneGeos = [], leafGeos = [], cM = new THREE.Matrix4()
+      for (let i = 0; i < (LIGHT ? 9 : 16); i++) { const bx = 15 + R() * 6.5, bz = -16 - R() * 18, by = heightAt(bx, bz); if (by < SEA.level + 0.5) continue
+        const h = 4.5 + R() * 2.8, tilt = (R() - 0.5) * 0.13
+        const cg = new THREE.CylinderGeometry(0.05, 0.075, h, 5); cM.makeRotationZ(tilt).setPosition(bx, by + h / 2, bz); cg.applyMatrix4(cM); caneGeos.push(cg)
+        const lg = new THREE.IcosahedronGeometry(0.6 + R() * 0.4, 0); lg.scale(1, 1.6, 1); lg.translate(bx + Math.sin(tilt) * h, by + h - 0.3, bz); leafGeos.push(lg) }
+      if (caneGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(caneGeos, false); if (m) { const me = new THREE.Mesh(m, caneMat); me.castShadow = true; town.add(me) } caneGeos.forEach((g) => g.dispose())
+        const lm = BufferGeometryUtils.mergeGeometries(leafGeos, false); if (lm) { const le = new THREE.Mesh(lm, bleafMat); le.castShadow = true; town.add(le) } leafGeos.forEach((g) => g.dispose()) }
+    }
+    // 舞う生きもの（春夏＝蝶／夏秋＝蜻蛉・秋は赤とんぼ）が棚田の上を舞う＝谷戸の生命感。
+    { const flyOK = season === 'spring' || season === 'summer', dartOK = season === 'summer' || season === 'autumn'
+      const flyCols = season === 'spring' ? [0xf6d0e0, 0xfaf0c0, 0xf2f2ee] : [0xf2ead0, 0xf6e8b0, 0xeec8a0]
+      if (flyOK && !isNight) for (let k = 0; k < 5; k++) { const a = R() * 6.28, r = 6 + R() * 15, px = Math.cos(a) * r, pz = -16 + Math.sin(a) * r * 0.8, py = heightAt(px, pz); if (py < SEA.level + 0.5) continue; mkButterfly(px, py + 1.2 + R() * 1.3, pz, flyCols[k % flyCols.length]) }
+      if (dartOK && !isNight) for (let k = 0; k < 6; k++) { const a = R() * 6.28, r = 5 + R() * 15, px = Math.cos(a) * r, pz = -16 + Math.sin(a) * r * 0.8, py = heightAt(px, pz); if (py < SEA.level + 0.5) continue; mkDragonfly(px, py + 1.2 + R() * 0.8, pz, season === 'autumn' ? 0xc2452a : 0x46665a) }
+    }
     // ── 朝靄（谷戸の朝・棚田とせせらぎに低くたなびく霧の薄衣）。大きく柔らかい横長スプライトを谷底に低く敷く。
     // 谷戸の朝の情景の核。やわらかい白の薄veil＝近景の硬い造形を少し溶かし、霞(fog)と地続きの大気感を出す。冬は省略（雪で別の趣）。
     if (weather !== 'snow') {
