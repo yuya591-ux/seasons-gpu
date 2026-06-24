@@ -1270,7 +1270,20 @@ export async function mountTown3d(parent, opts = {}) {
         const lw = (dx2 - gap) - (-w / 2 - 0.2), rw = (w / 2 + 0.2) - (dx2 + gap)
         if (lw > 0.5) { const hl = new THREE.BoxGeometry(lw, 0.66, 0.46); hl.translate((-w / 2 - 0.2 + dx2 - gap) / 2, 0.33, fw); propL.push({ geo: colGeo(hl, hcol) }) } // 左の生垣
         if (rw > 0.5) { const hr = new THREE.BoxGeometry(rw, 0.66, 0.46); hr.translate((dx2 + gap + w / 2 + 0.2) / 2, 0.33, fw); propL.push({ geo: colGeo(hr, hcol) }) } // 右の生垣
-        for (const gp of [dx2 - gap, dx2 + gap]) { const post = new THREE.BoxGeometry(0.2, 1.05, 0.2); post.translate(gp, 0.52, fw); propL.push({ geo: colGeo(post, 0xb6ab98) }) } } // 門柱
+        for (const gp of [dx2 - gap, dx2 + gap]) { const post = new THREE.BoxGeometry(0.2, 1.05, 0.2); post.translate(gp, 0.52, fw); propL.push({ geo: colGeo(post, 0xb6ab98) }) } // 門柱
+        // 出窓・物干しは位置ハッシュ hr() で決定＝主R()列をずらさず街の生成・描画コールを不変に保つ（統合済みのジオメトリだけ足す）。
+        let hs = ((Math.round(Math.abs(x) * 8) * 73856093) ^ (Math.round(Math.abs(z) * 8) * 19349663) ^ 0x9e3779b9) >>> 0
+        const hr = () => { hs = (hs * 1664525 + 1013904223) >>> 0; return hs / 4294967296 }
+        // 出窓（前面から張り出す窓＝フラットな壁を脱し、近接でも凹凸の佇まい）。2階に。
+        if (h > 4.2 && hr() < 0.42) { const by = h * 0.64, bx = (hr() < 0.5 ? -1 : 1) * w * 0.26, bz = df - 0.32
+          const bay = new THREE.BoxGeometry(1.4, 1.15, 0.64); bay.translate(bx, by, bz); propL.push({ geo: colGeo(bay, 0xe6ddc8) }) // 出窓の箱
+          const bglass = new THREE.BoxGeometry(1.16, 0.84, 0.06); bglass.translate(bx, by, bz - 0.33); propL.push({ geo: colGeo(bglass, isNight ? 0xffcaa0 : 0x46545e) }) // ガラス（夜は灯る色）
+          const broof = new THREE.BoxGeometry(1.6, 0.12, 0.82); broof.translate(bx, by + 0.62, bz + 0.04); propL.push({ geo: colGeo(broof, 0x8a7e70) }) } // 出窓の小屋根
+        // 物干し竿＋洗濯物（2階の前＝昭和平成の生活感・前面の奥行き）
+        if (h > 4.2 && !SNOW && hr() < 0.4) { const py = h - 0.85, pz = df - 0.55
+          for (const px of [-w * 0.3, w * 0.3]) { const pole = new THREE.BoxGeometry(0.05, 0.72, 0.05); pole.translate(px, py + 0.36, pz); propL.push({ geo: colGeo(pole, 0x9a958c) }) }
+          const bar = new THREE.BoxGeometry(w * 0.64, 0.04, 0.04); bar.translate(0, py + 0.7, pz); propL.push({ geo: colGeo(bar, 0xb0aaa0) }) // 竿
+          const nL = 1 + ((hr() * 3) | 0); for (let k = 0; k < nL; k++) { const lw = 0.28 + hr() * 0.3, laundry = new THREE.BoxGeometry(lw, 0.46, 0.04); laundry.translate(-w * 0.26 + k * 0.5, py + 0.42, pz); propL.push({ geo: colGeo(laundry, futonCols[(hr() * futonCols.length) | 0]) }) } } } // 洗濯物（と玄関ブロックを閉じる）
     } else if (type === 'apt') {
       // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.5, d * 1.04), toon(0x8a8478)); cap.position.y = h + 0.25; cap.castShadow = true; g.add(cap)
