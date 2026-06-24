@@ -876,7 +876,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (vertical) { c.width = 44; c.height = 40 * Math.max(1, chars.length) + 8; x.fillStyle = bg; x.fillRect(0, 0, c.width, c.height); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `bold ${fontPx || 30}px "Yu Mincho","Hiragino Mincho ProN",serif`; chars.forEach((ch, i) => x.fillText(ch, c.width / 2, 40 * i + 24)) }
     else { c.width = 132; c.height = 52; x.fillStyle = bg; x.fillRect(0, 0, 132, 52); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `bold ${fontPx || 28}px "Yu Gothic","Hiragino Sans",sans-serif`; x.fillText(text, 66, 28) }
     const t = new THREE.CanvasTexture(c); t.anisotropy = 4
-    const m = new THREE.MeshBasicMaterial({ map: t, fog: true }); signCache[key] = m; return m
+    // 昼夕は陰影付き(MeshToon)で景色の光になじませる／夜だけ発光(MeshBasic)で看板が灯る。MeshBasicは無影＝昼に原色がネオンのように浮く（評価指摘）のを断つ。
+    const m = isNight ? new THREE.MeshBasicMaterial({ map: t, fog: true }) : new THREE.MeshToonMaterial({ map: t, gradientMap: grad, fog: true }); signCache[key] = m; return m
   }
   // 縦看板（江戸/戦国の木の掛看板）: 板＋縦書きの屋号。x,zの位置・ry向き・高さ・板色。
   const mkSignV = (px, py, pz, ry, text, board = 0xe6d8b8, ink = 0x3a2a1a) => {
