@@ -410,8 +410,75 @@ export function createAudio(opts) {
     } catch { /* LFO非対応でもベース音量で鳴る */ }
     try { wsrc.start(); rsrc.start(); csrc.start() } catch { /* 無視 */ }
   }
+  //  夏祭りの囃子（太鼓＋締太鼓＋笛＋鉦＋人のざわめき）。setFestival(近さ0..1)が音量を満ち引きさせ、
+  //  遠くは brightLP で高域がこもり（太鼓だけが届く）→近づくと笛・鉦が際立つ＝「近づくと普通の音に近づく」を表現。
+  //  太鼓は低音をスマホで歪ませないため中域の thump＋クリックで拍を出す（低音ドローンの教訓）。
+  let festNode = null
+  const festState = { amt: 0 }
+  function startFestival() {
+    if (!ctx || festNode || !ctx.createBufferSource) return
+    const fg = ctx.createGain(); fg.gain.value = 0; fg.connect(master)                    // 祭り全体の音量（近さで満ち引き＝離れたら無音）
+    const bright = ctx.createBiquadFilter(); bright.type = 'lowpass'; bright.frequency.value = 650; bright.Q.value = 0.5; bright.connect(fg) // 笛/鉦の明るさ（遠=こもる→近=澄む）
+    // ざわめき（祭りの人声・常時）
+    const len = Math.floor(2 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0)
+    let mb = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; mb = 0.9 * mb + w * 0.1; dd[i] = (mb * 0.8 + w * 0.2) * 0.4 }
+    const msrc = ctx.createBufferSource(); msrc.buffer = buf; msrc.loop = true
+    const mhp = ctx.createBiquadFilter(); mhp.type = 'highpass'; mhp.frequency.value = 380
+    const mbp = ctx.createBiquadFilter(); mbp.type = 'bandpass'; mbp.frequency.value = 700; mbp.Q.value = 0.7
+    const mg = ctx.createGain(); mg.gain.value = 0.5; msrc.connect(mhp).connect(mbp).connect(mg).connect(fg)
+    try { msrc.start() } catch { /* 無視 */ }
+    festNode = { fg, bright, nextNote: ctx.currentTime + 0.12, step: 0, sched: null }
+    // 太鼓の一打（中域の thump＋クリック。低音はスマホで歪むので高め）
+    const taiko = (tt, hi) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; const g = ctx.createGain(); const f0 = hi ? 300 : 190
+      o.frequency.setValueAtTime(f0 * 1.7, tt); o.frequency.exponentialRampToValueAtTime(f0, tt + 0.06)
+      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(hi ? 0.42 : 0.8, tt + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, tt + (hi ? 0.11 : 0.2))
+      o.connect(g).connect(fg); o.start(tt); o.stop(tt + 0.28)
+      const cg2 = ctx.createGain(); cg2.gain.setValueAtTime(0.1, tt); cg2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.03)       // クリック＝遠くでも拍が分かる
+      const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = 900; cl.Q.value = 0.8
+      const nb = ctx.createBufferSource(); nb.buffer = buf; nb.loop = true; nb.connect(cl).connect(cg2).connect(fg); try { nb.start(tt); nb.stop(tt + 0.05) } catch { /* 無視 */ }
+    }
+    const fue = (tt, freq, dur) => {  // 笛（やわらかい三角波＋ビブラート。brightを通すので近づくほど際立つ）
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = freq
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.24, tt + 0.05); g.gain.setTargetAtTime(0.0001, tt + dur * 0.6, 0.12)
+      const v = ctx.createOscillator(); v.frequency.value = 5.5; const vg = ctx.createGain(); vg.gain.value = freq * 0.008; v.connect(vg).connect(o.frequency)
+      o.connect(g).connect(bright); try { o.start(tt); o.stop(tt + dur + 0.1); v.start(tt); v.stop(tt + dur + 0.1) } catch { /* 無視 */ }
+    }
+    const kane = (tt) => {  // 鉦（チャンチキ）＝金属質の高い点
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(0.1, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.16)
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600; hp.connect(g).connect(bright)
+      for (const f of [2700, 3550, 4300]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hp); try { o.start(tt); o.stop(tt + 0.18) } catch { /* 無視 */ } }
+    }
+    // 囃子のパターン（1小節=8ステップ。盆踊り風の繰り返し）。2=大太鼓 1=締太鼓 0=休。
+    const STEP = 0.3, taikoPat = [2, 0, 1, 0, 2, 0, 1, 0]
+    const fueA = [880, 0, 1047, 1175, 1047, 0, 880, 0], fueB = [1175, 0, 1047, 880, 784, 0, 880, 0]   // 2小節で交互＝単調さを避ける
+    const schedule = () => {
+      if (!festNode) return
+      const ahead = ctx.currentTime + 0.25
+      while (festNode.nextNote < ahead) {
+        if (festState.amt > 0.005) {  // 近くに祭りが無い時は音符を作らない（無駄な処理を省く）
+          const tt = festNode.nextNote, s = festNode.step % 8, bar = Math.floor(festNode.step / 8)
+          const tp = taikoPat[s]; if (tp === 2) taiko(tt, false); else if (tp === 1) taiko(tt, true)
+          const fn = (bar % 2 ? fueB : fueA)[s]; if (fn) fue(tt, fn, STEP * 0.9)
+          if (s === 0 || s === 4) kane(tt)
+        }
+        festNode.nextNote += STEP; festNode.step++
+      }
+      festNode.sched = setTimeout(schedule, 90)
+    }
+    schedule()
+  }
+  // 祭りの近さ(0..1)で囃子を満ち引きさせる。離れたら 0（無音）。近づくほど高域が澄む。
+  function setFestival(amt) {
+    if (!festNode) return
+    const t = now(), a = Math.max(0, Math.min(1, amt || 0))
+    festNode.fg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.5, t, 0.8)
+    festNode.bright.frequency.setTargetAtTime(560 + a * a * 3600, t, 0.8)   // 遠=太鼓だけがこもって届く／近=笛・鉦が際立つ
+    festState.amt = a
+  }
   // 海の近さ・川の近さ・人混みの近さ(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
-  function setAmbience(sea, river, crowd) {
+  function setAmbience(sea, river, crowd, fest) {
+    setFestival(fest)  // 夏祭りの囃子（場所への近さで満ち引き）
     if (!waterNode) return
     const t = now()
     const s = Math.max(0, Math.min(1, sea || 0)), r = Math.max(0, Math.min(1, river || 0)), cw = Math.max(0, Math.min(1, crowd || 0))
@@ -571,6 +638,7 @@ export function createAudio(opts) {
       started = true
       startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
       startWater() // 場所に応じた水の音（波/せせらぎ）の源を立ち上げる（音量0＝setAmbienceが近さで満ち引き）
+      startFestival() // 夏祭りの囃子の源を立ち上げる（音量0＝祭りに近づくと満ちる。離れている間は音符を作らない）
       // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
       // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
@@ -582,8 +650,10 @@ export function createAudio(opts) {
     /** 3Dの街の場面（部屋/窓辺/飛び始め/巡航/速度/山/海/各時代の近さ）でBGMの下地を静かに変える。
      *  3Dを離れる時は {off:true} で静かに引く。素材ゼロの合成パッドなのでオフライン/CC0原則と整合。 */
     setMusicBed,
-    /** 場所に応じた水の音（波/せせらぎ）の満ち引き。sea=海の近さ・river=川/運河の近さ(各0..1)。 */
+    /** 場所に応じた水の音（波/せせらぎ）の満ち引き。sea=海の近さ・river=川/運河の近さ・crowd=人混み・fest=夏祭りの近さ(各0..1)。 */
     setAmbience,
+    /** 夏祭りの囃子の満ち引き（遠くでほんのり→近づくと大きく・澄む）。amt=最寄りの開催中の祭りへの近さ(0..1)。 */
+    setFestival,
     /** 情景を切り替える（音もクロスフェードで差し替える）。 */
     async setScene(scene) {
       currentScene = scene
@@ -781,7 +851,7 @@ export function createAudio(opts) {
       }
     },
     getLookPan() { return lookPan }, // 検証/連携用
-    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2), crowd: +waterState.crowd.toFixed(2) } }, // 検証用: BGM下地＋水音/ざわめきの状態
+    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2), crowd: +waterState.crowd.toFixed(2), fest: +festState.amt.toFixed(2) } }, // 検証用: BGM下地＋水音/ざわめき/祭り囃子の状態
     isStarted() {
       return started
     },

@@ -933,6 +933,61 @@ export async function mountTown3d(parent, opts = {}) {
   // 灯りの地明かり（提灯/ガス灯の足元の暖かい光だまり）。夕夜に道を照らす＝降り立った夜の情緒。
   const poolCv = document.createElement('canvas'); poolCv.width = poolCv.height = 64; const pcx = poolCv.getContext('2d'); const pgr = pcx.createRadialGradient(32, 32, 1, 32, 32, 32); pgr.addColorStop(0, 'rgba(255,200,130,0.9)'); pgr.addColorStop(0.55, 'rgba(255,180,100,0.32)'); pgr.addColorStop(1, 'rgba(255,170,90,0)'); pcx.fillStyle = pgr; pcx.fillRect(0, 0, 64, 64); const poolTex = new THREE.CanvasTexture(poolCv)
   const lightPool = (x, gy, z, r, op) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 16), new THREE.MeshBasicMaterial({ map: poolTex, color: 0xffba66, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: true })); m.rotation.x = -Math.PI / 2; m.position.set(x, gy + 0.06, z); town.add(m); return m }
+  // ── 夏祭り（獅子ヶ谷の夏の夜祭り。やぐら＋放射状の提灯＋屋台＋盆踊りの輪）。会場へ配置できる再利用関数。──
+  // 日替わりで開催/非開催（実カレンダーの日付で決定＝同じ日は同じ・日が変わると変わる）。夏の夕夜のみ。
+  const festDay = Math.floor(Date.now() / 864e5) // 今日(エポックからの日数)
+  const FORCE_FEST = /[?&]fest=1/.test(location.search) // 検証/プレビュー用: 日替わりを無視して必ず開催
+  const festOn = (id) => season === 'summer' && (isNight || duskAmt > 0.2) && (FORCE_FEST || ((((festDay * 2654435761) ^ (id * 40503) ^ 0x5bd1e995) >>> 0) % 100) < 50) // 各会場50%で開催（夏の夕夜）
+  const festivalSpots = []  // 開催中の祭りの中心（音の距離計算用）＝遠くから囃子が聞こえ近づくと大きくなる
+  const festDancers = []    // 盆踊りの踊り手（frameで腕を上げ下げ・体を揺らす）
+  const makeFestival = (fx, fz, sc = 1) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）
+    const fgy = heightAt(fx, fz), woodMat = toon(0x9a7048), redMat = toon(0xc0392b)
+    const yag = new THREE.Group(); yag.position.set(fx, fgy, fz); town.add(yag) // やぐら（二段の木の櫓＋紅白幕＋太鼓＋宝形屋根）
+    for (const lx of [-1.8, 1.8]) for (const lz of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 4.6, 0.25), woodMat); leg.position.set(lx, 2.3, lz); leg.castShadow = true; yag.add(leg) }
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.3, 4.4), woodMat); deck.position.y = 3.3; deck.castShadow = true; yag.add(deck)
+    const mc = document.createElement('canvas'); mc.width = 48; mc.height = 8; const mcx = mc.getContext('2d'); for (let i = 0; i < 6; i++) { mcx.fillStyle = i % 2 ? '#c0392b' : '#f0ece0'; mcx.fillRect(i * 8, 0, 8, 8) }
+    const mtex = new THREE.CanvasTexture(mc); mtex.wrapS = THREE.RepeatWrapping; mtex.repeat.set(8, 1)
+    const maku = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 0.8, 4, 1, true), new THREE.MeshToonMaterial({ map: mtex, gradientMap: grad, side: THREE.DoubleSide })); maku.rotation.y = Math.PI / 4; maku.position.y = 4.6; yag.add(maku) // 紅白幕
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.0, 12), redMat); drum.rotation.z = Math.PI / 2; drum.position.y = 4.1; yag.add(drum) // 太鼓
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 1.6, 4), toon(0x55585e)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.castShadow = true; yag.add(roof)
+    // 放射状の提灯（やぐら頂上→周囲のポールへ。黄/赤/青。夜は灯る）
+    const lantCols = [toon(0xe8a838), redMat, toon(0x3a8ac0)], lantLit = [0xffd27a, 0xff8a6a, 0x8ac0e8], NP = LIGHT ? 5 : 8, poleR = 9.5 * sc, lit = isNight || duskAmt > 0.3
+    const poleGeos = [], lanGeos = [[], [], []]
+    for (let i = 0; i < NP; i++) {
+      const a = i / NP * 6.283, ppx = fx + Math.cos(a) * poleR, ppz = fz + Math.sin(a) * poleR, pgy = heightAt(ppx, ppz)
+      const pg2 = new THREE.CylinderGeometry(0.08, 0.1, 5, 6); pg2.translate(ppx, pgy + 2.5, ppz); poleGeos.push(pg2)
+      for (let k = 1; k <= 4; k++) { const tt = k / 5, lx2 = fx + (ppx - fx) * tt, lz2 = fz + (ppz - fz) * tt, ly2 = (fgy + 5.8) + ((pgy + 5) - (fgy + 5.8)) * tt - 0.2; const lg = new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8); lg.scale(1, 1.2, 1); lg.translate(lx2, ly2, lz2); lanGeos[k % 3].push(lg) }
+    }
+    if (BufferGeometryUtils.mergeGeometries) {
+      const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, woodMat)); poleGeos.forEach((g) => g.dispose())
+      for (let c = 0; c < 3; c++) { if (lanGeos[c].length) { const lm = BufferGeometryUtils.mergeGeometries(lanGeos[c], false); if (lm) town.add(new THREE.Mesh(lm, lit ? new THREE.MeshBasicMaterial({ color: lantLit[c], fog: true }) : lantCols[c])); lanGeos[c].forEach((g) => g.dispose()) } } // 夜は提灯が灯る
+    }
+    // 屋台×4（暖簾の品書き。夜は灯る）
+    const stallWords = ['たこやき', 'わたあめ', 'かきごおり', 'やきとり'], stallPos = [[-9, 4], [9, 2], [-4, 11], [6, 10]]
+    for (let s = 0; s < 4; s++) {
+      const sx = fx + stallPos[s][0] * sc, sz = fz + stallPos[s][1] * sc, sgy = heightAt(sx, sz), g = new THREE.Group(); g.position.set(sx, sgy, sz); town.add(g)
+      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 1.4), toon(0xcdb185)), { castShadow: true }).translateY(0.55))
+      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.7), toon([0xc0453a, 0x3a7a5e, 0x3a6a8a, 0xc89030][s])), { castShadow: true }).translateY(2.1))
+      for (const bx of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 6), toon(0x8a6a48)); post.position.set(bx, 1.05, 0); g.add(post) }
+      const scv = document.createElement('canvas'); scv.width = 64; scv.height = 24; const scx = scv.getContext('2d'); scx.fillStyle = '#f0ece0'; scx.fillRect(0, 0, 64, 24); scx.fillStyle = '#c0392b'; scx.font = 'bold 15px sans-serif'; scx.textAlign = 'center'; scx.textBaseline = 'middle'; scx.fillText(stallWords[s], 32, 12)
+      const signTex2 = new THREE.CanvasTexture(scv); const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.06), lit ? new THREE.MeshBasicMaterial({ map: signTex2, fog: true }) : new THREE.MeshToonMaterial({ map: signTex2, gradientMap: grad, fog: true })); sign.position.set(0, 1.55, 0.75); g.add(sign)
+      const stallLan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), lit ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : redMat); stallLan.scale.y = 1.2; stallLan.position.set(-1.2, 1.8, 0.7); g.add(stallLan)
+      if ((s === 0 || s === 3) && !LIGHT) for (let p = 0; p < 3; p++) { const puff = new THREE.Mesh(new THREE.SphereGeometry(0.32, 7, 6), new THREE.MeshBasicMaterial({ color: 0xf2f0ea, transparent: true, opacity: 0, depthWrite: false, fog: true })); puff.position.set(0.4, 1.4, 0.1); g.add(puff); steamPuffs.push({ mesh: puff, base: 1.4, ph: p * 0.8 + R() * 0.6 }) }
+      colliders.push({ x: sx, z: sz, r: 1.6 })
+    }
+    // 盆踊りの輪（やぐらを囲む人。中心を向き、frameで腕を上げ下げ・体を揺らす）
+    const skinMat = toon(0xf0c49c), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], nD = LIGHT ? 8 : 12
+    for (let i = 0; i < nD; i++) {
+      const a = i / 12 * 6.283, dx2 = fx + Math.cos(a) * 5.8 * sc, dz2 = fz + Math.sin(a) * 5.8 * sc, dgy = heightAt(dx2, dz2)
+      const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(fx - dx2, fz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
+      const yuk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])); yuk.position.y = 0.6; yuk.castShadow = true; d.add(yuk)
+      d.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat), {}).translateY(1.4)) // 頭
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), toon(yukataCols[i % yukataCols.length])); arm.position.set(0.22, 1.15, 0.1); arm.rotation.z = -0.9; d.add(arm)
+      festDancers.push({ d, arm, ph: i * 0.5, y0: dgy })
+    }
+    colliders.push({ x: fx, z: fz, r: 2.6 }); spawnAvoid.push({ x: fx, z: fz, r: 7 })
+    festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: この祭りに近づくと囃子が満ちる
+  }
 
   // ── 起伏する地面（谷へ下る坂の街の地面） ──
   {
@@ -2230,59 +2285,8 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3, rr = PARK.r - 0.4 + R() * 0.8; tree(px0 + Math.cos(a) * rr, pz0 + Math.sin(a) * rr, 0.8 + R() * 0.4) }
       colliders.push({ x: px0, z: pz0, r: pondR * 0.85 }) // 歩行: 池には入らない
       spawnAvoid.push({ x: px0, z: pz0, r: pondR + 1.5 }) // 着地: 池に降りない
-      // ── 夏祭り（公園の北の開けた所を会場に。やぐら＋放射状の提灯＋屋台＋盆踊りの輪）。──
-      {
-        const yx = px0, yz = pz0 - 9, ygy = heightAt(yx, yz) // 池の北
-        const woodMat = toon(0x9a7048), redMat = toon(0xc0392b)
-        // やぐら（二段の木の櫓＋紅白幕＋太鼓＋宝形屋根）
-        const yag = new THREE.Group(); yag.position.set(yx, ygy, yz); town.add(yag)
-        for (const lx of [-1.8, 1.8]) for (const lz of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 4.6, 0.25), woodMat); leg.position.set(lx, 2.3, lz); leg.castShadow = true; yag.add(leg) }
-        const deck = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.3, 4.4), woodMat); deck.position.y = 3.3; deck.castShadow = true; yag.add(deck)
-        // 紅白幕（上段の周り）
-        const mc = document.createElement('canvas'); mc.width = 48; mc.height = 8; const mcx = mc.getContext('2d'); for (let i = 0; i < 6; i++) { mcx.fillStyle = i % 2 ? '#c0392b' : '#f0ece0'; mcx.fillRect(i * 8, 0, 8, 8) }
-        const mtex = new THREE.CanvasTexture(mc); mtex.wrapS = THREE.RepeatWrapping; mtex.repeat.set(8, 1)
-        const maku = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 0.8, 4, 1, true), new THREE.MeshToonMaterial({ map: mtex, gradientMap: grad, side: THREE.DoubleSide })); maku.rotation.y = Math.PI / 4; maku.position.y = 4.6; yag.add(maku)
-        const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.0, 12), redMat); drum.rotation.z = Math.PI / 2; drum.position.y = 4.1; yag.add(drum) // 太鼓
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 1.6, 4), toon(0x55585e)); roof.rotation.y = Math.PI / 4; roof.position.y = 5.8; roof.castShadow = true; yag.add(roof)
-        // 放射状の提灯（やぐら頂上→周囲のポールへ。黄/赤/青）
-        const lantCols = [toon(0xe8a838), redMat, toon(0x3a8ac0)], NP = LIGHT ? 5 : 8, poleR = 9.5
-        const poleGeos = [], lanGeos = [[], [], []] // ポール・提灯を色ごとに統合（ドローコール削減）
-        for (let i = 0; i < NP; i++) {
-          const a = i / NP * 6.283, ppx = yx + Math.cos(a) * poleR, ppz = yz + Math.sin(a) * poleR, pgy = heightAt(ppx, ppz)
-          const pg2 = new THREE.CylinderGeometry(0.08, 0.1, 5, 6); pg2.translate(ppx, pgy + 2.5, ppz); poleGeos.push(pg2)
-          for (let k = 1; k <= 4; k++) { const tt = k / 5; const lx2 = yx + (ppx - yx) * tt, lz2 = yz + (ppz - yz) * tt, ly2 = (ygy + 5.8) + ((pgy + 5) - (ygy + 5.8)) * tt - 0.2; const lg = new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8); lg.scale(1, 1.2, 1); lg.translate(lx2, ly2, lz2); lanGeos[k % 3].push(lg) }
-        }
-        if (BufferGeometryUtils.mergeGeometries) {
-          const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, woodMat)); poleGeos.forEach((g) => g.dispose())
-          for (let c = 0; c < 3; c++) { if (lanGeos[c].length) { const lm = BufferGeometryUtils.mergeGeometries(lanGeos[c], false); if (lm) town.add(new THREE.Mesh(lm, lantCols[c])); lanGeos[c].forEach((g) => g.dispose()) } }
-        }
-        // 屋台×4（縁沿い。暖簾の品書き）
-        const stallWords = ['たこやき', 'わたあめ', 'かきごおり', 'やきとり']
-        const stallPos = [[yx - 9, yz + 4], [yx + 9, yz + 2], [yx - 4, yz + 11], [yx + 6, yz + 10]]
-        for (let s = 0; s < 4; s++) {
-          const sx = stallPos[s][0], sz = stallPos[s][1], sgy = heightAt(sx, sz), g = new THREE.Group(); g.position.set(sx, sgy, sz); town.add(g)
-          const counter = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 1.4), toon(0xcdb185)); counter.position.y = 0.55; counter.castShadow = true; g.add(counter)
-          const awn = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.7), toon([0xc0453a, 0x3a7a5e, 0x3a6a8a, 0xc89030][s])); awn.position.y = 2.1; awn.castShadow = true; g.add(awn)
-          for (const bx of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 6), toon(0x8a6a48)); post.position.set(bx, 1.05, 0); g.add(post) }
-          const sc = document.createElement('canvas'); sc.width = 64; sc.height = 24; const scx = sc.getContext('2d'); scx.fillStyle = '#f0ece0'; scx.fillRect(0, 0, 64, 24); scx.fillStyle = '#c0392b'; scx.font = 'bold 15px sans-serif'; scx.textAlign = 'center'; scx.textBaseline = 'middle'; scx.fillText(stallWords[s], 32, 12)
-          const signTex2 = new THREE.CanvasTexture(sc); const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.06), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ map: signTex2, fog: true }) : new THREE.MeshToonMaterial({ map: signTex2, gradientMap: grad, fog: true })); sign.position.set(0, 1.55, 0.75); g.add(sign) // 昼夕=陰影付き/夜=灯る
-          const stallLan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : redMat); stallLan.scale.y = 1.2; stallLan.position.set(-1.2, 1.8, 0.7); g.add(stallLan)
-          if ((s === 0 || s === 3) && !LIGHT) { // 焼き物の屋台(たこやき/やきとり)は湯気が立ちのぼる
-            for (let p = 0; p < 3; p++) { const puff = new THREE.Mesh(new THREE.SphereGeometry(0.32, 7, 6), new THREE.MeshBasicMaterial({ color: 0xf2f0ea, transparent: true, opacity: 0, depthWrite: false, fog: true })); puff.position.set(0.4, 1.4, 0.1); g.add(puff); steamPuffs.push({ mesh: puff, base: 1.4, ph: p * 0.8 + R() * 0.6 }) }
-          }
-          colliders.push({ x: sx, z: sz, r: 1.6 })
-        }
-        // 盆踊りの輪（やぐらを囲む人。中心を向き、片手を上げる）
-        const skinMat = toon(0xf0c49c), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0]
-        for (let i = 0; i < (LIGHT ? 8 : 12); i++) {
-          const a = i / 12 * 6.283, dx2 = yx + Math.cos(a) * 5.8, dz2 = yz + Math.sin(a) * 5.8, dgy = heightAt(dx2, dz2)
-          const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(yx - dx2, yz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
-          const yuk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])); yuk.position.y = 0.6; yuk.castShadow = true; d.add(yuk) // 浴衣
-          const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat); head.position.y = 1.4; d.add(head)
-          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), toon(yukataCols[i % yukataCols.length])); arm.position.set(0.22, 1.15, 0.1); arm.rotation.z = -0.9; d.add(arm) // 上げた手
-        }
-        colliders.push({ x: yx, z: yz, r: 2.6 }); spawnAvoid.push({ x: yx, z: yz, r: 7 })
-      }
+      // ── 夏祭り（公園の北の開けた所を会場に）。夏の夕夜・日替わりで開催。id=0 ──
+      if (festOn(0)) makeFestival(px0, pz0 - 9) // 池の北
     }
 
     // ── 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。──
@@ -2483,6 +2487,8 @@ export async function mountTown3d(parent, opts = {}) {
       }
       colliders.push({ x: cx, z: cz - 7, r: 8 }) // 校舎の塊
       spawnAvoid.push({ x: cx, z: cz - 7, r: 9 })
+      // 夏の夜祭り（校庭の盆踊り）＝獅子ヶ谷小学校の核の記憶。夏の夕夜・日替わりで開催。id=1
+      if (festOn(1)) makeFestival(cx, cz + 4, 0.62) // 校庭の真ん中（トラックの内側）にやぐらを立てる
     }
 
     // ── 遊園地（観覧車のまわり）。ゲート・回転木馬・旗・柵・ベンチ＝明るい賑わいの目的地。──
@@ -6472,6 +6478,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
     if (teacups) { teacups.rotation.y += dt * 0.5; for (const cup of teacups.children) cup.rotation.y -= dt * 1.1 } // 台が回り、各カップは逆に回る
     for (const sp of steamPuffs) { const cy = (t * 0.5 + sp.ph) % 2.4, p = cy / 2.4; sp.mesh.position.y = sp.base + p * 1.7; sp.mesh.position.x = 0.4 + Math.sin(t * 1.3 + sp.ph) * 0.18; sp.mesh.material.opacity = 0.32 * Math.sin(p * Math.PI); sp.mesh.scale.setScalar(0.55 + p * 0.8) } // 屋台の湯気が立ちのぼる
+    for (const d of festDancers) { const s = Math.sin(t * 1.5 + d.ph); d.arm.rotation.z = -0.3 - s * 0.55; d.d.position.y = d.y0 + Math.abs(s) * 0.07 } // 盆踊り: 腕を上げ下げし、体が弾む
     for (const k of koinobori) { k.grp.rotation.y = Math.sin(t * 1.1 + k.ph) * 0.32; k.grp.rotation.z = 0.05 + Math.sin(t * 0.85 + k.ph) * 0.12 } // 鯉のぼりが風になびく
     for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
@@ -7124,7 +7131,14 @@ export async function mountTown3d(parent, opts = {}) {
       const riverAmt = Math.max(0, Math.min(1, (8 - rivD) / 8)) * rivLow * outAmt * (1 - seaAmt) // 川の近く（海の時は波を優先）
       let crowdAmt = 0; for (const c of crowdCenters) { const d = Math.hypot(fp.x - c.x, fp.z - c.z); if (d < c.r) crowdAmt = Math.max(crowdAmt, 1 - d / c.r) } // 人だまりの近さ
       crowdAmt *= rivLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
-      onAmbience(seaAmt, riverAmt, crowdAmt) }
+      // 夏祭りの囃子＝遠くでほんのり聞こえ、近づくほど大きくなる（音で会場を探す）。窓辺でも遠くの祭りが届く。
+      let festAmt = 0
+      if (festivalSpots.length) {
+        const out = (active.flyP || 0) > 0.2, lx2 = out ? fp.x : eye.x, lz2 = out ? fp.z : eye.z, FEST_AUDIBLE = 175
+        for (const fs of festivalSpots) { const d = Math.hypot(lx2 - fs.x, lz2 - fs.z); festAmt = Math.max(festAmt, Math.pow(Math.max(0, Math.min(1, (FEST_AUDIBLE - d) / FEST_AUDIBLE)), 1.7)) }
+        if (out) festAmt *= Math.max(0, Math.min(1, (60 - Math.max(0, fp.y - SEA.level)) / 50)) // 飛行は高いほど静か（窓辺は等倍）
+      }
+      onAmbience(seaAmt, riverAmt, crowdAmt, festAmt) }
     // 夜の灯りの息づき（篝火/松明＝炎の揺らぎ・ガス灯＝穏やかな明滅）。二重サインで不規則に。
     for (const g of nightGlows) g.m.opacity = Math.max(0, g.base * (1 + g.amp * (Math.sin(t * g.sp + g.ph) * 0.6 + Math.sin(t * g.sp * 1.73 + g.ph * 1.3) * 0.4)))
     // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
