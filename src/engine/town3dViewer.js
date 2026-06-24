@@ -1528,7 +1528,7 @@ export async function mountTown3d(parent, opts = {}) {
         const awn = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 3.2), toon(awnCols[(R() * awnCols.length) | 0])); awn.position.set(fd * 0.95, 2.15, 0); awn.rotation.z = fd * 0.2; awn.castShadow = true; g.add(awn)
         const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 2.6), shopLit ? new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: true }) : toon(0x40484e)); win.position.set(fd * 0.48, 1.0, 0); g.add(win)
         const nc = document.createElement('canvas'); nc.width = 64; nc.height = 24; const ncx = nc.getContext('2d'); ncx.fillStyle = '#' + new THREE.Color(awnCols[(R() * awnCols.length) | 0]).getHexString(); ncx.fillRect(0, 0, 64, 24); ncx.fillStyle = '#f0ece0'; ncx.font = 'bold 15px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText(norenWords[(R() * norenWords.length) | 0], 32, 12)
-        const noren = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 2.3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); noren.position.set(fd * 0.52, 1.85, 0); g.add(noren)
+        const norenTex = new THREE.CanvasTexture(nc); const noren = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 2.3), shopLit ? new THREE.MeshBasicMaterial({ map: norenTex, fog: true }) : new THREE.MeshToonMaterial({ map: norenTex, gradientMap: grad, fog: true })); noren.position.set(fd * 0.52, 1.85, 0); g.add(noren) // 昼夕=陰影付き/夜=灯る（無影で昼に浮くのを断つ）
         colliders.push({ x: fx, z, r: 1.5 })
       }
     }
@@ -2263,7 +2263,7 @@ export async function mountTown3d(parent, opts = {}) {
           const awn = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.7), toon([0xc0453a, 0x3a7a5e, 0x3a6a8a, 0xc89030][s])); awn.position.y = 2.1; awn.castShadow = true; g.add(awn)
           for (const bx of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 6), toon(0x8a6a48)); post.position.set(bx, 1.05, 0); g.add(post) }
           const sc = document.createElement('canvas'); sc.width = 64; sc.height = 24; const scx = sc.getContext('2d'); scx.fillStyle = '#f0ece0'; scx.fillRect(0, 0, 64, 24); scx.fillStyle = '#c0392b'; scx.font = 'bold 15px sans-serif'; scx.textAlign = 'center'; scx.textBaseline = 'middle'; scx.fillText(stallWords[s], 32, 12)
-          const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.06), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc) })); sign.position.set(0, 1.55, 0.75); g.add(sign)
+          const signTex2 = new THREE.CanvasTexture(sc); const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.06), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ map: signTex2, fog: true }) : new THREE.MeshToonMaterial({ map: signTex2, gradientMap: grad, fog: true })); sign.position.set(0, 1.55, 0.75); g.add(sign) // 昼夕=陰影付き/夜=灯る
           const stallLan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : redMat); stallLan.scale.y = 1.2; stallLan.position.set(-1.2, 1.8, 0.7); g.add(stallLan)
           if ((s === 0 || s === 3) && !LIGHT) { // 焼き物の屋台(たこやき/やきとり)は湯気が立ちのぼる
             for (let p = 0; p < 3; p++) { const puff = new THREE.Mesh(new THREE.SphereGeometry(0.32, 7, 6), new THREE.MeshBasicMaterial({ color: 0xf2f0ea, transparent: true, opacity: 0, depthWrite: false, fog: true })); puff.position.set(0.4, 1.4, 0.1); g.add(puff); steamPuffs.push({ mesh: puff, base: 1.4, ph: p * 0.8 + R() * 0.6 }) }
@@ -5182,7 +5182,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 左壁。角部屋(kind:'corner')は二面採光＝左壁(開けた街側)に二つ目の窓の開口を残してパネルで囲む。枠/硝子は前窓の材ができた後で足す。
     let cornerWin = null
     if (kind === 'corner') {
-      const lwz = 1.9, ow2 = 2.2, o2T = WINCY + owH / 2, o2B = WINCY - owH / 2 // 左窓: 中心z・幅(z方向)・開口の上下端
+      const lwz = 1.2, ow2 = 2.2, o2T = WINCY + owH / 2, o2B = WINCY - owH / 2 // 左窓: 中心z・幅(z方向)・開口の上下端（前の角寄りへ＝整理ダンスを避け、前窓と角で出会う二面採光に）
       const lz0 = BZ / 2 - RD / 2, lz1 = BZ / 2 + RD / 2, wz0 = lwz - ow2 / 2, wz1 = lwz + ow2 / 2
       grad(box(0.3, WH, wz0 - lz0, -SX, (WT + FY) / 2, (lz0 + wz0) / 2, wallMat))     // 窓の手前(z小)の壁
       grad(box(0.3, WH, lz1 - wz1, -SX, (WT + FY) / 2, (wz1 + lz1) / 2, wallMat))     // 窓の奥(z大)の壁
