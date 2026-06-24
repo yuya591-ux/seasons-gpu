@@ -822,13 +822,14 @@ export async function mountTown3d(parent, opts = {}) {
     g.fillStyle = '#' + base.getHexString(); g.fillRect(0, 0, S, S)
     for (let i = 0; i < 110; i++) { const v = base.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06); g.globalAlpha = 0.1; g.fillStyle = '#' + v.getHexString(); g.fillRect(R() * S, R() * S, 2 + R() * 9, 2 + R() * 9) }
     g.globalAlpha = 1
-    if (kind === 'machiya') { // 江戸の町家: 上段=障子の格子窓／下段=格子戸・腰板
+    if (kind === 'machiya') { // 江戸の町家: 上段=障子の細かい組子／下段=格子戸・腰板（大きな多窓＝現代ガラスに見えるのを脱す）
       const wx = 22, wy = 18, ww = 84, wh = 42
-      g.fillStyle = '#e9e1cc'; g.fillRect(wx, wy, ww, wh)
-      g.strokeStyle = 'rgba(74,56,38,0.8)'; g.lineWidth = 1.5
-      for (let i = 0; i <= 6; i++) { g.beginPath(); g.moveTo(wx + ww * i / 6, wy); g.lineTo(wx + ww * i / 6, wy + wh); g.stroke() }
-      for (let i = 0; i <= 3; i++) { g.beginPath(); g.moveTo(wx, wy + wh * i / 3); g.lineTo(wx + ww, wy + wh * i / 3); g.stroke() }
-      g.strokeStyle = '#4a3826'; g.lineWidth = 3; g.strokeRect(wx, wy, ww, wh)
+      g.fillStyle = '#ddd2b8'; g.fillRect(wx, wy, ww, wh) // 障子紙＝白すぎない温かい生成り
+      g.strokeStyle = 'rgba(70,52,34,0.62)'; g.lineWidth = 1
+      for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(wx + ww * i / 10, wy); g.lineTo(wx + ww * i / 10, wy + wh); g.stroke() } // 縦の組子（細かく）
+      for (let i = 0; i <= 5; i++) { g.beginPath(); g.moveTo(wx, wy + wh * i / 5); g.lineTo(wx + ww, wy + wh * i / 5); g.stroke() } // 横の組子（細かく＝障子に）
+      g.strokeStyle = '#4a3826'; g.lineWidth = 2.4; g.strokeRect(wx, wy, ww, wh)                                  // 障子の框（外枠）
+      g.strokeStyle = '#4a3826'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(wx + ww / 2, wy); g.lineTo(wx + ww / 2, wy + wh); g.stroke() // 中央の召し合わせ（引き違い＝二枚障子）
       g.fillStyle = '#5a4632'; g.fillRect(20, 78, 88, 40); g.strokeStyle = 'rgba(28,20,12,0.55)'; g.lineWidth = 1.4
       for (let i = 0; i <= 11; i++) { g.beginPath(); g.moveTo(20 + 88 * i / 11, 78); g.lineTo(20 + 88 * i / 11, 118); g.stroke() }
     } else if (kind === 'sama') { // 戦国の侍屋敷: 連子窓（縦格子）＋板壁の横目地
