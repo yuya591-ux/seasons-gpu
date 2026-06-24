@@ -476,9 +476,62 @@ export function createAudio(opts) {
     festNode.bright.frequency.setTargetAtTime(560 + a * a * 3600, t, 0.8)   // 遠=太鼓だけがこもって届く／近=笛・鉦が際立つ
     festState.amt = a
   }
-  // 海の近さ・川の近さ・人混みの近さ(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
-  function setAmbience(sea, river, crowd, fest) {
+  //  駅の音（発車ベル＋電車の通過音）。setStation(近さ0..1)が満ち引きさせ、遠いとこもり近づくと澄む。
+  //  特定の発車メロディは模さず一般的な穏やかなベルの旋律。電車の通過音は中域＝スマホで歪まない。
+  let staNode = null
+  const staState = { amt: 0 }
+  function startStation() {
+    if (!ctx || staNode || !ctx.createBufferSource) return
+    const sg = ctx.createGain(); sg.gain.value = 0; sg.connect(master)
+    const bright = ctx.createBiquadFilter(); bright.type = 'lowpass'; bright.frequency.value = 700; bright.Q.value = 0.5; bright.connect(sg) // ベルの明るさ（遠=こもる→近=澄む）
+    const len = Math.floor(2 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0)
+    let mb = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; mb = 0.9 * mb + w * 0.1; dd[i] = (mb * 0.8 + w * 0.2) * 0.4 }
+    staNode = { sg, bright, timer: null }
+    const bell = (tt, freq) => {  // 発車ベルの一音（非整数倍音でベルらしく・残響）
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq
+      const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = freq * 2.76
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.22, tt + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, tt + 1.1)
+      const g2 = ctx.createGain(); g2.gain.value = 0.16
+      o.connect(g); o2.connect(g2).connect(g); g.connect(bright)
+      try { o.start(tt); o.stop(tt + 1.2); o2.start(tt); o2.stop(tt + 1.2) } catch { /* 無視 */ }
+    }
+    const trainPass = (tt) => {  // 電車の通過音（中域のゴーッ＋レールのカタンカタン。寄せて返す）
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 130
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 260; bp.Q.value = 0.7
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.linearRampToValueAtTime(0.4, tt + 2.6); g.gain.linearRampToValueAtTime(0.0001, tt + 5.6)
+      src.connect(hp).connect(bp).connect(g).connect(sg); try { src.start(tt); src.stop(tt + 6) } catch { /* 無視 */ }
+      for (let k = 0; k < 20; k++) { const ct = tt + 0.7 + k * 0.2, env = Math.sin((k / 20) * Math.PI)  // 近づき遠ざかるカタンカタン
+        const cg = ctx.createGain(); cg.gain.setValueAtTime(0.001, ct); cg.gain.exponentialRampToValueAtTime(0.1 * env + 0.002, ct + 0.004); cg.gain.exponentialRampToValueAtTime(0.0001, ct + 0.06)
+        const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = 500; cl.Q.value = 0.9
+        const nb = ctx.createBufferSource(); nb.buffer = buf; nb.loop = true; nb.connect(cl).connect(cg).connect(sg); try { nb.start(ct); nb.stop(ct + 0.09) } catch { /* 無視 */ } }
+    }
+    const notes = [1047, 1319, 1568, 1319, 1047, 880]  // 発車ベルの旋律（一般的な6音＝特定の発車メロディは模さない）
+    let beat = 0
+    const tick = () => {
+      if (!staNode) return
+      if (staState.amt > 0.02) {  // 近くに駅が無い間は何も鳴らさない（無駄な処理を省く）
+        const t = ctx.currentTime + 0.06
+        notes.forEach((f, i) => bell(t + i * 0.3, f))
+        if (beat % 2 === 1) trainPass(t + 2.2)  // 一回おきに電車が通過
+      }
+      beat++
+      staNode.timer = setTimeout(tick, 20000 + Math.random() * 16000)  // ~20-36秒ごと
+    }
+    tick()
+  }
+  // 駅の近さ(0..1)で発車ベル・電車の音を満ち引きさせる。離れたら 0（無音）。近づくほど澄む。
+  function setStation(amt) {
+    if (!staNode) return
+    const t = now(), a = Math.max(0, Math.min(1, amt || 0))
+    staNode.sg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.5, t, 0.7)
+    staNode.bright.frequency.setTargetAtTime(640 + a * a * 3200, t, 0.7)  // 遠=こもったベル／近=澄んだベル
+    staState.amt = a
+  }
+  // 海の近さ・川の近さ・人混みの近さ・夏祭り・駅(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
+  function setAmbience(sea, river, crowd, fest, sta) {
     setFestival(fest)  // 夏祭りの囃子（場所への近さで満ち引き）
+    setStation(sta)    // 駅の音（発車ベル＋電車の通過音）
     if (!waterNode) return
     const t = now()
     const s = Math.max(0, Math.min(1, sea || 0)), r = Math.max(0, Math.min(1, river || 0)), cw = Math.max(0, Math.min(1, crowd || 0))
@@ -639,6 +692,7 @@ export function createAudio(opts) {
       startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
       startWater() // 場所に応じた水の音（波/せせらぎ）の源を立ち上げる（音量0＝setAmbienceが近さで満ち引き）
       startFestival() // 夏祭りの囃子の源を立ち上げる（音量0＝祭りに近づくと満ちる。離れている間は音符を作らない）
+      startStation() // 駅の音の源を立ち上げる（音量0＝駅に近づくと発車ベル・電車の音が満ちる）
       // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
       // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
@@ -654,6 +708,8 @@ export function createAudio(opts) {
     setAmbience,
     /** 夏祭りの囃子の満ち引き（遠くでほんのり→近づくと大きく・澄む）。amt=最寄りの開催中の祭りへの近さ(0..1)。 */
     setFestival,
+    /** 駅の音（発車ベル＋電車の通過音）の満ち引き。amt=駅への近さ(0..1)。 */
+    setStation,
     /** 情景を切り替える（音もクロスフェードで差し替える）。 */
     async setScene(scene) {
       currentScene = scene
@@ -851,7 +907,7 @@ export function createAudio(opts) {
       }
     },
     getLookPan() { return lookPan }, // 検証/連携用
-    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2), crowd: +waterState.crowd.toFixed(2), fest: +festState.amt.toFixed(2) } }, // 検証用: BGM下地＋水音/ざわめき/祭り囃子の状態
+    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2), crowd: +waterState.crowd.toFixed(2), fest: +festState.amt.toFixed(2), sta: +staState.amt.toFixed(2) } }, // 検証用: BGM下地＋水音/ざわめき/祭り囃子/駅の状態
     isStarted() {
       return started
     },
