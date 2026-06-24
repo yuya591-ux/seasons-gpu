@@ -2573,13 +2573,10 @@ export async function mountTown3d(parent, opts = {}) {
     {
       // 海面（空を映す大きな水鏡。MeshToonの空グラデ＋さざ波。沖まで広く敷く）。
       const wc = document.createElement('canvas'); wc.width = wc.height = 128; const wcx = wc.getContext('2d')
-      const wg = wcx.createLinearGradient(0, 0, 0, 128)
-      // 海は空をうっすら映しつつ、青を芯に強く残す（夕の暖色フォグに溶けて砂色にならないよう、濃いめの青で）。
-      wg.addColorStop(0, '#' + new THREE.Color(0x2a6d9a).lerp(skyTop, 0.07).getHexString())
-      wg.addColorStop(1, '#' + new THREE.Color(0x163f5e).lerp(skyHorizon, 0.04).getHexString())
-      wcx.fillStyle = wg; wcx.fillRect(0, 0, 128, 128)
-      for (let i = 0; i < 150; i++) { wcx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.07})`; wcx.fillRect(R() * 128, R() * 128, 2 + R() * 4, 1) } // さざ波
-      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(104, 69); seaTex = wtex
+      // 縦グラデをタイルすると沖から「横縞」に見える（評価指摘）→グラデを廃し平坦な海面色に。奥行きは距離フォグで出す。
+      wcx.fillStyle = '#' + new THREE.Color(0x216082).lerp(skyTop, 0.05).getHexString(); wcx.fillRect(0, 0, 128, 128) // 濃いめの青を芯に（夕フォグで砂色化しない）
+      for (let i = 0; i < 130; i++) { wcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.055})`; const s = 1 + R() * 1.6; wcx.fillRect(R() * 128, R() * 128, s, s) } // さざ波＝小さな点（横長ダッシュは横縞に揃うので正方の点に）
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(13, 9); wtex.anisotropy = renderer.capabilities.getMaxAnisotropy(); seaTex = wtex // 繰り返しを減らし＋異方性フィルタ＝沖のモアレ/縞を抑える
       const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       // そこへシェーダーで「動くうねり・谷の濃藍・うろこ雲のような波頭・水平線のきらめき」を重ね、ぱっと見て海と分かる水面に。
