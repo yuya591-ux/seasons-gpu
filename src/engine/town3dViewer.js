@@ -6310,6 +6310,40 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 季節の風物詩（春＝桜吹雪／秋＝落ち葉の舞い／冬＝粉雪の渦）。風がスッと吹き、舞い散ってまた静まる。夏は無し（夕立→虹がある）。Pointsで1ドロー。──
+  function evSeasonalDrift() {
+    const cfg = season === 'spring' ? { col: 0xf2c0d4, sz: 0.52, n: 140, fall: 1.1 }
+      : season === 'autumn' ? { col: 0xcf7a30, sz: 0.6, n: 110, fall: 1.5 }
+        : season === 'winter' ? { col: 0xeef2f8, sz: 0.34, n: 170, fall: 0.85 }
+          : null
+    if (!cfg) return
+    const N = LIGHT ? Math.floor(cfg.n * 0.6) : cfg.n
+    const geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), seed = new Array(N)
+    for (let i = 0; i < N; i++) { const lx = (R() - 0.5) * 72, ly = 2 + R() * 26, lz = -4 - R() * 60; pos[i * 3] = lx; pos[i * 3 + 1] = ly; pos[i * 3 + 2] = lz; seed[i] = { lx, ly, lz, ph: R() * 6.28, sp: 0.7 + R() * 0.8, sw: 0.6 + R() * 1.2 } }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const mat = new THREE.PointsMaterial({ color: cfg.col, size: cfg.sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true })
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 2; scene.add(pts)
+    const dur = 26, wind = (R() < 0.5 ? 1 : -1) * (2.2 + R() * 1.0), peak = season === 'winter' ? 0.85 : 0.78
+    addFx({
+      update: (age, dt) => {
+        const k = Math.min(1, age / 5) * Math.min(1, Math.max(0, (dur - age) / 7)) // 吹いて→静まる
+        mat.opacity = peak * k
+        const a = evAnchor(), c = Math.cos(a.yaw), s = Math.sin(a.yaw), ay = a.fly ? a.y - EYEY : 0, pa = geo.attributes.position
+        for (let i = 0; i < N; i++) { const sd = seed[i]
+          sd.lx += (wind + Math.sin(age * 0.6 + sd.ph) * sd.sw) * dt // 風＋渦の横揺れ
+          sd.ly -= cfg.fall * sd.sp * dt                            // 舞い落ちる
+          sd.lz += Math.cos(age * 0.5 + sd.ph * 1.3) * sd.sw * 0.5 * dt
+          if (sd.ly < 0.4) sd.ly += 26                              // 落ちたら上へ（降り続ける）
+          if (sd.lx > 42) sd.lx -= 84; else if (sd.lx < -42) sd.lx += 84
+          pa.setXYZ(i, a.x + sd.lx * c - sd.lz * s, ay + sd.ly, a.z + sd.lx * s + sd.lz * c)
+        }
+        pa.needsUpdate = true
+        return age < dur
+      },
+      cleanup: () => { scene.remove(pts); geo.dispose(); mat.dispose() },
+    })
+  }
+
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
     birds: { run: evBirdFlock },
@@ -6323,12 +6357,13 @@ export async function mountTown3d(parent, opts = {}) {
     fireworks: { run: evFireworks, ok: () => isNight },
     fireworksFinale: { run: evFireworksFinale, ok: () => isNight }, // 花火大会のフィナーレ（波状の大当たり）
     mist: { run: evMist }, // 通り過ぎるもや（朝もや/宵のもや・時間帯問わず静かに整う）
+    drift: { run: evSeasonalDrift, ok: () => season !== 'summer' }, // 季節の風物詩（桜吹雪/落ち葉/粉雪）。夏は無し
     godRays: { run: evGodRays, ok: () => !isNight }, // 天使の梯子（雲間の光芒・昼夕）
     aurora: { run: evAurora, ok: () => isNight },
   }
   const fxBands = [
     { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },                 // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
-    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist', 'godRays'] }, // 中（少し特別）＝もや/光芒も含む
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist', 'godRays', 'drift', 'drift'] }, // 中（少し特別）＝もや/光芒/季節の風物詩（driftは季節感が出るので重み2）
     { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks', 'fireworksFinale'] },                   // まれ（大当たり＝雨→虹／花火／花火大会）
     { next: 360 + R() * 360, min: 1800, max: 3600, pool: ['aurora'] },                                              // 超レア（30〜60分に一度の“特別な空”＝オーロラ。最初は6〜12分で一度）
   ]
@@ -6344,7 +6379,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, godRays: evGodRays, aurora: evAurora }[n] || (() => {}))() }
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, godRays: evGodRays, drift: evSeasonalDrift, aurora: evAurora }[n] || (() => {}))() }
 
   // ── 飛行/歩行の没入オブジェクト ──
   // 自分の影が真下の地面を走る（高度＝飛んでいる手応え）。柔らかい円を地面に伏せる。
