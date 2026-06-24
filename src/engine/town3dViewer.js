@@ -1813,15 +1813,19 @@ export async function mountTown3d(parent, opts = {}) {
     const flCols = season === 'spring' ? [0xf0a8c4, 0xf6e07a, 0xf6f1ea, 0xc6a8e0, 0xf2b86a]      // 春＝菜の花/れんげ/桜草
       : season === 'autumn' ? [0xe07aa0, 0xf2f0ea, 0xd0688a, 0xe8a24e, 0xc8506e]                 // 秋＝コスモス/小菊
       : [0xf7f1e4, 0xf6e07a, 0xf3f3ef, 0xeec25e, 0xf0d2da]                                       // 夏＝白詰草/たんぽぽ
-    const oneFlower = (fx, fz) => {
+    const stemCol = season === 'autumn' ? 0x6a7444 : 0x5e7a44, baseCol = season === 'autumn' ? 0x6e7440 : 0x4e7038
+    const oneFlower = (fx, fz) => { // 一本のロリポップでなく、緑の株＋短い茎の小花を数輪＝自然な花株
       const fy = heightAt(fx, fz); if (fy < SEA.level + 0.6) return // 水際は避ける
-      const h = 0.26 + R() * 0.34
-      bakeColGeo(flowerGeos, new THREE.CylinderGeometry(0.018, 0.024, h, 3).toNonIndexed(), 0x5e7a44, fx, fy + h / 2, fz) // 茎（IcosahedronGeometryが非インデックスなので合わせる）
-      const head = new THREE.IcosahedronGeometry(0.07 + R() * 0.05, 0).toNonIndexed(); head.scale(1, 0.7, 1)
-      bakeColGeo(flowerGeos, head, flCols[(R() * flCols.length) | 0], fx, fy + h, fz)                      // 花
+      const base = new THREE.IcosahedronGeometry(0.12 + R() * 0.06, 0).toNonIndexed(); base.scale(1.3, 0.5, 1.3)
+      bakeColGeo(flowerGeos, base, baseCol, fx, fy + 0.05, fz) // 葉の株（足元のボリューム）
+      const n = 2 + ((R() * 3) | 0)
+      for (let k = 0; k < n; k++) { const ox = (R() - 0.5) * 0.36, oz = (R() - 0.5) * 0.36, h = 0.13 + R() * 0.2
+        bakeColGeo(flowerGeos, new THREE.CylinderGeometry(0.012, 0.018, h, 3).toNonIndexed(), stemCol, fx + ox, fy + 0.05 + h / 2, fz + oz) // 短い茎
+        const head = new THREE.IcosahedronGeometry(0.05 + R() * 0.035, 0).toNonIndexed(); head.scale(1, 0.72, 1)
+        bakeColGeo(flowerGeos, head, flCols[(R() * flCols.length) | 0], fx + ox, fy + 0.05 + h, fz + oz) } // 小花
     }
-    for (let i = 0; i < 56; i++) { const a = R() * 6.28, r = 7.5 + R() * 6.5, fx = PARK.x + Math.cos(a) * r, fz = PARK.z + Math.sin(a) * r; oneFlower(fx, fz) } // 公園のまわりの花野
-    for (let i = 0; i < 30; i++) { const side = R() < 0.5 ? -1 : 1, fx = side * (5 + R() * 4), fz = -6 - R() * 70; oneFlower(fx, fz) }                          // 街路の植え込みの足元
+    for (let i = 0; i < 42; i++) { const a = R() * 6.28, r = 7.5 + R() * 6.5, fx = PARK.x + Math.cos(a) * r, fz = PARK.z + Math.sin(a) * r; oneFlower(fx, fz) } // 公園のまわりの花野
+    for (let i = 0; i < 24; i++) { const side = R() < 0.5 ? -1 : 1, fx = side * (5 + R() * 4), fz = -6 - R() * 70; oneFlower(fx, fz) }                          // 街路の植え込みの足元
     if (flowerGeos.length && BufferGeometryUtils.mergeGeometries) { const fm = BufferGeometryUtils.mergeGeometries(flowerGeos, false); if (fm) town.add(new THREE.Mesh(fm, clutterMat)); flowerGeos.forEach((x) => x.dispose()) }
   }
 
@@ -1878,6 +1882,11 @@ export async function mountTown3d(parent, opts = {}) {
       const edge = new THREE.Mesh(new THREE.BoxGeometry(2.7, 9.4, 0.18), new THREE.MeshBasicMaterial({ color: 0x6ad0ff, fog: true }))
       edge.position.set(x + 4.3, gy + 9, z - 0.16); town.add(edge)
     }
+    // 1階の店構え（前面+z）。ガラス＋方立＋看板帯。夜は店内が煌々と灯る＝歩行目線の無地箱を脱す。
+    const pfz = z + 3.55
+    const pglass = new THREE.Mesh(new THREE.BoxGeometry(7, 3, 0.2), neonOn ? new THREE.MeshBasicMaterial({ color: 0xffd6a6, fog: true }) : toon(0x3b4a55)); pglass.position.set(x, gy + 1.7, pfz); town.add(pglass)
+    for (let i = 0; i <= 4; i++) { const ml = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.1, 0.3), toon(0x8a7e70)); ml.position.set(x - 3.5 + i * 1.75, gy + 1.7, pfz + 0.04); town.add(ml) } // 方立
+    const pband = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.9, 0.34), neonOn ? new THREE.MeshBasicMaterial({ color: 0xffe07a, fog: true }) : toon(0xd0a040)); pband.position.set(x, gy + 3.75, pfz); town.add(pband) // 看板帯（夜は灯る）
   }
   // ── 新装開店の電気屋（バルーンの真下。カラフルな庇＋幟） ──
   {
@@ -1886,6 +1895,11 @@ export async function mountTown3d(parent, opts = {}) {
     b.position.set(x, gy + 2.5, z); b.castShadow = true; town.add(b)
     const awn = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.5, 2.2), toon(0xd23a4a))
     awn.position.set(x, gy + 3.4, z + 3.4); town.add(awn)
+    // 1階の陳列のガラス窓＋入口＋方立（前面+z）＝歩行目線の無地箱を脱す。夕夜は店内が灯る。
+    const efz = z + 3.05, eLit = duskAmt > 0.2
+    const eglass = new THREE.Mesh(new THREE.BoxGeometry(8, 2.6, 0.2), eLit ? new THREE.MeshBasicMaterial({ color: 0xe3edf2, fog: true }) : toon(0x46545e)); eglass.position.set(x, gy + 1.5, efz); town.add(eglass)
+    const edoor = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.3, 0.22), toon(0x2b3640)); edoor.position.set(x - 2.7, gy + 1.15, efz - 0.05); town.add(edoor) // 入口
+    for (const mx of [-4, 0, 4]) { const ml = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.7, 0.28), toon(0xcfc6b6)); ml.position.set(x + mx, gy + 1.5, efz + 0.04); town.add(ml) } // 方立
     // 店先の幟（赤白の細い旗）
     for (let k = -2; k <= 2; k++) {
       const flag = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 0.7), toon(k % 2 ? 0xffffff : 0xd23a4a))
