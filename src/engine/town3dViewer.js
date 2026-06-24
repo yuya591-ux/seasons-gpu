@@ -5053,7 +5053,7 @@ export async function mountTown3d(parent, opts = {}) {
     const mk = (col, map) => { const m = new THREE.MeshBasicMaterial({ color: col, map: map || null, fog: false }); if (roomWarm) m.color.multiply(roomWarm); m.vertexColors = true; winRoomMats.push(m); return m }
     // 角をわずかに面取り（街のトゥーンの丸みに合わせ、硬い箱の安っぽさを和らげる）。細い桟/薄板は面取りすると角が
     // 立ってチカチカするので平らな箱にする（しきい値を上げて家具だけ丸める）。
-    const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.05, Math.min(w, h, d) * 0.24); const g = r > 0.032 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）
+    const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.09, Math.min(w, h, d) * 0.3); const g = r > 0.03 ? new RoundedBoxGeometry(w, h, d, 2, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）。角を少し丸めて柔らかく（街の水彩トゥーンに合わせる）
     const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m }
     const maxAniso = renderer.capabilities.getMaxAnisotropy() // 浅い角度の床テクスチャの明滅(モアレ)を抑える
     const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; return t }
@@ -5178,6 +5178,11 @@ export async function mountTown3d(parent, opts = {}) {
     box(0.018, 0.42, 0.018, 0.17, 1.86, 2.4, woodDk); cyl(0.04, 0.04, 0.09, 0.17, 1.6, 2.4, lampMat) // 灯りの引き紐＋握り玉（昭和の暮らし）
     { const gTex = cv(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 1, 32, 32, 32); g.addColorStop(0, 'rgba(255,232,178,0.95)'); g.addColorStop(0.45, 'rgba(255,216,150,0.32)'); g.addColorStop(1, 'rgba(255,216,150,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64) }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gTex, transparent: true, opacity: isNight ? 0.9 : 0.42, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); gl.position.set(0, 2.12, 2.4); gl.scale.set(2.4, 2.4, 1); gl.renderOrder = 6; winRoom.add(gl); winRoomMats.push(gl.material) } // 灯りの暖かいにじみ（夜ほど強い）
     if (isNight) { const pTex = cv(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, 'rgba(255,224,168,0.55)'); g.addColorStop(0.6, 'rgba(255,210,150,0.18)'); g.addColorStop(1, 'rgba(255,210,150,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64) }); const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: pTex, transparent: true, opacity: 0.6, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); pool.rotation.x = -Math.PI / 2; pool.position.set(0, FY + 0.04, 2.4); pool.renderOrder = 4; winRoom.add(pool); winRoomMats.push(pool.material) } // 夜: 灯りが畳に落とす暖かな光だまり
+    if (!isNight) { // 昼/夕: 窓から差し込む光が畳に落ちる陽だまり（窓際が明るく室内へ伸びる）＝見回すと部屋に陽が射している温かさ
+      const sTex = cv(96, 96, (x) => { const g = x.createLinearGradient(0, 0, 0, 96); g.addColorStop(0, 'rgba(255,240,206,0.62)'); g.addColorStop(0.45, 'rgba(255,234,194,0.3)'); g.addColorStop(1, 'rgba(255,230,188,0)'); x.fillStyle = g; x.fillRect(0, 0, 96, 96) })
+      const shaft = new THREE.Mesh(new THREE.PlaneGeometry(owW * 1.5, 3.0), new THREE.MeshBasicMaterial({ map: sTex, transparent: true, opacity: 0.3 + duskAmt * 0.22, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }))
+      shaft.rotation.x = -Math.PI / 2; shaft.position.set(0, FY + 0.035, 1.7); shaft.renderOrder = 4; winRoom.add(shaft); winRoomMats.push(shaft.material)
+    }
     // ── 和室の骨格: 四隅の柱と壁をめぐる長押（昭和の茶の間らしい陰影） ──
     const postMat = mk(C(0x6f573c, 0x40342a)) // 飴色の柱・長押
     for (const [px, pz] of [[-SX + 0.11, 0.22], [SX - 0.11, 0.22], [-SX + 0.11, BZ - 0.22], [SX - 0.11, BZ - 0.22]]) box(0.17, WT - FY, 0.17, px, (WT + FY) / 2, pz, postMat) // 四隅の柱
