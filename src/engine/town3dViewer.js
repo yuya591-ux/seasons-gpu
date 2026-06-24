@@ -2231,6 +2231,50 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // 手前の縁の大きな木立（窓の下辺を額装する近景＝奥行きの起点）
     for (const c of [[-12, 20], [13, 21], [-18, 16], [18, 18]]) tree(c[0], c[1], 1.7 + R() * 0.5)
+    // ── 路傍の什器（脱ローポリ＝歩いて回る目線の生活感）。建物・木に被らない通りの隙間へ。頂点色で焼いて数drawへ統合。──
+    if (kind !== 'yato') {
+      const occupied = (x, z, pad) => { for (const s of spawnAvoid) if (Math.hypot(x - s.x, z - s.z) < s.r + pad) return true; return false }
+      const col = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = c.r; a[i + 1] = c.g; a[i + 2] = c.b }; geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); return geo }
+      const bake = (arr, geo, hex, lx, ly, lz) => { geo.translate(lx, ly, lz); arr.push(col(geo, hex)) }
+      const lit = duskAmt > 0.2, furn = [], glow = []  // furn=トゥーン(頂点色)へ統合／glow=自販機の夜灯り(MeshBasic)
+      const vendBody = [0xc0392b, 0x2a6a9a, 0x3a8a5a, 0xd8a838]
+      let nVend = 0, nBike = 0, nWall = 0
+      for (let i = 0; i < (LIGHT ? 120 : 230); i++) {
+        const x = -78 + R() * 168, z = -84 + R() * 80
+        if (z > -3) continue                                                      // 窓のすぐ前は空けて景色を抜く
+        if (heightAt(x, z) < SEA.level + 1.3 || x > SEA.coast - 2) continue        // 海・汀は不可
+        if (Math.abs(x - RIVER.x) < RIVER.bankW + 1 && z > -130 && z < 46) continue // 川筋は不可
+        if (occupied(x, z, 0.9)) continue                                          // 建物・木に被らない
+        const gy = heightAt(x, z), r = R()
+        if (r < 0.16 && nVend < (LIGHT ? 6 : 12)) {                                // 自販機（夜は灯る・1〜2台並ぶ）＝日本の通りの象徴
+          const a = R() * 6.283, n2 = R() < 0.5 ? 2 : 1
+          for (let k = 0; k < n2; k++) { const vx = x + Math.cos(a) * 0.5 * k, vz = z + Math.sin(a) * 0.5 * k
+            bake(furn, new THREE.BoxGeometry(0.92, 1.85, 0.7), vendBody[(R() * 4) | 0], vx, gy + 0.93, vz)
+            const panel = new THREE.BoxGeometry(0.76, 1.2, 0.06); panel.translate(vx, gy + 1.05, vz + 0.36)
+            if (lit) glow.push(col(panel, 0xfff0c0)); else furn.push(col(panel, 0xe8eef0))
+            colliders.push({ x: vx, z: vz, r: 0.6 }) }
+          nVend++
+        } else if (r < 0.6 && nWall < (LIGHT ? 34 : 64)) {                         // ブロック塀の一節（通りを縁取る）
+          const horiz = R() < 0.5, L = 2.4 + R() * 2.2, hh = 1.0 + R() * 0.5
+          bake(furn, new THREE.BoxGeometry(horiz ? L : 0.22, hh, horiz ? 0.22 : L), 0xc3bdae, x, gy + hh / 2, z)
+          bake(furn, new THREE.BoxGeometry(horiz ? L + 0.1 : 0.32, 0.12, horiz ? 0.32 : L + 0.1), 0x9a958c, x, gy + hh + 0.06, z) // 笠木
+          nWall++
+        } else if (r < 0.82) {                                                     // プランター（鉢＋植栽）
+          bake(furn, new THREE.BoxGeometry(0.7, 0.4, 0.5), 0xb5764a, x, gy + 0.2, z)
+          bake(furn, new THREE.BoxGeometry(0.62, 0.34, 0.42), season === 'autumn' ? 0x9a7a3a : season === 'winter' ? 0x6e7a64 : 0x5e7a44, x, gy + 0.55, z)
+        } else if (nBike < (LIGHT ? 6 : 14)) {                                     // 停めた自転車（簡略：車輪×2＋フレーム＋サドル）
+          const a = R() * 6.283, fc = [0x3a5a7a, 0x6a6a6e, 0x7a5a4a, 0x3a6a5a][(R() * 4) | 0]
+          for (const wz of [-0.5, 0.5]) { const wheel = new THREE.TorusGeometry(0.32, 0.05, 6, 10); wheel.rotateY(a); wheel.translate(x + Math.cos(a) * wz, gy + 0.32, z + Math.sin(a) * wz); bake(furn, wheel, 0x2a2a2e, 0, 0, 0) }
+          const frame = new THREE.BoxGeometry(0.06, 0.5, 0.9); frame.rotateY(a); frame.translate(x, gy + 0.55, z); bake(furn, frame, fc, 0, 0, 0)
+          const seat = new THREE.BoxGeometry(0.13, 0.08, 0.28); seat.rotateY(a); seat.translate(x - Math.cos(a) * 0.3, gy + 0.82, z - Math.sin(a) * 0.3); bake(furn, seat, 0x2a2a2e, 0, 0, 0)
+          nBike++
+        }
+      }
+      if (BufferGeometryUtils.mergeGeometries) {
+        if (furn.length) { const m = BufferGeometryUtils.mergeGeometries(furn, false); if (m) { const fm = toon(0xffffff); fm.vertexColors = true; const me = new THREE.Mesh(m, fm); me.castShadow = true; me.receiveShadow = true; town.add(me) } furn.forEach((q) => q.dispose()) }
+        if (glow.length) { const m = BufferGeometryUtils.mergeGeometries(glow, false); if (m) town.add(new THREE.Mesh(m, new THREE.MeshBasicMaterial({ vertexColors: true, fog: true }))); glow.forEach((q) => q.dispose()) }
+      }
+    }
 
     // ── 鎮守の森の神社（飛んでいく目的地のランドマーク）。鳥居・社・石段・灯籠＋囲む木立。──
     {
