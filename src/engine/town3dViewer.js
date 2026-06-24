@@ -5116,7 +5116,19 @@ export async function mountTown3d(parent, opts = {}) {
     grad(box(RW, 0.3, RD, 0, FY - 0.15, BZ / 2, tatMat))        // 床（畳）
     grad(box(RW, 0.3, RD, 0, CY, BZ / 2, cmat))                // 天井（板目）
     grad(box(RW, WH, 0.3, 0, (WT + FY) / 2, BZ, wallMat))       // 奥壁
-    grad(box(0.3, WH, RD, -SX, (WT + FY) / 2, BZ / 2, wallMat)) // 左壁
+    // 左壁。角部屋(kind:'corner')は二面採光＝左壁(開けた街側)に二つ目の窓の開口を残してパネルで囲む。枠/硝子は前窓の材ができた後で足す。
+    let cornerWin = null
+    if (kind === 'corner') {
+      const lwz = 1.9, ow2 = 2.2, o2T = WINCY + owH / 2, o2B = WINCY - owH / 2 // 左窓: 中心z・幅(z方向)・開口の上下端
+      const lz0 = BZ / 2 - RD / 2, lz1 = BZ / 2 + RD / 2, wz0 = lwz - ow2 / 2, wz1 = lwz + ow2 / 2
+      grad(box(0.3, WH, wz0 - lz0, -SX, (WT + FY) / 2, (lz0 + wz0) / 2, wallMat))     // 窓の手前(z小)の壁
+      grad(box(0.3, WH, lz1 - wz1, -SX, (WT + FY) / 2, (wz1 + lz1) / 2, wallMat))     // 窓の奥(z大)の壁
+      grad(box(0.3, WT - o2T, ow2, -SX, (o2T + WT) / 2, lwz, wallMat))               // 窓の上の壁
+      box(0.3, o2B - (FY - 0.4), ow2, -SX, (o2B + FY - 0.4) / 2, lwz, wainsMat)       // 腰壁（窓の下）
+      cornerWin = { lwz, ow2, o2T, o2B }
+    } else {
+      grad(box(0.3, WH, RD, -SX, (WT + FY) / 2, BZ / 2, wallMat)) // 左壁（通常）
+    }
     grad(box(0.3, WH, RD, SX, (WT + FY) / 2, BZ / 2, wallMat))  // 右壁
     // ── 前壁（窓のある壁）。腰壁＋上壁＋左右壁で“ちょうど開ける高さの窓”に。 ──
     const oT = WINCY + owH / 2, oB = WINCY - owH / 2 // 開口の上端/下端
@@ -5149,6 +5161,14 @@ export async function mountTown3d(parent, opts = {}) {
       const refl = new THREE.Mesh(new THREE.PlaneGeometry(owW - 0.06, owH - 0.12), reflMat); refl.position.set(0, WINCY, 0.215); refl.renderOrder = 5; winRoom.add(refl)
       winRefl = { mat: reflMat, base: reflBase } }
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
+    if (cornerWin) { // 角部屋の二つ目の窓（左壁＝開けた街側）＝アルミサッシ枠＋硝子＋窓台。二面採光で「角部屋にいる」手応え。
+      const { lwz, ow2, o2T, o2B } = cornerWin, ax2 = -SX + 0.25
+      box(0.1, 0.1, ow2 + 0.2, ax2, o2T, lwz, alMat); box(0.1, 0.1, ow2 + 0.2, ax2, o2B + 0.06, lwz, alMat)                                  // 上下の横桟（z方向）
+      box(0.1, owH + 0.2, 0.1, ax2 + 0.04, WINCY, lwz - ow2 / 2 - 0.05, alMat); box(0.1, owH + 0.2, 0.1, ax2 + 0.04, WINCY, lwz + ow2 / 2 + 0.05, alMat) // 前後の縦桟
+      box(0.06, owH, 0.06, ax2 + 0.07, WINCY, lwz, alMat)                                                                                    // 中央の召し合わせ
+      const lglass = new THREE.Mesh(new THREE.PlaneGeometry(ow2 - 0.12, owH - 0.12), glassMat); lglass.rotation.y = Math.PI / 2; lglass.position.set(-SX + 0.2, WINCY, lwz); lglass.renderOrder = 4; winRoom.add(lglass) // 硝子（左壁面に平行）
+      box(0.4, 0.13, ow2 + 0.4, -SX + 0.2, o2B - 0.06, lwz, woodMat) // 室内側の窓台
+    }
     box(0.16, 0.12, 0.16, owW / 2 - 0.12, oB + 0.12, 0.26, greenMat) // 窓辺の小さな植木
     // ── 窓辺の一輪挿し（季節の花＝移ろう暮らし。春=桜色/夏=朝顔/秋=コスモス橙/冬=椿の紅） ──
     { const vx = 0.18, vy = oB + 0.02, vz = 0.30

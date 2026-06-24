@@ -1,32 +1,15 @@
-// 夜景の窓灯りの確認。夜の街が窓灯りで瞬くか（窓辺の俯瞰＋低空の街並み）。
 import { chromium } from 'playwright'
 const port = process.env.PORT || '4801'
-const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-page.on('pageerror', (e) => console.log('PAGE EXCEPTION:', e.message))
-page.on('console', (m) => { if (m.type() === 'error') console.log('PAGE ERROR:', m.text()) })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(700)
-await page.evaluate(() => window.__applyScene && window.__applyScene('kitaterao-window-3d-night'))
-await page.waitForTimeout(2400)
-await page.addStyleTag({ content: '.ui{display:none !important}' })
-
-// 窓辺の俯瞰（夜の街の灯り）
-await page.evaluate(() => window.__town3dWindow(true)); await page.waitForTimeout(900)
-await page.evaluate(() => window.__town3dLean(true)); await page.waitForTimeout(1300)
-await page.screenshot({ path: 'scripts/_shots/night-0-lean.png' })
-
-// 低空で街並みの窓灯り
-await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(400)
-await page.evaluate(() => { window.__town3dCruise(false); window.__town3dZoom(1.0); window.__town3dFlyPose(6, 10, -22, 0, -0.2) })
-await page.waitForTimeout(700)
-await page.screenshot({ path: 'scripts/_shots/night-1-street.png' })
-
-// 高めから夜の街を一望（灯りの広がり）
-await page.evaluate(() => { window.__town3dZoom(1.3); window.__town3dFlyPose(0, 40, -6, 0, -0.4) })
-await page.waitForTimeout(700)
-await page.screenshot({ path: 'scripts/_shots/night-2-wide.png' })
-
-await browser.close()
-console.log('night shots done')
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.8 })
+const errs=[]; p.on('pageerror',e=>errs.push(String(e)))
+await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(()=>{})
+await p.waitForTimeout(700)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-night')); await p.waitForTimeout(2800)
+await p.screenshot({ path:'scripts/_shots/night-window.png' }) // 窓辺(デフォルト)
+await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
+await p.evaluate(()=>window.__town3dFlyPose(-10,42,40,0,-0.32)); await p.waitForTimeout(1200)
+await p.screenshot({ path:'scripts/_shots/night-air.png' }) // 俯瞰
+console.log(errs.length?'ERR '+errs.slice(0,2):'no errors')
+await b.close()
