@@ -654,6 +654,9 @@ export async function mountTown3d(parent, opts = {}) {
   const SCHOOL = { x: 54, z: -18, r: 13 }
   // やまゆりホーム（地域の福祉施設）。公園と学校の間の馴染みの場所。前庭の広場で夏は「サマフェス」（模擬店＋ステージ）。
   const YAMAYURI = { x: 36, z: -37, r: 14 }
+  // ホームの目の前の広場＆街への入口（商店街ゲート手前）の広場。馴染みの広場。夏は日替わりでどちらか一方が盆踊りに。
+  const PLAZA_HOME = { x: 0, z: 6, r: 6 }   // 窓のすぐ前の広場
+  const PLAZA_GATE = { x: 0, z: -6, r: 6 }  // 入口が広くなった広場（ゲートの手前）
   // 遊園地（既存の観覧車を中心に）。メリーゴーラウンド・遊具・ゲート＝明るい賑わいの目的地。
   const FUN = { x: -26, z: -66, r: 13 }
   // 副都心（拡張した西の一角＝ガラスの高層ビル街）。旗艦homeの現代的な核＝街のスカイライン。飛んでいく目的地。
@@ -2208,6 +2211,8 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r - 2) continue // 寺は専用の木立で囲む
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
       if (Math.hypot(x - YAMAYURI.x, z - YAMAYURI.z) < YAMAYURI.r - 1) continue // やまゆりホームの前庭は専用に
+      if (Math.hypot(x - PLAZA_HOME.x, z - PLAZA_HOME.z) < PLAZA_HOME.r) continue // 目の前の広場は空ける
+      if (Math.hypot(x - PLAZA_GATE.x, z - PLAZA_GATE.z) < PLAZA_GATE.r) continue // 入口の広場は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
       if (x > SEA.coast && heightAt(x, z) < SEA.level + 1.5) continue // 海・汀には木を生やさない
       if (Math.hypot(x - HARBOR.x, z - HARBOR.z) < HARBOR.r) continue // 工業地帯には木を生やさない
@@ -2576,6 +2581,10 @@ export async function mountTown3d(parent, opts = {}) {
       // サマフェス（前庭の広場で。夏の夕夜・日替わりで開催。id=2）
       if (festOn(2)) makeSummerFes(hx, hz + 6)
     }
+
+    // ── ホームの目の前の広場／街への入口の広場の盆踊り。夏の夕夜・日替わりでどちらか一方が祭りに（近すぎるので両方同時はなし）。──
+    if (festOn(3)) makeFestival(PLAZA_HOME.x, PLAZA_HOME.z, 0.6)        // 窓のすぐ前で盆踊り（目の前の広場）id=3
+    else if (festOn(4)) makeFestival(PLAZA_GATE.x, PLAZA_GATE.z, 0.55) // 街の入口の広場で盆踊り id=4
 
     // ── 遊園地（観覧車のまわり）。ゲート・回転木馬・旗・柵・ベンチ＝明るい賑わいの目的地。──
     {

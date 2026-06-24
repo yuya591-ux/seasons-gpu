@@ -12,6 +12,9 @@ await p.waitForTimeout(700)
 await p.evaluate(() => window.__applyScene('kitaterao-window-3d-night'))
 await p.waitForTimeout(2800)
 
+// ── 窓辺視点: 窓を開けたら目の前の広場で盆踊り（実体験のまま撮る） ──
+await p.screenshot({ path: 'scripts/_shots/fest-window.png' })
+
 // ── 視覚: 学校の校庭の盆踊り(54,-14)と公園の祭り(16,-36)を撮る ──
 const shots = [
   ['fest-school', [44, 13, 0, 54, 2.5, -14, 58]],   // 校庭の盆踊りを斜め上から
