@@ -6360,7 +6360,7 @@ export async function mountTown3d(parent, opts = {}) {
     const dur = 64
     addFx({
       update: (age) => { mat.opacity = 0.82 * Math.min(1, age / 14) * Math.min(1, Math.max(0, (dur - age) / 18)); return age < dur }, // じわっと現れ・また淡く消える
-      cleanup: () => { scene.remove(m); mat.dispose(); tex.dispose() },
+      cleanup: () => { scene.remove(m); m.geometry.dispose(); mat.dispose(); tex.dispose() },
     })
   }
 
