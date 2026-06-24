@@ -6509,12 +6509,15 @@ export async function mountTown3d(parent, opts = {}) {
     // 雪／花びらが舞い降りる（横にゆらぎ、地面付近で空へ戻して循環）
     if (weatherPts) {
       const { pos, spd, phs, N, swirl } = weatherPts
+      // 窓辺(室内)では雪/花びらが部屋の中に降らないよう、部屋のAABB内の粒を窓の外(町側=-z)へ送る＝畳/猫に降る違和感を断つ。
+      const wm = winRoom && (active.flyP || 0) < 0.5, rcx = wm ? winRoom.position.x : 0, rcz = wm ? winRoom.position.z : 0, rcy = wm ? winRoom.position.y : 0
       for (let i = 0; i < N; i++) {
         const k = i * 3
         pos[k + 1] -= spd[i] * dt
         pos[k] += Math.sin(t * 0.6 + phs[i]) * swirl * dt
         pos[k + 2] += Math.cos(t * 0.4 + phs[i]) * swirl * 0.4 * dt
         if (pos[k + 1] < -14) { pos[k + 1] = 66 + R() * 12; pos[k] = (R() - 0.5) * 200 }
+        if (wm && Math.abs(pos[k] - rcx) < 6.5 && pos[k + 2] > rcz - 1.5 && pos[k + 2] < rcz + 9 && pos[k + 1] > rcy - 2.5 && pos[k + 1] < rcy + 6) { pos[k + 2] = rcz - 8 - R() * 40 } // 室内の粒は窓の外へ
       }
       weatherPts.pts.geometry.attributes.position.needsUpdate = true
     }
