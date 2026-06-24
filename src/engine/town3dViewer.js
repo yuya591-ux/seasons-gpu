@@ -5315,7 +5315,14 @@ export async function mountTown3d(parent, opts = {}) {
     box(1.5, 0.66, 0.7, SX - 0.42, FY + 0.33, 3.0, woodMat)        // テレビ台
     box(1.04, 0.78, 0.66, SX - 0.5, FY + 1.05, 3.0, tvMat)         // テレビ筐体
     box(0.06, 0.58, 0.7, SX - 1.04, FY + 1.05, 3.0, screenMat)     // 画面（部屋側=-xを向く）
-    box(0.04, 0.46, 0.56, SX - 1.06, FY + 1.05, 3.0, mk(C(0x9ab4c0, 0x33414a))) // 画面のほのかな映り
+    // 画面の映り込み（曲面ガラスに窓/灯りが斜めに映る＝平坦な死んだ板を脱す）。透過テクスチャで暗い画面の上に重ねる。
+    const tvReflTex = cv(64, 72, (x) => {
+      const rg = x.createLinearGradient(6, 64, 44, 4); rg.addColorStop(0, 'rgba(255,255,255,0)'); rg.addColorStop(0.46, 'rgba(190,212,224,0.2)'); rg.addColorStop(0.6, 'rgba(222,236,242,0.3)'); rg.addColorStop(0.74, 'rgba(190,212,224,0.16)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = rg; x.fillRect(0, 0, 64, 72) // 斜めの光の筋（窓の映り）
+      const cg = x.createRadialGradient(20, 15, 1, 20, 15, 22); cg.addColorStop(0, `rgba(${isNight ? '255,232,180' : '228,238,244'},0.2)`); cg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = cg; x.fillRect(0, 0, 64, 72) // 上左に窓/灯りの丸い映り
+      const vg = x.createRadialGradient(32, 36, 10, 32, 36, 40); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(8,10,14,0.35)'); x.fillStyle = vg; x.fillRect(0, 0, 64, 72) // 四隅の翳り＝曲面ガラス
+    })
+    const tvReflMat = new THREE.MeshBasicMaterial({ map: tvReflTex, transparent: true, depthWrite: false, fog: false }); winRoomMats.push(tvReflMat)
+    { const refl = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.46), tvReflMat); refl.rotation.y = -Math.PI / 2; refl.position.set(SX - 1.07, FY + 1.05, 3.0); refl.renderOrder = 3; winRoom.add(refl) } // 画面の映り込み（-x向き）
     for (const dz of [-0.18, 0.18]) cyl(0.05, 0.05, 0.05, SX - 1.02, FY + 0.78, 3.0 + dz, woodDk, 8) // つまみ
     for (const a of [-0.5, 0.5]) { const ant = box(0.02, 0.66, 0.02, SX - 0.5, FY + 1.7, 3.0, blackMat); ant.rotation.z = a } // V字アンテナ
     box(0.34, 0.16, 0.26, SX - 0.5, FY + 1.52, 3.1, mk(C(0x8a6a5a, 0x47393e))) // テレビ上の小物
