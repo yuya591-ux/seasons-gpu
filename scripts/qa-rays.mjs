@@ -1,18 +1,16 @@
 import { chromium } from 'playwright'
-const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-const errs = []
-page.on('pageerror', (e) => errs.push(e.message))
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
-await page.evaluate(() => document.fonts.ready)
-await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(600)
-await page.addStyleTag({ content: '.ui{display:none !important}' })
-for (const id of ['summer-dusk-seaside', 'kitaterao-rooftop', 'autumn-dusk-corner-room']) {
-  await page.evaluate((s) => window.__applyScene && window.__applyScene(s), id)
-  await page.waitForTimeout(2800)
-  await page.screenshot({ path: `scripts/_shots/qa-rays-${id}.png` })
-  console.log('撮影:', id)
-}
-console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0,4)) : 'エラー無し')
-await browser.close()
+const port = process.env.PORT || '4801'
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 1.6 })
+const errs=[]; p.on('pageerror',e=>errs.push(String(e)))
+await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.locator('.gate').click().catch(()=>{})
+await p.waitForTimeout(700)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-sunset')); await p.waitForTimeout(2600)
+await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(600)
+// 太陽の方角(-x寄り)を向いて低〜中空
+await p.evaluate(()=>window.__town3dFlyPose(20,22,20,-2.16,0.2)); await p.waitForTimeout(600)
+await p.evaluate(()=>window.__town3dEvent('godRays')); await p.waitForTimeout(11000)
+await p.screenshot({ path:'scripts/_shots/ev-rays.png' })
+console.log(errs.length?'ERR '+errs.slice(0,2):'no errors')
+await b.close()

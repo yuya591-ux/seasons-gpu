@@ -5831,6 +5831,32 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 天使の梯子（雲間から差す光芒）。やわらかな淡い光の帯が太陽の方角の空から降りる＝静かに整う特別な空。昼/夕のみ。 ──
+  function evGodRays() {
+    const grp = new THREE.Group(), mats = []
+    const sh = new THREE.Vector3(sun.position.x, 0, sun.position.z).normalize() // 太陽の水平方向（光芒はこの方角の空に立つ）
+    // 縦帯テクスチャ（横＝中央明るく端ぼかし／縦＝上明るく下フェード）＝光芒のソフトな芯
+    const c = document.createElement('canvas'); c.width = 32; c.height = 96; const gx2 = c.getContext('2d')
+    for (let y = 0; y < 96; y++) { const top = 1 - y / 96, hg = gx2.createLinearGradient(0, y, 32, y); hg.addColorStop(0, 'rgba(255,244,214,0)'); hg.addColorStop(0.5, `rgba(255,244,214,${(0.35 + 0.4 * top).toFixed(3)})`); hg.addColorStop(1, 'rgba(255,244,214,0)'); gx2.fillStyle = hg; gx2.fillRect(0, y, 32, 1) }
+    const tex = new THREE.CanvasTexture(c)
+    const N = 6
+    for (let i = 0; i < N; i++) { const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); mats.push(m)
+      const beam = new THREE.Mesh(new THREE.PlaneGeometry(7 + R() * 3, 92), m); beam.position.x = (i - (N - 1) / 2) * 6.2 + (R() - 0.5) * 2; beam.rotation.z = (i - (N - 1) / 2) * 0.05; grp.add(beam) }
+    scene.add(grp)
+    const dur = 32, EYEY2 = EYEY
+    addFx({
+      update: (age) => {
+        const env = 0.42 * Math.min(1, age / 8) * Math.min(1, Math.max(0, (dur - age) / 12)) // 淡く立ち上がり/引き（控えめ＝ギラつかせない）
+        for (const m of mats) m.opacity = env
+        const a = evAnchor(); grp.position.set(a.x, (a.fly ? a.y - EYEY2 : 0) + 46, a.z).addScaledVector(sh, 62) // 太陽の方角の空へ・自分に追従（光芒は地へ降りる）
+        const cp = camera.position // 各帯をカメラへ向ける（薄板の面が正面＝光芒に見える）
+        for (const beam of grp.children) { const wp = new THREE.Vector3(); beam.getWorldPosition(wp); beam.rotation.y = Math.atan2(cp.x - wp.x, cp.z - wp.z) }
+        return age < dur
+      },
+      cleanup: () => { scene.remove(grp); disposeObj(grp); tex.dispose() },
+    })
+  }
+
   // ── 飛行機雲（高空をゆっくり横切り、白い帯が後ろへ伸びていく。日常の“あ、飛行機”の発見） ──
   function evContrail() {
     const dir = R() < 0.5 ? 1 : -1
@@ -5998,11 +6024,12 @@ export async function mountTown3d(parent, opts = {}) {
     fireworks: { run: evFireworks, ok: () => isNight },
     fireworksFinale: { run: evFireworksFinale, ok: () => isNight }, // 花火大会のフィナーレ（波状の大当たり）
     mist: { run: evMist }, // 通り過ぎるもや（朝もや/宵のもや・時間帯問わず静かに整う）
+    godRays: { run: evGodRays, ok: () => !isNight }, // 天使の梯子（雲間の光芒・昼夕）
     aurora: { run: evAurora, ok: () => isNight },
   }
   const fxBands = [
     { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },                 // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
-    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist'] }, // 中（少し特別）＝もやも含む
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist', 'godRays'] }, // 中（少し特別）＝もや/光芒も含む
     { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks', 'fireworksFinale'] },                   // まれ（大当たり＝雨→虹／花火／花火大会）
     { next: 360 + R() * 360, min: 1800, max: 3600, pool: ['aurora'] },                                              // 超レア（30〜60分に一度の“特別な空”＝オーロラ。最初は6〜12分で一度）
   ]
@@ -6018,7 +6045,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, aurora: evAurora }[n] || (() => {}))() }
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, godRays: evGodRays, aurora: evAurora }[n] || (() => {}))() }
 
   // ── 飛行/歩行の没入オブジェクト ──
   // 自分の影が真下の地面を走る（高度＝飛んでいる手応え）。柔らかい円を地面に伏せる。
