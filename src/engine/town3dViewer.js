@@ -1264,7 +1264,13 @@ export async function mountTown3d(parent, opts = {}) {
       { const dx2 = (R() - 0.5) * w * 0.42, df = -d / 2
         const door = new THREE.BoxGeometry(1.04, 1.84, 0.14); door.translate(dx2, 0.92, df - 0.05); propL.push({ geo: colGeo(door, R() < 0.5 ? 0x6a5644 : 0x46545e) }) // 木の引き戸／ガラスの玄関戸
         const canopy = new THREE.BoxGeometry(1.5, 0.12, 0.62); canopy.translate(dx2, 1.96, df - 0.26); propL.push({ geo: colGeo(canopy, 0x8a7e70) }) // 玄関の庇
-        const step = new THREE.BoxGeometry(1.3, 0.18, 0.5); step.translate(dx2, 0.09, df - 0.3); propL.push({ geo: colGeo(step, 0xb4ab9c) }) } // 踏み石
+        const step = new THREE.BoxGeometry(1.3, 0.18, 0.5); step.translate(dx2, 0.09, df - 0.3); propL.push({ geo: colGeo(step, 0xb4ab9c) }) // 踏み石
+        // 前庭の低い生垣＋門柱（道に面した家の佇まい）。門の所(玄関の正面)は空ける。
+        const fw = df - 0.95, gap = 0.95, hcol = season === 'autumn' ? 0x7a7440 : season === 'winter' ? 0x586a54 : 0x4e7038
+        const lw = (dx2 - gap) - (-w / 2 - 0.2), rw = (w / 2 + 0.2) - (dx2 + gap)
+        if (lw > 0.5) { const hl = new THREE.BoxGeometry(lw, 0.66, 0.46); hl.translate((-w / 2 - 0.2 + dx2 - gap) / 2, 0.33, fw); propL.push({ geo: colGeo(hl, hcol) }) } // 左の生垣
+        if (rw > 0.5) { const hr = new THREE.BoxGeometry(rw, 0.66, 0.46); hr.translate((dx2 + gap + w / 2 + 0.2) / 2, 0.33, fw); propL.push({ geo: colGeo(hr, hcol) }) } // 右の生垣
+        for (const gp of [dx2 - gap, dx2 + gap]) { const post = new THREE.BoxGeometry(0.2, 1.05, 0.2); post.translate(gp, 0.52, fw); propL.push({ geo: colGeo(post, 0xb6ab98) }) } } // 門柱
     } else if (type === 'apt') {
       // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.5, d * 1.04), toon(0x8a8478)); cap.position.y = h + 0.25; cap.castShadow = true; g.add(cap)
