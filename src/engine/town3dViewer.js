@@ -2893,12 +2893,12 @@ export async function mountTown3d(parent, opts = {}) {
         addShip(180, -52, 0.5); addShip(320, -28, -0.7); addShip(460, -56, 0.25); addShip(380, -40, -0.4) // 東(江戸)への長い渡りに帆船を散らす
         addShip(150, -200, 1.7); addShip(135, -360, -1.5); addShip(150, -500, 1.6) // 北(戦国)への渡りにも帆船
         addShip(-270, -28, 0.6); addShip(-400, -44, -0.5); addShip(-510, -30, 0.3) // 西(大正)への渡りにも蒸気船/帆船
-        const addIslet = (ix, iz, scl) => { // 渡りの途中の緑豊かな小島（岩＋森＋松＝道中を退屈にしない）
+        const addIslet = (ix, iz, scl) => { // 渡りの途中の緑豊かな小島（岩＋森＋松＝道中を退屈にしない）。木が水に浮いて見えないよう、島を大きく緑を広く。
           const my = SEA.level - 0.4
-          const mound = new THREE.Mesh(new THREE.ConeGeometry(5.2 * scl, 3.4 * scl, 8), toon(0x6e6a5c)); mound.position.set(ix, my + 1.6 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound))
-          const cap = new THREE.Mesh(new THREE.ConeGeometry(4.4 * scl, 1.7 * scl, 8), toon(season === 'winter' ? 0xd8dde0 : season === 'autumn' ? 0x8a7a40 : 0x4e6e3e)); cap.position.set(ix, my + 3.1 * scl, iz); town.add(cap) // 緑の頂（広め＝緑豊か）
-          const topY = my + 3.4 * scl
-          for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.2832, rr = (0.3 + R() * 0.7) * 3.4 * scl; mkPine(ix + Math.cos(a) * rr, topY - rr * 0.22, iz + Math.sin(a) * rr, (0.7 + R() * 0.5) * scl) } // 森
+          const mound = new THREE.Mesh(new THREE.ConeGeometry(7.0 * scl, 4.4 * scl, 8), toon(0x6e6a5c)); mound.position.set(ix, my + 2.1 * scl, iz); mound.castShadow = true; town.add(mound); town.add(addOutline(mound)) // 大きく＝確かに海から立ち上がる島
+          const cap = new THREE.Mesh(new THREE.ConeGeometry(6.2 * scl, 2.3 * scl, 8), toon(season === 'winter' ? 0xd8dde0 : season === 'autumn' ? 0x8a7a40 : 0x4e6e3e)); cap.position.set(ix, my + 3.9 * scl, iz); town.add(cap) // 緑の頂（広め＝緑豊か＝木の土台が読める）
+          const topY = my + 4.3 * scl
+          for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.2832, rr = (0.3 + R() * 0.7) * 4.6 * scl; mkPine(ix + Math.cos(a) * rr, topY - rr * 0.22, iz + Math.sin(a) * rr, (0.7 + R() * 0.5) * scl) } // 森
           for (let i = 0; i < 3; i++) { const a = R() * 6.28, rk = new THREE.Mesh(new THREE.IcosahedronGeometry((0.6 + R() * 0.6) * scl, 0), toon(0x7c766a)); rk.position.set(ix + Math.cos(a) * 4.6 * scl, my + 0.5, iz + Math.sin(a) * 4.6 * scl); rk.rotation.set(R() * 3, R() * 3, R() * 3); town.add(rk) } // 岩
         }
         addIslet(180, -38, 1.4); addIslet(300, -50, 1.0); addIslet(420, -40, 1.3); addIslet(520, -52, 1.0) // 東(江戸)への島々（唯一導線を残す渡り＝退屈にしない中継）
