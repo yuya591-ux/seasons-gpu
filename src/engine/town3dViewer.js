@@ -627,6 +627,8 @@ export async function mountTown3d(parent, opts = {}) {
   let seasonFall = null // 季節の降りもの（春=花びら／秋=落ち葉。公園のあたりに舞う）
   let nearFall = null   // 歩く人に追従する近景の舞い散り（降り立つとどこでも桜吹雪/落ち葉の中へ）
   let crowdCenters = [] // 人だまりの中心（駅前/商店街/副都心/競技場/祭り等）＝近づくとざわめきが満ちる（音）
+  const nightGlows = [] // 夜の灯り（篝火/松明/提灯/ガス灯）のグロー材＝frameでそっと揺らす（炎の息づき）
+  const litFlicker = (mat, amp, sp) => { if (mat) nightGlows.push({ m: mat, base: mat.opacity, amp, sp, ph: R() * 6.28 }) } // 灯りのグローを揺らぎに登録（base=元の濃さ・amp=揺れ幅・sp=速さ）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
@@ -2995,7 +2997,7 @@ export async function mountTown3d(parent, opts = {}) {
           const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.5, 5), toon(0x3a2e20)); post.position.set(fx, fy + 0.75, fz); town.add(post)
           const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.26, 0.34, 8), toon(0x2a2620)); bowl.position.set(fx, fy + 1.55, fz); town.add(bowl)
           const fire = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.8, 6), fireMat); fire.position.set(fx, fy + 2.0, fz); town.add(fire)
-          const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.8 : 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(fx, fy + 2.0, fz); glow.scale.set(2.6, 2.6, 1); town.add(glow) } // 篝火
+          const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.8 : 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(fx, fy + 2.0, fz); glow.scale.set(2.6, 2.6, 1); town.add(glow); litFlicker(glow.material, 0.3, 6.2) } // 篝火（炎の揺らぎ）
         // 城下（山裾に密集する侍屋敷・町家。高さ/大きさ/色を変えて作り分け、メッシュ統合で軽く）
         const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根
         // 商品化レベルへ：壁の色を4種に（タン/淡い/焼杉の黒板/漆喰の白蔵）＋茅葺屋根で町並みに多様性と質感を出す。
@@ -3041,7 +3043,7 @@ export async function mountTown3d(parent, opts = {}) {
             const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.7, 4), poleMat); arm.rotation.z = Math.PI / 2; arm.position.set(px - side * 0.3, gh + 2.3, zz); town.add(arm)
             const cho = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.46, 10), chouMat); cho.position.set(px - side * 0.6, gh + 1.95, zz); cho.castShadow = true; town.add(cho) // 提灯本体
             for (const by of [0.15, -0.15]) { const bd = new THREE.Mesh(new THREE.CylinderGeometry(0.172, 0.172, 0.04, 10), bandMat); bd.position.set(px - side * 0.6, gh + 1.95 + by, zz); town.add(bd) } // 上下の白帯
-            if (lglow > 0.05) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xffb060, transparent: true, opacity: lglow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px - side * 0.6, gh + 1.95, zz); gl.scale.set(1.5, 1.5, 1); town.add(gl) }
+            if (lglow > 0.05) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xffb060, transparent: true, opacity: lglow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px - side * 0.6, gh + 1.95, zz); gl.scale.set(1.5, 1.5, 1); town.add(gl); litFlicker(gl.material, 0.12, 2.6) }
             if (lglow > 0.12) lightPool(px - side * 0.6, gh, zz, 1.3, lglow * 0.5) // 足元の灯りだまり
           }
         }
@@ -3102,7 +3104,7 @@ export async function mountTown3d(parent, opts = {}) {
             if (py < SEA.level + 0.6 || py > 14) continue
             const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.0, 4), tPoleMat); pole.position.set(px, py + 1.0, zz); town.add(pole)
             const fire = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 6), torchFire); fire.position.set(px, py + 2.2, zz); town.add(fire)
-            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.6 : 0.26, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(px, py + 2.2, zz); glow.scale.set(1.8, 1.8, 1); town.add(glow)
+            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.6 : 0.26, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(px, py + 2.2, zz); glow.scale.set(1.8, 1.8, 1); town.add(glow); litFlicker(glow.material, 0.28, 7.4) // 松明（炎の揺らぎ）
           }
         }
         // ── 棚田（西の尾根の谷側斜面に、等高線に沿って段々に連なる水田）。段に高さをスナップして水平な田を連ね、
@@ -3302,14 +3304,14 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < 10; k++) { const a = R() * 6.28, r2 = 14 + R() * 40, lx = tx + Math.cos(a) * r2, lz = tz + Math.sin(a) * r2, ly = heightAt(lx, lz); if (ly < SEA.level + 1.2) continue
             const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.0, 6), toon(0x3a3e42)); pole.position.set(lx, ly + 1.5, lz); town.add(pole)
             const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 8), isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : toon(0xf0e4c8)); lamp.position.set(lx, ly + 3.1, lz); town.add(lamp)
-            if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.4, 2.4, 1); town.add(gl) } }
+            if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.4, 2.4, 1); town.add(gl); litFlicker(gl.material, 0.07, 1.7) } }
           // ── 運河沿いの並木道のガス灯（水辺に灯りの列＝大正の港町の灯りの散歩道）。竿/灯は統合で軽量、夜はグローを灯す ──
           { const cPoleG = [], cLampG = [], cm = new THREE.Matrix4(), canalZ = tz + 17, lampMat = isNight ? new THREE.MeshBasicMaterial({ color: 0xffd28a, fog: true }) : toon(0xf0e4c8)
             for (let cx = tx - 100; cx <= tx + 26; cx += 7) for (const side of [-1, 1]) { const lx = cx, lz = canalZ + side * 5.5, ly = heightAt(lx, lz)
               if (ly < SEA.level + 1.0) continue
               const pg = new THREE.CylinderGeometry(0.07, 0.1, 3.0, 6); cm.makeTranslation(lx, ly + 1.5, lz); pg.applyMatrix4(cm); cPoleG.push(pg)
               const lg = new THREE.SphereGeometry(0.26, 8, 8); cm.makeTranslation(lx, ly + 3.1, lz); lg.applyMatrix4(cm); cLampG.push(lg)
-              if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.2, 2.2, 1); town.add(gl) }
+              if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tGlow, color: 0xffcf8a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(lx, ly + 3.1, lz); gl.scale.set(2.2, 2.2, 1); town.add(gl); litFlicker(gl.material, 0.07, 1.5) }
             }
             if (BufferGeometryUtils.mergeGeometries) { const pm = BufferGeometryUtils.mergeGeometries(cPoleG, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x3a3e42))); cPoleG.forEach((g) => g.dispose()); const lmM = BufferGeometryUtils.mergeGeometries(cLampG, false); if (lmM) town.add(new THREE.Mesh(lmM, lampMat)); cLampG.forEach((g) => g.dispose()) }
           }
@@ -3329,7 +3331,7 @@ export async function mountTown3d(parent, opts = {}) {
               const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.3, 8), ironMat); base.position.set(px, py + 0.15, pz); town.add(base) // 台座
               const glass = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.34, 0.24), lampGlass); glass.position.set(px, py + 3.12, pz); town.add(glass) // ランプ箱
               const cap = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.22, 6), ironMat); cap.position.set(px, py + 3.42, pz); town.add(cap) // 笠
-              if (lampGlow > 0.12) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gtex, color: 0xffcf8a, transparent: true, opacity: lampGlow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px, py + 3.12, pz); gl.scale.set(1.9, 1.9, 1); town.add(gl); lightPool(px, py, pz, 1.7, lampGlow * 0.5) } } // 足元の灯りだまり
+              if (lampGlow > 0.12) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: gtex, color: 0xffcf8a, transparent: true, opacity: lampGlow, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); gl.position.set(px, py + 3.12, pz); gl.scale.set(1.9, 1.9, 1); town.add(gl); litFlicker(gl.material, 0.07, 1.9); lightPool(px, py, pz, 1.7, lampGlow * 0.5) } } // 足元の灯りだまり
             const postMat = toon(0xc0392b)
             for (let k = 0; k < 2; k++) { const a = R() * 6.28, r2 = 12 + R() * 20, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
               const pb = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 1.2, 12), postMat); pb.position.set(px, py + 0.6, pz); pb.castShadow = true; town.add(pb) // 丸ポストの胴
@@ -7016,6 +7018,8 @@ export async function mountTown3d(parent, opts = {}) {
       let crowdAmt = 0; for (const c of crowdCenters) { const d = Math.hypot(fp.x - c.x, fp.z - c.z); if (d < c.r) crowdAmt = Math.max(crowdAmt, 1 - d / c.r) } // 人だまりの近さ
       crowdAmt *= rivLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
       onAmbience(seaAmt, riverAmt, crowdAmt) }
+    // 夜の灯りの息づき（篝火/松明＝炎の揺らぎ・ガス灯＝穏やかな明滅）。二重サインで不規則に。
+    for (const g of nightGlows) g.m.opacity = Math.max(0, g.base * (1 + g.amp * (Math.sin(t * g.sp + g.ph) * 0.6 + Math.sin(t * g.sp * 1.73 + g.ph * 1.3) * 0.4)))
     // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
     { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12)
       // 実時計 t で計る（休息中は描画が間引かれ dt が頭打ちになるため、dt 積算だと鈴が遅れる）
