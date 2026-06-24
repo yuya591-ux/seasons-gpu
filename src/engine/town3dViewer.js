@@ -4056,13 +4056,13 @@ export async function mountTown3d(parent, opts = {}) {
       mx.fillStyle = mg; mx.fillRect(0, 0, 64, 64)
       const mistTex = new THREE.CanvasTexture(mc)
       const mistTint = skyHorizon.clone().lerp(new THREE.Color(0xffffff), 0.55).getHex() // 朝の地平色を含む淡い白
-      const nMist = LIGHT ? 6 : 11
+      const nMist = LIGHT ? 5 : 8 // 重ねすぎると谷が白く霞んで主役の棚田/屋敷が読めない＝枚数と濃さを抑え、朝靄は“薄い帯”に
       for (let i = 0; i < nMist; i++) {
         const mxp = (R() - 0.5) * 24, mz = -43 + R() * 46
         const gy = heightAt(mxp, mz)
-        const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistTint, transparent: true, opacity: 0.13 + R() * 0.1, depthWrite: false, fog: true }))
-        spr.position.set(mxp, gy + 1.5 + R() * 1.4, mz)
-        spr.scale.set(15 + R() * 11, 6.5 + R() * 4, 1)
+        const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistTint, transparent: true, opacity: 0.08 + R() * 0.07, depthWrite: false, fog: true }))
+        spr.position.set(mxp, gy + 1.2 + R() * 1.1, mz)
+        spr.scale.set(14 + R() * 10, 5.5 + R() * 3.5, 1)
         scene.add(spr)
       }
     }
@@ -4184,8 +4184,11 @@ export async function mountTown3d(parent, opts = {}) {
   // フラット材(MeshBasic)にし、淡い白〜冷灰のやわらかな曇り空に溶かす（積雲の翳りは晴天/夜のみ）。
   const SNOWY = weather === 'snow'
   const mkCloud = (col) => SNOWY ? new THREE.MeshBasicMaterial({ color: col, fog: false }) : new THREE.MeshToonMaterial({ color: col, gradientMap: grad, fog: false })
-  const cloudMat = mkCloud(SNOWY ? 0xf6f4f0 : 0xfbfaf6)       // 陽の当たる白（雪天は少し落として白飛びを抑える）
-  const cloudBot = mkCloud(isNight ? 0x767e92 : (SNOWY ? 0xe6e9ee : 0xe9e4dc)) // 影になる雲底（やわらかな陰。雪天は淡い冷灰でほぼ均一＝明るい空に溶ける）
+  // 雲の色を時間帯に追従させる（昼=白／夕=暖色に染まる／夜=暗い月明かりの雲＝白い天井を脱す）。色は頂点色に焼くがシーンは時間帯ごとに別ビルドなのでビルド時にisNight/duskAmtで決めれば足りる。
+  const cloudTopHex = isNight ? 0x4a5168 : (SNOWY ? 0xf6f4f0 : new THREE.Color(0xfbfaf6).lerp(new THREE.Color(0xf3ca9c), duskAmt * 0.55).getHex()) // 夕は白→淡い夕焼け色
+  const cloudBotHex = isNight ? 0x363b50 : (SNOWY ? 0xe6e9ee : new THREE.Color(0xe9e4dc).lerp(new THREE.Color(0xd99a6a), duskAmt * 0.5).getHex())
+  const cloudMat = mkCloud(cloudTopHex)        // 陽/月の当たる雲頂（夜は暗く沈める）
+  const cloudBot = mkCloud(cloudBotHex)        // 影になる雲底（夜は更に暗い）
   const cloudVC = mkCloud(0xffffff); cloudVC.vertexColors = true // 雲のパフを群ごとに1メッシュへ統合（色は頂点色で焼く）＝描画コール削減
   // 色を頂点色で焼くヘルパ（colGeoは町造形ブロック内＝この外側スコープからは見えないので別途定義）。
   const cloudCol = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = c.r; a[i + 1] = c.g; a[i + 2] = c.b }; geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); return geo }
