@@ -363,6 +363,55 @@ export function createAudio(opts) {
     purrNode = { pg }
   }
 
+  // ── 場所に応じた水の音（波／川のせせらぎ）。合成（フィルタしたノイズ）＝CC0/オフライン原則と整合。
+  //  海の近く・低空で「波」が、川/運河の近くで「せせらぎ」が満ちる。setAmbience(海,川) が近さで音量を上下する。
+  //  未使用時は完全に 0（録音のAGCで増幅されるノイズ漏れを断つ＝以前の機械音の教訓）。低音の唸りはハイパスで断つ。
+  let waterNode = null
+  const waterState = { sea: 0, river: 0 }
+  function startWater() {
+    if (!ctx || waterNode || !ctx.createBiquadFilter) return
+    const len = Math.floor(2 * ctx.sampleRate)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    let b0 = 0, b1 = 0
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = 0.97 * b0 + w * 0.07; b1 = 0.90 * b1 + w * 0.10; d[i] = (b0 * 0.85 + b1 * 0.7 + w * 0.2) * 0.4 }
+    // 波：低めのローパス＋低音の唸りを断つハイパス。ゆっくり寄せては返すスウェル（2つのLFOで不規則に）。
+    const wsrc = ctx.createBufferSource(); wsrc.buffer = buf; wsrc.loop = true
+    const whp = ctx.createBiquadFilter(); whp.type = 'highpass'; whp.frequency.value = 200; whp.Q.value = 0.5
+    const wlp = ctx.createBiquadFilter(); wlp.type = 'lowpass'; wlp.frequency.value = 640; wlp.Q.value = 0.4
+    const wg = ctx.createGain(); wg.gain.value = 0.0
+    wsrc.connect(whp).connect(wlp).connect(wg).connect(master)
+    // せせらぎ：明るいバンドパス＋ハイパス。さらさらと一定（ごく僅かな揺らぎ）。
+    const rsrc = ctx.createBufferSource(); rsrc.buffer = buf; rsrc.loop = true
+    const rhp = ctx.createBiquadFilter(); rhp.type = 'highpass'; rhp.frequency.value = 900; rhp.Q.value = 0.5
+    const rbp = ctx.createBiquadFilter(); rbp.type = 'bandpass'; rbp.frequency.value = 2300; rbp.Q.value = 0.7
+    const rg = ctx.createGain(); rg.gain.value = 0.0
+    rsrc.connect(rhp).connect(rbp).connect(rg).connect(master)
+    waterNode = { wg, rg, wAmp: null, rAmp: null }
+    try { // 波のスウェル（寄せて返す）。LFOの振幅(wAmp)は setAmbience が海の近さで持たせる＝海に近いほど大きく寄せる。
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11      // 約9秒周期の大きなうねり
+      const wAmp = ctx.createGain(); wAmp.gain.value = 0; lfo.connect(wAmp).connect(wg.gain); lfo.start()
+      const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.063   // 不規則さを足す second swell
+      const wAmp2 = ctx.createGain(); wAmp2.gain.value = 0; lfo2.connect(wAmp2).connect(wg.gain); lfo2.start()
+      const rlfo = ctx.createOscillator(); rlfo.frequency.value = 0.21    // せせらぎのごく僅かな揺らぎ
+      const rAmp = ctx.createGain(); rAmp.gain.value = 0; rlfo.connect(rAmp).connect(rg.gain); rlfo.start()
+      waterNode.wAmp = wAmp; waterNode.wAmp2 = wAmp2; waterNode.rAmp = rAmp
+    } catch { /* LFO非対応でもベース音量で鳴る */ }
+    try { wsrc.start(); rsrc.start() } catch { /* 無視 */ }
+  }
+  // 海の近さ(0..1)・川の近さ(0..1)で水の音量を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
+  function setAmbience(sea, river) {
+    if (!waterNode) return
+    const t = now()
+    const s = Math.max(0, Math.min(1, sea || 0)), r = Math.max(0, Math.min(1, river || 0))
+    waterNode.wg.gain.setTargetAtTime(s <= 0.01 ? 0 : s * 0.05, t, 1.3)        // 波のベース音量
+    if (waterNode.wAmp) waterNode.wAmp.gain.setTargetAtTime(s <= 0.01 ? 0 : s * 0.03, t, 1.3)  // 寄せて返すうねりの深さ
+    if (waterNode.wAmp2) waterNode.wAmp2.gain.setTargetAtTime(s <= 0.01 ? 0 : s * 0.018, t, 1.3)
+    waterNode.rg.gain.setTargetAtTime(r <= 0.01 ? 0 : r * 0.04, t, 1.1)        // せせらぎ
+    if (waterNode.rAmp) waterNode.rAmp.gain.setTargetAtTime(r <= 0.01 ? 0 : r * 0.012, t, 1.1)
+    waterState.sea = s; waterState.river = r
+  }
+
   // ── 生成的なBGMの下地（素材ゼロ・合成パッド）。CC0/オフライン原則と完全整合。
   // 【作り直しの要点（実機FB「終始ぶーぶぶぶの電子ノイズで不快」）】
   //  ・低音ドローンを廃止＝和音を中高域(165〜660Hz)へ。スマホのスピーカーは低音(80〜220Hz)を歪ませ
@@ -507,6 +556,7 @@ export function createAudio(opts) {
       if (ctx.state === 'suspended') await ctx.resume()
       started = true
       startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
+      startWater() // 場所に応じた水の音（波/せせらぎ）の源を立ち上げる（音量0＝setAmbienceが近さで満ち引き）
       // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
       // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
@@ -518,6 +568,8 @@ export function createAudio(opts) {
     /** 3Dの街の場面（部屋/窓辺/飛び始め/巡航/速度/山/海/各時代の近さ）でBGMの下地を静かに変える。
      *  3Dを離れる時は {off:true} で静かに引く。素材ゼロの合成パッドなのでオフライン/CC0原則と整合。 */
     setMusicBed,
+    /** 場所に応じた水の音（波/せせらぎ）の満ち引き。sea=海の近さ・river=川/運河の近さ(各0..1)。 */
+    setAmbience,
     /** 情景を切り替える（音もクロスフェードで差し替える）。 */
     async setScene(scene) {
       currentScene = scene
@@ -715,7 +767,7 @@ export function createAudio(opts) {
       }
     },
     getLookPan() { return lookPan }, // 検証/連携用
-    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/') } }, // 検証用: BGM下地の状態
+    getDebug() { return { state: ctx ? ctx.state : 'none', bedReady: !!bedNodes, bedGain: bedState.gain, bedCut: bedState.cut, bedVoice: bedState.voice.join('/'), water: !!waterNode, sea: +waterState.sea.toFixed(2), river: +waterState.river.toFixed(2) } }, // 検証用: BGM下地＋水音の状態
     isStarted() {
       return started
     },

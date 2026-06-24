@@ -175,6 +175,7 @@ function start() {
           onFoot: (surf) => { if (!sleepFading) audio.footstep(surf) }, // 散策の足音（素材別＝舗装/土・草/木）
           onBirdFlush: () => { if (!sleepFading) audio.birdFlush() }, // 鳥が驚いて飛び立つ羽音
           onAltitude: (v) => audio.setAltitudeDuck(v), // 高空で街の環境音をしぼる（風だけの静けさへ）
+          onAmbience: (sea, river) => { if (!sleepFading) audio.setAmbience(sea, river) }, // 場所に応じた水の音（海＝波／川・運河＝せせらぎ）が満ち引き
           onScene: (c) => { if (!sleepFading) audio.setMusicBed(c) }, // 場面に応じて生成BGMの下地を静かに変える
           onSeaBird: () => { if (!sleepFading) audio.seaBird() }, // 海の上で時々かもめが鳴く
           onPurr: (v) => { if (!sleepFading) audio.setPurr(v) }, // 窓辺の猫を撫でるとゴロゴロ鳴る

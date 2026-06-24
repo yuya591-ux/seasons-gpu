@@ -310,6 +310,7 @@ export async function mountTown3d(parent, opts = {}) {
   const onAltitude = typeof opts.onAltitude === 'function' ? opts.onAltitude : () => {} // 飛行高度(0..1)を外へ伝える（高空で環境音をしぼる）
   const onScene = typeof opts.onScene === 'function' ? opts.onScene : () => {} // 場面（部屋/窓/飛行/歩行・速度・高度・地形・時代の近さ）を外へ伝える（BGMの下地）
   const onSeaBird = typeof opts.onSeaBird === 'function' ? opts.onSeaBird : () => {} // 海の上で時々かもめが鳴く（海らしさ＋渡りの退屈しのぎ）
+  const onAmbience = typeof opts.onAmbience === 'function' ? opts.onAmbience : () => {} // 場所に応じた水の音(海=波/川=せせらぎ)の近さ(0..1)を外へ伝える
   const onPurr = typeof opts.onPurr === 'function' ? opts.onPurr : () => {} // 窓辺の猫を撫でるとゴロゴロ鳴る（0..1）
   const onMeow = typeof opts.onMeow === 'function' ? opts.onMeow : () => {} // 窓辺の猫がタップ反応で鳴く（pitch, kind）
   const onFlockWing = typeof opts.onFlockWing === 'function' ? opts.onFlockWing : () => {} // 渡りの群れに近づいて飛ぶと羽音
@@ -6971,6 +6972,19 @@ export async function mountTown3d(parent, opts = {}) {
     if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) active.climb = 0 }
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
+    // 場所に応じた水の音の満ち引き（足元が海＝波／川・運河の近く＝せせらぎ）。飛行/歩行で外に出ている時だけ。
+    { const fp = active.flyPos, outAmt = Math.max(0, Math.min(1, ((active.flyP || 0) - 0.2) / 0.4))
+      const altLow = Math.max(0, Math.min(1, (34 - Math.max(0, fp.y - SEA.level)) / 34)) // 低いほど水音が近い
+      // 海＝汀の外の海域ゾーン（東湾x>coast/西沖x<westCoast/各時代の島の周囲）かつ周囲が広く水。内陸の谷/川/池を「海」と誤検知しない。
+      const seaward = (fp.x > SEA.coast - 12 || fp.x < SEA.westCoast + 12) ? 1 : 0
+      let wet = 0; for (const [ox, oz] of [[0, 0], [13, 0], [-13, 0], [0, 13], [0, -13]]) if (heightAt(fp.x + ox, fp.z + oz) < SEA.level + 1.5) wet++
+      const seaAmt = seaward * Math.max(0, Math.min(1, (wet - 1.5) / 3)) * altLow * outAmt
+      let rivD = Math.min(edoStream(fp.x, fp.z), taishoCanal(fp.x, fp.z)) // 江戸の川／大正の運河（領域外は999）
+      if (Math.abs(fp.x - RIVER.x) < 40 && fp.z > -130 && fp.z < 46) rivD = Math.min(rivD, Math.abs(fp.x - RIVER.x)) // 現代homeの川(x=-52)
+      { const dz = fp.z - SENGOKU.z; if (Math.abs(dz) < SENGOKU.r) rivD = Math.min(rivD, Math.abs((fp.x - SENGOKU.x) - senValley(dz))) } // 戦国の谷の川
+      const rivLow = Math.max(0, Math.min(1, (30 - Math.max(0, fp.y - SEA.level)) / 24)) // 川・運河は低空/地上でだけ聞こえる
+      const riverAmt = Math.max(0, Math.min(1, (8 - rivD) / 8)) * rivLow * outAmt * (1 - seaAmt) // 川の近く（海の時は波を優先）
+      onAmbience(seaAmt, riverAmt) }
     // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
     { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12)
       // 実時計 t で計る（休息中は描画が間引かれ dt が頭打ちになるため、dt 積算だと鈴が遅れる）
