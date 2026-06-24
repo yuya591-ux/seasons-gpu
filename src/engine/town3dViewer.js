@@ -5117,6 +5117,7 @@ export async function mountTown3d(parent, opts = {}) {
   let winDust = null // 窓の光に舞うほこり（昼の“居る部屋”の空気感）
   let winCat = null // 窓辺の日だまりで丸くなって眠る猫（呼吸でそっと上下）
   let winRefl = null // 窓ガラスへの室内の映り込み（夕/夜ほど強い・窓をあけると消える）
+  let winRainGlass = null // 雨天の窓ガラスに伝う雨粒・流れ（窓辺で“雨が降っている”手応え。下へ流れる）
   {
     // 寸法（局所座標。原点=窓の中心、カメラは局所(0,1.5,3.2)＝立って窓辺に居る）。FY床/CY天井/SX側壁/BZ奥壁/WINCY窓の中心高。
     const dWall = 3.2, owW = 2.4, owH = 1.7, FY = -1.1, CY = 3.7, SX = 4.7, BZ = 7.4, WINCY = 1.0 // 少し広い部屋に
@@ -5237,6 +5238,21 @@ export async function mountTown3d(parent, opts = {}) {
       const reflMat = new THREE.MeshBasicMaterial({ map: reflTex, transparent: true, opacity: reflBase, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); winRoomMats.push(reflMat)
       const refl = new THREE.Mesh(new THREE.PlaneGeometry(owW - 0.06, owH - 0.12), reflMat); refl.position.set(0, WINCY, 0.215); refl.renderOrder = 5; winRoom.add(refl)
       winRefl = { mat: reflMat, base: reflBase } }
+    // ── 雨天の窓ガラス: 伝う雨粒＋下へ流れる滴＝窓辺で「雨が降っている」手応え（仕様の核心。半透明＝街は透ける）。 ──
+    if (weather === 'rain') {
+      const rgTex = cv(256, 256, (x) => {
+        x.fillStyle = 'rgba(204,218,228,0.045)'; x.fillRect(0, 0, 256, 256) // うっすら濡れた曇り
+        for (let i = 0; i < 11; i++) { const rx = R() * 256, w = 2 + R() * 4, g = x.createLinearGradient(rx, 0, rx + w, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, `rgba(236,246,250,${(0.09 + R() * 0.12).toFixed(3)})`); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(rx, R() * 120, w, 256) } // 縦の流れ筋(runnel)
+        for (let i = 0; i < 95; i++) { const dx = R() * 256, dy = R() * 256, dr = 1.6 + R() * 3.6 // 雨粒＝小さなレンズ(明るい縁＋淡い中＝屈折の手応え)
+          const dg = x.createRadialGradient(dx - dr * 0.3, dy - dr * 0.3, 0, dx, dy, dr); dg.addColorStop(0, `rgba(255,255,255,${(0.32 + R() * 0.22).toFixed(3)})`); dg.addColorStop(0.55, 'rgba(184,204,216,0.12)'); dg.addColorStop(1, 'rgba(120,140,155,0)')
+          x.fillStyle = dg; x.beginPath(); x.arc(dx, dy, dr, 0, 6.2832); x.fill()
+          if (R() < 0.3) { const tg = x.createLinearGradient(dx, dy, dx, dy + dr * 6); tg.addColorStop(0, 'rgba(222,236,242,0.2)'); tg.addColorStop(1, 'rgba(222,236,242,0)'); x.fillStyle = tg; x.fillRect(dx - dr * 0.5, dy, dr, dr * 6) } } // 流れた尾
+      })
+      rgTex.wrapS = rgTex.wrapT = THREE.RepeatWrapping
+      const rgMat = new THREE.MeshBasicMaterial({ map: rgTex, transparent: true, opacity: 0.62, depthWrite: false, fog: false }); winRoomMats.push(rgMat)
+      const rg = new THREE.Mesh(new THREE.PlaneGeometry(owW - 0.04, owH - 0.1), rgMat); rg.position.set(0, WINCY, 0.225); rg.renderOrder = 6; winRoom.add(rg) // 障子/映り込みより手前＝ガラス面の雨
+      winRainGlass = { mat: rgMat, tex: rgTex }
+    }
     box(owW + 0.4, 0.13, 0.4, 0, oB - 0.06, 0.18, woodMat) // 室内側の窓台
     if (cornerWin) { // 角部屋の二つ目の窓（左壁＝開けた街側）＝アルミサッシ枠＋硝子＋窓台。二面採光で「角部屋にいる」手応え。
       const { lwz, ow2, o2T, o2B } = cornerWin, ax2 = -SX + 0.25
@@ -7124,6 +7140,7 @@ export async function mountTown3d(parent, opts = {}) {
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
     if (winRoom.visible && winRefl) winRefl.mat.opacity = winRefl.base * (1 - wo) // 窓をあけると硝子の映り込みは消える（外気が澄む）
+    if (winRoom.visible && winRainGlass) { winRainGlass.tex.offset.y = (winRainGlass.tex.offset.y + dt * 0.045) % 1; winRainGlass.mat.opacity = 0.62 * (1 - wo) } // 雨粒がガラスを下へ流れる／窓をあけると消える
     if (winRoom.visible) for (const ct of winCurtains) { ct.position.x = ct.userData.x0 + Math.sin(t * 1.15 + ct.userData.cs) * 0.035 * wo; ct.position.z = 0.42 + (0.5 + 0.5 * Math.sin(t * 0.85 + ct.userData.cs * 1.7)) * 0.07 * wo } // 窓をあけると外気でカーテンがそっとそよぐ（閉=静止）
     if (winRoom.visible && windChime) windChime.rotation.z = Math.sin(t * 1.7) * (0.02 + 0.05 * wo) // 風鈴は窓をあけるとよく揺れる（閉=ごく僅か）
     if (winRoom.visible) for (const sp of teaSteam) { const p = (t * 0.16 + sp.userData.ph) % 1; sp.position.y = sp.userData.y0 + p * 0.5; sp.position.x = sp.userData.x0 + Math.sin(t * 0.7 + sp.userData.ph * 6.3) * 0.05 * p; sp.material.opacity = 0.16 * Math.sin(p * Math.PI); sp.scale.setScalar(0.1 + p * 0.16) } // 急須から湯気がゆらりと立ちのぼる
