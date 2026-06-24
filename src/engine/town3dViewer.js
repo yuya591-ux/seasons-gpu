@@ -6344,6 +6344,26 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 天の川（澄んだ夜空を横切る淡い星の帯）。夜にそっと現れ、しばらく懸かってまた淡く消える＝静かに整う特別な空。──
+  function evMilkyWay() {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d')
+    g.save(); g.translate(256, 128); g.rotate(-0.34) // 斜めに横切る帯
+    const bg = g.createLinearGradient(0, -64, 0, 64); bg.addColorStop(0, 'rgba(196,206,238,0)'); bg.addColorStop(0.5, 'rgba(214,222,246,0.5)'); bg.addColorStop(1, 'rgba(196,206,238,0)')
+    g.fillStyle = bg; g.fillRect(-320, -64, 640, 128)
+    for (let i = 0; i < 44; i++) { g.fillStyle = `rgba(222,226,250,${(0.04 + Math.random() * 0.06).toFixed(3)})`; g.beginPath(); g.arc((Math.random() - 0.5) * 580, (Math.random() - 0.5) * 76, 12 + Math.random() * 30, 0, 6.2832); g.fill() } // 帯の中の雲のような濃淡
+    for (let i = 0; i < 440; i++) { const inBand = Math.random() < 0.72, bx = (Math.random() - 0.5) * (inBand ? 580 : 620), by = inBand ? (Math.random() - 0.5) * 76 : (Math.random() - 0.5) * 230, s = Math.random() * 1.5 + 0.4; g.fillStyle = `rgba(255,255,255,${(0.4 + Math.random() * 0.6).toFixed(2)})`; g.fillRect(bx, by, s, s) } // 星の粒（帯に密・周囲に疎）
+    g.restore()
+    const tex = new THREE.CanvasTexture(c)
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(380, 190), mat)
+    const a = evAnchor(); const [mx, my, mz] = evPos(0, 72, eye.z - 212, a); m.position.set(mx, my, mz); m.rotation.y = -a.yaw; m.frustumCulled = false; scene.add(m) // 夜空の高みを横切る（飛行中は進む先の空へ）
+    const dur = 64
+    addFx({
+      update: (age) => { mat.opacity = 0.82 * Math.min(1, age / 14) * Math.min(1, Math.max(0, (dur - age) / 18)); return age < dur }, // じわっと現れ・また淡く消える
+      cleanup: () => { scene.remove(m); mat.dispose(); tex.dispose() },
+    })
+  }
+
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
     birds: { run: evBirdFlock },
@@ -6358,12 +6378,13 @@ export async function mountTown3d(parent, opts = {}) {
     fireworksFinale: { run: evFireworksFinale, ok: () => isNight }, // 花火大会のフィナーレ（波状の大当たり）
     mist: { run: evMist }, // 通り過ぎるもや（朝もや/宵のもや・時間帯問わず静かに整う）
     drift: { run: evSeasonalDrift, ok: () => season !== 'summer' }, // 季節の風物詩（桜吹雪/落ち葉/粉雪）。夏は無し
+    milkyway: { run: evMilkyWay, ok: () => isNight && weather !== 'rain' && weather !== 'snow' }, // 天の川（澄んだ夜空のみ）
     godRays: { run: evGodRays, ok: () => !isNight }, // 天使の梯子（雲間の光芒・昼夕）
     aurora: { run: evAurora, ok: () => isNight },
   }
   const fxBands = [
     { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },                 // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
-    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist', 'godRays', 'drift', 'drift'] }, // 中（少し特別）＝もや/光芒/季節の風物詩（driftは季節感が出るので重み2）
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist', 'godRays', 'drift', 'drift', 'milkyway'] }, // 中（少し特別）＝もや/光芒/季節の風物詩/天の川
     { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks', 'fireworksFinale'] },                   // まれ（大当たり＝雨→虹／花火／花火大会）
     { next: 360 + R() * 360, min: 1800, max: 3600, pool: ['aurora'] },                                              // 超レア（30〜60分に一度の“特別な空”＝オーロラ。最初は6〜12分で一度）
   ]
@@ -6379,7 +6400,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, godRays: evGodRays, drift: evSeasonalDrift, aurora: evAurora }[n] || (() => {}))() }
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, godRays: evGodRays, drift: evSeasonalDrift, milkyway: evMilkyWay, aurora: evAurora }[n] || (() => {}))() }
 
   // ── 飛行/歩行の没入オブジェクト ──
   // 自分の影が真下の地面を走る（高度＝飛んでいる手応え）。柔らかい円を地面に伏せる。
