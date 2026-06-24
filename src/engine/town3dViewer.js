@@ -5797,6 +5797,37 @@ export async function mountTown3d(parent, opts = {}) {
     })
   }
 
+  // ── 花火大会のフィナーレ（波状に次々と開く＝夜のまれな大当たり） ──
+  function evFireworksFinale() { evFireworks(); const waves = 5 + ((R() * 3) | 0); for (let i = 1; i < waves; i++) delayFx(i * (1.5 + R() * 1.3), evFireworks) }
+
+  // ── 通り過ぎるもや（朝もや/宵のもや）。やわらかな靄のひとひらがゆっくり流れ、視界が淡く霞んでまた晴れる＝静かに整う空気。──
+  function evMist() {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d')
+    const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64); gr.addColorStop(0, 'rgba(246,246,242,0.5)'); gr.addColorStop(0.5, 'rgba(240,240,236,0.2)'); gr.addColorStop(1, 'rgba(240,240,236,0)')
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const mtex = new THREE.CanvasTexture(c)
+    const tint = isNight ? 0xb8c2cc : 0xf2f0ea // 夜は青白く・昼は乳白
+    const wisps = []
+    for (let i = 0; i < (LIGHT ? 8 : 14); i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: mtex, color: tint, transparent: true, opacity: 0, depthWrite: false, fog: false })) // 前景のひとひらは霧で消さず際立たせる
+      const sc = 30 + R() * 32; sp.scale.set(sc, sc * (0.42 + R() * 0.2), 1)
+      sp.userData = { lx: (R() - 0.5) * 90, ly: 1.5 + R() * 16, lz: -6 - R() * 66, drift: (0.5 + R() * 0.7) * (R() < 0.5 ? 1 : -1), ph: R() * 6.28, op: 0.4 + R() * 0.2 }
+      sp.frustumCulled = false; sp.renderOrder = 1; scene.add(sp); wisps.push(sp)
+    }
+    const dur = 54, fogN0 = scene.fog.near, fogF0 = scene.fog.far // 霧を一時的に濃く＝距離が淡く霞む（evRainと同じ絶対値方式で安全）
+    addFx({
+      update: (age, dt) => {
+        const k = Math.min(1, age / 11) * Math.min(1, Math.max(0, (dur - age) / 17)) // ゆっくり立ち上がり/引き＝じわっと霞んでまた晴れる
+        scene.fog.near = fogN0 * (1 - 0.5 * k); scene.fog.far = fogF0 * (1 - 0.4 * k)
+        const a = evAnchor()
+        for (const sp of wisps) { const u = sp.userData; u.lx += u.drift * dt * 2.0; if (u.lx > 64) u.lx -= 128; else if (u.lx < -64) u.lx += 128
+          const [wx, wy, wz] = evPos(u.lx, u.ly + Math.sin(age * 0.28 + u.ph) * 0.7, u.lz, a); sp.position.set(wx, wy, wz); sp.material.opacity = u.op * k }
+        if (age >= dur) { scene.fog.near = fogN0; scene.fog.far = fogF0; return false }
+        return true
+      },
+      cleanup: () => { scene.fog.near = fogN0; scene.fog.far = fogF0; for (const sp of wisps) { scene.remove(sp); sp.material.dispose() } mtex.dispose() },
+    })
+  }
+
   // ── 飛行機雲（高空をゆっくり横切り、白い帯が後ろへ伸びていく。日常の“あ、飛行機”の発見） ──
   function evContrail() {
     const dir = R() < 0.5 ? 1 : -1
@@ -5962,12 +5993,14 @@ export async function mountTown3d(parent, opts = {}) {
     rainbowSolo: { run: evRainbow, ok: () => !rainActive }, // 雨無しの単独虹（中バンドに低確率）＝見せ場を観られる機会を増やす
     rain: { run: () => evRain(30), ok: () => !rainActive },
     fireworks: { run: evFireworks, ok: () => isNight },
+    fireworksFinale: { run: evFireworksFinale, ok: () => isNight }, // 花火大会のフィナーレ（波状の大当たり）
+    mist: { run: evMist }, // 通り過ぎるもや（朝もや/宵のもや・時間帯問わず静かに整う）
     aurora: { run: evAurora, ok: () => isNight },
   }
   const fxBands = [
-    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },         // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
-    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo'] }, // 中（少し特別）
-    { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks'] },                                      // まれ（大当たり＝雨→虹／花火）
+    { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },                 // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
+    { next: 45 + R() * 35, min: 70, max: 150, pool: ['contrail', 'balloon', 'star', 'cloudShade', 'duskLights', 'rainbowSolo', 'mist'] }, // 中（少し特別）＝もやも含む
+    { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks', 'fireworksFinale'] },                   // まれ（大当たり＝雨→虹／花火／花火大会）
     { next: 360 + R() * 360, min: 1800, max: 3600, pool: ['aurora'] },                                              // 超レア（30〜60分に一度の“特別な空”＝オーロラ。最初は6〜12分で一度）
   ]
   function scheduleFx(dt) {
@@ -5982,7 +6015,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
-  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, aurora: evAurora }[n] || (() => {}))() }
+  if (/[?&]dev=1/.test(location.search)) window.__town3dEvent = (n) => { onEvent(n); return ({ rain: () => evRain(16), rainbow: evRainbow, wetRoad: evWetRoad, birds: evBirdFlock, balloon: evBalloon, star: evShootingStars, contrail: evContrail, cloudShade: evCloudShade, duskLights: evDuskLights, fireworks: evFireworks, fireworksFinale: evFireworksFinale, mist: evMist, aurora: evAurora }[n] || (() => {}))() }
 
   // ── 飛行/歩行の没入オブジェクト ──
   // 自分の影が真下の地面を走る（高度＝飛んでいる手応え）。柔らかい円を地面に伏せる。

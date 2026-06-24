@@ -166,9 +166,10 @@ function start() {
           brightness: getState().settings.brightness, // 明るさ設定を3Dにも反映
           reduceMotion: !!(mqReduce && mqReduce.matches), // 視差軽減: 定期イベントを止める
           onEvent: (kind) => {
-            if (!sleepFading) audio.playEvent(kind) // 画面の現象に音を結ぶ（おやすみ中は鳴らさない）
-            const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', aurora: 'aurora', star: 'star' }[kind]
-            if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録
+            const k2 = kind === 'fireworksFinale' ? 'fireworks' : kind // 花火大会フィナーレも花火の音
+            if (!sleepFading) audio.playEvent(k2) // 画面の現象に音を結ぶ（おやすみ中は鳴らさない）
+            const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', fireworksFinale: 'fireworks', aurora: 'aurora', star: 'star' }[kind]
+            if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録（もやは静かな日常なので記録しない）
           },
           onSpeed: (v) => { if (!sleepFading) audio.setFlyWind(v) }, // 飛行速度で風音を膨らませる
           onFoot: (surf) => { if (!sleepFading) audio.footstep(surf) }, // 散策の足音（素材別＝舗装/土・草/木）
