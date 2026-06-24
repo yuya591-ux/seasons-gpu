@@ -3702,8 +3702,8 @@ export async function mountTown3d(parent, opts = {}) {
       // 暖簾（青の布）
       const nc = document.createElement('canvas'); nc.width = 96; nc.height = 40; const ncx = nc.getContext('2d')
       ncx.fillStyle = '#3a6a8a'; ncx.fillRect(0, 0, 96, 40); ncx.fillStyle = '#f0ece0'; ncx.font = 'bold 22px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText('うみのいえ', 48, 21)
-      const noren = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 3.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); noren.position.set(2.4, 1.7, 0); hut.add(noren)
-      colliders.push({ x: bx, z: bz, r: 2.6 })
+      const norenTex = new THREE.CanvasTexture(nc); const noren = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 3.2), duskAmt > 0.2 ? new THREE.MeshBasicMaterial({ map: norenTex, fog: true }) : new THREE.MeshToonMaterial({ map: norenTex, gradientMap: grad, fog: true })); noren.position.set(2.4, 1.7, 0); hut.add(noren) // 昼夕=陰影付き/夜=灯る
+      colliders.push({ x: bx, z: bz, r: 2.6 }); spawnAvoid.push({ x: bx, z: bz, r: 4 }) // 着地は海の家に被らない
       // ビーチパラソル＋浮き輪＋ビーチボール（冬は仕舞う）
       if (season !== 'winter') {
         const paraCols = [[0xd84a4a, 0xf0ece0], [0x3a8ac0, 0xf0ece0], [0xe0a030, 0xf0ece0]]
@@ -3964,6 +3964,10 @@ export async function mountTown3d(parent, opts = {}) {
       { const pineTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.5, 6), toon(0x5a4632)); pineTrunk.position.set(-3.6, 0.75, 4.7); pineTrunk.rotation.z = 0.2; pineTrunk.castShadow = true; g.add(pineTrunk) // 庭の松
         for (const [px, py, pz, s] of [[-3.9, 1.8, 4.7, 0.9], [-3.2, 1.6, 5.0, 0.7], [-3.7, 2.2, 4.5, 0.6]]) { const pf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), toon(season === 'winter' ? 0x6a7a66 : 0x46663e)); pf.position.set(px, py, pz); pf.scale.y = 0.55; pf.castShadow = true; g.add(pf) } // 松の葉（平たい層＝手入れされた庭木）
         for (const [sx, sz, sr] of [[-1.5, 5.0, 0.42], [-2.3, 5.3, 0.3]]) { const stone = new THREE.Mesh(new THREE.IcosahedronGeometry(sr, 0), toon(0x8a857c)); stone.position.set(sx, sr * 0.5, sz); stone.scale.y = 0.6; g.add(stone) } } // 庭石
+      // 着地/歩行: 屋敷の建屋(主屋＋長屋門＋土蔵)に埋もれて降りない・歩いて入らない。groupは×1.5・回転-0.16なので世界座標で囲む。
+      colliders.push({ x: fx, z: fz, r: 7.2 })                     // 主屋＋中庭
+      colliders.push({ x: fx - 10.8, z: fz + 1.2, r: 3.0 })        // 土蔵(局所-7.4×1.5)
+      spawnAvoid.push({ x: fx, z: fz - 2, r: 12 })                 // 着地は屋敷の前庭/谷へ
     }
     // 屋敷林（屋敷を「後ろから」抱く高木の木立）。主屋(z=-18)の手前を空け、背後と側面奥にのみ立てる。
     for (const c of [[-8, -26], [8, -25], [-6, -31], [7, -30], [0, -33], [-11, -28], [11, -27]]) tree(c[0], c[1], 1.3 + R() * 0.5)
@@ -3974,6 +3978,7 @@ export async function mountTown3d(parent, opts = {}) {
       const fg = new THREE.Group(); fg.position.set(c[0], gy, c[1]); fg.scale.setScalar(c[2]); fg.rotation.y = (R() - 0.5) * 0.8; town.add(fg)
       const fb = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 3.4), toon(0xd8cfbf)); fb.position.y = 1.2; fb.castShadow = true; fg.add(fb)
       const fr = new THREE.Mesh(makeHipRoof(5.0, 4.2, 2.2, 1.7), farmRoof[(R() * 3) | 0]); fr.position.y = 2.2; fr.castShadow = true; fg.add(fr) // 瓦の寄棟（深い軒）
+      colliders.push({ x: c[0], z: c[1], r: 2.6 * c[2] }); spawnAvoid.push({ x: c[0], z: c[1], r: 3.6 * c[2] }) // 着地/歩行: 農家に埋もれない
     }
     // 子メッシュを位置指定して群に足す小ヘルパ（mesh.position は読み取り専用なので set を使う）
     const addAt = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh }
