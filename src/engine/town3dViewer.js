@@ -1260,6 +1260,11 @@ export async function mountTown3d(parent, opts = {}) {
         const tank = new THREE.CylinderGeometry(0.17, 0.17, w * 0.48, 8); tank.rotateZ(Math.PI / 2); tank.translate(0, 0.22, -d * 0.18); tank.applyMatrix4(tiltM); tank.applyMatrix4(sgM); propL.push({ geo: colGeo(tank, 0xc8c4ba) }) // 貯湯タンク
       }
       if (R() < 0.85) { const ac = new THREE.BoxGeometry(0.8, 0.55, 0.45); ac.translate(w * 0.5 + 0.22, 0.5, (R() - 0.5) * d * 0.5); propL.push({ geo: colGeo(ac, 0xd8d4c6) }) } // 壁際の室外機
+      // 玄関（前面=-z局面に。引き戸＋庇＋踏み石＝家が草地に箱で建つ印象を脱す）。propLに溜め、回転後にグローバル統合（1ドロー）。
+      { const dx2 = (R() - 0.5) * w * 0.42, df = -d / 2
+        const door = new THREE.BoxGeometry(1.04, 1.84, 0.14); door.translate(dx2, 0.92, df - 0.05); propL.push({ geo: colGeo(door, R() < 0.5 ? 0x6a5644 : 0x46545e) }) // 木の引き戸／ガラスの玄関戸
+        const canopy = new THREE.BoxGeometry(1.5, 0.12, 0.62); canopy.translate(dx2, 1.96, df - 0.26); propL.push({ geo: colGeo(canopy, 0x8a7e70) }) // 玄関の庇
+        const step = new THREE.BoxGeometry(1.3, 0.18, 0.5); step.translate(dx2, 0.09, df - 0.3); propL.push({ geo: colGeo(step, 0xb4ab9c) }) } // 踏み石
     } else if (type === 'apt') {
       // 団地・アパート：陸屋根＋前面のベランダ（手すり付き＝平成の集合住宅）
       const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.5, d * 1.04), toon(0x8a8478)); cap.position.y = h + 0.25; cap.castShadow = true; g.add(cap)
