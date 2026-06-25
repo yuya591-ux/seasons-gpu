@@ -3144,7 +3144,7 @@ export async function mountTown3d(parent, opts = {}) {
           for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28 + 0.3, r2 = 27 + R() * 15, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
             makeStall(px, py, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, { roof: R() < 0.5 ? 'reed' : 'cloth', roofCol: R() < 0.5 ? 0xb84a3e : 0x4a5a6a, goods: edoGoods, noren: R() < 0.5 ? 0x2a4a6a : 0x8a3a2a }) }
           for (let k = 0; k < 3; k++) { const a = R() * 6.28, r2 = 25 + R() * 16, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xc8b89a : 0x4a4038, 0.6 + R() * 0.12) } }
-        const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.3, 7), toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)); fo.position.set(px, py + 2.8, pz); town.add(fo) }
+        const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fc = toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44); for (const [cy, cr, ch] of [[2.3, 1.7, 1.8], [3.3, 1.25, 1.55], [4.2, 0.82, 1.35]]) { const fo = new THREE.Mesh(new THREE.ConeGeometry(cr, ch, 8), fc); fo.position.set(px, py + cy, pz); fo.castShadow = true; town.add(fo) } } // 松/杉＝段重ねの円錐（層のある常緑樹）
         // 城下に木立を散らす（家々の合間・辻・空き地を緑で埋める＝home並みの緑量へ）。統合で軽量（1本ごとのドローコールを増やさない）。
         { const leafC = season === 'spring' ? 0x7faa4e : season === 'autumn' ? 0xcf8a38 : season === 'winter' ? 0xcdd6cc : 0x5a7e44
           const trunkGeos = [], coneGeos = [], leafGeos = [], tmM2 = new THREE.Matrix4()
@@ -3152,7 +3152,7 @@ export async function mountTown3d(parent, opts = {}) {
             if (py < SEA.level + 1.4 || edoStream(px, pz) < 7 || Math.hypot(px - ex, pz - ez) < 21 || edoFac.some((f) => Math.hypot(px - f.x, pz - f.z) < f.r + 1)) continue // 海/広い川/堀の内/庭園は避ける（拡大した島の外周まで緑を行き渡らせる）
             const pine = R() < 0.4, s = pine ? 1 : 0.85 + R() * 0.5
             const trG = new THREE.CylinderGeometry(0.17 * s, 0.27 * s, 1.9 * s, 6); tmM2.makeTranslation(px, py + 0.95 * s, pz); trG.applyMatrix4(tmM2); trunkGeos.push(trG)
-            if (pine) { const fG = new THREE.ConeGeometry(1.6, 2.3, 7); tmM2.makeTranslation(px, py + 2.8, pz); fG.applyMatrix4(tmM2); coneGeos.push(fG) } // 松/杉
+            if (pine) { for (const [cy, cr, ch] of [[2.3, 1.7, 1.8], [3.3, 1.25, 1.55], [4.2, 0.82, 1.35]]) { const fG = new THREE.ConeGeometry(cr, ch, 8); tmM2.makeTranslation(px, py + cy, pz); fG.applyMatrix4(tmM2); coneGeos.push(fG) } } // 松/杉＝段重ねの円錐（単一の尖りを脱し層のある常緑樹に。統合済みで描画コール不変）
             else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 1); tmM2.makeTranslation(px, py + 2.2 * s, pz); fG.applyMatrix4(tmM2); leafGeos.push(fG) } } // 雑木
           for (const [geos, mat] of [[trunkGeos, toon(0x6a4f38)], [coneGeos, toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)], [leafGeos, toon(leafC)]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         }
@@ -3521,12 +3521,14 @@ export async function mountTown3d(parent, opts = {}) {
         }
         // ── 森（尾根筋の杉木立。城を囲む深い緑＝殺風景を脱す）。背の高い杉を尾根に散らす ──
         { const cedarF = season === 'winter' ? 0x6f7a72 : season === 'autumn' ? 0x4d5a3a : 0x35522f, trunkM = toon(0x46382a), folM = toon(cedarF)
+          const trunkGeos = [], coneGeos = [], nM = new THREE.Matrix4() // 杉54本を1本ごとのメッシュ(108ドローコール)から統合(2)へ＝重さの大幅削減＋段重ねで質も上げる
           for (let k = 0; k < 54; k++) { const a = R() * 6.2832, rr = 14 + R() * 60, px = sx + Math.cos(a) * rr, pz = sz + Math.sin(a) * rr, py = senH(px, pz)
             if (py < SEA.level + 2.5 || py > 30) continue // 海・谷底の町は避け、斜面〜尾根に森
             if (Math.hypot(px - bx, pz - bz) < 12) continue // 城の平場は空ける
             const vd = Math.abs((px - sx) - senValley(pz)); if (vd < 9 && py < 11) continue // 谷底の町並みは避ける
-            const s = 0.85 + R() * 0.5; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5), trunkM); tr.position.set(px, py + 0.7 * s, pz); town.add(tr)
-            const fo = new THREE.Mesh(new THREE.ConeGeometry(1.5 * s, 4.2 * s, 6), folM); fo.position.set(px, py + 3.0 * s, pz); fo.castShadow = true; town.add(fo) } // 杉
+            const s = 0.85 + R() * 0.5; const trG = new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5); nM.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(nM); trunkGeos.push(trG)
+            for (const [cy, cr, ch] of [[2.0, 1.55, 2.5], [3.4, 1.12, 2.1], [4.7, 0.68, 1.8]]) { const fG = new THREE.ConeGeometry(cr * s, ch * s, 6); nM.makeTranslation(px, py + cy * s, pz); fG.applyMatrix4(nM); coneGeos.push(fG) } } // 段重ねの杉（単一の尖りを脱し背の高い常緑樹に）
+          for (const [geos, mat] of [[trunkGeos, trunkM], [coneGeos, folM]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         }
         // ── 山寺（西の尾根の中腹に佇む寺＝エリアの新たな見どころ）。山門→石段→本堂(入母屋)＋多宝塔＋鐘楼、杉木立に抱かれる。 ──
         { const tX = sx - 41, tZ = sz - 8, tY = senH(tX, tZ)
@@ -3558,8 +3560,10 @@ export async function mountTown3d(parent, opts = {}) {
                 if (prev) { const ddx = px - prev.x, ddz = pz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const step = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.22, len + 0.5), stoneM); step.position.set((px + prev.x) / 2, (py + prev.y) / 2, (pz + prev.z) / 2); step.rotation.y = Math.atan2(ddx, ddz); town.add(step) } }
                 prev = { x: px, y: py, z: pz } } }
             // 杉に囲む（寺の周りに濃い杉木立）
-            { const folM2 = toon(season === 'winter' ? 0x6f7a72 : 0x33502d), trunkM2 = toon(0x46382a)
-              for (let k = 0; k < 12; k++) { const a = k / 12 * 6.2832, rr = 9 + R() * 4, px = tX + Math.cos(a) * rr, pz = tZ + Math.sin(a) * rr, py = senH(px, pz); if (!senInland(px, pz, 1.6)) continue; const s = 1.0 + R() * 0.4; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5), trunkM2); tr.position.set(px, py + 0.7 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.4 * s, 4.0 * s, 6), folM2); fo.position.set(px, py + 2.9 * s, pz); fo.castShadow = true; town.add(fo) } }
+            { const folM2 = toon(season === 'winter' ? 0x6f7a72 : 0x33502d), trunkM2 = toon(0x46382a), tG2 = [], cG2 = [], nM2 = new THREE.Matrix4() // 寺の杉12本も統合(24→2ドローコール)＋段重ね
+              for (let k = 0; k < 12; k++) { const a = k / 12 * 6.2832, rr = 9 + R() * 4, px = tX + Math.cos(a) * rr, pz = tZ + Math.sin(a) * rr, py = senH(px, pz); if (!senInland(px, pz, 1.6)) continue; const s = 1.0 + R() * 0.4; const trG = new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5); nM2.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(nM2); tG2.push(trG)
+                for (const [cy, cr, ch] of [[1.9, 1.45, 2.4], [3.3, 1.05, 2.0], [4.5, 0.62, 1.7]]) { const fG = new THREE.ConeGeometry(cr * s, ch * s, 6); nM2.makeTranslation(px, py + cy * s, pz); fG.applyMatrix4(nM2); cG2.push(fG) } }
+              for (const [geos, mat] of [[tG2, trunkM2], [cG2, folM2]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } } }
           }
         }
         // ── 谷の霧（低くたなびく霞の帯＝「霧の谷あい」のエモさ）。柔らかな billboard を谷底に数枚。 ──
@@ -3798,7 +3802,7 @@ export async function mountTown3d(parent, opts = {}) {
             if (py < SEA.level + 0.6 || py > 34) continue // 汀より上・外周の低い所のみ（城/山頂は森にしない）
             const pine = R() < 0.45, s = 0.8 + R() * 0.6
             const trG = new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.8 * s, 6); nM.makeTranslation(px, py + 0.9 * s, pz); trG.applyMatrix4(nM); beltTrunk.push(trG)
-            if (pine) { const fG = new THREE.ConeGeometry(1.5 * s, 2.4 * s, 7); nM.makeTranslation(px, py + 2.7 * s, pz); fG.applyMatrix4(nM); beltCone.push(fG) } // 松/杉
+            if (pine) { for (const [cy, cr, ch] of [[2.4, 1.5, 2.3], [3.6, 1.0, 1.9]]) { const fG = new THREE.ConeGeometry(cr * s, ch * s, 7); nM.makeTranslation(px, py + cy * s, pz); fG.applyMatrix4(nM); beltCone.push(fG) } } // 松/杉＝2段の円錐（本数が多いので2段に抑え発熱配慮）
             else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 1); nM.makeTranslation(px, py + 2.1 * s, pz); fG.applyMatrix4(nM); beltLeaf.push(fG) } } // 雑木
           const rockN = Math.round(isle.r * 0.5)
           for (let i = 0; i < rockN; i++) { const a = R() * 6.2832, rr = isle.r * (0.96 + R() * 0.12), px = isle.x + Math.cos(a) * rr, pz = isle.z + Math.sin(a) * rr, py = heightAt(px, pz)
