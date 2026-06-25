@@ -541,9 +541,11 @@ export async function mountTown3d(parent, opts = {}) {
         g.fillRect(sx, rnd() * S * 0.4, 1.2 + rnd() * 1.4, S * (0.3 + rnd() * 0.5))
       }
     }
-    // 窓の格子（3列×4段）。各窓にサッシ枠＋十字桟＋窓台を描く＝近接で「窓」と読める立体。
-    for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) {
-      const px = 16 + xx * 36, py = 14 + yy * 28, pw = 24, ph = 19
+    // 窓の格子（列数×段数は建物ごとに変える＝全建物が同じ窓割りで量産クローンに見えるのを脱す）。各窓にサッシ枠＋十字桟＋窓台。
+    const cols = opt.cols ?? 3, rows = opt.rows ?? 4
+    const pitchX = S / cols, pitchY = (S - 8) / rows, pw = Math.round(pitchX * 0.64), ph = Math.round(pitchY * 0.66)
+    for (let yy = 0; yy < rows; yy++) for (let xx = 0; xx < cols; xx++) {
+      const px = Math.round(xx * pitchX + (pitchX - pw) / 2), py = Math.round(6 + yy * pitchY + (pitchY - ph) / 2)
       if (lit) {
         const on = rnd() < litRatio
         g.fillStyle = on ? litCol : '#0a0a0a'
@@ -581,9 +583,12 @@ export async function mountTown3d(parent, opts = {}) {
     t.anisotropy = LIGHT ? 1 : 4 // 斜め見の壁面でも窓がにじまない（歩行・低空で効く）
     return t
   }
-  const winMapBase = makeWinTex(false, 1)
-  // 夜は灯る窓を増やし（街が瞬く）、色をわずかに濃い暖色へ。夕は控えめ。
-  const winEmis = [3, 11, 29, 53].map((s) => makeWinTex(true, s, { litRatio: isNight ? 0.7 : 0.46, litCol: isNight ? '#ffdca0' : '#ffd089' }))
+  // 昼の窓を窓割り違いの4種に＝全建物が同一の窓模様で量産クローンに見えるのを脱す（建物ごとに位置ハッシュで選ぶ）
+  const winGrids = [{ cols: 3, rows: 4 }, { cols: 2, rows: 3 }, { cols: 4, rows: 4 }, { cols: 3, rows: 3 }]
+  const winMapBases = winGrids.map((gd, i) => makeWinTex(false, 1 + i * 22, gd))
+  const winMapBase = winMapBases[0]
+  // 夜は灯る窓を増やし（街が瞬く）、色をわずかに濃い暖色へ。夕は控えめ。灯る窓も窓割りを昼と揃える（昼夜でズレない）＝種類ごとに1枚。
+  const winEmis = winGrids.map((gd, i) => makeWinTex(true, 3 + i * 13, { litRatio: isNight ? 0.7 : 0.46, litCol: isNight ? '#ffdca0' : '#ffd089', cols: gd.cols, rows: gd.rows }))
   // 灯り度（空の明るさで決める。明るい昼=窓は灯らない／夕暮れ=ほのか／夜=煌々と）
   const skyBright = (skyTop.r + skyTop.g + skyTop.b) / 3
   const duskAmt = Math.min(1, Math.max(0, (0.56 - skyBright) * 2.4))
@@ -1280,10 +1285,12 @@ export async function mountTown3d(parent, opts = {}) {
     const wm = toon(wallCols[(R() * wallCols.length) | 0]) // 壁は軽量な拡散材（多数あるため性能優先）
     wm.vertexColors = true // 壁面の縦グラデ（接地AO＋空の光）を頂点色で乗せる
     const rep = Math.max(1, Math.round(w / 2.6)), repV = Math.max(1, Math.round(h / 2.4))
-    const m = winMapBase.clone(); m.repeat.set(rep, repV); m.needsUpdate = true
+    const wvi = (((Math.floor(x) * 73856093) ^ (Math.floor(z) * 19349663)) >>> 0) % winMapBases.length // 建物ごとに窓の種類を変える（位置ハッシュ＝主R()非消費）
+    const m = winMapBases[wvi].clone(); m.repeat.set(rep, repV); m.needsUpdate = true
     wm.map = m
-    if (duskAmt > 0.12) { // 夕方は窓が灯る
-      const e = winEmis[(R() * winEmis.length) | 0].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
+    if (duskAmt > 0.12) { // 夕方は窓が灯る（昼と同じ窓割りの灯り＝wviで揃える）
+      R() // 旧来ここで窓種をR()で選んでいた＝乱数列を保ち街の生成（建物分布/描画コール）を不変に保つ
+      const e = winEmis[wvi].clone(); e.repeat.set(rep, repV); e.needsUpdate = true
       wm.emissiveMap = e; wm.emissive = new THREE.Color(isNight ? 0xffbe82 : 0xffcaa0); wm.emissiveIntensity = 0.3 + duskAmt * (isNight ? 0.95 : 0.62) // 夜は窓灯りを強めて瞬かせる（夕は控えめで貼り絵感を防ぐ）
     }
     // 近景の建物だけ角を面取りして「低ポリの箱」の鋭い角を脱す（奥は霞むので箱のまま＝軽量）。
@@ -2234,8 +2241,8 @@ export async function mountTown3d(parent, opts = {}) {
     const nwMat = toon(0xb4b0a6)
     const rep = 7
     const nm = winMapBase.clone(); nm.repeat.set(rep, rep * 1.5); nm.needsUpdate = true; nwMat.map = nm
-    if (duskAmt > 0.12) { // 夕/夜は隣室の窓も灯る
-      const ne = winEmis[(R() * winEmis.length) | 0].clone(); ne.repeat.set(rep, rep * 1.5); ne.needsUpdate = true
+    if (duskAmt > 0.12) { // 夕/夜は隣室の窓も灯る（窓割りはwinMapBase=種類0に揃える）
+      const ne = winEmis[0].clone(); ne.repeat.set(rep, rep * 1.5); ne.needsUpdate = true
       nwMat.emissiveMap = ne; nwMat.emissive = new THREE.Color(0xffcaa0); nwMat.emissiveIntensity = 0.3 + duskAmt * 0.6
     }
     const wall = new THREE.Mesh(new THREE.BoxGeometry(3.5, 58, 44), nwMat)
