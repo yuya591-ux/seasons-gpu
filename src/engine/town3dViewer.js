@@ -931,6 +931,16 @@ export async function mountTown3d(parent, opts = {}) {
     const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; machiyaGlowTex = t; return t }
   // 町家の壁材（夕夜は障子が行灯で灯る＝城下町の夜が生きる）。
   const machiyaMat = (baseHex) => { const m = facadeMat('machiya', baseHex); if (duskAmt > 0.12) { m.emissiveMap = getMachiyaGlow(); m.emissive = new THREE.Color(isNight ? 0xffb45a : 0xffc684); m.emissiveIntensity = 0.22 + duskAmt * (isNight ? 0.6 : 0.34) } return m }
+  // 侍屋敷の連子窓の夜の灯り（格子の奥の行灯）。連子の面を暖色＋縦格子を影で抜く emissiveMap。R()不使用。
+  let samaGlowTex = null
+  const getSamaGlow = () => { if (samaGlowTex) return samaGlowTex
+    const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d')
+    g.fillStyle = '#000000'; g.fillRect(0, 0, S, S)
+    g.fillStyle = '#ffcf86'; g.fillRect(30, 28, 68, 40) // 連子窓が行灯で温かく光る
+    g.strokeStyle = 'rgba(40,26,10,0.7)'; g.lineWidth = 2.4
+    for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(30 + 68 * i / 8, 28); g.lineTo(30 + 68 * i / 8, 68); g.stroke() } // 縦格子の影
+    const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; samaGlowTex = t; return t }
+  const samaMat = (baseHex) => { const m = facadeMat('sama', baseHex); if (duskAmt > 0.12) { m.emissiveMap = getSamaGlow(); m.emissive = new THREE.Color(isNight ? 0xffac52 : 0xffc079); m.emissiveIntensity = 0.2 + duskAmt * (isNight ? 0.56 : 0.3) } return m }
   // 壁の接地AO（頂点色で底=翳り→上=空の光）。時代の建物の箱に焼いて、平らな箱面の一様さを破り接地感を出す。
   const bakeAO = (geo, hh) => { const pos = geo.attributes.position, col = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { const tt = Math.min(1, Math.max(0, (pos.getY(i) + hh / 2) / Math.max(0.001, hh))), ao = Math.min(1, tt / 0.26), v = 0.72 + 0.28 * ao + 0.06 * tt; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v } geo.setAttribute('color', new THREE.BufferAttribute(col, 3)) }
   // 瓦の屋根テクスチャ（横列の瓦＋軒の重なりの影＋縦の丸瓦の筋）＝単色の屋根を脱し俯瞰の質感を上げる。
@@ -3396,9 +3406,9 @@ export async function mountTown3d(parent, opts = {}) {
           const fire = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.8, 6), fireMat); fire.position.set(fx, fy + 2.0, fz); town.add(fire)
           const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.8 : 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(fx, fy + 2.0, fz); glow.scale.set(2.6, 2.6, 1); town.add(glow); litFlicker(glow.material, 0.3, 6.2) } // 篝火（炎の揺らぎ）
         // 城下（山裾に密集する侍屋敷・町家。高さ/大きさ/色を変えて作り分け、メッシュ統合で軽く）
-        const samWall = facadeMat('sama', season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = facadeMat('sama', season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根
+        const samWall = samaMat(season === 'winter' ? 0xc8c2b6 : 0xab9c84), samWall2 = samaMat(season === 'winter' ? 0xdcd8ce : 0x8a7a62), samRoof = tileMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x2e2a24 : 0x46402f), 3, 2, false), samRoof2 = tileMat(isNight ? 0x383229 : 0x5a4e3a, 3, 2, false) // 侍屋敷=連子窓の板壁＋黒瓦の屋根（夕夜は連子窓が灯る）
         // 商品化レベルへ：壁の色を4種に（タン/淡い/焼杉の黒板/漆喰の白蔵）＋茅葺屋根で町並みに多様性と質感を出す。
-        const samWall3 = facadeMat('sama', isNight ? 0x33302c : 0x55483a), samWall4 = mottleMat(season === 'winter' ? 0xe4ded2 : (isNight ? 0xb8b2a4 : 0xd8d0bf), 130, 0.1, [1.5, 1.5]) // 焼杉の黒板／漆喰の白壁(土蔵)
+        const samWall3 = samaMat(isNight ? 0x33302c : 0x55483a), samWall4 = mottleMat(season === 'winter' ? 0xe4ded2 : (isNight ? 0xb8b2a4 : 0xd8d0bf), 130, 0.1, [1.5, 1.5]) // 焼杉の黒板／漆喰の白壁(土蔵)
         const samRoofT = mottleMat(season === 'winter' ? 0xcfc8b6 : (isNight ? 0x3e352a : 0x6e5d44), 90, 0.18, [2, 1.4]) // 茅葺(かやぶき)の屋根
         samWall3.vertexColors = true; samWall4.vertexColors = true
         // 切妻屋根の単位（ridge=X, 妻行=Z, 棟高Y 0→1）。家を「箱＋三角帽(4角錐)」でなく稜線のある家屋に＝戦国の城下町の質感。江戸のgableUnitと同手法。
