@@ -1000,7 +1000,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 日替わりで開催/非開催（実カレンダーの日付で決定＝同じ日は同じ・日が変わると変わる）。夏の夕夜のみ。
   const festDay = Math.floor(Date.now() / 864e5) // 今日(エポックからの日数)
   const FORCE_FEST = /[?&]fest=1/.test(location.search) // 検証/プレビュー用: 日替わりを無視して必ず開催
-  const festOn = (id) => season === 'summer' && (isNight || duskAmt > 0.2) && (FORCE_FEST || ((((festDay * 2654435761) ^ (id * 40503) ^ 0x5bd1e995) >>> 0) % 100) < 50) // 各会場50%で開催（夏の夕夜）
+  const festOn = (id) => season === 'summer' && weather !== 'rain' && weather !== 'snow' && (isNight || duskAmt > 0.2) && (FORCE_FEST || ((((festDay * 2654435761) ^ (id * 40503) ^ 0x5bd1e995) >>> 0) % 100) < 50) // 各会場50%で開催（夏の夕夜）。雨/雪は現実通り中止（実機FB）
   const festivalSpots = []  // 開催中の祭りの中心（音の距離計算用）＝遠くから囃子が聞こえ近づくと大きくなる
   const festDancers = []    // 盆踊りの踊り手（frameで腕を上げ下げ・体を揺らす）
   // 祭りの立ち姿（浴衣の人影）。壺/こけしを避け、肩から裾へ広がる胴＋首＋小さめの頭＋髪＝人らしく（実機FB「ポットみたいなもの」の解消）。
@@ -6845,8 +6845,11 @@ export async function mountTown3d(parent, opts = {}) {
   for (const [cbtn, dir] of [[climbUp, 1], [climbDn, -1]]) {
     const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir; altGauge.show() }
     const cend = (e) => { if (e) e.stopPropagation(); if (active) active.climb = 0 }
-    cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cend); cbtn.addEventListener('pointercancel', cend); cbtn.addEventListener('pointerleave', cend)
+    // pointerleaveは外す（実機FB: 指が僅かにボタン端からズレると降下/上昇が止まる・効かない不具合の主因）。setPointerCaptureでpointerupは確実にボタンへ届く。
+    cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cend); cbtn.addEventListener('pointercancel', cend)
   }
+  // 保険: 画面のどこで指を離しても昇降入力を確実に解除（setPointerCapture失敗時もボタンが押しっぱなしにならない）。
+  window.addEventListener('pointerup', () => { if (active) active.climb = 0 })
 
   function frame() {
     if (!active) return

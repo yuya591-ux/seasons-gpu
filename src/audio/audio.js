@@ -432,7 +432,7 @@ export function createAudio(opts) {
     const taiko = (tt, hi) => {
       const o = ctx.createOscillator(); o.type = 'sine'; const g = ctx.createGain(); const f0 = hi ? 300 : 190
       o.frequency.setValueAtTime(f0 * 1.7, tt); o.frequency.exponentialRampToValueAtTime(f0, tt + 0.06)
-      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(hi ? 0.42 : 0.8, tt + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, tt + (hi ? 0.11 : 0.2))
+      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(hi ? 0.44 : 0.6, tt + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, tt + (hi ? 0.11 : 0.2)) // 大太鼓のドンドンを抑え華やかな囃子へ（実機FB）
       o.connect(g).connect(fg); o.start(tt); o.stop(tt + 0.28)
       const cg2 = ctx.createGain(); cg2.gain.setValueAtTime(0.1, tt); cg2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.03)       // クリック＝遠くでも拍が分かる
       const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = 900; cl.Q.value = 0.8
@@ -440,12 +440,12 @@ export function createAudio(opts) {
     }
     const fue = (tt, freq, dur) => {  // 笛（やわらかい三角波＋ビブラート。brightを通すので近づくほど際立つ）
       const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = freq
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.24, tt + 0.05); g.gain.setTargetAtTime(0.0001, tt + dur * 0.6, 0.12)
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.34, tt + 0.05); g.gain.setTargetAtTime(0.0001, tt + dur * 0.6, 0.12) // 笛の旋律を立てる＝祭りらしさ（実機FB）
       const v = ctx.createOscillator(); v.frequency.value = 5.5; const vg = ctx.createGain(); vg.gain.value = freq * 0.008; v.connect(vg).connect(o.frequency)
       o.connect(g).connect(bright); try { o.start(tt); o.stop(tt + dur + 0.1); v.start(tt); v.stop(tt + dur + 0.1) } catch { /* 無視 */ }
     }
     const kane = (tt) => {  // 鉦（チャンチキ）＝金属質の高い点
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(0.1, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.16)
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(0.13, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.16) // 鉦の高い点を立てる＝祭りらしさ
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600; hp.connect(g).connect(bright)
       for (const f of [2700, 3550, 4300]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hp); try { o.start(tt); o.stop(tt + 0.18) } catch { /* 無視 */ } }
     }
@@ -472,7 +472,7 @@ export function createAudio(opts) {
   function setFestival(amt) {
     if (!festNode) return
     const t = now(), a = Math.max(0, Math.min(1, amt || 0))
-    festNode.fg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.5, t, 0.8)
+    festNode.fg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.3, t, 0.8) // 実機FBで音量を下げる（0.5→0.3）
     festNode.bright.frequency.setTargetAtTime(560 + a * a * 3600, t, 0.8)   // 遠=太鼓だけがこもって届く／近=笛・鉦が際立つ
     festState.amt = a
   }
