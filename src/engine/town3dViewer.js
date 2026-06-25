@@ -7913,6 +7913,9 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dResPin = (i, x, z, face = 0, yOver) => { const r = residents[i]; if (!r) return; const u = r.userData; u.frozen = true; r.position.set(x, yOver !== undefined ? yOver : heightAt(x, z), z); r.rotation.y = face; u.face = face } // 検証用: 住人を座標(任意y)に凍結
     window.__town3dFolkPin = (i, x, z, face = Math.PI, y = 90) => { const f = festDancers[i]; if (!f) return; f.d.position.set(x, y, z); f.y0 = y; f.d.rotation.y = face } // 検証用: 祭りの踊り手/演者(folkBody)を上空へ（空背景で接写）
     window.__town3dFolkCount = () => festDancers.length
+    window.__town3dQuadFront = (i = 0, dist = 4) => { const q = quads[i]; if (!q) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); const u = q.userData; u.moving = false; u.moveT = 1e9; u.hx = t.x; u.hz = t.z; q.position.set(t.x, heightAt(t.x, t.z), t.z) } // 検証用: 犬猫をカメラ正面の地面へ（造形確認）
+    window.__town3dQuadPin = (i, x, z, y, face = 0) => { const q = quads[i]; if (!q) return; const u = q.userData; u.moving = false; u.moveT = 1e9; u.hx = x; u.hz = z; q.position.set(x, y !== undefined ? y : heightAt(x, z), z); q.rotation.y = face } // 検証用: 犬猫を座標(任意y)に固定（shotAtで接写）
+    window.__town3dQuadCount = () => quads.length
     window.__town3dResClip = () => { // 検証用: 建物コライダーに食い込んでいる住民/peepの数（実機FB「住民が建物に食い込む」の定量化）
       let resIn = 0, peepIn = 0; const bad = []
       for (const r of residents) if (blockedAt(r.position.x, r.position.z)) { resIn++; bad.push({ t: 'res', x: +r.position.x.toFixed(1), z: +r.position.z.toFixed(1) }) }
