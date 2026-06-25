@@ -1011,6 +1011,20 @@ export async function mountTown3d(parent, opts = {}) {
     parent.add(new THREE.Mesh(new THREE.SphereGeometry(0.162, 9, 8, 0, 6.2832, 0, Math.PI * 0.6), hairMat).translateY(1.3).translateZ(-0.012)) // 髪（後頭部）
     return body
   }
+  // 群衆の一人＝人らしい体（裾広がりの胴＋首＋小頭＋髪）を頂点色で1メッシュに焼く。こけし人形(円柱＋球)を脱しつつ描画コールは1（市の人々で多用するので軽量化も兼ねる）。
+  const crowdMat = toon(0xffffff); crowdMat.vertexColors = true
+  const mkCrowdPerson = (px, py, pz, bodyCol, sc = 0.7) => {
+    const skinHex = 0xe6c6a4, hairHex = 0x2a1f18, geos = []
+    const bake = (geo, hex, y) => { geo.translate(0, y, 0); const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(geo) }
+    bake(new THREE.CylinderGeometry(0.17, 0.27, 1.12, 8).toNonIndexed(), bodyCol, 0.56) // 胴（肩→裾へ広がる一枚）
+    bake(new THREE.CylinderGeometry(0.044, 0.052, 0.09, 6).toNonIndexed(), skinHex, 1.16) // 首
+    const hd = new THREE.SphereGeometry(0.15, 9, 7).toNonIndexed(); hd.scale(0.95, 1.06, 0.96); bake(hd, skinHex, 1.28) // 小さめの頭＝頭身を伸ばす
+    bake(new THREE.SphereGeometry(0.162, 8, 7, 0, 6.2832, 0, Math.PI * 0.6).toNonIndexed(), hairHex, 1.3) // 髪（後頭部）
+    if (!BufferGeometryUtils.mergeGeometries) return
+    const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
+    const mesh = new THREE.Mesh(m, crowdMat); mesh.position.set(px, py, pz); mesh.rotation.y = R() * 6.28; mesh.scale.setScalar(sc); mesh.castShadow = true; town.add(mesh)
+    return mesh // 動く旅人(cityWalkers)等が参照して動かせるよう返す
+  }
   const makeFestival = (fx, fz, sc = 1) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）
     const fgy = heightAt(fx, fz), woodMat = toon(0x9a7048), redMat = toon(0xc0392b)
     const yag = new THREE.Group(); yag.position.set(fx, fgy, fz); town.add(yag) // やぐら（二段の木の櫓＋紅白幕＋太鼓＋宝形屋根）
@@ -3054,7 +3068,7 @@ export async function mountTown3d(parent, opts = {}) {
           if (fy > SEA.level + 1) { for (const [ddx, ddz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7, 5), toon(0x5a4632)); leg.position.set(fx + ddx * 0.9, fy + 3.5, fz + ddz * 0.9); leg.rotation.set(ddz * 0.05, 0, -ddx * 0.05); town.add(leg) } const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.4, 2.4), toon(0x6a5238)); cab.position.set(fx, fy + 7.4, fz); cab.castShadow = true; town.add(cab); town.add(addOutline(cab)); const cr = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.0, 4), tRoof); cr.rotation.y = Math.PI / 4; cr.position.set(fx, fy + 8.6, fz); town.add(cr) } } // 火の見櫓
         // ── 城下の賑わい（市場・屋台・提灯・人々）＝街に生気を ──
         const kimono = [0xb0432e, 0x3a5a7a, 0x55703f, 0xc89a34, 0x84548a, 0x5a5a5e, 0xa85a40]
-        const mkPerson = (px, py, pz, col) => { const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(col)); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) }
+        const mkPerson = (px, py, pz, col) => mkCrowdPerson(px, py, pz, col) // 人らしい体（胴＋首＋小頭＋髪）に＝こけし人形(円柱＋球)を脱す
         { const ma = Math.PI - 0.6, mr = 31, mcx = ex + Math.cos(ma) * mr, mcz = ez + Math.sin(ma) * mr, mgy = heightAt(mcx, mcz)
           if (mgy > SEA.level + 1) {
             for (let s = 0; s < 9; s++) { const a2 = (s / 9) * 6.2832, sx2 = mcx + Math.cos(a2) * 5.5, sz2 = mcz + Math.sin(a2) * 5.5, sgy = heightAt(sx2, sz2); if (sgy < SEA.level + 1) continue
@@ -3072,7 +3086,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const yago = ['魚', '酒', '米', '茶', '薬', '呉服', '両替', '蕎麦', '飯', '宿', '油', '炭', '団子', '塩'] // 城下の店の屋号（縦書きの木の掛看板）
           for (let k = 0; k < 13; k++) { const a2 = (k / 13) * 6.28 + 0.3; if (angGap(a2) < 0.34) continue; const r2 = 22 + R() * 9, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue
             mkSignV(px, py + 1.4, pz, a2 + Math.PI / 2 + (R() - 0.5) * 0.4, yago[k % yago.length], season === 'winter' ? 0xeae0cc : 0xe6d8b8, 0x3a2a1a) } } // 城下の店の看板
-        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.78, 6), toon(kimono[(j * 2 + 1) % kimono.length])); wb.position.y = 0.4; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); wh.position.y = 0.95; wg.add(wh); wg.position.set(ex + Math.cos(ang) * r0, heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), ez + Math.sin(ang) * r0); town.add(wg); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人（初期位置を置く＝遠方時に原点へ取り残されない）
+        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = mkCrowdPerson(ex + Math.cos(ang) * r0, heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), ez + Math.sin(ang) * r0, kimono[(j * 2 + 1) % kimono.length], 0.7); cityWalkers.push({ g: wg, // 人らしい体に（こけし人形を脱す） cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人（初期位置を置く＝遠方時に原点へ取り残されない）
         // ── 城下の市の床店＋犬猫＝降り立った時に出会う江戸の賑わい。 ──
         { const edoGoods = [0xc8702e, 0x7a8a3a, 0xb04030, 0xd0a850, 0x9a5a3a, 0x5a7a8a]
           for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28 + 0.3, r2 = 27 + R() * 15, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
@@ -3503,9 +3517,9 @@ export async function mountTown3d(parent, opts = {}) {
             const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: mistCol, transparent: true, opacity: 0.11 + R() * 0.08, depthWrite: false, fog: true })); m.position.set(px, py, zz); m.scale.set(20 + R() * 9, 5 + R() * 2.5, 1); town.add(m); senMist.push(m) } // 谷底にひくく漂う川霧（家を覆い隠さず＝俯瞰でも washy にならない）
         }
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
-          for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py > 13 || !senInland(px, pz)) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[k % sgKim.length])); body.position.y = 0.38; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); head.position.y = 0.9; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
+          for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py > 13 || !senInland(px, pz)) continue; mkCrowdPerson(px, py, pz, sgKim[k % sgKim.length], 0.66) } // 人らしい体に（こけし人形を脱す）。遠景の人は少なめ（作り込んだ住人placeEraを増やした）
           for (let j = 0; j < 10; j++) { const z0 = sz + 20 - j * 4.4, cl = senValley(z0); if (senH(sx + cl + 4.8, z0) < SEA.level + 1.2) continue // 街道が陸地の所だけに旅人を置く（水際/海の上を歩かせない）
-            const wg = new THREE.Group(); const wb = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.74, 6), toon(sgKim[j % sgKim.length])); wb.position.y = 0.38; wb.castShadow = true; wg.add(wb); const wh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xddbfa0)); wh.position.y = 0.9; wg.add(wh); wg.position.set(sx + cl + 4.8, senH(sx + cl + 4.8, z0), z0); town.add(wg)
+            const wg = mkCrowdPerson(sx + cl + 4.8, senH(sx + cl + 4.8, z0), z0, sgKim[j % sgKim.length], 0.66) // 人らしい体（胴＋首＋小頭＋髪）に＝こけし人形を脱す
             // 旅人は地面の高さに沿って歩く。水際に踏み込む手前(senH<SEA.level+1)で折り返す＝海の上を歩かない。
             cityWalkers.push({ g: wg, road: true, x0: sx + cl + 4.8, z0, len: 8 + R() * 6, sp: 0.05 + R() * 0.04, ph: R() * 2, fn: (u) => { const zz = z0 - u, c2 = senValley(zz), xx = sx + c2 + 4.8, gh = senH(xx, zz); if (gh < SEA.level + 1) { const c3 = senValley(z0), x3 = sx + c3 + 4.8; return { x: x3, y: senH(x3, z0), z: z0 } } return { x: xx, y: gh, z: zz } } }) } // 街道を行き交う旅人
           const sgmei = ['酒', '鍛冶', '旅籠', '飯', '馬', '薬'] // 城下の店（質素な木の掛看板）
@@ -3653,7 +3667,7 @@ export async function mountTown3d(parent, opts = {}) {
             if (BufferGeometryUtils.mergeGeometries) { const pm = BufferGeometryUtils.mergeGeometries(cPoleG, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x3a3e42))); cPoleG.forEach((g) => g.dispose()); const lmM = BufferGeometryUtils.mergeGeometries(cLampG, false); if (lmM) town.add(new THREE.Mesh(lmM, lampMat)); cLampG.forEach((g) => g.dispose()) }
           }
           const tKim = [0x8a3a32, 0x3a4a6a, 0x556040, 0x7a5a34, 0x6a4a5a, 0x40443a] // 大正の人々（着物＋洋装の中間色）
-          for (let k = 0; k < 6; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.25, 0.78, 6), toon(tKim[k % tKim.length])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 6), toon(0xe6c6a4)); head.position.y = 0.95; g.add(head); town.add(g) } // 簡素な遠景の人は少なめに（作り込んだ住人placeEraを増やした）
+          for (let k = 0; k < 6; k++) { const a = R() * 6.28, r2 = 12 + R() * 44, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; mkCrowdPerson(px, py, pz, tKim[k % tKim.length], 0.72) } // 人らしい体に（こけし人形を脱す）。遠景の人は少なめ（作り込んだ住人placeEraを増やした）
           // ── 港町の市の屋台＋犬猫＝降り立った大正の賑わい。 ──
           { const taiGoods = [0xc85038, 0x6a8a9a, 0xd0a040, 0x9a5a3a, 0xb87050, 0x7a8a4a]
             for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.28 + 0.5, r2 = 16 + R() * 22, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
