@@ -3001,8 +3001,17 @@ export async function mountTown3d(parent, opts = {}) {
           } } // 城下〜外周の田畑（外周の地肌を埋める）＋町なかの庭木
         // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
         for (let k = 0; k < 26; k++) { const a = (k / 26) * 6.2832 + R() * 0.2, rr = 106 + R() * 5, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
+        // 江戸の堀・川を「空を映す水鏡」に（海テクスチャ流用の平らな青を脱す＝谷戸/home/大正と質を揃える）。さざ波は決定的パターン＝R()列を乱さない。
+        const ewc = document.createElement('canvas'); ewc.width = ewc.height = 64; const ewx = ewc.getContext('2d')
+        const ewg = ewx.createLinearGradient(0, 0, 0, 64); ewg.addColorStop(0, '#' + new THREE.Color(0x6ea2c4).lerp(skyTop, 0.34).getHexString()); ewg.addColorStop(1, '#' + new THREE.Color(0x46708e).lerp(skyHorizon, 0.18).getHexString())
+        ewx.fillStyle = ewg; ewx.fillRect(0, 0, 64, 64)
+        const ewsg = ewx.createLinearGradient(20, 64, 44, 0); ewsg.addColorStop(0, 'rgba(255,255,255,0)'); ewsg.addColorStop(0.5, '#' + sunCol.clone().lerp(new THREE.Color(0xffffff), 0.2).getHexString()); ewsg.addColorStop(1, 'rgba(255,255,255,0)')
+        ewx.globalAlpha = 0.32; ewx.fillStyle = ewsg; ewx.fillRect(0, 0, 64, 64); ewx.globalAlpha = 1
+        for (let i = 0; i < 46; i++) { ewx.fillStyle = 'rgba(255,255,255,0.07)'; ewx.fillRect((i * 29) % 64, (i * 13) % 64, 1 + (i % 2), 1) } // さざ波（決定的＝乱数を消費しない）
+        const ewtex = new THREE.CanvasTexture(ewc); ewtex.wrapS = ewtex.wrapT = THREE.RepeatWrapping; ewtex.repeat.set(2, 2)
+        const edoWaterMat = () => freshWater(new THREE.MeshToonMaterial({ map: ewtex, gradientMap: grad, color: isNight ? 0x8a98a4 : 0xffffff, fog: true }))
         // ── 城下を蛇行する小川（平底の河床＋河川敷の草＋木の橋）＝平らな台地に水辺の自然 ──
-        { const wmat = freshWater(new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4e5c66 : 0x9fbcca, fog: true }))
+        { const wmat = edoWaterMat()
           const grassC = season === 'winter' ? 0xb8c0b6 : season === 'autumn' ? 0x9a8a52 : 0x6e8a48
           let prev = null
           for (let s = 0; s <= 26; s++) { const edd = 24 + s * ((EDO.r - 14 - 24) / 26), ang = 1.15 + Math.sin(edd * 0.085) * 0.34, px = ex + Math.cos(ang) * edd, pz = ez + Math.sin(ang) * edd, py = heightAt(px, pz)
@@ -3013,7 +3022,7 @@ export async function mountTown3d(parent, opts = {}) {
             const br = new THREE.Mesh(new THREE.BoxGeometry(9, 0.34, 2.3), toon(0x7a6248)); br.position.set(bx, bbank + 0.5, bz); br.rotation.y = bang; br.castShadow = true; town.add(br); town.add(addOutline(br))
             for (const rl of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(9, 0.5, 0.12), toon(0x6a5440)); rail.position.set(bx + Math.cos(bang + Math.PI / 2) * 1.05 * rl, bbank + 0.95, bz + Math.sin(bang + Math.PI / 2) * 1.05 * rl); rail.rotation.y = bang; town.add(rail) } } // 木の橋＋欄干
         }
-        const moat = new THREE.Mesh(new THREE.RingGeometry(12, 20, 56), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4e5c66 : 0x9fbcca, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.12, ez); town.add(moat) // 堀（青い水面＝上から水堀と読める。やや広く）
+        const moat = new THREE.Mesh(new THREE.RingGeometry(12, 20, 56), edoWaterMat()); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.12, ez); town.add(moat) // 堀（空を映す水鏡＝上から水堀と読める。やや広く）
         for (const rr of [12, 20]) { const bank = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.35, 6, 44), toon(season === 'winter' ? 0x8e8b82 : 0x847d70)); bank.rotation.x = -Math.PI / 2; bank.position.set(ex, gy + 0.22, ez); town.add(bank) } // 石垣の護岸（内外の縁）
         const baseH = 7.5
         const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), stoneMat(season === 'winter' ? 0x908d84 : 0x8b8478, 5, 5)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台・野面積みの石テクスチャ＝近接で本物の石積み）
