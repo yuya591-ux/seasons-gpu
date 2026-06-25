@@ -4628,7 +4628,7 @@ export async function mountTown3d(parent, opts = {}) {
       const kasa = new THREE.Mesh(new THREE.BoxGeometry(tw + 3.4, 0.95, 1.7), toriiMat); kasa.position.set(0, th + 1.4, 0); g.add(kasa)
       const nuki = new THREE.Mesh(new THREE.BoxGeometry(tw + 0.6, 0.7, 1.1), toriiMat); nuki.position.set(0, th - 1.8, 0); g.add(nuki) // 貫
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.62, 7, 6), tn(0x5a4636)); trunk.position.set(8, 4.5, -3); g.add(trunk)
-      const pine = new THREE.Mesh(new THREE.IcosahedronGeometry(4.2, 1), tn(isNight ? 0x2e4a36 : 0x47704a)); pine.position.set(8, 9, -3); pine.scale.y = 0.85; g.add(pine)
+      const pine = new THREE.Mesh(new THREE.IcosahedronGeometry(4.2, 2), tn(isNight ? 0x2e4a36 : 0x47704a)); pine.position.set(8, 9, -3); pine.scale.y = 0.85; g.add(pine)
       isles.push({ x: -60, z: -440, r: 40, g }) }
     // 五重塔の島
     { const g = makeFloatIsle(15), pagMat = tn(isNight ? 0x6a4a3e : 0x9c5a44), roofMat = tn(isNight ? 0x33384a : 0x49545f)
@@ -4639,7 +4639,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 御神木（大樹）の島
     { const g = makeFloatIsle(15), canMat = tn(isNight ? 0x2e4a36 : 0x4f7a4e)
       const tk = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.7, 9, 8), tn(0x5a4636)); tk.position.y = 4.4; g.add(tk)
-      for (let c = 0; c < 5; c++) { const cs = 4.5 + R() * 3, cl = new THREE.Mesh(new THREE.IcosahedronGeometry(cs, 1), canMat); cl.position.set((R() - 0.5) * 7, 9.5 + (R() - 0.5) * 4, (R() - 0.5) * 7); cl.scale.y = 0.9; g.add(cl) } // 大きな樹冠
+      for (let c = 0; c < 5; c++) { const cs = 4.5 + R() * 3, cl = new THREE.Mesh(new THREE.IcosahedronGeometry(cs, 2), canMat); cl.position.set((R() - 0.5) * 7, 9.5 + (R() - 0.5) * 4, (R() - 0.5) * 7); cl.scale.y = 0.9; g.add(cl) } // 大きな樹冠
       isles.push({ x: -175, z: -500, r: 42, g }) }
     // 茅葺きの一軒家の島（故郷のぬくもり）
     { const g = makeFloatIsle(14), wallMat = tn(isNight ? 0x6a6052 : 0xd0c4a8), thatchMat = tn(isNight ? 0x4a4236 : 0x8a7a54)
@@ -4658,7 +4658,7 @@ export async function mountTown3d(parent, opts = {}) {
       { x: 30, z: -256, r: 12, topY: SEA_Y + 21, kind: 'onsen' },     // 雲の温泉（露天＝湯けむり）
     ]
     const cwBridges = []
-    const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6 }) }
+    const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6, ra: a.r - 1, rb: b.r - 1 }) }
     link(0, 1); link(0, 2); link(0, 3); link(0, 4) // 中心から各島へ吊り橋
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
@@ -4670,20 +4670,32 @@ export async function mountTown3d(parent, opts = {}) {
         const x1 = br.ax + dx * t1 + px * br.halfW * side, z1 = br.az + dz * t1 + pz * br.halfW * side, y1 = surfY(t1) + 1.2
         const sl = Math.hypot(x1 - x0, y1 - y0, z1 - z0), rope = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, sl, 5), ropeMat)
         rope.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); rope.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3((x1 - x0) / sl, (y1 - y0) / sl, (z1 - z0) / sl)); g.add(rope) }
-      for (const [ex, ez, ey] of [[br.ax, br.az, br.ay], [br.bx, br.bz, br.by]]) for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 2.6, 6), plankMat); post.position.set(ex + px * br.halfW * side, ey + 1.0, ez + pz * br.halfW * side); g.add(post) }
+      const ux = dx / len, uz = dz / len // 門柱は島の中心でなく「橋が島の縁に取り付く点」に立てる（中央に門柱が密集する不可解な束を防ぐ）
+      for (const [ex, ez, ey] of [[br.ax + ux * (br.ra || 0), br.az + uz * (br.ra || 0), br.ay], [br.bx - ux * (br.rb || 0), br.bz - uz * (br.rb || 0), br.by]]) for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 2.6, 6), plankMat); post.position.set(ex + px * br.halfW * side, ey + 1.0, ez + pz * br.halfW * side); g.add(post) }
       g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); return g
     }
     for (const br of cwBridges) { const bg = makeBridge(br); scene.add(bg); cloudObjs.push(bg) }
     for (const n of cwNodes) { // 各島を建てる
       const g = makeFloatIsle(n.r)
       if (n.kind === 'pavilion') {
-        const pave = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 0.4, 22), tn(isNight ? 0x646670 : 0xb7b1a4)); pave.position.y = GY + 0.05; g.add(pave)
-        const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640), azRoof = tn(isNight ? 0x3a3f4a : 0x6b5347)
-        for (const [px, pz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 5, 7), woodMat); post.position.set(px, GY + 2.7, pz); g.add(post) }
-        const beam = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.5, 11.4), woodMat); beam.position.y = GY + 5.2; g.add(beam)
-        const azr = new THREE.Mesh(new THREE.ConeGeometry(9.6, 3.6, 4), azRoof); azr.rotation.y = Math.PI / 4; azr.position.y = GY + 7.1; g.add(azr)
-        const bench0 = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 1.6), woodMat); bench0.position.set(0, GY + 0.9, 4.2); g.add(bench0)
-        for (const lx of [-2.6, 2.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.4), woodMat); leg.position.set(lx, GY + 0.45, 4.2); g.add(leg) }
+        // 四阿（あずまや）＝雲海を座って眺める休憩所。板張りの床＋六本柱＋深い軒の八角寄棟屋根＋擬宝珠＋縁の腰掛け。
+        const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640), azRoof = tn(isNight ? 0x3a3f4a : 0x7a5a48), ridgeMat = tn(isNight ? 0x4a4038 : 0x66483a)
+        const stoneBase = new THREE.Mesh(new THREE.CylinderGeometry(8.6, 9.0, 0.5, 8), tn(isNight ? 0x646670 : 0xa8a294)); stoneBase.position.y = GY + 0.05; g.add(stoneBase) // 石の基壇
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(7.7, 7.7, 0.34, 8), tn(isNight ? 0x6a5240 : 0x8a6b4a)); deck.position.y = GY + 0.36; g.add(deck) // 板張りの床
+        const NP = 6, pr = 6.9
+        const ang = (i) => i / NP * Math.PI * 2 + Math.PI / NP
+        for (let i = 0; i < NP; i++) { const a = ang(i); const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 5.7, 8), woodMat); post.position.set(Math.cos(a) * pr, GY + 3.05, Math.sin(a) * pr); g.add(post) } // 六本柱
+        const beamRing = new THREE.Mesh(new THREE.TorusGeometry(pr, 0.26, 6, 8), woodMat); beamRing.rotation.x = Math.PI / 2; beamRing.position.y = GY + 5.75; g.add(beamRing) // 桁（柱頭を結ぶ）
+        const eave = new THREE.Mesh(new THREE.ConeGeometry(9.5, 1.2, 8), azRoof); eave.rotation.y = Math.PI / 8; eave.position.y = GY + 6.05; g.add(eave) // 深い軒先
+        const azr = new THREE.Mesh(new THREE.ConeGeometry(7.7, 4.1, 8), azRoof); azr.rotation.y = Math.PI / 8; azr.position.y = GY + 7.7; g.add(azr) // 主屋根（八角寄棟）
+        const ridge = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.3, 8), ridgeMat); ridge.rotation.y = Math.PI / 8; ridge.position.y = GY + 9.9; g.add(ridge) // 頂の段
+        const giboshi = new THREE.Mesh(new THREE.SphereGeometry(0.52, 10, 8), tn(isNight ? 0x7a6a4a : 0xb9a060)); giboshi.position.y = GY + 10.7; g.add(giboshi) // 擬宝珠
+        // 縁の腰掛け（柱間の4辺。背もたれ無しの板＝縁側に腰かけて雲海を眺める。2辺は橋・出入りのため開ける）
+        const benchMat = tn(isNight ? 0x5a4636 : 0x6e5640), br0 = 5.7
+        for (const i of [0, 1, 3, 4]) { const a = (i + 0.5) / NP * Math.PI * 2 + Math.PI / NP, cx = Math.cos(a) * br0, cz = Math.sin(a) * br0
+          const seat = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.32, 1.05), benchMat); seat.position.set(cx, GY + 1.05, cz); seat.rotation.y = -a - Math.PI / 2; g.add(seat)
+          const tx = -Math.sin(a), tz = Math.cos(a) // 接線方向
+          for (const lo of [-1.9, 1.9]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.05, 0.85), benchMat); leg.position.set(cx + tx * lo, GY + 0.52, cz + tz * lo); g.add(leg) } }
         const lantStone = tn(isNight ? 0x707280 : 0x9a948a)
         for (const [lx, lz] of [[-14, 6], [13, -7]]) {
           const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.0, 6), lantStone); base.position.set(lx, GY + 0.5, lz); g.add(base)
@@ -4699,7 +4711,7 @@ export async function mountTown3d(parent, opts = {}) {
         const bench = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 1.3), woodMat); bench.position.set(0, GY + 0.9, 3); g.add(bench) // 縁の腰かけ
         for (const lx of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.1), woodMat); leg.position.set(lx, GY + 0.45, 3); g.add(leg) }
         const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 6, 7), tn(0x5a4636)); tk.position.set(-5, GY + 3, -4); g.add(tk)
-        const can = new THREE.Mesh(new THREE.IcosahedronGeometry(4.6, 1), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-5, GY + 7, -4); can.scale.y = 0.85; g.add(can)
+        const can = new THREE.Mesh(new THREE.IcosahedronGeometry(4.6, 2), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-5, GY + 7, -4); can.scale.y = 0.85; g.add(can)
       } else if (n.kind === 'shrine') { // 小さな祠＋鳥居
         const trMat = tn(isNight ? 0x7a3026 : 0xc34a32), th = 7, tw = 5
         for (const sx of [-1, 1]) { const pi = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, th, 8), trMat); pi.position.set(sx * tw * 0.5, GY + th * 0.5, 4); g.add(pi) }
@@ -4752,10 +4764,10 @@ export async function mountTown3d(parent, opts = {}) {
         if (gaps.some((gp) => Math.hypot(gx - gp.x, gz - gp.z) < gp.r)) continue // 雲の切れ間（地上が覗く穴）
         const jx = gx + (R() - 0.5) * step * 0.4, jz = gz + (R() - 0.5) * step * 0.4, baseY = (R() - 0.5) * 11
         const sB = (LIGHT ? 19 : 15) + R() * 9
-        const gb = new THREE.IcosahedronGeometry(sB, 1); gb.scale(1, 0.46, 1); gb.translate(jx, baseY, jz); cloudTint(gb, -12, 24, seaLowC, seaHighC); seaGeos.push(gb) // 平たい底スラブ
+        const gb = new THREE.IcosahedronGeometry(sB, 1); gb.scale(1, 0.46, 1); gb.translate(jx, baseY, jz); cloudTint(gb, -16, 42, seaLowC, seaHighC); seaGeos.push(gb) // 平たい底スラブ
         const bumps = 1 + ((R() * 2) | 0)
-        for (let bI = 0; bI < bumps; bI++) { const sBu = sB * (0.5 + R() * 0.42), bx = jx + (R() - 0.5) * sB * 0.7, bz = jz + (R() - 0.5) * sB * 0.7, by = baseY + sB * 0.34 + R() * 4; const gg = new THREE.IcosahedronGeometry(sBu, 1); gg.scale(1, 0.72, 1); gg.translate(bx, by, bz); cloudTint(gg, -12, 24, seaLowC, seaHighC); seaGeos.push(gg) } // もくもくの頂
-        if (R() < 0.5) { const st = 4 + R() * 4, gt = new THREE.IcosahedronGeometry(st, 1); gt.scale(1, 0.8, 1); gt.translate(jx + (R() - 0.5) * sB * 0.5, baseY + sB * 0.5 + R() * 4, jz + (R() - 0.5) * sB * 0.5); cloudTint(gt, -12, 24, seaLowC, seaHighC); seaGeos.push(gt) } // 細かいカリフラワー
+        for (let bI = 0; bI < bumps; bI++) { const sBu = sB * (0.5 + R() * 0.42), bx = jx + (R() - 0.5) * sB * 0.7, bz = jz + (R() - 0.5) * sB * 0.7, by = baseY + sB * 0.34 + R() * 4; const gg = new THREE.IcosahedronGeometry(sBu, 1); gg.scale(1, 0.72, 1); gg.translate(bx, by, bz); cloudTint(gg, -16, 42, seaLowC, seaHighC); seaGeos.push(gg) } // もくもくの頂
+        if (R() < 0.5) { const st = 4 + R() * 4, gt = new THREE.IcosahedronGeometry(st, 1); gt.scale(1, 0.8, 1); gt.translate(jx + (R() - 0.5) * sB * 0.5, baseY + sB * 0.5 + R() * 4, jz + (R() - 0.5) * sB * 0.5); cloudTint(gt, -16, 42, seaLowC, seaHighC); seaGeos.push(gt) } // 細かいカリフラワー
       }
     }
     const seaMerged = BufferGeometryUtils.mergeGeometries(seaGeos, false); seaGeos.forEach((g) => g.dispose())
