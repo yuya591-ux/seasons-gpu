@@ -941,6 +941,14 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(30 + 68 * i / 8, 28); g.lineTo(30 + 68 * i / 8, 68); g.stroke() } // 縦格子の影
     const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; samaGlowTex = t; return t }
   const samaMat = (baseHex) => { const m = facadeMat('sama', baseHex); if (duskAmt > 0.12) { m.emissiveMap = getSamaGlow(); m.emissive = new THREE.Color(isNight ? 0xffac52 : 0xffc079); m.emissiveIntensity = 0.2 + duskAmt * (isNight ? 0.56 : 0.3) } return m }
+  // 大正の洋風窓の夜の灯り（上げ下げ窓＋1階の店の硝子が灯る＝ハイカラな港町の夜景）。R()不使用。
+  let yofuGlowTex = null
+  const getYofuGlow = () => { if (yofuGlowTex) return yofuGlowTex
+    const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d')
+    g.fillStyle = '#000000'; g.fillRect(0, 0, S, S)
+    g.fillStyle = '#ffe1ad'; for (const [wx, wy] of [[18, 12], [72, 12], [18, 50], [72, 50]]) { g.fillRect(wx, wy, 38, 32); g.fillStyle = 'rgba(50,34,14,0.5)'; g.fillRect(wx, wy + 14, 38, 2.2); g.fillRect(wx + 17.8, wy, 2.2, 32); g.fillStyle = '#ffe1ad' } // 上げ下げ窓（十字桟を影で）
+    g.fillStyle = '#ffe6bc'; for (const [sx2, sw] of [[14, 46], [70, 30]]) g.fillRect(sx2, 101, sw, 21) // 1階の店の硝子
+    const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; yofuGlowTex = t; return t }
   // 壁の接地AO（頂点色で底=翳り→上=空の光）。時代の建物の箱に焼いて、平らな箱面の一様さを破り接地感を出す。
   const bakeAO = (geo, hh) => { const pos = geo.attributes.position, col = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { const tt = Math.min(1, Math.max(0, (pos.getY(i) + hh / 2) / Math.max(0.001, hh))), ao = Math.min(1, tt / 0.26), v = 0.72 + 0.28 * ao + 0.06 * tt; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v } geo.setAttribute('color', new THREE.BufferAttribute(col, 3)) }
   // 瓦の屋根テクスチャ（横列の瓦＋軒の重なりの影＋縦の丸瓦の筋）＝単色の屋根を脱し俯瞰の質感を上げる。
@@ -3664,7 +3672,7 @@ export async function mountTown3d(parent, opts = {}) {
         // 港町の家々（看板建築＝和洋折衷。煉瓦/クリームの壁＋陸屋根/寄棟。格子の町割り。メッシュ統合で軽く）
         // 壁色のパレット（大正ハイカラ＝クリーム/淡い若草/淡い黄土/淡い青鼠）。建物ごとに振り分けて単調なクリーム一色を脱す。
         const tWallPal = season === 'winter' ? [0xd8d2c4, 0xd2d6cc, 0xdcd4c0, 0xcdd2d4] : [0xcfc3ab, 0xb9c0a6, 0xd6c49a, 0xb7c1c4]
-        const tWallMats = tWallPal.map((c) => { const m = facadeMat('yofu', c); m.vertexColors = true; return m }) // 接地AO（頂点色）を効かせる
+        const tWallMats = tWallPal.map((c) => { const m = facadeMat('yofu', c); m.vertexColors = true; if (duskAmt > 0.12) { m.emissiveMap = getYofuGlow(); m.emissive = new THREE.Color(isNight ? 0xffc878 : 0xffd49a); m.emissiveIntensity = 0.2 + duskAmt * (isNight ? 0.58 : 0.32) } return m }) // 接地AO（頂点色）＋夕夜は洋風窓が灯る
         // 屋根色のパレット（瓦の赤茶/いぶし茶/スレート青鼠）。俯瞰で一色だった屋根に多様さを。
         const tRoofPal = isNight ? [0x4a3832, 0x423a32, 0x3e444a] : [0x9a5642, 0x6e5a48, 0x5d666e]
         const tRoofMats = tRoofPal.map((c, i) => i < 2 ? tileMat(c, 2, 2, true) : mottleMat(c, 150, 0.12, [1.8, 1.8])) // 瓦色(赤茶/いぶし)は瓦テクスチャ＝見上げで瓦の筋が出る／青鼠スレートは平滑なまま
