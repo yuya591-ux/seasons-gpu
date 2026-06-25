@@ -632,6 +632,16 @@ export async function mountTown3d(parent, opts = {}) {
   const litFlicker = (mat, amp, sp) => { if (mat) nightGlows.push({ m: mat, base: mat.opacity, amp, sp, ph: R() * 6.28 }) } // 灯りのグローを揺らぎに登録（base=元の濃さ・amp=揺れ幅・sp=速さ）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
+  // 建物フットプリント(円/向き付き矩形)に入るか。住民配置・徘徊・歩行で共用するので関数本体スコープの早い位置で定義（配置時はcollidersが既に積まれている）。
+  const blockedAt = (x, z) => {
+    for (const c of colliders) { const dx = x - c.x, dz = z - c.z
+      if (c.hw !== undefined) { // 向き付き矩形（建物の敷地）＝局所座標へ回して矩形内か判定
+        const lx = dx * c.cos - dz * c.sin, lz = dx * c.sin + dz * c.cos
+        if (lx > -c.hw && lx < c.hw && lz > -c.hd && lz < c.hd) return true
+      } else if (dx * dx + dz * dz < c.r * c.r) return true // 円（木・池・塔など）
+    }
+    return false
+  }
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
   const spawnAvoid = []
   // 鎮守の森の神社（飛んでいく目的地のランドマーク）。街の左手の一角を空けて建てる。建物/木の生成で共用するので関数本体スコープに。
@@ -4891,7 +4901,12 @@ export async function mountTown3d(parent, opts = {}) {
   crowdCenters = crowdSpots.map((s) => ({ x: s.x, z: s.z, r: s.rad + 9 })) // 音のざわめき用（人だまりの少し広めの範囲）
   for (const s of crowdSpots) for (let i = 0; i < (LIGHT ? Math.ceil(s.n * 0.5) : s.n); i++) {
     const g = makePeep()
-    const hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
+    let hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
+    if (blockedAt(hx, hz)) { let ok = false // 人だまりの定位置が建物に入ったら近くの空きへ（食い込み防止）
+      for (let st = 1.2; st <= 8 && !ok; st += 1.2) for (let a = 0; a < 12 && !ok; a++) { const nx = hx + Math.sin(a / 12 * 6.2832) * st, nz = hz - Math.cos(a / 12 * 6.2832) * st; if (!blockedAt(nx, nz)) { hx = nx; hz = nz; ok = true } }
+      if (!ok && !blockedAt(s.x, s.z)) hx = s.x, hz = s.z // 中心が空いていれば中心へ
+      else if (!ok) continue // 周囲が祭り等で埋まり空きが無ければ置かない（建物に食い込むより居ない方が自然）
+    }
     Object.assign(g.userData, { loiter: true, hx, hz, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 })
     g.position.set(hx, heightAt(hx, hz), hz)
     town.add(g); peeps.push(g)
@@ -5126,7 +5141,13 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // ── home（現代）の住人を要所に ──
   const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 } ]
-  const placeResident = (hx, hz, cfg) => { const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); const u = g.userData; u.ax = hx; u.az = hz; u.tx = hx; u.tz = hz; u.face = R() * 6.28; u.ph = R() * 6.28; u.pauseT = 0.5 + R() * 4; u.moving = false; u.speed = 0.66 + R() * 0.5; u.rad = 4 + R() * 5; g.rotation.y = u.face; town.add(g); residents.push(g) }
+  const placeResident = (hx, hz, cfg) => {
+    if (blockedAt(hx, hz)) { // 配置点が建物の中なら近くの空きへ寄せる（実機FB: 住民が建物に食い込む）
+      let ok = false
+      for (let s = 1.2; s <= 6 && !ok; s += 1.4) for (let a = 0; a < 8 && !ok; a++) { const nx = hx + Math.sin(a / 8 * 6.2832) * s, nz = hz - Math.cos(a / 8 * 6.2832) * s; if (!blockedAt(nx, nz)) { hx = nx; hz = nz; ok = true } }
+      if (!ok) return // 近くに空きが無ければ置かない（密集地で建物に埋もれるより居ない方が自然）
+    }
+    const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); const u = g.userData; u.ax = hx; u.az = hz; u.tx = hx; u.tz = hz; u.face = R() * 6.28; u.ph = R() * 6.28; u.pauseT = 0.5 + R() * 4; u.moving = false; u.speed = 0.66 + R() * 0.5; u.rad = 4 + R() * 5; g.rotation.y = u.face; town.add(g); residents.push(g) }
   const RES_MODERN = ['modern', 'modern', 'suit', 'blouse']
   for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
   // ── home の通りを行き交う簡素な人々（人の気配の密度＝降り立った街の賑わい）。商店街の中央通りと駅前を中心に。 ──
@@ -5794,17 +5815,7 @@ export async function mountTown3d(parent, opts = {}) {
   function resize() { applySize() }
   window.addEventListener('resize', resize)
 
-  // ── 歩行（散策）の当たり判定 ──
-  // 建物フットプリント(円)に入らないよう、軸ごとに分けて判定＝壁ぎわをかすめて進める（引っかかって止まらない）。
-  const blockedAt = (x, z) => {
-    for (const c of colliders) { const dx = x - c.x, dz = z - c.z
-      if (c.hw !== undefined) { // 向き付き矩形（建物の敷地）＝局所座標へ回して矩形内か判定
-        const lx = dx * c.cos - dz * c.sin, lz = dx * c.sin + dz * c.cos
-        if (lx > -c.hw && lx < c.hw && lz > -c.hd && lz < c.hd) return true
-      } else if (dx * dx + dz * dz < c.r * c.r) return true // 円（木・池・塔など）
-    }
-    return false
-  }
+  // ── 歩行（散策）の当たり判定 ── blockedAt は上方（colliders定義の直後）で定義済み＝住民配置時にも使える
   // 水際（海・川）は歩いて踏み込まない＝汀で止まる。歩行のみで使う。
   const wetAt = (x, z) => kind !== 'yato' && ((x > SEA.coast && heightAt(x, z) < SEA.level + 0.4) || Math.abs(x - RIVER.x) < RIVER.halfW)
   const tryWalk = (pos, dx, dz) => {
@@ -6629,10 +6640,13 @@ export async function mountTown3d(parent, opts = {}) {
     // 住民が歩道を歩く（少し上下に弾む）
     for (const p of peeps) {
       const u = p.userData
+      const pdx = p.position.x - active.flyPos.x, pdz = p.position.z - active.flyPos.z
+      if (pdx * pdx + pdz * pdz > 19600) continue // 遠い人（home中央通りに集中）は更新しない＝他時代の上空で無駄に動かさない
       const legs = u.legs || [], arms = u.arms || []
       if (u.loiter) { // ランドマークの賑わい: 定位置の周りをゆっくり佇み歩き、体の向きを少しずつ変える
-        const px = u.hx + Math.sin(t * u.sp + u.ph) * u.rad
-        const pz = u.hz + Math.cos(t * u.sp * 0.8 + u.ph * 1.3) * u.rad
+        let px = u.hx + Math.sin(t * u.sp + u.ph) * u.rad
+        let pz = u.hz + Math.cos(t * u.sp * 0.8 + u.ph * 1.3) * u.rad
+        if (blockedAt(px, pz)) { px = u.hx; pz = u.hz } // 揺れた先が建物なら定位置へ（食い込み防止）
         p.position.set(px, heightAt(px, pz) + Math.abs(Math.sin(t * 2.4 + u.ph)) * 0.05, pz)
         p.rotation.y = u.face + Math.sin(t * 0.3 + u.ph) * 0.7
         const idle = Math.sin(t * 1.6 + u.ph) * 0.12 // 佇み＝そっと重心を移す程度
@@ -6641,8 +6655,18 @@ export async function mountTown3d(parent, opts = {}) {
         continue
       }
       u.z += u.dir * u.speed * dt
-      if (u.z > 20) u.z = -88
-      if (u.z < -88) u.z = 20
+      if (u.z > 18) u.z = -52 // 本通り（商店街）の範囲を巡回＝住宅街の路地(x±3に家が建つ)へ踏み込ませない
+      if (u.z < -52) u.z = 18
+      // 行く手にアーケードの柱や什器があれば、少し先を見て手前から歩道幅の中で横へ寄って回り込む（throttleで負荷配慮・抜けたら元の車線へ戻る）
+      if (u.baseX === undefined) { u.baseX = u.x; u.lane = u.x; u.wchk = R() * 0.25 }
+      u.wchk -= dt
+      if (u.wchk <= 0) { u.wchk = 0.18 + R() * 0.12
+        const look = u.z + u.dir * 2.6 // 2.6u先に障害物があれば手前から避け始める
+        let lane = u.baseX
+        if (blockedAt(lane, look) || blockedAt(lane, u.z)) { for (const ox of [1.0, -1.0, 2.0, -2.0, 3.0, -3.0]) { if (!blockedAt(lane + ox, look) && !blockedAt(lane + ox, u.z)) { lane += ox; break } } }
+        u.lane = lane
+      }
+      u.x += (u.lane - u.x) * Math.min(1, dt * 3.4) // 横へなめらかに寄る／戻る
       const cad = 6 + u.speed * 2.2, sw = Math.sin(t * cad + u.ph) // 歩調（速いほど速く運ぶ）
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * cad + u.ph)) * 0.06, u.z) // 一歩ごとに弾む
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
@@ -6656,11 +6680,20 @@ export async function mountTown3d(parent, opts = {}) {
       const rvis = rd2 < 12100 // 110uより遠い住人は描画しない（点でしか見えないのにメッシュ多数＝描画コール節約）
       if (r.visible !== rvis) r.visible = rvis
       if (rd2 > 19600) continue // 140uより遠い住人は更新もスキップ（再び近づく時に自然な位置にいるよう110〜140uは更新だけ続ける）
+      if (u.chkT === undefined) u.chkT = R() * 0.5 // 住民ごとに位相をずらして負荷を分散
+      u.chkT -= dt
+      if (u.chkT <= 0) { u.chkT = 0.5 + R() * 0.4 // 押し出し判定は約0.5秒毎（blockedAtは全コライダー走査で重いため間引く）
+        if (blockedAt(r.position.x, r.position.z)) { // 実機FB: 住民が建物に食い込む→近い空きへ押し出す（配置/徘徊で建物に入った時の保険）
+          for (let a = 0; a < 8; a++) { const yaw = a / 8 * 6.2832, ox = Math.sin(yaw) * 0.7, oz = -Math.cos(yaw) * 0.7; if (!blockedAt(r.position.x + ox, r.position.z + oz)) { r.position.x += ox; r.position.z += oz; u.ax = r.position.x; u.az = r.position.z; break } }
+          r.position.y = heightAt(r.position.x, r.position.z); u.moving = false; u.pauseT = Math.max(u.pauseT, 0.6); continue
+        }
+      }
       if (u.moving) {
         const dx = u.tx - r.position.x, dz = u.tz - r.position.z, d = Math.hypot(dx, dz)
         if (d < 0.28) { u.moving = false; u.pauseT = 1.5 + R() * 4 } // 着いた→ひと休み
         else {
           const step = Math.min(d, u.speed * dt), nx = r.position.x + dx / d * step, nz = r.position.z + dz / d * step
+          if (blockedAt(nx, nz)) { u.moving = false; u.pauseT = 0.4 + R() * 1.4; continue } // 壁にぶつかった→止まって向き直す（建物を貫通しない）
           const ph = t * u.speed * 5.2 + u.ph, sw = Math.sin(ph)
           r.position.set(nx, heightAt(nx, nz) + Math.abs(sw) * (u.legs.length ? 0.03 : 0.014), nz) // 歩のバウンド（着物は控えめ）
           u.face = Math.atan2(dx, dz)
@@ -7710,6 +7743,12 @@ export async function mountTown3d(parent, opts = {}) {
     })
     window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2), ddt: +lastDDT.toFixed(3), low: adQLow, ok: adQOk } } // 検証用: 描画コール/三角形/オブジェクト数/自動品質状態
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
+    window.__town3dResClip = () => { // 検証用: 建物コライダーに食い込んでいる住民/peepの数（実機FB「住民が建物に食い込む」の定量化）
+      let resIn = 0, peepIn = 0; const bad = []
+      for (const r of residents) if (blockedAt(r.position.x, r.position.z)) { resIn++; bad.push({ t: 'res', x: +r.position.x.toFixed(1), z: +r.position.z.toFixed(1) }) }
+      for (const p of peeps) if (blockedAt(p.position.x, p.position.z)) { peepIn++; bad.push({ t: 'peep', x: +p.position.x.toFixed(1), z: +p.position.z.toFixed(1) }) }
+      return { residents: residents.length, peeps: peeps.length, resIn, peepIn, bad: bad.slice(0, 12) }
+    }
     window.__town3dResFace = (i, ya) => { if (residents[i]) { const u = residents[i].userData; residents[i].rotation.y = ya; u.face = ya; u.moving = false; u.pauseT = 999; for (const a of u.arms) a.rotation.x = 0; for (const l of u.legs) l.rotation.x = 0 } } // 検証用: 住人を止めて向きを固定（顔の確認）
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
     window.__town3dCatReact = (n) => { if (winCat) { winCat.react = n || 'roll'; winCat.reactDur = 2.4; winCat.reactT = 2.4; winCat.wakeHold = 2.5; winCat.alert = 1; winCat.lastReact = -1 } } // 検証用: 猫の反応を手動発火
