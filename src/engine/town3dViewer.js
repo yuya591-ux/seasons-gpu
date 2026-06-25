@@ -6277,15 +6277,21 @@ export async function mountTown3d(parent, opts = {}) {
     }
     return best || [x, z] // どこも狭ければ、せめて最も開けた所へ
   }
-  // 着地時に最も視界の抜ける向き（街路や建物の隙間の奥）を選ぶ＝壁や木立を正面にしない。
+  // 着地時の向き：最も視界の抜ける方向を基本に、街並み(中心)の方へ顔を向ける＝壁/空き地/水面でなく
+  // 景色の深い方（街路・ランドマーク）を望む。抜けの距離＋中心へ向く度合いの合算で選ぶ。
   active.openYaw = (x, z) => {
-    let best = 0, bestD = -1
+    const centers = [{ x: 0, z: -24 }, DOWNTOWN, STATION, PARK, { x: EDO.x, z: EDO.z }, { x: SENGOKU.x, z: SENGOKU.z }, { x: TAISHO.x, z: TAISHO.z }]
+    let ic = centers[0], icd = 1e9
+    for (const c of centers) { const d = (c.x - x) ** 2 + (c.z - z) ** 2; if (d > 100 && d < icd) { icd = d; ic = c } } // 自分から少し離れた最寄りの中心
+    const toCenter = Math.atan2(ic.x - x, -(ic.z - z))
+    let best = toCenter, bestScore = -1
     for (let a = 0; a < 16; a++) {
-      const yaw = a / 16 * 6.2832
-      const hx = Math.sin(yaw), hz = -Math.cos(yaw)
+      const yaw = a / 16 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw)
       let d = 1.0
       for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break }
-      if (d > bestD) { bestD = d; best = yaw }
+      let dd = yaw - toCenter; dd = Math.atan2(Math.sin(dd), Math.cos(dd))
+      const score = d + (1 - Math.abs(dd) / Math.PI) * 9 // 抜けの距離(最大34)＋中心へ向く度合い(最大+9)＝景色の深い街並みを正面に
+      if (score > bestScore) { bestScore = score; best = yaw }
     }
     return best
   }
