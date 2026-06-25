@@ -957,6 +957,27 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const stoneMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeStoneTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
+  // ── 赤煉瓦（イギリス積み風）のテクスチャ。大正の赤レンガ倉庫・時計塔は色ムラだけだと近接で滑らかな赤一色＝安っぽい。
+  //    段ごとに半煉瓦ずらした規則的な煉瓦＋明るいモルタル目地＋一枚ごとの色ゆらぎで、間近でも本物の煉瓦壁に。──
+  const makeBrickTex = (baseHex) => {
+    const W = 128, c = document.createElement('canvas'); c.width = c.height = W; const x = c.getContext('2d'), base = new THREE.Color(baseHex)
+    x.fillStyle = '#' + base.clone().offsetHSL(0.02, -0.28, 0.34).getHexString(); x.fillRect(0, 0, W, W) // 明るいモルタルの下地
+    const rows = 9, rh = W / rows, bw = W / 5 // 煉瓦の段と一枚の幅
+    for (let r = 0; r < rows; r++) {
+      const y0 = r * rh, off = (r % 2) * (bw / 2) // 段ごとに半煉瓦ずらす（イギリス積み風）
+      for (let bx = -off; bx < W; bx += bw) {
+        const m = 1.3, px = bx + m, py = y0 + m, pw = bw - m * 2, ph = rh - m * 2
+        if (pw > 1 && ph > 1) {
+          x.fillStyle = '#' + base.clone().offsetHSL((R() - 0.5) * 0.02, (R() - 0.5) * 0.05, (R() - 0.5) * 0.1).getHexString(); x.fillRect(px, py, pw, ph) // 一枚ごとに色をゆらす
+          x.fillStyle = 'rgba(255,255,255,0.06)'; x.fillRect(px, py, pw, 1)      // 上端のかすかな光
+          x.fillStyle = 'rgba(0,0,0,0.12)'; x.fillRect(px, py + ph - 1, pw, 1)   // 下端のかすかな影
+        }
+      }
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4
+    return t
+  }
+  const brickMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeBrickTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
   // ── 看板（canvasで店名を描く＝オフラインで鮮明・時代ごとの字体。看板/のれん/ホーロー看板を立てる） ──
   const signCache = {}
   const signMat = (text, bg, fg, vertical, fontPx) => {
@@ -3589,7 +3610,7 @@ export async function mountTown3d(parent, opts = {}) {
           { const bx = tx + 4, bbank = heightAt(bx, cz0 + 5.6); const br = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 9.4), stone); br.position.set(bx, bbank + 0.5, cz0); br.castShadow = true; town.add(br); town.add(addOutline(br))
             for (const rl of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 9.4), toon(0x6a6258)); rail.position.set(bx + 1.2 * rl, bbank + 1.0, cz0); town.add(rail) } } // 石橋＋欄干（広い水路に合わせて長く）
         }
-        const brick = mottleMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 180, 0.16, [2.6, 1.4]) // 赤煉瓦の濃淡
+        const brick = brickMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 2.4, 2.2) // 赤煉瓦（イギリス積み＝近接で本物の煉瓦壁）
         const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
         // 赤レンガ倉庫（港の象徴。海側に長い煉瓦倉庫が並ぶ。拡大した波止場に沿って増設）
         for (let i = 0; i < 7; i++) { const wx = tx - 58 + i * 6.0, wz = tz - 30 + (i % 2) * 3, wy = heightAt(wx, wz); if (wy < SEA.level + 1) continue
