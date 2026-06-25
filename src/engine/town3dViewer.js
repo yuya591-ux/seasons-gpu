@@ -2995,7 +2995,7 @@ export async function mountTown3d(parent, opts = {}) {
           { const folC = season === 'autumn' ? 0xb86a32 : season === 'winter' ? 0xd2dadd : season === 'spring' ? 0xe8bcd2 : 0x5e7e42, trunkM = toon(0x5a4632), foliM = toon(folC), trGeos = [], foGeos = []
             for (let k = 0; k < 40; k++) { const a = R() * 6.28, rr = 24 + R() * 84, fx = ex + Math.cos(a) * rr, fz = ez + Math.sin(a) * rr, fy = heightAt(fx, fz); if (fy < SEA.level + 1.6 || edoStream(fx, fz) < 5) continue
               const s = 0.8 + R() * 0.5, tg = new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 1.5 * s, 5); tg.translate(fx, fy + 0.75 * s, fz); trGeos.push(tg)
-              const fg = new THREE.IcosahedronGeometry(1.5 * s, 0); fg.translate(fx, fy + 2.1 * s, fz); foGeos.push(fg) }
+              const fg = new THREE.IcosahedronGeometry(1.5 * s, 1); fg.scale(1, 0.94, 1); fg.translate(fx, fy + 2.1 * s, fz); foGeos.push(fg) } // det1で樹冠を丸く（統合済み＝三角形増のみ・描画コール不変）
             if (trGeos.length && BufferGeometryUtils.mergeGeometries) { const tm = BufferGeometryUtils.mergeGeometries(trGeos, false); if (tm) { const me = new THREE.Mesh(tm, trunkM); me.castShadow = true; town.add(me) } trGeos.forEach((g) => g.dispose())
               const fm = BufferGeometryUtils.mergeGeometries(foGeos, false); if (fm) { const fe = new THREE.Mesh(fm, foliM); fe.castShadow = true; town.add(fe) } foGeos.forEach((g) => g.dispose()) }
           } } // 城下〜外周の田畑（外周の地肌を埋める）＋町なかの庭木
