@@ -5390,10 +5390,14 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < nb; k++) { const a = R() * 6.283, h = 0.18 + R() * 0.24, lean = 0.12 + R() * 0.22; const bl = new THREE.CylinderGeometry(0.004, 0.022, h, 3).toNonIndexed(); bl.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.cos(a) * lean)); bakeL(bl, col, (wx - cx) + Math.cos(a) * 0.06, y + 0.02 + h / 2, (wz - cz) + Math.sin(a) * 0.06) } }
         const oneBush = (wx, wz) => { const y = heightAt(wx, wz); if (y < SEA.level + 1) return; const col = gCols[(R() * gCols.length) | 0], colD = new THREE.Color(col).multiplyScalar(0.72).getHex(), nlobe = 2 + ((R() * 3) | 0)
           for (let k = 0; k < nlobe; k++) { const rr = 0.4 + R() * 0.42, ox = (R() - 0.5) * 0.7, oz = (R() - 0.5) * 0.7; const lf = new THREE.IcosahedronGeometry(rr, 0).toNonIndexed(); lf.scale(1.1, 0.82, 1.1); bakeL(lf, k === 0 ? colD : col, (wx - cx) + ox, y + rr * 0.68, (wz - cz) + oz) } } // 低木の茂み＝眼の高さで見える緑の量感
+        const flowerCols = [0xeef0ee, 0xf0d850, 0xe89ec0, 0xe8a048] // 白/黄/桃/橙の野花＝眼の高さの彩り
+        const oneFlower = (wx, wz) => { const y = heightAt(wx, wz); if (y < SEA.level + 1) return; const fc = flowerCols[(R() * flowerCols.length) | 0], nf = 3 + ((R() * 4) | 0)
+          for (let k = 0; k < nf; k++) { const ox = (R() - 0.5) * 0.7, oz = (R() - 0.5) * 0.7, h = 0.18 + R() * 0.14; const stem = new THREE.CylinderGeometry(0.006, 0.006, h, 3).toNonIndexed(); bakeL(stem, 0x4e6e3a, (wx - cx) + ox, y + h / 2, (wz - cz) + oz); const fl = new THREE.IcosahedronGeometry(0.045 + R() * 0.03, 0).toNonIndexed(); bakeL(fl, fc, (wx - cx) + ox, y + h + 0.02, (wz - cz) + oz) } } // 野花（小さな彩りの点）
         for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 6 + R() * (rOut - 6), wx = cx + Math.cos(a) * rr, wz = cz + Math.sin(a) * rr
           if (blockedAt(wx, wz) || (wetFn && wetFn(wx, wz)) || heightAt(wx, wz) < SEA.level + 1) continue
           const clump = 2 + ((R() * 4) | 0); for (let j = 0; j < clump; j++) { const ox = (R() - 0.5) * 2, oz = (R() - 0.5) * 2; if (!blockedAt(wx + ox, wz + oz) && !(wetFn && wetFn(wx + ox, wz + oz))) oneTuft(wx + ox, wz + oz) }
-          if (R() < 0.55 && !blockedAt(wx, wz)) { oneBush(wx, wz); if (R() < 0.4) oneBush(wx + (R() - 0.5) * 3, wz + (R() - 0.5) * 3) } } // 低木の茂みを群れて（緑の量感＝眼の高さの裸地を埋める）
+          if (R() < 0.55 && !blockedAt(wx, wz)) { oneBush(wx, wz); if (R() < 0.4) oneBush(wx + (R() - 0.5) * 3, wz + (R() - 0.5) * 3) } // 低木の茂みを群れて（緑の量感）
+          if (R() < 0.3 && !blockedAt(wx, wz)) oneFlower(wx + (R() - 0.5) * 2, wz + (R() - 0.5) * 2) } // 野花の彩り
         if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const me = new THREE.Mesh(m, cm); me.position.set(cx, 0, cz); town.add(me) } geos.forEach((g) => g.dispose()) }
       }
       const NE = LIGHT ? 200 : 420
