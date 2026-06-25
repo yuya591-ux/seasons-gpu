@@ -958,6 +958,14 @@ export async function mountTown3d(parent, opts = {}) {
   const festOn = (id) => season === 'summer' && (isNight || duskAmt > 0.2) && (FORCE_FEST || ((((festDay * 2654435761) ^ (id * 40503) ^ 0x5bd1e995) >>> 0) % 100) < 50) // 各会場50%で開催（夏の夕夜）
   const festivalSpots = []  // 開催中の祭りの中心（音の距離計算用）＝遠くから囃子が聞こえ近づくと大きくなる
   const festDancers = []    // 盆踊りの踊り手（frameで腕を上げ下げ・体を揺らす）
+  // 祭りの立ち姿（浴衣の人影）。壺/こけしを避け、肩から裾へ広がる胴＋首＋小さめの頭＋髪＝人らしく（実機FB「ポットみたいなもの」の解消）。
+  const folkBody = (parent, bodyMat, skinMat, hairMat) => {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.27, 1.12, 9), bodyMat); body.position.y = 0.56; body.castShadow = true; parent.add(body) // 浴衣（肩→裾へ広がる一枚）
+    parent.add(new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.052, 0.09, 6), skinMat).translateY(1.16)) // 首
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skinMat); h.position.y = 1.28; h.scale.set(0.95, 1.06, 0.96); parent.add(h) // 頭は小さめ＝頭身を伸ばす
+    parent.add(new THREE.Mesh(new THREE.SphereGeometry(0.162, 9, 8, 0, 6.2832, 0, Math.PI * 0.6), hairMat).translateY(1.3).translateZ(-0.012)) // 髪（後頭部）
+    return body
+  }
   const makeFestival = (fx, fz, sc = 1) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）
     const fgy = heightAt(fx, fz), woodMat = toon(0x9a7048), redMat = toon(0xc0392b)
     const yag = new THREE.Group(); yag.position.set(fx, fgy, fz); town.add(yag) // やぐら（二段の木の櫓＋紅白幕＋太鼓＋宝形屋根）
@@ -994,13 +1002,12 @@ export async function mountTown3d(parent, opts = {}) {
       colliders.push({ x: sx, z: sz, r: 1.6 })
     }
     // 盆踊りの輪（やぐらを囲む人。中心を向き、frameで腕を上げ下げ・体を揺らす）
-    const skinMat = toon(0xf0c49c), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], nD = LIGHT ? 8 : 12
+    const skinMat = toon(0xf0c49c), hairMat = toon(0x2a2420), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], nD = LIGHT ? 8 : 12
     for (let i = 0; i < nD; i++) {
       const a = i / 12 * 6.283, dx2 = fx + Math.cos(a) * 5.8 * sc, dz2 = fz + Math.sin(a) * 5.8 * sc, dgy = heightAt(dx2, dz2)
       const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(fx - dx2, fz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
-      const yuk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])); yuk.position.y = 0.6; yuk.castShadow = true; d.add(yuk)
-      d.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat), {}).translateY(1.4)) // 頭
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), toon(yukataCols[i % yukataCols.length])); arm.position.set(0.22, 1.15, 0.1); arm.rotation.z = -0.9; d.add(arm)
+      const yukM = toon(yukataCols[i % yukataCols.length]); folkBody(d, yukM, skinMat, hairMat) // 浴衣の踊り手（首・小頭・髪で人らしく）
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.5, 6), yukM); arm.position.set(0.19, 1.06, 0.08); arm.rotation.z = -0.9; d.add(arm) // 上げた片腕（踊り）
       festDancers.push({ d, arm, ph: i * 0.5, y0: dgy })
     }
     colliders.push({ x: fx, z: fz, r: 2.6 }); spawnAvoid.push({ x: fx, z: fz, r: 7 })
@@ -1018,11 +1025,10 @@ export async function mountTown3d(parent, opts = {}) {
     const btex = new THREE.CanvasTexture(bc); const banner = new THREE.Mesh(new THREE.BoxGeometry(6.6, 2.5, 0.12), lit ? new THREE.MeshBasicMaterial({ map: btex, fog: true }) : new THREE.MeshToonMaterial({ map: btex, gradientMap: grad, fog: true })); banner.position.set(fx, stY + 1.95, stz - 1.4); banner.castShadow = true; town.add(banner)
     for (const sx of [-3.5, 3.5]) { const g = new THREE.Group(); g.position.set(fx + sx, stY, stz - 0.2); town.add(g); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 3, 6), toon(0x4a4640)).translateY(1.5)); const sp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.4), toon(0x2a2724)); sp.position.y = 2.5; g.add(sp) } // 袖のスピーカー
     // ステージの演者×2（手を振る。frameで腕が動く）
-    const yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], skinMat = toon(0xf0c49c)
+    const yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], skinMat = toon(0xf0c49c), hairMat = toon(0x2a2420)
     for (let i = 0; i < 2; i++) { const px = fx + (i ? 1.4 : -1.4), pz = stz + 0.3, d = new THREE.Group(); d.position.set(px, stY + 0.6, pz); d.rotation.y = Math.PI; town.add(d) // 客席(+z)を向く
-      d.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i])).translateY(0.6))
-      d.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat).translateY(1.4))
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), toon(yukataCols[i])); arm.position.set(0.22, 1.15, 0.1); arm.rotation.z = -0.9; d.add(arm)
+      const yukM = toon(yukataCols[i]); folkBody(d, yukM, skinMat, hairMat)
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.5, 6), yukM); arm.position.set(0.19, 1.06, 0.08); arm.rotation.z = -0.9; d.add(arm)
       festDancers.push({ d, arm, ph: i * 1.4, y0: stY + 0.6 }) }
     // 提灯の列（広場を囲むポール間に渡す。色ごとに統合）
     const lanLit = [0xffd27a, 0xff8a6a, 0x8ac0e8], lanCols = [toon(0xe8a838), toon(0xc0392b), toon(0x3a8ac0)], lanGeos = [[], [], []], poleGeos = []
@@ -1045,8 +1051,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 見物の人（ステージを向いて集まる）
     for (let i = 0; i < (LIGHT ? 8 : 14); i++) { const ang = (R() - 0.5) * 2.2, rad = 2.6 + R() * 4.2, cx2 = fx + Math.sin(ang) * rad, cz2 = fz + 1.5 + Math.cos(ang) * rad * 0.6, cgy = heightAt(cx2, cz2)
       const d = new THREE.Group(); d.position.set(cx2, cgy, cz2); d.rotation.y = Math.atan2(fx - cx2, stz - cz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d) // ステージを向く
-      d.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 7), toon(yukataCols[i % yukataCols.length])).translateY(0.6))
-      d.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skinMat).translateY(1.4)) }
+      folkBody(d, toon(yukataCols[i % yukataCols.length]), skinMat, hairMat) } // 浴衣の見物客（首・小頭・髪で人らしく＝壺の解消）
     colliders.push({ x: fx, z: stz, r: 3.6 }); spawnAvoid.push({ x: fx, z: fz, r: 8 })
     festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: サマフェスにも近づくと囃子が満ちる
   }
@@ -4862,13 +4867,13 @@ export async function mountTown3d(parent, opts = {}) {
   const makePeep = () => {
     const g = new THREE.Group(), legs = [], arms = []
     const pm = toon(pantsCols[(R() * pantsCols.length) | 0]), tm = toon(peepCols[(R() * peepCols.length) | 0]), hm = toon(hairCols[(R() * hairCols.length) | 0]), sm = toon(skinCols[(R() * skinCols.length) | 0])
-    // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く
-    for (const s of [-1, 1]) { const leg = new THREE.Group(); const lm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.62, 6), pm); lm.position.y = -0.31; lm.castShadow = true; leg.add(lm); leg.position.set(s * 0.11, 0.71, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点）
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.54, 8), tm); torso.position.y = 0.98; torso.castShadow = true; g.add(torso) // 胴
-    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), tm); shoulder.position.y = 1.18; shoulder.scale.set(1.1, 0.6, 0.8); g.add(shoulder) // 肩
-    for (const s of [-1, 1]) { const arm = new THREE.Group(); const am = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.5, 6), tm); am.position.y = -0.25; am.castShadow = true; arm.add(am); arm.position.set(s * 0.28, 1.19, 0); arm.rotation.z = s * 0.07; g.add(arm); arms.push(arm) } // 腕（肩支点）
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), sm); head.position.y = 1.42; head.scale.set(0.96, 1.04, 0.96); g.add(head)
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.66), hm); hair.position.set(0, 1.45, -0.015); g.add(hair) // 髪（上＋後ろ。顔は出す）
+    // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く。少し長く細く＝寸胴(壺)を解消。
+    for (const s of [-1, 1]) { const leg = new THREE.Group(); const lm = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.066, 0.68, 6), pm); lm.position.y = -0.34; lm.castShadow = true; leg.add(lm); leg.position.set(s * 0.1, 0.74, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点）
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.135, 0.6, 10), tm); torso.position.y = 1.04; torso.castShadow = true; g.add(torso) // 胴＝肩(上)から腰(下)へすぼまる一本のテーパー（壺の寸胴を避け肩を張る）
+    for (const s of [-1, 1]) { const arm = new THREE.Group(); const am = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.046, 0.52, 6), tm); am.position.y = -0.26; am.castShadow = true; arm.add(am); arm.position.set(s * 0.205, 1.28, 0); arm.rotation.z = s * 0.08; g.add(arm); arms.push(arm) } // 腕（肩支点。肩幅に合わせ内へ）
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 7), sm); neck.position.y = 1.37; neck.castShadow = true; g.add(neck) // 首（頭が肩にめり込まず頭身が伸びる＝こけし/壺感の解消）
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 9), sm); head.position.y = 1.55; head.scale.set(0.94, 1.06, 0.96); g.add(head) // 頭は小さめ＝約7頭身に
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.183, 10, 9, 0, Math.PI * 2, 0, Math.PI * 0.62), hm); hair.position.set(0, 1.58, -0.012); g.add(hair) // 髪（上＋後ろ。顔は出す）
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
     g.userData = { legs, arms }
     return g
@@ -6640,6 +6645,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 住民が歩道を歩く（少し上下に弾む）
     for (const p of peeps) {
       const u = p.userData
+      if (u.frozen) continue // 検証用に凍結中（__town3dPeepPin）
       const pdx = p.position.x - active.flyPos.x, pdz = p.position.z - active.flyPos.z
       if (pdx * pdx + pdz * pdz > 19600) continue // 遠い人（home中央通りに集中）は更新しない＝他時代の上空で無駄に動かさない
       const legs = u.legs || [], arms = u.arms || []
@@ -6667,6 +6673,7 @@ export async function mountTown3d(parent, opts = {}) {
         u.lane = lane
       }
       u.x += (u.lane - u.x) * Math.min(1, dt * 3.4) // 横へなめらかに寄る／戻る
+      if (blockedAt(u.x, u.z)) { for (const ox of [0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.2, -2.2, 3.0, -3.0]) { if (!blockedAt(u.x + ox, u.z)) { u.x += ox; u.lane = u.x; break } } } // 柱が密で寄り切れない時は最近傍の空きへ即スナップ＝貫通フレームを作らない
       const cad = 6 + u.speed * 2.2, sw = Math.sin(t * cad + u.ph) // 歩調（速いほど速く運ぶ）
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * cad + u.ph)) * 0.06, u.z) // 一歩ごとに弾む
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
@@ -6676,6 +6683,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す。
     // 近く（見える範囲）の住人だけ更新＝遠い時代エリアの人々を毎フレーム動かさない＝滑らかさを守りつつ人を増やせる。
     for (const r of residents) { const u = r.userData
+      if (u.frozen) continue // 検証用に凍結中（__town3dResPin）
       const rdx = r.position.x - active.flyPos.x, rdz = r.position.z - active.flyPos.z, rd2 = rdx * rdx + rdz * rdz
       const rvis = rd2 < 12100 // 110uより遠い住人は描画しない（点でしか見えないのにメッシュ多数＝描画コール節約）
       if (r.visible !== rvis) r.visible = rvis
@@ -7743,6 +7751,11 @@ export async function mountTown3d(parent, opts = {}) {
     })
     window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2), ddt: +lastDDT.toFixed(3), low: adQLow, ok: adQOk } } // 検証用: 描画コール/三角形/オブジェクト数/自動品質状態
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
+    window.__town3dPeepFront = (i, dist = 4, lift = 0.9) => { const p = peeps[i]; if (!p) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); const u = p.userData; u.loiter = true; u.hx = t.x; u.hz = t.z; u.rad = 0; u.sp = 0; u.face = Math.atan2(camera.position.x - t.x, camera.position.z - t.z); p.position.set(t.x, t.y - lift, t.z); p.rotation.y = u.face } // 検証用: 簡易peepをカメラ正面の視線上に立たせる（壺感の確認）
+    window.__town3dPeepPin = (i, x, z, face = 0, yOver) => { const p = peeps[i]; if (!p) return; const u = p.userData; u.frozen = true; p.position.set(x, yOver !== undefined ? yOver : heightAt(x, z), z); p.rotation.y = face } // 検証用: 簡易peepを座標(任意y)に凍結（shotAtで接写）
+    window.__town3dResPin = (i, x, z, face = 0, yOver) => { const r = residents[i]; if (!r) return; const u = r.userData; u.frozen = true; r.position.set(x, yOver !== undefined ? yOver : heightAt(x, z), z); r.rotation.y = face; u.face = face } // 検証用: 住人を座標(任意y)に凍結
+    window.__town3dFolkPin = (i, x, z, face = Math.PI, y = 90) => { const f = festDancers[i]; if (!f) return; f.d.position.set(x, y, z); f.y0 = y; f.d.rotation.y = face } // 検証用: 祭りの踊り手/演者(folkBody)を上空へ（空背景で接写）
+    window.__town3dFolkCount = () => festDancers.length
     window.__town3dResClip = () => { // 検証用: 建物コライダーに食い込んでいる住民/peepの数（実機FB「住民が建物に食い込む」の定量化）
       let resIn = 0, peepIn = 0; const bad = []
       for (const r of residents) if (blockedAt(r.position.x, r.position.z)) { resIn++; bad.push({ t: 'res', x: +r.position.x.toFixed(1), z: +r.position.z.toFixed(1) }) }

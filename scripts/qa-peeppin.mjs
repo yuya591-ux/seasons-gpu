@@ -1,0 +1,20 @@
+import { chromium } from 'playwright'
+const PORT = process.env.PORT || 4876
+const tag = process.argv[2] || 'before'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 560, height: 760 }, deviceScaleFactor: 2 })
+await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(700)
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2600)
+await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(700)
+await page.evaluate(() => window.__town3dCruise(false)); await page.waitForTimeout(300)
+for (let k = 0; k < 4; k++) await page.evaluate((k) => window.__town3dPeepPin(k, -1.5 + k * 1.0, -2, Math.PI), k)
+await page.waitForTimeout(600)
+const gy = await page.evaluate(() => window.__town3dGroundAt(0, -2))
+await page.evaluate(([gy]) => window.__town3dShotAt(0, gy + 0.9, 2.4, 0, gy + 0.85, -2, 28), [gy])
+await page.waitForTimeout(400)
+await page.screenshot({ path: `scripts/_shots/peeppin_${tag}.png` })
+console.log('shot', tag, 'gy=', gy)
+await browser.close()

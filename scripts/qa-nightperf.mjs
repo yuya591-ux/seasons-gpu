@@ -1,0 +1,22 @@
+import { chromium } from 'playwright'
+const PORT = process.env.PORT || 4877
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 480, height: 820 } })
+const errs=[]; page.on('pageerror',e=>errs.push('PE:'+e.message)); page.on('console',m=>{if(m.type()==='error')errs.push('CE:'+m.text())})
+await page.goto(`http://localhost:${PORT}/seasons/?dev=1&fest=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(700)
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d-night'))
+await page.waitForTimeout(3000)
+console.log('窓辺 stats:', JSON.stringify(await page.evaluate(()=>window.__town3dStats())))
+console.log('窓辺 load:', JSON.stringify(await page.evaluate(()=>window.__town3dLoad())))
+console.log('draw:', JSON.stringify(await page.evaluate(()=>window.__town3dDraw && window.__town3dDraw())))
+await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(600)
+await page.evaluate(() => window.__town3dFlyPose(0, 4, 14, 0, -0.18)); await page.waitForTimeout(2500)
+console.log('広場 draw:', JSON.stringify(await page.evaluate(()=>window.__town3dDraw && window.__town3dDraw())))
+console.log('広場 load:', JSON.stringify(await page.evaluate(()=>window.__town3dLoad())))
+// 8秒巡航でエラー監視
+await page.evaluate(() => window.__town3dCruise(true)); await page.waitForTimeout(8000)
+console.log('巡航後 resClip:', JSON.stringify(await page.evaluate(()=>{const r=window.__town3dResClip();return {resIn:r.resIn,peepIn:r.peepIn}})))
+console.log(errs.length?'ERR '+JSON.stringify(errs.slice(0,5)):'no errors')
+await browser.close()
