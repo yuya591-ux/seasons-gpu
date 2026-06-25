@@ -5250,6 +5250,25 @@ export async function mountTown3d(parent, opts = {}) {
         oneBush(bx, bz)
         spawnAvoid.push({ x: bx, z: bz, r: 1.2 }) // 後続の地被/着地が茂みに重ならないよう
       }
+      // 木立(thicket): 斜面・周縁のスカスカを埋める背景の緑＝小ぶりの木の塊。統合メッシュなので描画コール増やさずに緑量を稼ぐ（実機FB: 斜面/背景が殺風景）。
+      const tkCol = season === 'spring' ? [0x5e8a40, 0x6e9a4a] : season === 'autumn' ? [0x9a7a38, 0x8a6e34, 0x6e7438] : [0x47682f, 0x53743a, 0x3e5e2c]
+      const oneThicket = (x, z) => {
+        const y = heightAt(x, z); if (y < SEA.level + 0.7) return
+        const tH = 0.7 + R() * 0.7, col = tkCol[(R() * tkCol.length) | 0], colD = new THREE.Color(col).multiplyScalar(0.76).getHex()
+        const tr = new THREE.CylinderGeometry(0.06, 0.1, tH, 4).toNonIndexed(); bakeT(tuftGeos, tr, 0x5a4632, x, y + tH / 2, z) // 短い幹
+        const cl = 3 + ((R() * 2) | 0)
+        for (let k = 0; k < cl; k++) { const rr = 0.5 + R() * 0.4, ox = (R() - 0.5) * 0.7, oz = (R() - 0.5) * 0.7, oy = tH + rr * 0.4 + k * 0.18
+          const lf = new THREE.IcosahedronGeometry(rr, 0).toNonIndexed(); lf.scale(1.05, 0.9, 1.05); bakeT(tuftGeos, lf, k === 0 ? colD : col, x + ox, y + oy, z + oz) }
+      }
+      const NK = LIGHT ? 26 : 56
+      for (let i = 0; i < NK; i++) {
+        const kx = -150 + R() * 250, kz = -130 + R() * 165 // 周縁の斜面まで広く
+        if (onRoad(kx, kz) || wet(kx, kz) || occ(kx, kz) || blockedAt(kx, kz)) continue
+        if (Math.hypot(kx - DOWNTOWN.x, kz - DOWNTOWN.z) < DOWNTOWN.r || Math.hypot(kx - STADIUM.x, kz - STADIUM.z) < STADIUM.r) continue // 副都心/競技場は避ける
+        oneThicket(kx, kz)
+        if (R() < 0.5) oneThicket(kx + (R() - 0.5) * 3, kz + (R() - 0.5) * 3) // たまに2株で茂みの塊に
+        spawnAvoid.push({ x: kx, z: kz, r: 1.6 })
+      }
       if (tuftGeos.length && BufferGeometryUtils.mergeGeometries) { const tm = BufferGeometryUtils.mergeGeometries(tuftGeos, false); if (tm) town.add(new THREE.Mesh(tm, coverMat)); tuftGeos.forEach((x) => x.dispose()) }
     }
     // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
