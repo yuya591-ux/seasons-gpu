@@ -499,24 +499,20 @@ export function createAudio(opts) {
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 130
       const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 260; bp.Q.value = 0.7
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.linearRampToValueAtTime(0.4, tt + 2.6); g.gain.linearRampToValueAtTime(0.0001, tt + 5.6)
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.linearRampToValueAtTime(0.2, tt + 2.6); g.gain.linearRampToValueAtTime(0.0001, tt + 5.6) // 控えめに（遠い電車）
       src.connect(hp).connect(bp).connect(g).connect(sg); try { src.start(tt); src.stop(tt + 6) } catch { /* 無視 */ }
       for (let k = 0; k < 20; k++) { const ct = tt + 0.7 + k * 0.2, env = Math.sin((k / 20) * Math.PI)  // 近づき遠ざかるカタンカタン
         const cg = ctx.createGain(); cg.gain.setValueAtTime(0.001, ct); cg.gain.exponentialRampToValueAtTime(0.1 * env + 0.002, ct + 0.004); cg.gain.exponentialRampToValueAtTime(0.0001, ct + 0.06)
         const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = 500; cl.Q.value = 0.9
         const nb = ctx.createBufferSource(); nb.buffer = buf; nb.loop = true; nb.connect(cl).connect(cg).connect(sg); try { nb.start(ct); nb.stop(ct + 0.09) } catch { /* 無視 */ } }
     }
-    const notes = [1047, 1319, 1568, 1319, 1047, 880]  // 発車ベルの旋律（一般的な6音＝特定の発車メロディは模さない）
+    void bell // 発車ベルは「チン」が不快との実機FBで廃止（関数は残すが鳴らさない）
     let beat = 0
     const tick = () => {
       if (!staNode) return
-      if (staState.amt > 0.02) {  // 近くに駅が無い間は何も鳴らさない（無駄な処理を省く）
-        const t = ctx.currentTime + 0.06
-        notes.forEach((f, i) => bell(t + i * 0.3, f))
-        if (beat % 2 === 1) trainPass(t + 2.2)  // 一回おきに電車が通過
-      }
+      if (staState.amt > 0.06 && beat % 3 === 0) trainPass(ctx.currentTime + 0.1)  // ベル無し＝遠い電車の通過音だけを、ごくたまに
       beat++
-      staNode.timer = setTimeout(tick, 20000 + Math.random() * 16000)  // ~20-36秒ごと
+      staNode.timer = setTimeout(tick, 52000 + Math.random() * 36000)  // ~52-88秒ごと（電車は実質2.5〜4分に一度・控えめ）
     }
     tick()
   }
@@ -713,8 +709,8 @@ export function createAudio(opts) {
       startWind() // 生成的な風をそっと立ち上げる（全情景でループ感を消す）
       startWater() // 場所に応じた水の音（波/せせらぎ）の源を立ち上げる（音量0＝setAmbienceが近さで満ち引き）
       startFestival() // 夏祭りの囃子の源を立ち上げる（音量0＝祭りに近づくと満ちる。離れている間は音符を作らない）
-      startStation() // 駅の音の源を立ち上げる（音量0＝駅に近づくと発車ベル・電車の音が満ちる）
-      startFurin() // 夏の風鈴の源を立ち上げる（夏に窓をあけた時だけ風まかせに鳴る）
+      startStation() // 駅の音の源を立ち上げる（音量0＝駅に近づくと遠い電車の音がたまに。ベルは廃止）
+      // startFurin() ← 風鈴の「チリン」が不快との実機FBで停止（風鈴の見た目だけ残す）
       // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
       // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
