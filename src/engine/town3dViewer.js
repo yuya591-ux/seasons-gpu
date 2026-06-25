@@ -5402,7 +5402,7 @@ export async function mountTown3d(parent, opts = {}) {
       }
       const NE = LIGHT ? 200 : 420
       eraCover(EDO.x, EDO.z, EDO.r, NE, [0x6e7a40, 0x7e8a48, 0x5e6e34, 0x8a8a50], (x, z) => edoStream(x, z) < 6) // 江戸=乾いた草
-      eraCover(TAISHO.x, TAISHO.z, TAISHO.r, NE, [0x6e8244, 0x7a8a4c, 0x86905a], (x, z) => taishoCanal(x, z) < 5) // 大正=苔草
+      eraCover(TAISHO.x, TAISHO.z, TAISHO.r, NE, [0x6e8244, 0x7a8a4c, 0x86905a], (x, z) => taishoCanal(x, z) < 3.9) // 大正=苔草（護岸±3.6の外側まで地被を寄せ運河沿いの裸帯を埋める）
       eraCover(SENGOKU.x, SENGOKU.z, SENGOKU.r, NE, [0x5c7a3a, 0x6e8c46, 0x52702f]) // 戦国=谷の緑（谷底の川は低くheightAtで除外）
     }
     // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
