@@ -1719,6 +1719,7 @@ export async function mountTown3d(parent, opts = {}) {
       const hull = new THREE.Mesh(new RoundedBoxGeometry(3.2, 0.7, 1.1, 1, 0.3), hullMat); hull.position.y = 0.4; hull.castShadow = true; yacht.add(hull)
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.4, 5), mastMat); mast.position.set(0, 2.0, 0); yacht.add(mast)
       const sail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.5, 1.5), sailMat); sail.position.set(0, 1.85, 0.55); yacht.add(sail)
+      if (duskAmt > 0.12) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffd089, fog: true })); lamp.position.set(0, 1.3, -0.5); yacht.add(lamp) } // 船尾の灯り（夕夜）
       town.add(yacht); boats.push(yacht) } // 係留のヨット（白い船体＋マスト＋帆）＝波にゆれる
     // 海辺の遊歩道（岸の上）＝ベンチ＋街路樹＋人
     const promY = (px, pz) => heightAt(px, pz)
@@ -1739,6 +1740,7 @@ export async function mountTown3d(parent, opts = {}) {
       const sail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 3.2, 1.9), sailMatS); sail.position.set(0.3, 2.3, 0.6); boat.add(sail)
       const jib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.0, 1.1), sailMatS); jib.position.set(0.3, 1.9, -0.7); boat.add(jib) // 前帆
       const wake = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 13), wakeMatS); wake.rotation.x = -Math.PI / 2; wake.position.set(0, 0.02, -7.5); boat.add(wake) // 引き波
+      if (duskAmt > 0.12) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffd089, fog: true })); lamp.position.set(0.3, 1.7, -1.6); boat.add(lamp) } // 船尾の灯り（夕夜の海に温かい点）
       town.add(boat); boats.push(boat)
     }
   }
