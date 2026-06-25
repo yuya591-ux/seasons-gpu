@@ -10,15 +10,16 @@ export default {
   status: 'ready',
   render: 'town3d', // Three.js ビューア（src/engine/town3dViewer.js）
   town3dWeather: 'snow', // 雪を降らせる
-  bg3d: 'bg/town3d-snow.jpg', // 奥に敷く実写の雪の里山（遠景を写真級に）
+  // bg3d は敢えて置かない: 明るい雪景色の実写を奥に敷くと、街が霧で白い写真に溶けて全体が白飛びした。
+  // 雨シーン同様に空ドームのみにし、雪雲の鈍色の地平に街の階調を残す（眺める対象の街を見えるように）。
 
   palette: {
     early: {
-      skyTop: '#8ba1bb', // 雪雲の鈍色（上端は青灰を残し白飛びを防ぐ）
-      skyMid: '#b4c1cf',
-      horizon: '#dcdcd9', // 雪明かりの淡い地平（純白でなく僅かに灰を残す）
-      sunGlow: '#f2ead8',
-      dropTint: '#5a6470', // 冷たい影色
+      skyTop: '#7a8ca4', // 雪雲の鈍色（やや沈めて街が白に溶けるのを防ぐ＝冬夕の階調）
+      skyMid: '#9eabbd',
+      horizon: '#c4cace', // 雪明かりの地平（明るすぎる灰だと中景の街が白飛びする→一段落とす）
+      sunGlow: '#ecdfc6',
+      dropTint: '#525c68', // 冷たい影色
     },
     late: {
       skyTop: '#7c8aa0', // 暮れてゆく鈍色
