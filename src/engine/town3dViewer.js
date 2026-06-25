@@ -5174,11 +5174,11 @@ export async function mountTown3d(parent, opts = {}) {
     const g = makeResident(cfg); const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) return; g.position.set(hx, gy, hz); const u = g.userData; u.ax = hx; u.az = hz; u.tx = hx; u.tz = hz; u.face = R() * 6.28; u.ph = R() * 6.28; u.pauseT = 0.5 + R() * 4; u.moving = false; u.speed = 0.66 + R() * 0.5; u.rad = 4 + R() * 5; g.rotation.y = u.face; town.add(g); residents.push(g) }
   const RES_MODERN = ['modern', 'modern', 'suit', 'blouse']
   for (const sp of residentSpots) placeResident(sp.x + (R() - 0.5) * 1.6, sp.z + (R() - 0.5) * 1.6, { skin: RES_SKIN[(R() * RES_SKIN.length) | 0], hair: RES_HAIR[(R() * RES_HAIR.length) | 0], top: RES_TOP[(R() * RES_TOP.length) | 0], bottom: RES_BOT[(R() * RES_BOT.length) | 0], iris: RES_IRIS[(R() * RES_IRIS.length) | 0], outfit: RES_MODERN[(R() * RES_MODERN.length) | 0], hairStyle: (R() * 3) | 0 })
-  // ── home の通りを行き交う簡素な人々（人の気配の密度＝降り立った街の賑わい）。商店街の中央通りと駅前を中心に。 ──
-  if (kind !== 'yato') { const peepCols = [0x4a5a6a, 0x6a4a3a, 0x8a3a3a, 0x3a4a5a, 0x5a5a4a, 0xa89878, 0x46464e, 0x7a5a4a]
-    const mkPeep2 = (px, py, pz) => { const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, 0.72, 6), toon(peepCols[(R() * peepCols.length) | 0])); body.position.y = 0.4; body.castShadow = true; g.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 6), toon(0xf0d2b4)); head.position.y = 0.9; g.add(head); const hair = new THREE.Mesh(new THREE.SphereGeometry(0.146, 7, 6, 0, 6.283, 0, 1.7), toon(0x2a2420)); hair.position.y = 0.93; g.add(hair); town.add(g) }
-    for (let i = 0; i < 14; i++) { const z = -90 + i * 8 + (R() - 0.5) * 4, x = (R() - 0.5) * 6.5, py = heightAt(x, z); if (py < SEA.level + 1 || (Math.abs(z - RAIL.z) < 3 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1)) continue; mkPeep2(x, py, z) } // 商店街の中央通り（開けた抜け）
-    for (const [cx, cz, n] of [[STATION.x, STATION.z + STATION.r - 2, 4], [PARK.x, PARK.z, 3], [DOWNTOWN.x, DOWNTOWN.z, 3]]) for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 3 + R() * 6, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, py = heightAt(x, z); if (py < SEA.level + 1.2 || x > SEA.coast) continue; mkPeep2(x, py, z) } } // 駅前/公園/副都心の人だかり
+  // ── home の通りを行き交う人々（人の気配の密度＝降り立った街の賑わい）。歩く人(中央通り)＋佇む人(駅前/公園/副都心)。
+  // 旧mkPeep2は静止した円柱＋球で「人形・生きてるか分からない」との実機FB→makePeepでアニメさせpeeps配列へ（歩く/佇む）。
+  if (kind !== 'yato') {
+    for (let i = 0; i < 8; i++) { const z = -84 + R() * 96, x = (R() < 0.5 ? -1 : 1) * (2.4 + R() * 1.5), py = heightAt(x, z); if (py < SEA.level + 1 || (Math.abs(z - RAIL.z) < 3 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1)) continue; const g = makePeep(); const dir = x < 0 ? 1 : -1; g.position.set(x, py, z); Object.assign(g.userData, { dir, x, speed: 1.0 + R() * 0.7, z, ph: R() * 6.28 }); town.add(g); peeps.push(g) } // 中央通りを歩く
+    for (const [cx, cz, n] of [[STATION.x, STATION.z + STATION.r - 2, 4], [PARK.x, PARK.z, 3], [DOWNTOWN.x, DOWNTOWN.z, 3]]) for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 3 + R() * 6, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, py = heightAt(x, z); if (py < SEA.level + 1.2 || x > SEA.coast || blockedAt(x, z)) continue; const g = makePeep(); g.position.set(x, py, z); Object.assign(g.userData, { loiter: true, hx: x, hz: z, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 }); town.add(g); peeps.push(g) } } // 駅前/公園/副都心の人だかり（佇む）
   // ── 港町の少女（添付の模倣）＝2D立ち絵の主人公キャラ。港・水辺・街角に。──
   for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
@@ -6713,8 +6713,9 @@ export async function mountTown3d(parent, opts = {}) {
     for (const p of peeps) {
       const u = p.userData
       if (u.frozen) continue // 検証用に凍結中（__town3dPeepPin）
-      const pdx = p.position.x - active.flyPos.x, pdz = p.position.z - active.flyPos.z
-      if (pdx * pdx + pdz * pdz > 19600) continue // 遠い人（home中央通りに集中）は更新しない＝他時代の上空で無駄に動かさない
+      const pdx = p.position.x - active.flyPos.x, pdz = p.position.z - active.flyPos.z, pd2 = pdx * pdx + pdz * pdz
+      if (!u.frozen) { const pv = pd2 < 12100; if (p.visible !== pv) p.visible = pv } // 110uより遠いpeepは描画しない＝描画コール節約（人を増やせる）
+      if (pd2 > 19600) continue // 140uより遠い人は更新もしない＝他時代の上空で無駄に動かさない
       const legs = u.legs || [], arms = u.arms || []
       if (u.loiter) { // ランドマークの賑わい: 定位置の周りをゆっくり佇み歩き、体の向きを少しずつ変える
         let px = u.hx + Math.sin(t * u.sp + u.ph) * u.rad
@@ -6740,7 +6741,10 @@ export async function mountTown3d(parent, opts = {}) {
         u.lane = lane
       }
       u.x += (u.lane - u.x) * Math.min(1, dt * 3.4) // 横へなめらかに寄る／戻る
-      if (blockedAt(u.x, u.z)) { for (const ox of [0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.2, -2.2, 3.0, -3.0]) { if (!blockedAt(u.x + ox, u.z)) { u.x += ox; u.lane = u.x; break } } } // 柱が密で寄り切れない時は最近傍の空きへ即スナップ＝貫通フレームを作らない
+      if (blockedAt(u.x, u.z)) { let snapped = false
+        for (const ox of [0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.2, -2.2, 3.0, -3.0]) { if (!blockedAt(u.x + ox, u.z)) { u.x += ox; u.lane = u.x; snapped = true; break } } // 柱が密で寄り切れない時は最近傍の空きへ即スナップ＝貫通フレームを作らない
+        if (!snapped) { u.z += u.dir * 1.4; if (u.z > 18) u.z = -52; if (u.z < -52) u.z = 18; u.x = u.baseX; u.lane = u.baseX } // それでも詰まり点(街灯+建物に挟まれ)なら一歩先へ抜ける
+      }
       const cad = 6 + u.speed * 2.2, sw = Math.sin(t * cad + u.ph) // 歩調（速いほど速く運ぶ）
       p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * cad + u.ph)) * 0.06, u.z) // 一歩ごとに弾む
       p.rotation.y = u.dir > 0 ? 0 : Math.PI
