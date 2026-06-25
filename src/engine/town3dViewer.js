@@ -5386,12 +5386,12 @@ export async function mountTown3d(parent, opts = {}) {
       const fLeaf = [], fTrunk = [], fM = new THREE.Matrix4()
       const lc = season === 'spring' ? [0x6f9a4e, 0x82ad58, 0x5e8a44, 0xeeb6cc] : season === 'autumn' ? [0xb0843c, 0x9c6e34, 0xc89a4a, 0xcf7034] : [0x4e7038, 0x5e8244, 0x436830, 0x6a8a48]
       const bakeF = (arr, geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); arr.push(geo) }
-      for (let i = 0; i < (LIGHT ? 130 : 260); i++) {
-        const x = -195 + fr() * 330, z = -188 + fr() * 152, y = heightAt(x, z)
-        if (y < SEA.level + 2 || (Math.abs(x) < 72 && z > -50) || blockedAt(x, z)) continue // 中央の街並みは避け、それを取り囲む背後・側方の丘を密な森で埋める（水・建物も避ける）
-        const s = 0.85 + fr() * 0.85, ci = (fr() * lc.length) | 0
-        const tr = new THREE.CylinderGeometry(0.09 * s, 0.15 * s, 1.5 * s, 4); fM.makeTranslation(x, y + 0.75 * s, z); tr.applyMatrix4(fM); bakeF(fTrunk, tr, season === 'winter' ? 0x6a6258 : 0x5a4632)
-        const lg = new THREE.IcosahedronGeometry((1.45 + fr() * 0.55) * s, 1); lg.scale(1, 0.92, 1); fM.makeTranslation(x, y + 2.25 * s, z); lg.applyMatrix4(fM); bakeF(fLeaf, lg, season === 'winter' ? 0xdfe4e2 : lc[ci])
+      for (let i = 0; i < (LIGHT ? 220 : 460); i++) {
+        const x = -198 + fr() * 336, z = -190 + fr() * 158, y = heightAt(x, z)
+        if (y < SEA.level + 2 || (Math.abs(x) < 56 && z > -36) || blockedAt(x, z)) continue // 中央の街並みだけ避け、それを取り囲む背後・側方の丘を密な森で広く埋める（水・建物も避ける）
+        const s = 1.0 + fr() * 1.1, ci = (fr() * lc.length) | 0
+        const tr = new THREE.CylinderGeometry(0.09 * s, 0.16 * s, 1.6 * s, 4); fM.makeTranslation(x, y + 0.8 * s, z); tr.applyMatrix4(fM); bakeF(fTrunk, tr, season === 'winter' ? 0x6a6258 : 0x5a4632)
+        const lg = new THREE.IcosahedronGeometry((1.6 + fr() * 0.7) * s, 1); lg.scale(1, 0.94, 1); fM.makeTranslation(x, y + 2.5 * s, z); lg.applyMatrix4(fM); bakeF(fLeaf, lg, season === 'winter' ? 0xdfe4e2 : lc[ci])
       }
       if (BufferGeometryUtils.mergeGeometries) {
         const tm = fTrunk.length && BufferGeometryUtils.mergeGeometries(fTrunk, false); if (tm) { const m = toon(0xffffff); m.vertexColors = true; const me = new THREE.Mesh(tm, m); me.castShadow = true; me.receiveShadow = true; town.add(me) } fTrunk.forEach((g) => g.dispose())
