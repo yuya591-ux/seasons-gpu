@@ -2556,6 +2556,15 @@ export async function mountTown3d(parent, opts = {}) {
         for (let i = 0; i < 8; i++) { const board = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.21, 0.03), toon(emaCols[i % 5])); board.position.set(-1.08 + i * 0.31, 1.22, 0.05); board.rotation.z = (i % 2 ? 0.06 : -0.05); ema.add(board) } // 絵馬の木札
         grp.add(ema)
       }
+      // ── 手水舎（参道脇の清めの水場）。石の水盤＋四本柱＋宝形の小屋根＋柄杓。絵馬の反対側に。──
+      { const cho = new THREE.Group(); cho.position.set(-4.0, 0, 4.2); cho.rotation.y = 0.5
+        const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.78, 0.7, 8), stoneMat); basin.position.y = 0.75; basin.castShadow = true; cho.add(basin) // 石の水盤
+        const water = new THREE.Mesh(new THREE.CircleGeometry(0.58, 14), new THREE.MeshBasicMaterial({ color: isNight ? 0x4a5a64 : 0x9fc0cc, fog: true })); water.rotation.x = -Math.PI / 2; water.position.y = 1.07; cho.add(water) // 水面
+        for (const [px2, pz2] of [[-1.0, -1.0], [1.0, -1.0], [-1.0, 1.0], [1.0, 1.0]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.3, 6), woodMat); post.position.set(px2, 1.15, pz2); post.castShadow = true; cho.add(post) } // 四本柱
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(1.7, 0.85, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.position.y = 2.7; roof.castShadow = true; cho.add(roof); cho.add(addOutline(roof)) // 宝形屋根
+        const ladle = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.66, 5), woodMat); ladle.rotation.z = Math.PI / 2; ladle.position.set(0.1, 1.16, 0.45); cho.add(ladle); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.09, 8), woodMat); cup.position.set(0.42, 1.16, 0.45); cho.add(cup) // 柄杓（柄＋椀）
+        grp.add(cho)
+      }
       town.add(grp)
       const sandoAng = Math.atan2(-sz, -sx) // 参道（街の中心）へ向く角度＝この方角は木を寄せて社殿/鳥居の正面を開ける
       for (let i = 0; i < 12; i++) { let a = i / 12 * 6.283; const da = Math.atan2(Math.sin(a - sandoAng), Math.cos(a - sandoAng)); if (Math.abs(da) < 0.55) a = sandoAng + (da < 0 ? -0.6 : 0.6); const rr = 8.5 + R() * 3.5; tree(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr, 1.5 + R() * 0.8) } // 鎮守の森（参道の正面は開ける・少し外周へ）
