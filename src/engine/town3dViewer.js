@@ -860,6 +860,22 @@ export async function mountTown3d(parent, opts = {}) {
     m.map.repeat.set(rep[0], rep[1])
     return snowify(m)
   }
+  // 地面メッシュに頂点色で大スケールの土/草のムラ＋傾斜で土が覗くを焼く＝のっぺりを脱す（homeと同手法を各時代の地形へ）。
+  // geo は heightAt 適用済み＋computeVertexNormals 済みのこと。ox/oz はメッシュのワールド原点。位置ノイズで主R()非消費。
+  const bakeGroundVColors = (geo, ox, oz, cGrass, cDry, cEarth, grassBias = 0.66) => {
+    const pos = geo.attributes.position, nrm = geo.attributes.normal, col = [], tc = new THREE.Color()
+    const cG = new THREE.Color(cGrass), cD = new THREE.Color(cDry), cE = new THREE.Color(cEarth)
+    for (let i = 0; i < pos.count; i++) {
+      const x = ox + pos.getX(i), z = oz + pos.getZ(i), ny = nrm ? nrm.getY(i) : 1
+      const slope = Math.max(0, Math.min(1, (1 - ny) * 3.0))
+      const zone = 0.5 + 0.5 * Math.sin(x * 0.045 + 0.7) * Math.cos(z * 0.037 - 0.4) + 0.16 * Math.sin(x * 0.11 - z * 0.09)
+      const dry = Math.max(0, Math.min(1, zone))
+      tc.copy(cG).lerp(cD, dry * grassBias); tc.lerp(cE, slope * 0.82)
+      const v = 0.95 + 0.1 * Math.sin(x * 0.7 + z * 0.55)
+      col.push(tc.r * v, tc.g * v, tc.b * v)
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
+  }
   // ── 時代の建物の正面テクスチャ（格子窓/連子窓/洋風窓）＝近づいても「窓のある建物」に。最初の街の質感へ統一する。 ──
   const makeFacade = (kind, baseHex) => {
     const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), base = new THREE.Color(baseHex)
@@ -2895,7 +2911,16 @@ export async function mountTown3d(parent, opts = {}) {
         // 島の地面（heightAtに沿う土・草の地面。これが無いと建物/人が宙に浮く）。縁は海面下へ落ちて海に隠れる。
         { const isz = (EDO.r + 6) * 2, gI = new THREE.PlaneGeometry(isz, isz, 74, 74); gI.rotateX(-Math.PI / 2); const gp = gI.attributes.position
           for (let i = 0; i < gp.count; i++) gp.setY(i, heightAt(ex + gp.getX(i), ez + gp.getZ(i)) - 0.06)
-          gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xd6dcd4 : season === 'autumn' ? 0x9a8a56 : 0x8e8158, 230, 0.22, [6, 6])); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
+          gI.computeVertexNormals()
+          // 頂点色で土／枯草／斜面の土が覗くムラ＝のっぺりした砂土を脱す（城下町なのでhomeより乾いた土寄り）。
+          const snowE = season === 'winter'
+          bakeGroundVColors(gI, ex, ez,
+            snowE ? 0xdde3dc : season === 'autumn' ? 0x9a8a4e : season === 'spring' ? 0x86984e : 0x86864c, // 草地（乾いた緑）
+            snowE ? 0xd2d8d2 : season === 'autumn' ? 0x9a8048 : 0x9a8c5a, // 乾いた地肌
+            snowE ? 0xcdd2cc : 0x8a7448, 0.6) // 斜面の土
+          const em = mottleMat(0xffffff, 150, 0.09, [20, 20]); em.vertexColors = true
+          if (em.map) { em.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); em.map.needsUpdate = true }
+          const gmesh = new THREE.Mesh(gI, em); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
         // 城下の田畑・草地（地面に緑/黄の区画を点在＝のっぺりした砂色を脱す）
         { const fieldCols = season === 'autumn' ? [0xb89a4a, 0x9a8848, 0x8a7a40] : season === 'winter' ? [0xd8dcd6, 0xc8ccc4, 0xb8b0a0] : season === 'spring' ? [0x8aa84e, 0x7a9a44, 0x9ab058] : [0x6e8a48, 0x7e9450, 0x5e7a40]
           for (let k = 0; k < 68; k++) { const a = R() * 6.28, rr = 26 + R() * 80, fx = ex + Math.cos(a) * rr, fz = ez + Math.sin(a) * rr, fy = heightAt(fx, fz); if (fy < SEA.level + 2 || edoStream(fx, fz) < 6) continue
@@ -2911,7 +2936,7 @@ export async function mountTown3d(parent, opts = {}) {
         // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
         for (let k = 0; k < 26; k++) { const a = (k / 26) * 6.2832 + R() * 0.2, rr = 106 + R() * 5, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
         // ── 城下を蛇行する小川（平底の河床＋河川敷の草＋木の橋）＝平らな台地に水辺の自然 ──
-        { const wmat = new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4e5c66 : 0x9fbcca, fog: true })
+        { const wmat = freshWater(new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4e5c66 : 0x9fbcca, fog: true }))
           const grassC = season === 'winter' ? 0xb8c0b6 : season === 'autumn' ? 0x9a8a52 : 0x6e8a48
           let prev = null
           for (let s = 0; s <= 26; s++) { const edd = 24 + s * ((EDO.r - 14 - 24) / 26), ang = 1.15 + Math.sin(edd * 0.085) * 0.34, px = ex + Math.cos(ang) * edd, pz = ez + Math.sin(ang) * edd, py = heightAt(px, pz)
@@ -3235,7 +3260,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         // ── 川（谷を南北に蛇行し、南の河口で海へ注ぐ。水辺に城下町が沿う）──
-        { const rmat = new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x2c3842 : 0x52666c, fog: true }), rgeos = [], rM = new THREE.Matrix4(); let prev = null // 落ち着いた深い水色（明るい青を抑え「町が水に乗る」印象を弱める）
+        { const rmat = freshWater(new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x2c3842 : 0x52666c, fog: true })), rgeos = [], rM = new THREE.Matrix4(); let prev = null // 落ち着いた深い水色＋穏やかなきらめき（谷川の水辺）
           for (let s = 0; s <= 42; s++) { const zz = sz + 36 - s * 2.5, cl = senValley(zz), px = sx + cl, gh = senH(px, zz), py = Math.max(SEA.level - 0.1, gh) - 0.04
             if (gh > 8.5) break // 谷頭で止める（川が山へ登って見えるのを防ぐ＝水源は山の中）
             const wdt = Math.max(2.2, 5.0 - Math.max(0, gh - 1) * 0.45) // 上流ほど細る（水の主張を抑え川幅を絞る）
@@ -3476,7 +3501,16 @@ export async function mountTown3d(parent, opts = {}) {
         const tx = TAISHO.x, tz = TAISHO.z, gy = heightAt(tx, tz)
         { const isz = TAISHO.r * 2 + 6, gI = new THREE.PlaneGeometry(isz, isz, 66, 66); gI.rotateX(-Math.PI / 2); const pos = gI.attributes.position
           for (let i = 0; i < pos.count; i++) { const lx = pos.getX(i), lz = pos.getZ(i); pos.setY(i, heightAt(tx + lx, tz + lz) - gy) }
-          gI.computeVertexNormals(); const gmesh = new THREE.Mesh(gI, mottleMat(season === 'winter' ? 0xc9c8c2 : 0x9c948a, 220, 0.16, [7, 7])); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
+          gI.computeVertexNormals()
+          // 頂点色で土／苔草／斜面の地肌のムラ＝のっぺりした石土を脱す（港町なので緑控えめ・石土寄り）。
+          const snowT = season === 'winter'
+          bakeGroundVColors(gI, tx, tz,
+            snowT ? 0xcfd0ca : season === 'autumn' ? 0x90884e : 0x86905a, // 苔/草地
+            snowT ? 0xc9c8c2 : 0x9c948a, // 石土
+            snowT ? 0xc2c2bc : 0x8a7e68, 0.72) // 斜面の地肌
+          const tm = mottleMat(0xffffff, 150, 0.08, [22, 22]); tm.vertexColors = true
+          if (tm.map) { tm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); tm.map.needsUpdate = true }
+          const gmesh = new THREE.Mesh(gI, tm); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
         // ── 運河（港から内陸へ引かれた石積みの水路＋石橋）＝大正の港町の水辺 ──
         { const cz0 = tz + 17, stone = mottleMat(0x9a948a, 150, 0.12, [2, 1])
           // 運河の水面＝空を映す水鏡(MeshToon＋空グラデ＋朝日の照り返し＋さざ波)。フラットなMeshBasicの「紙」を脱す（評価指摘）。
@@ -3486,7 +3520,7 @@ export async function mountTown3d(parent, opts = {}) {
           const csg = ccx.createLinearGradient(20, 64, 44, 0); csg.addColorStop(0, 'rgba(255,255,255,0)'); csg.addColorStop(0.5, '#' + sunCol.clone().lerp(new THREE.Color(0xffffff), 0.2).getHexString()); csg.addColorStop(1, 'rgba(255,255,255,0)'); ccx.globalAlpha = 0.34; ccx.fillStyle = csg; ccx.fillRect(0, 0, 64, 64); ccx.globalAlpha = 1
           for (let i = 0; i < 36; i++) { ccx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.06})`; ccx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) }
           const canalTex = new THREE.CanvasTexture(ccv); canalTex.wrapS = canalTex.wrapT = THREE.RepeatWrapping
-          const cwmat = new THREE.MeshToonMaterial({ map: canalTex, gradientMap: grad, color: isNight ? 0x5e6f7e : 0xaccad8, fog: true }) // 青みを残す＝空を映しつつ俯瞰でも「水」と読める(淡白だと上から街に溶ける)
+          const cwmat = freshWater(new THREE.MeshToonMaterial({ map: canalTex, gradientMap: grad, color: isNight ? 0x5e6f7e : 0xaccad8, fog: true })) // 青みを残す＋穏やかなきらめき（運河の水辺で映える）
           for (let cx0 = -TAISHO.r + 8; cx0 <= 28; cx0 += 5) { const px = tx + cx0, cy = heightAt(px, cz0)
             const w = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 6.4), cwmat); w.rotation.x = -Math.PI / 2; w.position.set(px, cy + 0.28, cz0); town.add(w) // 水面（広い水路＝俯瞰に水の青と反射を、地上に水辺の散歩を）
             for (const side of [-1, 1]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.2, 0.7), stone); wall.position.set(px, cy + 1.0, cz0 + 3.6 * side); wall.castShadow = true; town.add(wall) } } // 石積みの護岸
