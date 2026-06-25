@@ -35,8 +35,10 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 音はCC0/既存の流用（秋の虫の音）。出典は CREDITS.md に記録済み。
+  // 音はCC0/既存の流用（秋の夕暮れ＝虫の音＋鈴虫＋木々を渡る風）。出典は CREDITS.md に記録済み。
   sounds: [
-    { id: 'crickets', label: '虫の音', src: 'audio/autumn-dusk-corner-room/crickets.mp3', gain: 0.45, loop: true },
+    { id: 'crickets', label: '虫の音', src: 'audio/autumn-dusk-corner-room/crickets.mp3', gain: 0.42, loop: true },
+    { id: 'suzumushi', label: '鈴虫', src: 'audio/kitaterao-window-3d-night/suzumushi.mp3', gain: 0.26, loop: true },
+    { id: 'wind', label: '木々の風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.12, loop: true },
   ],
 }

@@ -35,9 +35,10 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 音はCC0/既存の流用（うぐいす・小川）。出典は CREDITS.md に記録済み。
+  // 音はCC0/既存の流用（うぐいす・小川・遠くの蛙）。出典は CREDITS.md に記録済み。
   sounds: [
     { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.4, loop: true },
-    { id: 'stream', label: 'せせらぎ', src: 'audio/shishigaya-morning-yato/stream.mp3', gain: 0.4, loop: true },
+    { id: 'stream', label: 'せせらぎ', src: 'audio/shishigaya-morning-yato/stream.mp3', gain: 0.36, loop: true },
+    { id: 'frogs', label: '遠くの蛙', src: 'audio/spring-dusk-corner-room/frogs.mp3', gain: 0.14, loop: true },
   ],
 }
