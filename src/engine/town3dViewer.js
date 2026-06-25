@@ -7710,6 +7710,7 @@ export async function mountTown3d(parent, opts = {}) {
         for (const fs of festivalSpots) { const d = Math.hypot(lx2 - fs.x, lz2 - fs.z); festAmt = Math.max(festAmt, Math.pow(Math.max(0, Math.min(1, (FEST_AUDIBLE - d) / FEST_AUDIBLE)), 1.7)) }
         if (out) festAmt *= Math.max(0, Math.min(1, (60 - Math.max(0, fp.y - SEA.level)) / 50)) // 飛行は高いほど静か（窓辺は等倍）
       }
+      if (rainActive) festAmt = 0 // 通り雨の間は祭りの囃子をしぼる（雨が降ったら祭りは中断＝現実忠実・実機FB）
       // 駅の音＝駅に近づくと発車ベル・電車の通過音が満ちる（歩行/低空で）。谷戸には駅が無い。
       let staAmt = 0
       if (kind !== 'yato') {
