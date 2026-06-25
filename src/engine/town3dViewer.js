@@ -2530,8 +2530,35 @@ export async function mountTown3d(parent, opts = {}) {
         for (const m of [foot, post, fire, cap]) { m.castShadow = true; lan.add(m) }
         grp.add(lan)
       }
+      // ── 狛犬×2（参道を守る阿吽の対）。石の台座＋うずくまる体＋頭＝神社の風格。R()不使用で生成列を保つ。──
+      for (const kx of [-2.7, 2.7]) {
+        const kd = new THREE.Group(); kd.position.set(kx, 0.9, 3.9)
+        const ped = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.0, 0.86), stoneMat); ped.position.y = 0.5; ped.castShadow = true; kd.add(ped) // 台座
+        const bodyK = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.66, 0.86), stoneMat); bodyK.position.set(0, 1.32, -0.04); bodyK.castShadow = true; kd.add(bodyK) // 座した体
+        const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.25, 0.62, 8), stoneMat); chest.position.set(0, 1.1, 0.34); chest.castShadow = true; kd.add(chest) // 前脚
+        const headK = new THREE.Mesh(new THREE.IcosahedronGeometry(0.33, 1), stoneMat); headK.position.set(0, 1.78, 0.28); headK.castShadow = true; kd.add(headK) // 頭
+        kd.rotation.y = kx > 0 ? -0.22 : 0.22 // 参道側へ少し向く
+        grp.add(kd)
+      }
+      // ── 賽銭箱＋鈴＋鈴緒（拝殿の正面＝お参りの中心）。──
+      const saisen = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 0.95), toon(0x6a5236)); saisen.position.set(0, 1.0, -1.6); saisen.castShadow = true; grp.add(saisen) // 賽銭箱
+      const saiTop = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.14, 1.06), toon(0x463726)); saiTop.position.set(0, 1.43, -1.6); grp.add(saiTop) // 格子の天板
+      const suzu = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), toon(0xc9a544)); suzu.position.set(0, 2.95, -1.85); suzu.castShadow = true; grp.add(suzu) // 鈴（真鍮）
+      const suzuo = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.25, 6), toon(0xc4473a)); suzuo.position.set(0, 2.28, -1.82); grp.add(suzuo) // 鈴緒（紅白の綱・簡略）
+      // ── 注連縄＋紙垂（鳥居に渡す＝結界の気配）。──
+      const shime = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 5.0, 7), toon(0xcfc09a)); shime.rotation.z = Math.PI / 2; shime.position.set(0, 5.42, 5.2); grp.add(shime) // 注連縄
+      for (const sd of [-1.5, 0, 1.5]) { const shide = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.04), toon(0xf2f0e8)); shide.position.set(sd, 5.08, 5.2); grp.add(shide) } // 紙垂（白い紙の稲妻）
+      // ── 絵馬掛け（願いの木札がずらり＝彩りと祈りの気配）。──
+      { const ema = new THREE.Group(); ema.position.set(4.2, 0.0, 2.0); ema.rotation.y = -0.6
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 0.12), woodMat); bar.position.y = 1.42; ema.add(bar)
+        for (const lx2 of [-1.15, 1.15]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.5, 6), woodMat); leg.position.set(lx2, 0.75, 0); leg.castShadow = true; ema.add(leg) }
+        const emaCols = [0xd8a24a, 0xc06a48, 0xdcc27a, 0xb6884a, 0xcf9a52]
+        for (let i = 0; i < 8; i++) { const board = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.21, 0.03), toon(emaCols[i % 5])); board.position.set(-1.08 + i * 0.31, 1.22, 0.05); board.rotation.z = (i % 2 ? 0.06 : -0.05); ema.add(board) } // 絵馬の木札
+        grp.add(ema)
+      }
       town.add(grp)
-      for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283, rr = 7.5 + R() * 3.5; tree(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr, 1.5 + R() * 0.8) } // 鎮守の森
+      const sandoAng = Math.atan2(-sz, -sx) // 参道（街の中心）へ向く角度＝この方角は木を寄せて社殿/鳥居の正面を開ける
+      for (let i = 0; i < 12; i++) { let a = i / 12 * 6.283; const da = Math.atan2(Math.sin(a - sandoAng), Math.cos(a - sandoAng)); if (Math.abs(da) < 0.55) a = sandoAng + (da < 0 ? -0.6 : 0.6); const rr = 8.5 + R() * 3.5; tree(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr, 1.5 + R() * 0.8) } // 鎮守の森（参道の正面は開ける・少し外周へ）
       colliders.push({ x: sx, z: sz - 3.5, r: 3.2 }) // 歩行: 社殿には入らない
     }
 
