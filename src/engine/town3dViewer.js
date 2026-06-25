@@ -6647,7 +6647,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
-    birds: { run: evBirdFlock },
+    birds: { run: evBirdFlock, ok: () => !rainActive }, // 通り雨の間は鳥は飛ばさない（雨宿り＝現実忠実）
     balloon: { run: evBalloon, ok: () => !isNight && weather !== 'rain' && !rainActive }, // 気球は雨では飛ばさない（現実忠実）
     star: { run: evShootingStars, ok: () => isNight && weather !== 'rain' && weather !== 'snow' && !rainActive }, // 流れ星は雨/雪の曇天では見えない
     contrail: { run: evContrail },
