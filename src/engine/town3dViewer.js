@@ -933,6 +933,30 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const tileMat = (hex, repU, repV, dbl) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeTileTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); if (dbl) m.side = THREE.DoubleSide; return m }
+  // ── 石垣（野面積み）のテクスチャ。城の裾広がりの石垣は瓦テクスチャの流用だと「滑らかな横縞」に見える＝近接で安っぽい。
+  //    段ごとに半石ずらした不揃いの石（布積み）＋暗い目地＋上下のコバの陰影で、間近でも本物の石積みに。──
+  const makeStoneTex = (baseHex) => {
+    const W = 128, c = document.createElement('canvas'); c.width = c.height = W; const x = c.getContext('2d'), base = new THREE.Color(baseHex)
+    x.fillStyle = '#' + base.clone().offsetHSL(0, 0, -0.08).getHexString(); x.fillRect(0, 0, W, W) // 目地（暗い下地）
+    const rows = 7, rh = W / rows
+    for (let r = 0; r < rows; r++) {
+      const y0 = r * rh, off = (r % 2) * (W / 9) // 段ごとに半石ずらす（布積み）
+      let xx = -off
+      while (xx < W) {
+        const sw = (W / 6) * (0.7 + R() * 0.8), m = 1.5 + R() * 1.2 // 石幅をばらつかせ（野面積み）＋目地の隙間
+        const px = xx + m, py = y0 + m, pw = sw - m * 2, ph = rh - m * 2
+        if (pw > 1 && ph > 1) {
+          x.fillStyle = '#' + base.clone().offsetHSL((R() - 0.5) * 0.02, (R() - 0.5) * 0.05, (R() - 0.5) * 0.13).getHexString(); x.fillRect(px, py, pw, ph) // 石ごとに色味をゆらす
+          x.fillStyle = 'rgba(255,255,255,0.09)'; x.fillRect(px, py, pw, 1)            // 上端の光
+          x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(px, py + ph - 1, pw, 1)         // 下端の影
+        }
+        xx += sw
+      }
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4
+    return t
+  }
+  const stoneMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeStoneTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
   // ── 看板（canvasで店名を描く＝オフラインで鮮明・時代ごとの字体。看板/のれん/ホーロー看板を立てる） ──
   const signCache = {}
   const signMat = (text, bg, fg, vertical, fontPx) => {
@@ -2971,7 +2995,7 @@ export async function mountTown3d(parent, opts = {}) {
         const moat = new THREE.Mesh(new THREE.RingGeometry(12, 20, 56), new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x4e5c66 : 0x9fbcca, fog: true })); moat.rotation.x = -Math.PI / 2; moat.position.set(ex, gy + 0.12, ez); town.add(moat) // 堀（青い水面＝上から水堀と読める。やや広く）
         for (const rr of [12, 20]) { const bank = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.35, 6, 44), toon(season === 'winter' ? 0x8e8b82 : 0x847d70)); bank.rotation.x = -Math.PI / 2; bank.position.set(ex, gy + 0.22, ez); town.add(bank) } // 石垣の護岸（内外の縁）
         const baseH = 7.5
-        const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), tileMat(season === 'winter' ? 0x908d84 : 0x8b8478, 7, 4, false)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台・石積みテクスチャ）
+        const ishi = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 12.5, baseH, 4), stoneMat(season === 'winter' ? 0x908d84 : 0x8b8478, 5, 5)); ishi.rotation.y = Math.PI / 4; ishi.position.set(ex, gy + baseH / 2, ez); ishi.castShadow = true; ishi.receiveShadow = true; town.add(ishi); town.add(addOutline(ishi)) // 石垣（裾広がりの四角錐台・野面積みの石テクスチャ＝近接で本物の石積み）
         for (const f of [0.26, 0.52, 0.78]) { const r = 12.5 + (9.5 - 12.5) * f; const cs = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.05, r + 0.12, 0.16, 4), toon(0x6f6b62)); cs.rotation.y = Math.PI / 4; cs.position.set(ex, gy + baseH * f, ez); town.add(cs) } // 石の段（横の石組み）
         const wallC = toon(season === 'winter' ? 0xf1ede3 : 0xebe5d7), roofC = toon(season === 'winter' ? (isNight ? 0x6e7782 : 0x9aa3ab) : (isNight ? 0x29303a : 0x3a434e)) // 冬は屋根に雪化粧
         const litMat = new THREE.MeshBasicMaterial({ color: 0xf0bd72, fog: true }) // 夜に灯る障子/窓の暖色
@@ -3306,7 +3330,7 @@ export async function mountTown3d(parent, opts = {}) {
         // ── 城は中央の急峰でなく、東尾根の中腹の平場(bluff)に建つ＝「真ん中に城が奇妙」を解消。石垣の段に天守。──
         const sWall = mottleMat(season === 'winter' ? 0x6e665c : 0x4a3f30, 150, 0.16, [1.4, 1.4]), sRoof = mottleMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x232730 : 0x34383f), 150, 0.12, [1.8, 1.8]) // 黒い板張りの木目＋黒瓦の濃淡（冬は雪化粧）
         const bx = sx + senBluff.dx, bz = sz + senBluff.dz, bgY = senH(bx, bz)
-        for (const [cr, ch] of [[10.5, 2.6], [7, 2.4]]) { const ku = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1.2, cr, ch, 7), tileMat(season === 'winter' ? 0x9aa0a2 : 0x8a8278, 7, 2, false)); ku.rotation.y = 0.3; ku.position.set(bx, bgY + ch / 2 - 0.4, bz); ku.castShadow = true; ku.receiveShadow = true; town.add(ku); town.add(addOutline(ku)) } // 石垣の段（平場の土台）
+        for (const [cr, ch] of [[10.5, 2.6], [7, 2.4]]) { const ku = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1.2, cr, ch, 7), stoneMat(season === 'winter' ? 0x9aa0a2 : 0x8a8278, 6, 2)); ku.rotation.y = 0.3; ku.position.set(bx, bgY + ch / 2 - 0.4, bz); ku.castShadow = true; ku.receiveShadow = true; town.add(ku); town.add(addOutline(ku)) } // 石垣の段（平場の土台・野面積み）
         let yb = bgY + 4.2; const st = [[5.4, 3.4], [4.2, 2.9], [3.0, 2.5]]
         for (let i = 0; i < st.length; i++) {
           const w = st[i][0], h = st[i][1], rw = (w + 1.5) * 0.72, rh = 1.85
@@ -8087,9 +8111,14 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dShotAt = (cx, cy, cz, lx, ly, lz, fov) => { // 検証用: 任意のカメラ位置/注視点でシーンを正確に1枚撮る（飛行の三人称オフセット無し）
       const W = 640, H = 560
       const cam = new THREE.PerspectiveCamera(fov || 55, W / H, 0.1, 2200); cam.position.set(cx, cy, cz); cam.lookAt(lx, ly, lz)
+      // 空ドーム/太陽光輪はアニメ毎フレームでカメラへ追従する（L7685付近）。単発撮影はそれが走らず、
+      // 遠い時代エリア(原点から640)ではドーム外＝黒い虚空＋星が透けて夜のように写る。撮影前に追従位置を合わせ実機と一致させる。
+      const sdP = skyDome && skyDome.position.clone(); if (skyDome) skyDome.position.set(cx, cy, cz)
+      const sgP = sunGlow && sunGlow.position.clone(); if (sunGlow) sunGlow.position.set(cx + sunDir.x * 470, cy + sunDir.y * 470, cz + sunDir.z * 470)
       const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, cam)
       const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT)
+      if (skyDome && sdP) skyDome.position.copy(sdP); if (sunGlow && sgP) sunGlow.position.copy(sgP) // 追従位置を元へ戻す
       const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); const img = x.createImageData(W, H)
       for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); x.putImageData(img, 0, 0); rt.dispose()
       return c.toDataURL()

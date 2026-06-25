@@ -1,0 +1,10 @@
+import { chromium } from 'playwright'
+const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:440,height:860} })
+await p.goto('http://localhost:4920/seasons/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(2600)
+const win = await p.evaluate(()=>({calls:window.__renderer?.info?.render?.calls, tris:window.__renderer?.info?.render?.triangles}))
+await p.evaluate(()=>window.__town3dFlyPose(-10,26,10,Math.PI,-0.04)).catch(()=>{}); await p.waitForTimeout(2200)
+const fly = await p.evaluate(()=>({calls:window.__renderer?.info?.render?.calls, tris:window.__renderer?.info?.render?.triangles}))
+console.log('窓辺:', JSON.stringify(win)); console.log('飛行(丘):', JSON.stringify(fly))
+await b.close()

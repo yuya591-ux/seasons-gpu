@@ -1,14 +1,12 @@
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
-const b = await chromium.launch({ args:['--autoplay-policy=no-user-gesture-required'] })
-const p = await b.newPage()
-const errs=[]; p.on('pageerror',e=>errs.push(String(e)))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await p.locator('.gate').click().catch(()=>{})
-await p.waitForTimeout(1000)
-await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-sunset'))
-await p.waitForTimeout(4000) // 窓辺で安静
-const dbg = await p.evaluate(()=>window.__audio && window.__audio.getDebug && window.__audio.getDebug())
-console.log('audio debug (窓辺・安静):', JSON.stringify(dbg))
-console.log(errs.length?'ERR '+errs.slice(0,2):'no errors')
+const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:440,height:840} })
+const reqs=new Set(); const errs=[]
+p.on('response',r=>{const u=r.url(); if(u.includes('/audio/')&&u.endsWith('.mp3')) reqs.add(r.status()+' '+u.split('/audio/')[1])})
+p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>{if(m.type()==='error')errs.push(m.text().slice(0,80))})
+await p.goto('http://localhost:4920/seasons/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
+for(const id of ['photo-window-autumn','photo-window-spring','photo-window-night','kitaterao-window-3d-autumn']){ await p.evaluate(s=>window.__applyScene(s),id).catch(()=>{}); await p.waitForTimeout(2200) }
+await p.waitForTimeout(600)
+console.log([...reqs].join('\n'))
+console.log(errs.length?'ERR '+errs.slice(0,4).join('|'):'no console err')
 await b.close()
