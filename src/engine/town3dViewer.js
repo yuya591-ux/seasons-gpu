@@ -1066,9 +1066,28 @@ export async function mountTown3d(parent, opts = {}) {
       pos.setY(i, heightAt(x, z))
     }
     g.computeVertexNormals()
-    // 季節で地面の色を替える（雪=淡い白／春=新緑／秋=枯草／夏=くすんだ草地。蛍光緑を避ける）
-    const groundHex = weather === 'snow' ? 0xe2e8ec : season === 'spring' ? 0x93a35a : season === 'autumn' ? 0x9c8a4e : 0x8a9060
-    const ground = new THREE.Mesh(g, mottleMat(groundHex, 210, 0.15, [4, 4])) // 草地に大小のムラ＝絵画的な地面（反復を減らし大きな色斑を効かせる）
+    // 地面に頂点色で「大きな草地のムラ」を焼く＝タイル反復を断ち、平地は緑・斜面や乾き地は土が覗く自然な地面へ
+    // （実機FB: 広いベタ土＋ランダムな暗い染みが殺風景でテクスチャがずれて見える、への対応）。位置ベースの滑らかノイズで主R()は消費しない。
+    const snow = weather === 'snow'
+    const cGrass = new THREE.Color(snow ? 0xe8eef0 : season === 'spring' ? 0x8fb05a : season === 'autumn' ? 0xa6924c : 0x7f9a50) // 平地の草（くすませつつ少し豊かな緑）
+    const cDry = new THREE.Color(snow ? 0xdde4e7 : season === 'spring' ? 0xa9ab69 : season === 'autumn' ? 0x9c7f42 : 0x9b9560) // 乾いた草地
+    const cEarth = new THREE.Color(snow ? 0xd2d9dc : season === 'winter' ? 0x9c968c : 0x8a7550) // 斜面に覗く土
+    const nrm = g.attributes.normal, gcol = [], tmpG = new THREE.Color()
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i), ny = nrm.getY(i)
+      const slope = Math.max(0, Math.min(1, (1 - ny) * 3.0)) // 法線から傾斜（0平地〜1急）
+      const zone = 0.5 + 0.5 * Math.sin(x * 0.045 + 0.7) * Math.cos(z * 0.037 - 0.4) + 0.16 * Math.sin(x * 0.11 - z * 0.09) // 草むら/乾き地のゆらぎ（大スケール）
+      const dry = Math.max(0, Math.min(1, zone))
+      tmpG.copy(cGrass).lerp(cDry, dry * 0.66) // 草地→乾いた草地
+      tmpG.lerp(cEarth, slope * 0.82) // 斜面ほど土が覗く
+      const v = 0.95 + 0.1 * Math.sin(x * 0.7 + z * 0.55) // 細かな明暗（水彩の手触り）
+      gcol.push(tmpG.r * v, tmpG.g * v, tmpG.b * v)
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3))
+    // テクスチャは「細かい草目」を高反復で（大スケールは頂点色が担うのでタイル感が出ない）。grazing角を綺麗にする異方性も付与。
+    const gm = mottleMat(0xffffff, 150, 0.09, [18, 20]); gm.vertexColors = true
+    if (gm.map) { gm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); gm.map.needsUpdate = true }
+    const ground = new THREE.Mesh(g, gm)
     ground.receiveShadow = true
     town.add(ground)
   }

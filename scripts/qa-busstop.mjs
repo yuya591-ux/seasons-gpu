@@ -1,29 +1,26 @@
-// 駅前ロータリー＋バス停＋走るバスの確認。
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
+import { writeFileSync } from 'fs'
+const PORT = process.env.PORT || 4878
+const tag = process.argv[2] || 'after'
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-page.on('pageerror', (e) => console.log('PAGE EXCEPTION:', e.message))
-page.on('console', (m) => { if (m.type() === 'error') console.log('PAGE ERROR:', m.text()) })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+const page = await browser.newPage({ viewport: { width: 900, height: 440 } })
+await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
-await page.evaluate(() => window.__applyScene && window.__applyScene('kitaterao-window-3d'))
-await page.waitForTimeout(1800)
-await page.evaluate(() => window.__town3dWindow(true)); await page.waitForTimeout(1000)
-await page.evaluate(() => window.__town3dLean(true)); await page.waitForTimeout(1300)
-await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(400)
-await page.evaluate(() => window.__town3dCruise(false))
-await page.addStyleTag({ content: '.ui{display:none !important}' })
-
-// 駅前(ロータリー 31,-36／駅 34,-44)を真上ぎみから
-await page.evaluate(() => { window.__town3dZoom(1.1); window.__town3dFlyPose(32, 19, -38, 0, -1.15) })
-await page.waitForTimeout(700)
-await page.screenshot({ path: 'scripts/_shots/busstop-0.png' })
-
-// 中央の街道（バスを狙う）を上から
-await page.evaluate(() => { window.__town3dZoom(1.2); window.__town3dFlyPose(0, 24, -30, 0, -0.9) })
-for (let i = 0; i < 3; i++) { await page.waitForTimeout(1200); await page.screenshot({ path: `scripts/_shots/busstop-bus${i}.png` }) }
-
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2600)
+await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(500)
+const save = (name, durl) => writeFileSync(`scripts/_shots/${name}.png`, Buffer.from(durl.split(',')[1], 'base64'))
+// ロータリー/バス停(25,-37)付近の開けた地面を横長・eye高さで見渡す（横画面=実機landscape）
+const views = [
+  ['rotary', 31, -22, 31, -40],   // ロータリーを南から見る
+  ['busstop', 20, -30, 28, -44],  // バス停越しに開けを見る
+  ['eastopen', 45, -30, 55, -48], // 東の開け
+]
+for (const [n, cx, cz, lx, lz] of views) {
+  const gy = await page.evaluate(([x,z]) => window.__town3dGroundAt(x,z), [cx,cz])
+  const ly = await page.evaluate(([x,z]) => window.__town3dGroundAt(x,z), [lx,lz])
+  save(`bus_${tag}_${n}`, await page.evaluate(([cx,cz,gy,lx,lz,ly]) => window.__town3dShotAt(cx, gy+1.65, cz, lx, ly+1.0, lz, 70), [cx,cz,gy,lx,lz,ly]))
+  console.log(n, 'gy', gy.toFixed(2))
+}
 await browser.close()
-console.log('busstop shots done')
