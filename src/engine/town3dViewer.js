@@ -4762,12 +4762,14 @@ export async function mountTown3d(parent, opts = {}) {
         if (cwNodes.some((n) => Math.hypot(gx - n.x, gz - n.z) < n.r + 15)) continue // 回遊群島の島の周りはくぼませる
         if (cwBridges.some((br) => { const dx = br.bx - br.ax, dz = br.bz - br.az, L2 = dx * dx + dz * dz; let t = ((gx - br.ax) * dx + (gz - br.az) * dz) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(gx - (br.ax + dx * t), gz - (br.az + dz * t)) < br.halfW + 9 })) continue // 吊り橋の筋もくぼませる
         if (gaps.some((gp) => Math.hypot(gx - gp.x, gz - gp.z) < gp.r)) continue // 雲の切れ間（地上が覗く穴）
-        const jx = gx + (R() - 0.5) * step * 0.4, jz = gz + (R() - 0.5) * step * 0.4, baseY = (R() - 0.5) * 11
-        const sB = (LIGHT ? 19 : 15) + R() * 9
-        const gb = new THREE.IcosahedronGeometry(sB, 1); gb.scale(1, 0.46, 1); gb.translate(jx, baseY, jz); cloudTint(gb, -16, 42, seaLowC, seaHighC); seaGeos.push(gb) // 平たい底スラブ
-        const bumps = 1 + ((R() * 2) | 0)
-        for (let bI = 0; bI < bumps; bI++) { const sBu = sB * (0.5 + R() * 0.42), bx = jx + (R() - 0.5) * sB * 0.7, bz = jz + (R() - 0.5) * sB * 0.7, by = baseY + sB * 0.34 + R() * 4; const gg = new THREE.IcosahedronGeometry(sBu, 1); gg.scale(1, 0.72, 1); gg.translate(bx, by, bz); cloudTint(gg, -16, 42, seaLowC, seaHighC); seaGeos.push(gg) } // もくもくの頂
-        if (R() < 0.5) { const st = 4 + R() * 4, gt = new THREE.IcosahedronGeometry(st, 1); gt.scale(1, 0.8, 1); gt.translate(jx + (R() - 0.5) * sB * 0.5, baseY + sB * 0.5 + R() * 4, jz + (R() - 0.5) * sB * 0.5); cloudTint(gt, -16, 42, seaLowC, seaHighC); seaGeos.push(gt) } // 細かいカリフラワー
+        const jx = gx + (R() - 0.5) * step * 0.4, jz = gz + (R() - 0.5) * step * 0.4, baseY = (R() - 0.5) * 9
+        // やわらかな雲海＝大きめに重ねた広く平たい底＋低くゆるい膨らみ。個々の綿玉でなく、うねる雲の海として連続させる。
+        const sB = (LIGHT ? 20 : 18) + R() * 10
+        const hiJ = new THREE.Color(seaHighC).lerp(new THREE.Color(seaLowC), R() * 0.3).getHex() // 頂の明度を少し散らす＝のっぺり白を脱す（painterly）
+        const gb = new THREE.IcosahedronGeometry(sB, 1); gb.scale(1.18, 0.4, 1.18); gb.translate(jx, baseY, jz); cloudTint(gb, -16, 42, seaLowC, hiJ); seaGeos.push(gb) // 広く平たい底＝隣と重なって連続面に
+        const bumps = 1 + ((R() * 1.6) | 0)
+        for (let bI = 0; bI < bumps; bI++) { const sBu = sB * (0.6 + R() * 0.4), bx = jx + (R() - 0.5) * sB * 0.6, bz = jz + (R() - 0.5) * sB * 0.6, by = baseY + sB * 0.22 + R() * 3; const gg = new THREE.IcosahedronGeometry(sBu, 1); gg.scale(1.1, 0.54, 1.1); gg.translate(bx, by, bz); cloudTint(gg, -16, 42, seaLowC, hiJ); seaGeos.push(gg) } // 低くゆるい膨らみ
+        if (R() < 0.3) { const st = 5 + R() * 4, gt = new THREE.IcosahedronGeometry(st, 1); gt.scale(1.1, 0.64, 1.1); gt.translate(jx + (R() - 0.5) * sB * 0.5, baseY + sB * 0.38 + R() * 3, jz + (R() - 0.5) * sB * 0.5); cloudTint(gt, -16, 42, seaLowC, hiJ); seaGeos.push(gt) } // 控えめな頂
       }
     }
     const seaMerged = BufferGeometryUtils.mergeGeometries(seaGeos, false); seaGeos.forEach((g) => g.dispose())
