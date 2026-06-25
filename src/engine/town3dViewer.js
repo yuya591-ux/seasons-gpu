@@ -850,9 +850,14 @@ export async function mountTown3d(parent, opts = {}) {
       x.fillStyle = '#' + col.getHexString()
       x.beginPath(); x.arc(R() * S, R() * S, 15 + R() * 58, 0, 6.283); x.fill()
     }
+    // 細かい粒子＝近接(主観視点)で読める手触り。遠目では反復が密でサブピクセル化し不変、近づくと土/舗装のザラつきが出る（実機FB: 近接で地面が平滑）。
+    for (let i = 0; i < n * 7; i++) { const dk = R() < 0.5; x.globalAlpha = 0.07 + R() * 0.12; x.fillStyle = dk ? '#000000' : '#ffffff'; const sp = 1 + R() * 2.2; x.fillRect(R() * S, R() * S, sp, sp) }
+    // ごく短いかすれ筋（ひび/轍の気配）をまばらに＝のっぺりした面に方向と用いられた跡
+    for (let i = 0; i < Math.round(n * 0.4); i++) { x.globalAlpha = 0.04 + R() * 0.05; x.strokeStyle = '#000000'; x.lineWidth = 0.6 + R() * 0.6; const sx2 = R() * S, sy2 = R() * S, an = R() * 6.283, ln = 6 + R() * 22; x.beginPath(); x.moveTo(sx2, sy2); x.lineTo(sx2 + Math.cos(an) * ln, sy2 + Math.sin(an) * ln); x.stroke() }
     x.globalAlpha = 1
     const t = new THREE.CanvasTexture(c)
     t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.anisotropy = 4
     return t
   }
   const mottleMat = (baseHex, n, spread, rep) => {
@@ -1146,7 +1151,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     g.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3))
     // テクスチャは「細かい草目」を高反復で（大スケールは頂点色が担うのでタイル感が出ない）。grazing角を綺麗にする異方性も付与。
-    const gm = mottleMat(0xffffff, 150, 0.09, [18, 20]); gm.vertexColors = true
+    const gm = mottleMat(0xffffff, 150, 0.1, [42, 46]); gm.vertexColors = true // 反復を上げ近接(主観視点)で地面の細部が出る（粗い反復は1タイル超拡大で平滑にボケる）
     if (gm.map) { gm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); gm.map.needsUpdate = true }
     const ground = new THREE.Mesh(g, gm)
     ground.receiveShadow = true
@@ -1607,7 +1612,7 @@ export async function mountTown3d(parent, opts = {}) {
       house(px, pz, w, d, h, R() < 0.5 ? 'apt' : 'mid')
     }
     // 駅前広場/大通りの石畳（副都心の足元を均す）と街路樹
-    const plaza = new THREE.Mesh(new THREE.CircleGeometry(DOWNTOWN.r - 4, 28), mottleMat(season === 'winter' ? 0xc6cac6 : 0x8e8a84, 110, 0.1, [5, 5])); plaza.rotation.x = -Math.PI / 2; plaza.position.set(dcx, heightAt(dcx, dcz) + 0.05, dcz); plaza.receiveShadow = true; town.add(plaza)
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(DOWNTOWN.r - 4, 28), mottleMat(season === 'winter' ? 0xc6cac6 : 0x8e8a84, 110, 0.13, [13, 13])); plaza.rotation.x = -Math.PI / 2; plaza.position.set(dcx, heightAt(dcx, dcz) + 0.05, dcz); plaza.receiveShadow = true; town.add(plaza) // 反復を上げ近接で舗装の質感（5→13）
     const dgC = season === 'spring' ? 0x7faa56 : season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xcdd6d2 : 0x5e7e46
     for (let k = 0; k < 12; k++) { const a = R() * 6.28, rr = 14 + R() * 12, px = dcx + Math.cos(a) * rr, pz = dcz + Math.sin(a) * rr, py = heightAt(px, pz); if (py < SEA.level + 1) continue; const s = 0.8 + R() * 0.4; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 1.6 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.8 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 * s, 1), toon(dgC)); fo.position.set(px, py + 2.0 * s, pz); fo.castShadow = true; town.add(fo) } // 街路樹
   }
@@ -2934,7 +2939,7 @@ export async function mountTown3d(parent, opts = {}) {
             snowE ? 0xdde3dc : season === 'autumn' ? 0x9a8a4e : season === 'spring' ? 0x86984e : 0x86864c, // 草地（乾いた緑）
             snowE ? 0xd2d8d2 : season === 'autumn' ? 0x9a8048 : 0x9a8c5a, // 乾いた地肌
             snowE ? 0xcdd2cc : 0x8a7448, 0.6) // 斜面の土
-          const em = mottleMat(0xffffff, 150, 0.09, [20, 20]); em.vertexColors = true
+          const em = mottleMat(0xffffff, 150, 0.1, [44, 44]); em.vertexColors = true // 反復を上げ近接で地面の細部（過拡大の平滑を脱す）
           if (em.map) { em.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); em.map.needsUpdate = true }
           const gmesh = new THREE.Mesh(gI, em); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
         // 城下の田畑・草地（地面に緑/黄の区画を点在＝のっぺりした砂色を脱す）
@@ -3541,7 +3546,7 @@ export async function mountTown3d(parent, opts = {}) {
             snowT ? 0xcfd0ca : season === 'autumn' ? 0x90884e : 0x86905a, // 苔/草地
             snowT ? 0xc9c8c2 : 0x9c948a, // 石土
             snowT ? 0xc2c2bc : 0x8a7e68, 0.72) // 斜面の地肌
-          const tm = mottleMat(0xffffff, 150, 0.08, [22, 22]); tm.vertexColors = true
+          const tm = mottleMat(0xffffff, 150, 0.1, [46, 46]); tm.vertexColors = true // 反復を上げ近接で地面の細部（過拡大の平滑を脱す）
           if (tm.map) { tm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); tm.map.needsUpdate = true }
           const gmesh = new THREE.Mesh(gI, tm); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
         // ── 運河（港から内陸へ引かれた石積みの水路＋石橋）＝大正の港町の水辺 ──
