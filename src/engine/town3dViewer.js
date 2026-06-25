@@ -3285,7 +3285,7 @@ export async function mountTown3d(parent, opts = {}) {
         // ── 城は中央の急峰でなく、東尾根の中腹の平場(bluff)に建つ＝「真ん中に城が奇妙」を解消。石垣の段に天守。──
         const sWall = mottleMat(season === 'winter' ? 0x6e665c : 0x4a3f30, 150, 0.16, [1.4, 1.4]), sRoof = mottleMat(season === 'winter' ? (isNight ? 0x7a828a : 0xa8b0b6) : (isNight ? 0x232730 : 0x34383f), 150, 0.12, [1.8, 1.8]) // 黒い板張りの木目＋黒瓦の濃淡（冬は雪化粧）
         const bx = sx + senBluff.dx, bz = sz + senBluff.dz, bgY = senH(bx, bz)
-        for (const [cr, ch] of [[10.5, 2.6], [7, 2.4]]) { const ku = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1.2, cr, ch, 7), toon(season === 'winter' ? 0x9aa0a2 : 0x8a8278)); ku.rotation.y = 0.3; ku.position.set(bx, bgY + ch / 2 - 0.4, bz); ku.castShadow = true; ku.receiveShadow = true; town.add(ku); town.add(addOutline(ku)) } // 石垣の段（平場の土台）
+        for (const [cr, ch] of [[10.5, 2.6], [7, 2.4]]) { const ku = new THREE.Mesh(new THREE.CylinderGeometry(cr - 1.2, cr, ch, 7), tileMat(season === 'winter' ? 0x9aa0a2 : 0x8a8278, 7, 2, false)); ku.rotation.y = 0.3; ku.position.set(bx, bgY + ch / 2 - 0.4, bz); ku.castShadow = true; ku.receiveShadow = true; town.add(ku); town.add(addOutline(ku)) } // 石垣の段（平場の土台）
         let yb = bgY + 4.2; const st = [[5.4, 3.4], [4.2, 2.9], [3.0, 2.5]]
         for (let i = 0; i < st.length; i++) {
           const w = st[i][0], h = st[i][1], rw = (w + 1.5) * 0.72, rh = 1.85
