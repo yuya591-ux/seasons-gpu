@@ -4093,8 +4093,8 @@ export async function mountTown3d(parent, opts = {}) {
       const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping
       return new THREE.MeshToonMaterial({ color: 0xffffff, map: t, gradientMap: grad, fog: true }) // トゥーンで陰影を乗せ白飛びを防ぐ
     }
-    const waterMat = makeWaterMirror(0.34)  // 水を張った田（空を映す水鏡）
-    const waterSun = makeWaterMirror(0.58)  // 朝日を照り返す明るい水面
+    const waterMat = freshWater(makeWaterMirror(0.34))  // 水を張った田（空を映す水鏡＋穏やかなきらめき）
+    const waterSun = freshWater(makeWaterMirror(0.58))  // 朝日を照り返す明るい水面＋きらめき
     // 青田（田植え後の稲の条が整然と並ぶ緑＝俯瞰で「田んぼ」と読ませる。ベタ緑を脱す）。
     const ric = document.createElement('canvas'); ric.width = ric.height = 64
     const rix = ric.getContext('2d')
