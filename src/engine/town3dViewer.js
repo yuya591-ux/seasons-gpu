@@ -657,6 +657,9 @@ export async function mountTown3d(parent, opts = {}) {
   // ホームの目の前の広場＆街への入口（商店街ゲート手前）の広場。馴染みの広場。夏は日替わりでどちらか一方が盆踊りに。
   const PLAZA_HOME = { x: 0, z: 6, r: 6 }   // 窓のすぐ前の広場
   const PLAZA_GATE = { x: 0, z: -6, r: 6 }  // 入口が広くなった広場（ゲートの手前）
+  // 夏祭りの会場（やぐら/提灯/屋台）。木立が会場に食い込まないよう、ここを空ける（公園と学校の校庭。やまゆり/広場は各々の用地で既に空く）。
+  const FEST_ZONES = [{ x: PARK.x, z: PARK.z - 9, r: 11.5 }, { x: SCHOOL.x, z: SCHOOL.z + 4, r: 6.8 }]
+  const inFestZone = (x, z) => FEST_ZONES.some((f) => Math.hypot(x - f.x, z - f.z) < f.r)
   // 遊園地（既存の観覧車を中心に）。メリーゴーラウンド・遊具・ゲート＝明るい賑わいの目的地。
   const FUN = { x: -26, z: -66, r: 13 }
   // 副都心（拡張した西の一角＝ガラスの高層ビル街）。旗艦homeの現代的な核＝街のスカイライン。飛んでいく目的地。
@@ -2259,6 +2262,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < TEMPLE.r - 2) continue // 寺は専用の木立で囲む
       if (Math.hypot(x - SCHOOL.x, z - SCHOOL.z) < SCHOOL.r - 1) continue // 学校は校庭を空ける
       if (Math.hypot(x - YAMAYURI.x, z - YAMAYURI.z) < YAMAYURI.r - 1) continue // やまゆりホームの前庭は専用に
+      if (inFestZone(x, z)) continue // 祭り会場（やぐら/提灯/屋台が木に食い込まないよう空ける）
       if (Math.hypot(x - PLAZA_HOME.x, z - PLAZA_HOME.z) < PLAZA_HOME.r) continue // 目の前の広場は空ける
       if (Math.hypot(x - PLAZA_GATE.x, z - PLAZA_GATE.z) < PLAZA_GATE.r) continue // 入口の広場は空ける
       if (Math.hypot(x - FUN.x, z - FUN.z) < FUN.r - 1) continue // 遊園地は空ける
@@ -2427,11 +2431,11 @@ export async function mountTown3d(parent, opts = {}) {
         for (const sx2 of [-0.8, 0.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.46), toon(0x6a5a48)); leg.position.set(sx2, 0.25, 0); bg.add(leg) }
       }
       // 公園の縁を低めの木立で囲む（広場の輪郭。中央の池・橋・桜は開けておく＝水面が見える）
-      for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3, rr = PARK.r - 0.4 + R() * 0.8; tree(px0 + Math.cos(a) * rr, pz0 + Math.sin(a) * rr, 0.8 + R() * 0.4) }
+      for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + 0.3, rr = PARK.r - 0.4 + R() * 0.8, tx = px0 + Math.cos(a) * rr, tz = pz0 + Math.sin(a) * rr; if (inFestZone(tx, tz)) continue; tree(tx, tz, 0.8 + R() * 0.4) } // 祭り会場（北）には木立を置かない
       colliders.push({ x: px0, z: pz0, r: pondR * 0.85 }) // 歩行: 池には入らない
       spawnAvoid.push({ x: px0, z: pz0, r: pondR + 1.5 }) // 着地: 池に降りない
-      // ── 夏祭り（公園の北の開けた所を会場に）。夏の夕夜・日替わりで開催。id=0 ──
-      if (festOn(0)) makeFestival(px0, pz0 - 9) // 池の北
+      // ── 夏祭り（公園の南の開けた所を会場に）。夏の夕夜・日替わりで開催。狭い公園に収まるようコンパクトに。id=0 ──
+      if (festOn(0)) makeFestival(px0, pz0 - 10, 0.62) // 池の南（屋台が池/木立に食い込まないよう縮小＋南へ）
     }
 
     // ── 展望塔（谷を見はるかす街の塔）。高く昇って並ぶ目印・飛んで上がる目的地。──
@@ -2615,6 +2619,7 @@ export async function mountTown3d(parent, opts = {}) {
       // 桜並木（校門から校舎へ）。季節で姿が変わる（春=桜・夏=緑・秋=紅葉・冬=雪枝）。
       const schBlossom = season === 'spring' ? 0xf0bcce : season === 'autumn' ? 0xd6743a : season === 'winter' ? 0xe4eaf0 : 0x6f9a52
       for (const c of [[-6, 9], [6, 9], [-6, 4.5], [6, 4.5]]) {
+        if (inFestZone(cx + c[0], cz + c[1])) continue // 校庭の祭り会場（やぐら/屋台）に重なる桜は置かない
         const gy = heightAt(cx + c[0], cz + c[1]); const sg = new THREE.Group(); sg.position.set(cx + c[0], gy, cz + c[1]); town.add(sg)
         const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 7), toon(0x8a6a48)); tr.position.y = 1.1; tr.castShadow = true; sg.add(tr)
         const sakuraMat = toon(schBlossom)
