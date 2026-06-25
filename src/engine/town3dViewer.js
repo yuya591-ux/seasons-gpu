@@ -940,13 +940,17 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 生きもの（街/時代/季節で最適化・水彩のやさしい色）──
   const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.2, 7), new THREE.MeshToonMaterial({ color: col, gradientMap: grad, side: THREE.DoubleSide, transparent: true, opacity: 0.82, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) } // 羽は陰影付き(toon)＋わずかに透過＝霧/夕の中で煌々と浮かない
   const mkDragonfly = (cx, cy, cz, bodyCol = 0x46665a) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(bodyCol)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
-  // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーンで佇む。
+  // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーン。frameで尾を振り・首を傾げ・たまに数歩あるく（佇む人形にしない）。
+  const quads = []
   const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 3, 6), toon(col)); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25 * sc, 7, 6), toon(col)); head.position.set(0.58 * sc, 0.96 * sc, 0); g.add(head)
-    for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.7 * sc, 5), toon(col)); leg.position.set(lx * sc, 0.35 * sc, lz * sc); g.add(leg) }
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), toon(col)); tail.position.set(-0.55 * sc, 0.8 * sc, 0); tail.rotation.z = 0.7; g.add(tail)
-    town.add(g); return g }
+    const headG = new THREE.Group(); headG.position.set(0.58 * sc, 0.96 * sc, 0); g.add(headG) // 首振りの支点
+    headG.add(new THREE.Mesh(new THREE.SphereGeometry(0.25 * sc, 7, 6), toon(col)))
+    const legs = []
+    for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const legG = new THREE.Group(); legG.position.set(lx * sc, 0.7 * sc, lz * sc); g.add(legG); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.7 * sc, 5), toon(col)); leg.position.y = -0.35 * sc; legG.add(leg); legs.push(legG) } // 脚は股支点で振る
+    const tailG = new THREE.Group(); tailG.position.set(-0.55 * sc, 0.8 * sc, 0); g.add(tailG); const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), toon(col)); tail.position.y = -0.25 * sc; tail.rotation.z = 0.7; tailG.add(tail)
+    g.userData = { headG, tailG, legs, sc, hx: x, hz: z, face: ry, ph: Math.random() * 6.28, moving: false, tx: x, tz: z, moveT: 2 + Math.random() * 6, speed: 0.5 + Math.random() * 0.4 }
+    town.add(g); quads.push(g); return g }
   // 屋台/床店（市の賑わい＝着地の散歩で出会う活気）。柱＋差し掛け屋根＋商品台＋籠＋色とりどりの品＋暖簾。
   const makeStall = (x, gy, z, rot, opts = {}) => {
     const g = new THREE.Group(); g.position.set(x, gy, z); g.rotation.y = rot
@@ -6900,6 +6904,21 @@ export async function mountTown3d(parent, opts = {}) {
     if (teacups) { teacups.rotation.y += dt * 0.5; for (const cup of teacups.children) cup.rotation.y -= dt * 1.1 } // 台が回り、各カップは逆に回る
     for (const sp of steamPuffs) { const cy = (t * 0.5 + sp.ph) % 2.4, p = cy / 2.4; sp.mesh.position.y = sp.base + p * 1.7; sp.mesh.position.x = 0.4 + Math.sin(t * 1.3 + sp.ph) * 0.18; sp.mesh.material.opacity = 0.32 * Math.sin(p * Math.PI); sp.mesh.scale.setScalar(0.55 + p * 0.8) } // 屋台の湯気が立ちのぼる
     for (const d of festDancers) { const s = Math.sin(t * 1.5 + d.ph); d.arm.rotation.z = -0.3 - s * 0.55; d.d.position.y = d.y0 + Math.abs(s) * 0.07 } // 盆踊り: 腕を上げ下げし、体が弾む
+    // 犬猫馬: 尾を振り・首を傾げ・たまに数歩あるく（佇む人形にしない）。近いものだけ更新＝遠い時代の動物は止める。
+    for (const q of quads) { const u = q.userData
+      const qdx = q.position.x - active.flyPos.x, qdz = q.position.z - active.flyPos.z; if (qdx * qdx + qdz * qdz > 14000) continue
+      if (u.tailG) u.tailG.rotation.y = Math.sin(t * 2.4 + u.ph) * 0.35 // 尾を振る
+      if (u.headG) u.headG.rotation.y = Math.sin(t * 0.5 + u.ph) * 0.45 // 首を傾げて見回す
+      if (u.moving) {
+        const dx = u.tx - q.position.x, dz = u.tz - q.position.z, d = Math.hypot(dx, dz)
+        if (d < 0.18) { u.moving = false; u.moveT = 3 + Math.random() * 7 }
+        else { const step = Math.min(d, u.speed * dt), nx = q.position.x + dx / d * step, nz = q.position.z + dz / d * step
+          if (blockedAt(nx, nz)) { u.moving = false; u.moveT = 2 + Math.random() * 3 }
+          else { q.position.set(nx, heightAt(nx, nz), nz); u.face = Math.atan2(dx, dz); q.rotation.y = u.face; for (let li = 0; li < u.legs.length; li++) u.legs[li].rotation.x = Math.sin(t * 7 + u.ph + li * 1.6) * 0.5 } } // 脚を交互に運ぶ
+      } else { u.moveT -= dt; for (const lg of u.legs) lg.rotation.x *= 0.85 // 止まると脚を戻す
+        if (u.moveT <= 0) { const a = Math.random() * 6.28, rr = 1.5 + Math.random() * 3.5, nx = u.hx + Math.cos(a) * rr, nz = u.hz + Math.sin(a) * rr
+          if (heightAt(nx, nz) > SEA.level + 1 && !blockedAt(nx, nz)) { u.tx = nx; u.tz = nz; u.moving = true } else u.moveT = 1.5 + Math.random() * 2 } }
+    }
     for (const k of koinobori) { k.grp.rotation.y = Math.sin(t * 1.1 + k.ph) * 0.32; k.grp.rotation.z = 0.05 + Math.sin(t * 0.85 + k.ph) * 0.12 } // 鯉のぼりが風になびく
     for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
