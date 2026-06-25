@@ -34,6 +34,7 @@ export default {
   // 時間帯がduskなので、昼のアブラゼミ(ジリジリ)でなく夕方のヒグラシに（情景に合う蝉へ差し替え）。
   sounds: [
     { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.4, loop: true },
+    { id: 'suzumushi', label: '鈴虫', src: 'audio/kitaterao-window-3d-night/suzumushi.mp3', gain: 0.2, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.07, loop: true },
   ],
 }

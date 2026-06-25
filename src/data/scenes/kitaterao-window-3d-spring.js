@@ -34,6 +34,7 @@ export default {
   // 春のうぐいす＋やわらかな風（既存のCC0素材を再利用）。蛙のゲコゲコは街の情景に合わず不快なため差し替え。
   sounds: [
     { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.34, loop: true },
+    { id: 'frogs', label: '遠くの蛙', src: 'audio/spring-dusk-corner-room/frogs.mp3', gain: 0.13, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.1, loop: true },
   ],
 }
