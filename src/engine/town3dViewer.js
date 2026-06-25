@@ -6328,9 +6328,12 @@ export async function mountTown3d(parent, opts = {}) {
   // ════════════════════════════════════════════════════════════════════════
   const fxList = []
   const addFx = (fx) => { fx.age = 0; fxList.push(fx) }
+  // 材質＋そのテクスチャ(map等)を破棄。gradientMap(grad)は全トゥーン材で共有なので絶対に破棄しない。
+  // 注: イベントの map/alphaMap/emissiveMap はイベント固有(共有しない)＝破棄して安全＝GPUメモリのリークを防ぐ。
+  const disposeMat = (m) => { if (!m) return; for (const k of ['map', 'alphaMap', 'emissiveMap']) { const t = m[k]; if (t && t !== grad) t.dispose() } m.dispose() }
   const disposeObj = (o) => o.traverse((c) => {
     if (c.geometry) c.geometry.dispose()
-    const m = c.material; if (m) { Array.isArray(m) ? m.forEach((x) => x.dispose()) : m.dispose() }
+    const m = c.material; if (m) { Array.isArray(m) ? m.forEach(disposeMat) : disposeMat(m) }
   })
   const delayFx = (sec, fn) => addFx({ update: (age) => { if (age >= sec) { fn(); return false } return true }, cleanup: () => {} }) // sec秒後に1回実行
   function updateFx(dt) {
@@ -7567,6 +7570,7 @@ export async function mountTown3d(parent, opts = {}) {
       active.vel.x += (dvX - active.vel.x) * k
       active.vel.y += (dvY - active.vel.y) * k
       active.vel.z += (dvZ - active.vel.z) * k
+      if (!(Math.abs(active.vel.x) + Math.abs(active.vel.y) + Math.abs(active.vel.z) < 1e5)) active.vel.set(0, 0, 0) // 安全網: 速度が異常値(NaN/Inf)に化けたら停止（遷移時の固まり防止）
       // そよ風/突風＝空気が生きている。時々ふっと押される（横＋わずかに上）。山型に立ち上がって収まる＝自然な一陣。
       active.gustEnv = 0
       if (!isWalk) {
@@ -7620,6 +7624,7 @@ export async function mountTown3d(parent, opts = {}) {
         active.flyPos.z = Math.max(b.zMin, Math.min(b.zMax, active.flyPos.z))
         const floor = heightAt(active.flyPos.x, active.flyPos.z) + b.yFloor
         active.flyPos.y = Math.max(floor, Math.min(b.yMax, active.flyPos.y))
+        const fp = active.flyPos; if (!(fp.x === fp.x && fp.y === fp.y && fp.z === fp.z && Math.abs(fp.x) < 1e5 && Math.abs(fp.y) < 1e5 && Math.abs(fp.z) < 1e5)) { fp.set(0, 36, 50); active.vel.set(0, 0, 0); active.camReady = false } // 安全網: 位置が異常値(NaN/Inf)になったら安全な空へ戻す（遷移時の固まり防止）
       }
 
       // 旋回バンク（飛行のみ）：旋回（左スティックの曲がり＝yawV）に応じて世界が傾く＝飛翔の手応え。
@@ -7773,6 +7778,7 @@ export async function mountTown3d(parent, opts = {}) {
       // 高空を速く飛ぶと飛行機雲を引く（後ろへ。一定距離ごとに一粒を撒く）
       if (!isWalk && active.flyPos.y > 38 && speedMag > FLY.speed * 0.45) {
         trailAccum += speedMag * dt
+        if (!(trailAccum < 1e4)) trailAccum = 0 // 安全網: 速度が異常値(NaN/Inf)でも while が無限ループ＝フリーズしないよう上限で打ち切る
         const inv = 1 / Math.max(speedMag, 0.001)
         const tarr = trailGeo.attributes.position.array
         while (trailAccum > 2.5) {
