@@ -1739,6 +1739,7 @@ export async function mountTown3d(parent, opts = {}) {
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.4, 5), mastMatS); mast.position.set(0.3, 2.6, 0); boat.add(mast)
       const sail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 3.2, 1.9), sailMatS); sail.position.set(0.3, 2.3, 0.6); boat.add(sail)
       const jib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.0, 1.1), sailMatS); jib.position.set(0.3, 1.9, -0.7); boat.add(jib) // 前帆
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.34, 0.6), toon([0xc06a5a, 0x6a8db5, 0x82a878][Math.abs(Math.round(bx)) % 3])); flag.position.set(0.3, 4.55, -0.28); boat.add(flag) // マスト頂の三角旗（海を行く帆船らしさ）
       const wake = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 13), wakeMatS); wake.rotation.x = -Math.PI / 2; wake.position.set(0, 0.02, -7.5); boat.add(wake) // 引き波
       if (duskAmt > 0.12) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffd089, fog: true })); lamp.position.set(0.3, 1.7, -1.6); boat.add(lamp) } // 船尾の灯り（夕夜の海に温かい点）
       town.add(boat); boats.push(boat)
