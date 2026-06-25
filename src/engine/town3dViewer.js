@@ -1727,6 +1727,21 @@ export async function mountTown3d(parent, opts = {}) {
       if (i % 2 === 0) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6), toon(0x6a4f38)); tr.position.set(px - 2, py + 0.9, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e8a52)); fo.position.set(px - 2, py + 2.3, pz); fo.castShadow = true; town.add(fo) } }
   }
 
+  // ── 沖を行く帆船（home↔時代エリアの開けた海を渡る飛行に、穏やかな見どころの焦点を置く）。静的＋波にゆれるだけ＝発熱/リーク無し。R()不使用で生成列を保つ。──
+  if (kind !== 'yato') {
+    const hullMatS = toon(season === 'winter' ? 0xdcd6c8 : 0xcfc8ba), mastMatS = toon(0x7a7268), sailMatS = toon(0xeae4d6)
+    const wakeMatS = new THREE.MeshBasicMaterial({ color: season === 'winter' ? 0xdfe6ea : 0xdfeaef, transparent: true, opacity: 0.3, depthWrite: false, fog: true })
+    for (const [bx, bz, brot] of [[330, -210, 0.7], [455, -380, 2.3], [-250, -255, 1.2], [150, -335, -0.6], [-360, -430, 1.9]]) {
+      if (heightAt(bx, bz) > SEA.level - 1) continue // 念のため水上のみ（陸/島には置かない）
+      const boat = new THREE.Group(); boat.position.set(bx, SEA.level + 0.2, bz); boat.rotation.y = brot; boat.userData = { ph: Math.abs(bx + bz) % 6.28 }
+      const hull = new THREE.Mesh(new RoundedBoxGeometry(4.2, 0.9, 1.5, 1, 0.4), hullMatS); hull.position.y = 0.5; hull.castShadow = true; boat.add(hull)
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.4, 5), mastMatS); mast.position.set(0.3, 2.6, 0); boat.add(mast)
+      const sail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 3.2, 1.9), sailMatS); sail.position.set(0.3, 2.3, 0.6); boat.add(sail)
+      const jib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.0, 1.1), sailMatS); jib.position.set(0.3, 1.9, -0.7); boat.add(jib) // 前帆
+      const wake = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 13), wakeMatS); wake.rotation.x = -Math.PI / 2; wake.position.set(0, 0.02, -7.5); boat.add(wake) // 引き波
+      town.add(boat); boats.push(boat)
+    }
+  }
   // ── 自分の丘の近所（手前の両脇の家。緑だけの近景を埋め、自分も坂の街に居る感じに） ──
   for (const c of [[-13, 24], [13, 25], [-19, 19], [20, 20], [-10, 28], [11, 29]]) {
     house(c[0], c[1], 5 + R() * 1.5, 5 + R() * 1.5, 4 + R() * 2, R() < 0.7 ? 'house' : 'apt')
