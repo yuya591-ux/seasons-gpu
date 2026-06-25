@@ -3123,30 +3123,25 @@ export async function mountTown3d(parent, opts = {}) {
         const sx = SENGOKU.x, sz = SENGOKU.z, peak = senH(sx, sz)
         // 配置は全て senH(px,pz) に載せる＝うねる稜線と完全一致で何も浮かない。coneY は中央の城郭の段用（半径だけの近似＝山頂付近は平ら）。
         const coneY = (rr) => { const v = senH(sx + rr, sz); return v > -990 ? v : SEA.level }
-        // ── 山本体＝senH を極座標グリッドでサンプルした非対称メッシュ（対称Latheを置換）。稜線・谷・肩の小峰が立ち、頂点色で水彩の濃淡。──
+        // ── 山本体＝heightAt(=senH)をサンプルしたカルテシアンPlaneの地面（江戸/大正と同方式）。極座標メッシュは配置位置を覆えず家/人が宙に浮いたので置換。頂点色で谷の緑→尾根の岩。──
         {
-          const RINGS = 30, SEG = 58, vpos = [], vcol = [], idx = []
-          const cBase = new THREE.Color(season === 'winter' ? 0xcacfce : season === 'autumn' ? 0x6f5f37 : 0x4a6038) // 裾の緑（季節）
-          const cHigh = new THREE.Color(season === 'winter' ? 0xe6eaeb : 0x827e66) // 高所の岩肌/雪
+          const isz = senR * 2.9, SUB = 150, gI = new THREE.PlaneGeometry(isz, isz, SUB, SUB); gI.rotateX(-Math.PI / 2) // 細かい格子＝住民/家がsenHと一致し浮き/めり込みを根絶
+          const gp = gI.attributes.position, vcol = []
+          const cBase = new THREE.Color(season === 'winter' ? 0xcfd3cf : season === 'autumn' ? 0x7a6a3c : 0x57733e) // 裾の緑（はっきりした草地＝水色に見えるのを脱す）
+          const cHigh = new THREE.Color(season === 'winter' ? 0xe6eaeb : 0x867f64) // 高所の岩肌/雪
           const tmpC = new THREE.Color()
-          for (let i = 0; i <= RINGS; i++) {
-            const rr = Math.pow(i / RINGS, 1.05) * senR * 1.42
-            for (let j = 0; j <= SEG; j++) {
-              const ang = (j / SEG) * Math.PI * 2
-              const px = sx + Math.cos(ang) * rr, pz = sz + Math.sin(ang) * rr
-              let y = senH(px, pz); if (y < -990) y = SEA.floor - 1.5
-              vpos.push(Math.cos(ang) * rr, y, Math.sin(ang) * rr)
-              const hT = Math.max(0, Math.min(1, (y - 11) / 24)) // 谷底〜中腹は緑のまま(町の地面が水色に見えるのを防ぐ)、高い尾根だけ岩/雪へ
-              tmpC.copy(cBase).lerp(cHigh, hT * hT) // 高所ほど岩/雪
-              const sh = 0.84 + 0.16 * (0.5 + 0.5 * Math.sin(ang * 3.0 + rr * 0.12)) // 尾根筋のわずかな明暗（水彩のムラ）
-              vcol.push(tmpC.r * sh, tmpC.g * sh, tmpC.b * sh)
-            }
+          for (let i = 0; i < gp.count; i++) {
+            const wx = sx + gp.getX(i), wz = sz + gp.getZ(i)
+            let y = senH(wx, wz); if (y < -990) y = SEA.floor - 1.5
+            gp.setY(i, y - 0.05) // heightAt(配置)と完全一致（-0.05で家の床と僅かに重ね段差を消す）
+            const hT = Math.max(0, Math.min(1, (y - 11) / 24)) // 谷底〜中腹は緑、高い尾根だけ岩/雪へ
+            tmpC.copy(cBase).lerp(cHigh, hT * hT)
+            const sh = 0.86 + 0.14 * (0.5 + 0.5 * Math.sin(wx * 0.11 + wz * 0.08)) // 水彩のムラ
+            vcol.push(tmpC.r * sh, tmpC.g * sh, tmpC.b * sh)
           }
-          for (let i = 0; i < RINGS; i++) for (let j = 0; j < SEG; j++) { const a = i * (SEG + 1) + j, b = a + 1, c = a + (SEG + 1), d = c + 1; idx.push(a, c, b, b, c, d) }
-          const mg = new THREE.BufferGeometry()
-          mg.setAttribute('position', new THREE.Float32BufferAttribute(vpos, 3)); mg.setAttribute('color', new THREE.Float32BufferAttribute(vcol, 3)); mg.setIndex(idx); mg.computeVertexNormals()
+          gI.setAttribute('color', new THREE.Float32BufferAttribute(vcol, 3)); gI.computeVertexNormals()
           const mMat = toon(0xffffff); mMat.vertexColors = true
-          const mtn = new THREE.Mesh(mg, mMat); mtn.position.set(sx, 0, sz); mtn.castShadow = true; mtn.receiveShadow = true; town.add(mtn)
+          const mtn = new THREE.Mesh(gI, mMat); mtn.position.set(sx, 0, sz); mtn.receiveShadow = true; town.add(mtn)
         }
         // ── 奥の山並み（重なり合う稜線を大気遠近で淡く。城の背後＝北と両袖に不均等に。接近路の南は海を開ける）──
         { const fogC = new THREE.Color(SEN_FOGC.getHex()), rngBase = new THREE.Color(season === 'winter' ? 0xcfd4d6 : season === 'autumn' ? 0x6a6048 : 0x55664c)
@@ -7734,6 +7729,7 @@ export async function mountTown3d(parent, opts = {}) {
       return c.toDataURL()
     }
     window.__town3dGroundAt = (x, z) => heightAt(x, z) // 検証用: 地面の高さ（カメラを地中に潜らせない/正しい歩行目線に置く）
+    window.__town3dRayGround = (x, z) => { const rc = new THREE.Raycaster(new THREE.Vector3(x, 220, z), new THREE.Vector3(0, -1, 0)); const meshes = []; scene.traverse((o) => { if (o.isMesh && o.visible && o.geometry) meshes.push(o) }); const hits = rc.intersectObjects(meshes, false); return hits.slice(0, 5).map((h) => ({ y: +h.point.y.toFixed(1), v: h.object.geometry.attributes.position.count })) } // 検証用: 上から当たる全メッシュの高さ＋頂点数（地形メッシュ=多頂点/海=4頂点を識別）
     // 検証用: 浮遊の自機を任意の位置・向きへ即座に置いて撮影する（飛行視点のサムネ確認）
     window.__town3dFlyPose = (x, y, z, yaw, pitch) => {
       if (!active || !active.flyEnabled) return
