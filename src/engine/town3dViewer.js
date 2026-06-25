@@ -288,7 +288,7 @@ export async function mountTown3d(parent, opts = {}) {
   let bcFrame = 0 // フレーム数（初回の影焼き後にhome建物の霧カリングを始める）
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
-  let composer = null, fxaaPass = null // FXAA（輪郭をなめらかに＝解像度を上げずにくっきり）。読み込み失敗時はnullで通常描画にフォールバック
+  let composer = null, fxaaPass = null, bloomPass = null // FXAA（輪郭をなめらかに）＋夕夜の灯りのブルーム。読み込み失敗時はnullで通常描画にフォールバック
   renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
@@ -5441,12 +5441,13 @@ export async function mountTown3d(parent, opts = {}) {
     : new THREE.Vector3(0, 31, 30)  // 街: 高台の上階から見下ろす
   // ── FXAA（輪郭のギザギザをなめらかに）。MSAA付きの中間ターゲット→FXAA→OutputPass(色空間を正しく)。失敗時はnullで通常描画へ。──
   try {
-    const [{ EffectComposer }, { RenderPass }, { ShaderPass }, { OutputPass }, { FXAAShader }] = await Promise.all([
+    const [{ EffectComposer }, { RenderPass }, { ShaderPass }, { OutputPass }, { FXAAShader }, bloomMod] = await Promise.all([
       import('three/examples/jsm/postprocessing/EffectComposer.js'),
       import('three/examples/jsm/postprocessing/RenderPass.js'),
       import('three/examples/jsm/postprocessing/ShaderPass.js'),
       import('three/examples/jsm/postprocessing/OutputPass.js'),
       import('three/examples/jsm/shaders/FXAAShader.js'),
+      LIGHT ? Promise.resolve(null) : import('three/examples/jsm/postprocessing/UnrealBloomPass.js').catch(() => null), // 灯りのブルーム（非力端末は読み込まず＝発熱回避）
     ])
     if (my !== token) return
     const crt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 2 }) // MSAAは2x（4xはモバイルで帯域・発熱が重く、FXAA併用なので2xで十分・2026-06）
@@ -5454,6 +5455,13 @@ export async function mountTown3d(parent, opts = {}) {
     composer.addPass(new RenderPass(scene, camera))
     fxaaPass = new ShaderPass(FXAAShader)
     composer.addPass(fxaaPass)
+    // 夕夜の灯り（窓/街灯/提灯/自販機）がふわっと滲んで光るブルーム。ハーフ解像度＋高しきい値で「灯りだけ」を控えめに。昼/非力端末はstrength0で無効化＝負荷ゼロ。
+    if (bloomMod && bloomMod.UnrealBloomPass) {
+      const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.18 + duskAmt * 0.34 : 0 // 夜は強め・はっきりした夕はほのか・明るい昼や薄暮の霞む昼は無し
+      bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, 0.6, 0.72)
+      bloomPass.enabled = bs > 0.1 // 明るい昼/霞む昼はパス自体を無効化＝downsample/upsampleの負荷もゼロ（発熱回避）
+      composer.addPass(bloomPass)
+    }
     composer.addPass(new OutputPass())
   } catch (e) { composer = null }
 
