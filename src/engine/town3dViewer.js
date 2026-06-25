@@ -3631,7 +3631,7 @@ export async function mountTown3d(parent, opts = {}) {
         const tWallMats = tWallPal.map((c) => { const m = facadeMat('yofu', c); m.vertexColors = true; return m }) // 接地AO（頂点色）を効かせる
         // 屋根色のパレット（瓦の赤茶/いぶし茶/スレート青鼠）。俯瞰で一色だった屋根に多様さを。
         const tRoofPal = isNight ? [0x4a3832, 0x423a32, 0x3e444a] : [0x9a5642, 0x6e5a48, 0x5d666e]
-        const tRoofMats = tRoofPal.map((c) => mottleMat(c, 150, 0.12, [1.8, 1.8]))
+        const tRoofMats = tRoofPal.map((c, i) => i < 2 ? tileMat(c, 2, 2, true) : mottleMat(c, 150, 0.12, [1.8, 1.8])) // 瓦色(赤茶/いぶし)は瓦テクスチャ＝見上げで瓦の筋が出る／青鼠スレートは平滑なまま
         const taiFac = [{ x: tx + 33, z: tz - 42, r: 14 }, { x: tx + 42, z: tz + 46, r: 13 }, { x: tx - 48, z: tz + 30, r: 12 }, { x: tx - 30, z: tz - 50, r: 10 }, { x: tx + 70, z: tz + 8, r: 9 }] // 公園/学校＋緑地の区画（建物を空け、緑と広場で密集を割る＝閉鎖感対策）
         const twBuckets = tWallPal.map(() => []), trBuckets = tRoofPal.map(() => []), twC = [], tlit = [], plT = [], tmM = new THREE.Matrix4()
         // 港町の町並み＝完全な碁盤の目の均一さを脱す: 主要街路は残しつつ、街区内は密に詰め、
