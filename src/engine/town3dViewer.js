@@ -5411,11 +5411,16 @@ export async function mountTown3d(parent, opts = {}) {
         const flowerCols = [0xeef0ee, 0xf0d850, 0xe89ec0, 0xe8a048] // 白/黄/桃/橙の野花＝眼の高さの彩り
         const oneFlower = (wx, wz) => { const y = heightAt(wx, wz); if (y < SEA.level + 1) return; const fc = flowerCols[(R() * flowerCols.length) | 0], nf = 3 + ((R() * 4) | 0)
           for (let k = 0; k < nf; k++) { const ox = (R() - 0.5) * 0.7, oz = (R() - 0.5) * 0.7, h = 0.18 + R() * 0.14; const stem = new THREE.CylinderGeometry(0.006, 0.006, h, 3).toNonIndexed(); bakeL(stem, 0x4e6e3a, (wx - cx) + ox, y + h / 2, (wz - cz) + oz); const fl = new THREE.IcosahedronGeometry(0.045 + R() * 0.03, 0).toNonIndexed(); bakeL(fl, fc, (wx - cx) + ox, y + h + 0.02, (wz - cz) + oz) } } // 野花（小さな彩りの点）
+        const treeLC = season === 'autumn' ? [0xb0843c, 0x9c6e34, 0xc89a4a] : season === 'winter' ? [0xdfe4e2, 0xd2dad6, 0xcfd6d2] : [0x4e7038, 0x5e8244, 0x436830, 0x6a8a48]
+        const oneTree = (wx, wz) => { const y = heightAt(wx, wz); if (y < SEA.level + 2) return; const s = 0.95 + R() * 1.0
+          const tr = new THREE.CylinderGeometry(0.09 * s, 0.15 * s, 1.5 * s, 4).toNonIndexed(); bakeL(tr, season === 'winter' ? 0x6a6258 : 0x5a4632, (wx - cx), y + 0.75 * s, (wz - cz))
+          const cv = new THREE.IcosahedronGeometry((1.45 + R() * 0.6) * s, 1).toNonIndexed(); cv.scale(1, 0.92, 1); bakeL(cv, treeLC[(R() * treeLC.length) | 0], (wx - cx), y + 2.3 * s, (wz - cz)) } // 丘の木（時代エリアの背後の丘を森に）
         for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 6 + R() * (rOut - 6), wx = cx + Math.cos(a) * rr, wz = cz + Math.sin(a) * rr
           if (blockedAt(wx, wz) || (wetFn && wetFn(wx, wz)) || heightAt(wx, wz) < SEA.level + 1) continue
           const clump = 2 + ((R() * 4) | 0); for (let j = 0; j < clump; j++) { const ox = (R() - 0.5) * 2, oz = (R() - 0.5) * 2; if (!blockedAt(wx + ox, wz + oz) && !(wetFn && wetFn(wx + ox, wz + oz))) oneTuft(wx + ox, wz + oz) }
           if (R() < 0.55 && !blockedAt(wx, wz)) { oneBush(wx, wz); if (R() < 0.4) oneBush(wx + (R() - 0.5) * 3, wz + (R() - 0.5) * 3) } // 低木の茂みを群れて（緑の量感）
-          if (R() < 0.3 && !blockedAt(wx, wz)) oneFlower(wx + (R() - 0.5) * 2, wz + (R() - 0.5) * 2) } // 野花の彩り
+          if (R() < 0.3 && !blockedAt(wx, wz)) oneFlower(wx + (R() - 0.5) * 2, wz + (R() - 0.5) * 2) // 野花の彩り
+          if (heightAt(wx, wz) > 9 && !blockedAt(wx, wz) && R() < 0.62) oneTree(wx, wz) } // 丘（高所）には木＝背後の丘を森に
         if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const me = new THREE.Mesh(m, cm); me.position.set(cx, 0, cz); town.add(me) } geos.forEach((g) => g.dispose()) }
       }
       const NE = LIGHT ? 200 : 420
