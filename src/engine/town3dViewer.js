@@ -5348,6 +5348,23 @@ export async function mountTown3d(parent, opts = {}) {
       }
       if (tuftGeos.length && BufferGeometryUtils.mergeGeometries) { const tm = BufferGeometryUtils.mergeGeometries(tuftGeos, false); if (tm) town.add(new THREE.Mesh(tm, coverMat)); tuftGeos.forEach((x) => x.dispose()) }
     }
+    // ── 時代エリア(江戸/大正/戦国)の開けた地面にも草株を散らす＝homeと同じ豊かさ。距離カリングに乗せるためメッシュをエリア中心に置きジオメトリはローカルで焼く（mesh.position≒エリア中心→eraCullが拾う）。──
+    if (!SNOW) {
+      const eraCover = (cx, cz, rOut, n, gCols, wetFn) => {
+        const geos = [], cm = toon(0xffffff); cm.vertexColors = true
+        const bakeL = (geo, hex, lx, ly, lz) => { geo.translate(lx, ly, lz); const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(geo) }
+        const oneTuft = (wx, wz) => { const y = heightAt(wx, wz); if (y < SEA.level + 1) return; const col = gCols[(R() * gCols.length) | 0], nb = 2 + ((R() * 3) | 0)
+          for (let k = 0; k < nb; k++) { const a = R() * 6.283, h = 0.13 + R() * 0.18, lean = 0.12 + R() * 0.2; const bl = new THREE.CylinderGeometry(0.004, 0.02, h, 3).toNonIndexed(); bl.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.cos(a) * lean)); bakeL(bl, col, (wx - cx) + Math.cos(a) * 0.05, y + 0.02 + h / 2, (wz - cz) + Math.sin(a) * 0.05) } }
+        for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 6 + R() * (rOut - 6), wx = cx + Math.cos(a) * rr, wz = cz + Math.sin(a) * rr
+          if (blockedAt(wx, wz) || (wetFn && wetFn(wx, wz)) || heightAt(wx, wz) < SEA.level + 1) continue
+          const clump = 2 + ((R() * 4) | 0); for (let j = 0; j < clump; j++) { const ox = (R() - 0.5) * 2, oz = (R() - 0.5) * 2; if (!blockedAt(wx + ox, wz + oz) && !(wetFn && wetFn(wx + ox, wz + oz))) oneTuft(wx + ox, wz + oz) } }
+        if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const me = new THREE.Mesh(m, cm); me.position.set(cx, 0, cz); town.add(me) } geos.forEach((g) => g.dispose()) }
+      }
+      const NE = LIGHT ? 70 : 140
+      eraCover(EDO.x, EDO.z, EDO.r, NE, [0x6e7a40, 0x7e8a48, 0x5e6e34, 0x8a8a50], (x, z) => edoStream(x, z) < 6) // 江戸=乾いた草
+      eraCover(TAISHO.x, TAISHO.z, TAISHO.r, NE, [0x6e8244, 0x7a8a4c, 0x86905a], (x, z) => taishoCanal(x, z) < 5) // 大正=苔草
+      eraCover(SENGOKU.x, SENGOKU.z, SENGOKU.r, NE, [0x5c7a3a, 0x6e8c46, 0x52702f]) // 戦国=谷の緑（谷底の川は低くheightAtで除外）
+    }
     // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
     if (/[?&]dev=1/.test(location.search)) window.__town3dFigShot = (yaw, cfgJson, faceZoom) => {
       const cfg = cfgJson ? JSON.parse(cfgJson) : { skin: 0xf7d8bc, hair: 0x241c18, iris: 0x4a3a2c, outfit: 'blouse', top: 0xf0ece2, bottom: 0x2e3a42, hairStyle: 'bob', prop: 'bag', bagCol: 0x8a7256 }
