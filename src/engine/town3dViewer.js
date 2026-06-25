@@ -6264,10 +6264,12 @@ export async function mountTown3d(parent, opts = {}) {
   const maxClearAt = (x, z) => { let best = 0; for (let a = 0; a < 8; a++) { const yaw = a / 8 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw); let d = 1.0; for (; d < 14; d += 1.4) { if (blockedAt(x + hx * d, z + hz * d)) break } if (d > best) best = d } return best }
   active.resolveSpawn = (x, z) => {
     // 「建物/水を避ける」だけでなく「歩いて出られる開けた所」を選ぶ＝降りた途端に透明の壁で詰まらない。
+    // さらに、屋台/門/群衆の際に降りると一人称の前方が近接物で塞がるため、十分に開けた地点を優先する
+    // （前方視界の抜けを確保＝降り立った景色を気持ちよく）。16u以上開けた所を見つけたら即採用、無ければ最も開けた所。
     let best = null, bestClear = -1
-    const consider = (nx, nz) => { if (spawnBad(nx, nz)) return false; const c = maxClearAt(nx, nz); if (c > bestClear) { bestClear = c; best = [nx, nz] } return c >= 9 } // 9u以上歩ける所なら即採用
+    const consider = (nx, nz) => { if (spawnBad(nx, nz)) return false; const c = maxClearAt(nx, nz); if (c > bestClear) { bestClear = c; best = [nx, nz] }; return c >= 16 } // 十分に開けた所を優先（旧: 9u即採用→近接物で塞がりやすかった）
     if (consider(x, z)) return [x, z]
-    for (let r = 1.5; r <= 20; r += 1.5) {
+    for (let r = 1.5; r <= 22; r += 1.5) {
       for (let a = 0; a < 12; a++) {
         const nx = x + Math.cos(a / 12 * 6.2832) * r, nz = z + Math.sin(a / 12 * 6.2832) * r
         if (consider(nx, nz)) return [nx, nz]
