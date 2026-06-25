@@ -36,5 +36,6 @@ export default {
   sounds: [
     { id: 'uguisu', label: '鶯', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.5, loop: false, interval: [6, 16] },
     { id: 'stream', label: 'せせらぎ', src: 'audio/shishigaya-morning-yato/stream.mp3', gain: 0.3, loop: true },
+    { id: 'frogs', label: '田の蛙', src: 'audio/spring-dusk-corner-room/frogs.mp3', gain: 0.16, loop: true },
   ],
 }
