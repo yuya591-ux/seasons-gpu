@@ -1020,6 +1020,8 @@ export async function mountTown3d(parent, opts = {}) {
     bake(new THREE.CylinderGeometry(0.044, 0.052, 0.09, 6).toNonIndexed(), skinHex, 1.16) // 首
     const hd = new THREE.SphereGeometry(0.15, 9, 7).toNonIndexed(); hd.scale(0.95, 1.06, 0.96); bake(hd, skinHex, 1.28) // 小さめの頭＝頭身を伸ばす
     bake(new THREE.SphereGeometry(0.162, 8, 7, 0, 6.2832, 0, Math.PI * 0.6).toNonIndexed(), hairHex, 1.3) // 髪（後頭部）
+    const aM = new THREE.Matrix4() // 腕（肩から裾へ・胴色）＝人型の手応え。同じ統合メッシュに焼くので描画コール不変
+    for (const s of [-1, 1]) { const arm = new THREE.CylinderGeometry(0.03, 0.042, 0.5, 5).toNonIndexed(); aM.makeRotationZ(s * 0.2).setPosition(s * 0.19, 0.72, 0.01); arm.applyMatrix4(aM); const c = new THREE.Color(bodyCol), a = new Float32Array(arm.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } arm.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(arm) }
     if (!BufferGeometryUtils.mergeGeometries) return
     const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
     const mesh = new THREE.Mesh(m, crowdMat); mesh.position.set(px, py, pz); mesh.rotation.y = R() * 6.28; mesh.scale.setScalar(sc); mesh.castShadow = true; town.add(mesh)
