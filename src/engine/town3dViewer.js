@@ -918,6 +918,19 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const facadeMat = (kind, baseHex) => snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeFacade(kind, baseHex), gradientMap: grad }))
+  // 町家の夜の灯り（障子の奥の行灯）。障子の面を暖色に＋組子を影で抜く emissiveMap。R()不使用＝生成乱数列を不変に保つ。
+  let machiyaGlowTex = null
+  const getMachiyaGlow = () => { if (machiyaGlowTex) return machiyaGlowTex
+    const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d')
+    g.fillStyle = '#000000'; g.fillRect(0, 0, S, S)
+    const wx = 22, wy = 18, ww = 84, wh = 42
+    g.fillStyle = '#ffd596'; g.fillRect(wx, wy, ww, wh) // 障子が行灯で温かく光る
+    g.strokeStyle = 'rgba(60,40,18,0.5)'; g.lineWidth = 1
+    for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(wx + ww * i / 10, wy); g.lineTo(wx + ww * i / 10, wy + wh); g.stroke() }
+    for (let i = 0; i <= 5; i++) { g.beginPath(); g.moveTo(wx, wy + wh * i / 5); g.lineTo(wx + ww, wy + wh * i / 5); g.stroke() }
+    const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; machiyaGlowTex = t; return t }
+  // 町家の壁材（夕夜は障子が行灯で灯る＝城下町の夜が生きる）。
+  const machiyaMat = (baseHex) => { const m = facadeMat('machiya', baseHex); if (duskAmt > 0.12) { m.emissiveMap = getMachiyaGlow(); m.emissive = new THREE.Color(isNight ? 0xffb45a : 0xffc684); m.emissiveIntensity = 0.22 + duskAmt * (isNight ? 0.6 : 0.34) } return m }
   // 壁の接地AO（頂点色で底=翳り→上=空の光）。時代の建物の箱に焼いて、平らな箱面の一様さを破り接地感を出す。
   const bakeAO = (geo, hh) => { const pos = geo.attributes.position, col = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { const tt = Math.min(1, Math.max(0, (pos.getY(i) + hh / 2) / Math.max(0.001, hh))), ao = Math.min(1, tt / 0.26), v = 0.72 + 0.28 * ao + 0.06 * tt; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v } geo.setAttribute('color', new THREE.BufferAttribute(col, 3)) }
   // 瓦の屋根テクスチャ（横列の瓦＋軒の重なりの影＋縦の丸瓦の筋）＝単色の屋根を脱し俯瞰の質感を上げる。
@@ -3044,7 +3057,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const br = topW / 2 + 0.45, ry0 = topBase + 1.3; for (const [ax, az, ry] of [[0, br, 0], [0, -br, 0], [br, 0, Math.PI / 2], [-br, 0, Math.PI / 2]]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(br * 2 + 0.2, 0.34, 0.1), toon(0x6a4a30)); rail.position.set(ex + ax, ry0, ez + az); rail.rotation.y = ry; town.add(rail) } } // 最上階の高欄（望楼の廻縁）
         for (const sgn of [-1, 1]) { const shachi = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.1, 6), toon(0xc8a23c)); shachi.position.set(ex + sgn * 1.3, yb + 0.2, ez); shachi.rotation.z = sgn * -0.32; town.add(shachi) } // 鯱（金）
         // ── 城下の町家（堀の外。環状に整列）。西(ang≈π)に大手門への参道を空ける ──
-        const tRoof = toon(season === 'winter' ? (isNight ? 0x8a9098 : 0xb8bcc0) : (isNight ? 0x47403a : 0x6f5f4d)), tWall = facadeMat('machiya', season === 'winter' ? 0xd9d3c5 : 0xcbc0a9) // 町家＝障子の格子窓＋格子戸の正面（最初の街の質感へ）
+        const tRoof = toon(season === 'winter' ? (isNight ? 0x8a9098 : 0xb8bcc0) : (isNight ? 0x47403a : 0x6f5f4d)), tWall = machiyaMat(season === 'winter' ? 0xd9d3c5 : 0xcbc0a9) // 町家＝障子の格子窓＋格子戸の正面（夕夜は障子が行灯で灯る）
         const angGap = (a) => { let d = Math.abs(a - Math.PI); if (d > Math.PI) d = 6.2832 - d; return d } // 西の参道(ang≈π)からの角度差
         // 広大な城下町: 町家(平屋/2階)・土蔵・大店を高さ/大きさ/色を変えて密に。放射の大通りで街区を割る。メッシュ統合で軽量。
         // 屋根は街区(扇形セクタ)ごとに色をまとめ＝俯瞰の市松を脱し「瓦の町並みの塊」に。町家は街路に平行な切妻、土蔵/大店は寄棟。
@@ -3099,7 +3112,7 @@ export async function mountTown3d(parent, opts = {}) {
             if (isNight && R() < 0.5) { tmpM.makeRotationY(a).setPosition(hx + Math.cos(a) * (hw * 0.45), hy + hh * (two ? 0.62 : 0.45), hz + Math.sin(a) * (hw * 0.45)); const lg = new THREE.BoxGeometry(0.5, 0.5, 0.12); lg.applyMatrix4(tmpM); litG.push(lg) }
           }
         }
-        const wallBMat = mottleMat(season === 'winter' ? 0xeae6dc : 0xe2ddd0, 170, 0.1, [1.2, 1.2]), wall3Mat = facadeMat('machiya', season === 'winter' ? 0xb8b0a2 : 0x9a8a70) // 土蔵=漆喰のまま/板壁の町家=格子窓の正面
+        const wallBMat = mottleMat(season === 'winter' ? 0xeae6dc : 0xe2ddd0, 170, 0.1, [1.2, 1.2]), wall3Mat = machiyaMat(season === 'winter' ? 0xb8b0a2 : 0x9a8a70) // 土蔵=漆喰のまま/板壁の町家=格子窓の正面（夕夜は灯る）
         tWall.vertexColors = true; wall3Mat.vertexColors = true // 壁の接地AO（頂点色）を効かせる
         const plinthMat = mottleMat(season === 'winter' ? 0xbcc0c2 : 0x8c867c, 120, 0.12, [2, 1]) // 石の土台
         for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [plE, plinthMat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
@@ -3219,7 +3232,7 @@ export async function mountTown3d(parent, opts = {}) {
           const torii = new THREE.Group(); torii.position.set(hx0, hy0, hz0 + 8); const trd = toon(season === 'winter' ? 0xb04438 : 0xc0392b)
           for (const px of [-2.2, 2.2]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 5.0, 7), trd); pil.position.set(px, 2.5, 0); pil.castShadow = true; torii.add(pil) }
           torii.add(new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.6, 0.7), trd).translateY(4.9)); torii.add(new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.4, 0.5), trd).translateY(3.9)); town.add(torii); town.add(addOutline(torii))
-          const hall = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 5), facadeMat('machiya', 0xd8cfb8)); hall.position.set(hx0, hy0 + 1.6, hz0); hall.castShadow = true; hall.receiveShadow = true; town.add(hall); town.add(addOutline(hall))
+          const hall = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 5), machiyaMat(0xd8cfb8)); hall.position.set(hx0, hy0 + 1.6, hz0); hall.castShadow = true; hall.receiveShadow = true; town.add(hall); town.add(addOutline(hall))
           const hroof = new THREE.Mesh(new THREE.ConeGeometry(5.4, 2.2, 4), tileMat(season === 'winter' ? 0xb8bcc0 : 0x564636, 2, 2, false)); hroof.rotation.y = Math.PI / 4; hroof.position.set(hx0, hy0 + 4.3, hz0); hroof.castShadow = true; town.add(hroof); town.add(addOutline(hroof))
           for (let k = 0; k < 12; k++) { const a = R() * 6.28, rr = 8 + R() * 12, tx2 = hx0 + Math.cos(a) * rr, tz2 = hz0 + Math.sin(a) * rr, ty2 = heightAt(tx2, tz2); if (ty2 < hy0 - 4) continue; const s = 1.0 + R() * 0.5 // 鎮守の森
             const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 2.0 * s, 6), toon(0x6a4f38)); tr.position.set(tx2, ty2 + 1.0 * s, tz2); town.add(tr)
@@ -3236,7 +3249,7 @@ export async function mountTown3d(parent, opts = {}) {
         // ── 寺子屋（手習いの学び舎＋幟）＝城下の学校 ──
         { const sx0 = ex - 26, sz0 = ez - 58, sy0 = heightAt(sx0, sz0)
           if (sy0 > SEA.level + 1) {
-            const hall = new THREE.Mesh(new RoundedBoxGeometry(8, 3.0, 5.4, 1, 0.12), facadeMat('machiya', 0xd8cfb8)); hall.position.set(sx0, sy0 + 1.5, sz0); hall.castShadow = true; hall.receiveShadow = true; town.add(hall); town.add(addOutline(hall))
+            const hall = new THREE.Mesh(new RoundedBoxGeometry(8, 3.0, 5.4, 1, 0.12), machiyaMat(0xd8cfb8)); hall.position.set(sx0, sy0 + 1.5, sz0); hall.castShadow = true; hall.receiveShadow = true; town.add(hall); town.add(addOutline(hall))
             const hroof = new THREE.Mesh(new THREE.ConeGeometry(6.4, 2.0, 4), tileMat(season === 'winter' ? 0xb8bcc0 : 0x564636, 2, 2, false)); hroof.rotation.y = Math.PI / 4; hroof.position.set(sx0, sy0 + 4.0, sz0); hroof.castShadow = true; town.add(hroof); town.add(addOutline(hroof))
             const fence = new THREE.Mesh(new THREE.BoxGeometry(14, 1.0, 0.2), toon(0x8a6a48)); fence.position.set(sx0, sy0 + 0.5, sz0 + 6); town.add(fence) // 庭の塀
             const nob = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 3.2), signMat('手習所', '#e6dcc4', '#3a2a1a', true)); nob.position.set(sx0 - 5.2, sy0 + 2.6, sz0 + 4); town.add(nob); const npole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.4, 5), toon(0x6a5440)); npole.position.set(sx0 - 5.7, sy0 + 2.2, sz0 + 4); town.add(npole) } } // 幟
@@ -3260,7 +3273,7 @@ export async function mountTown3d(parent, opts = {}) {
             for (const [lx, lz, lw, ld] of [[0, -4.7, 9.4, 0.4], [0, 4.7, 9.4, 0.4], [-4.7, 0, 0.4, 9.0], [4.7, 0, 0.4, 9.0]]) { const w = new THREE.Mesh(new THREE.BoxGeometry(lw, 1.5, ld), bWall); w.position.set(lx, 0.75, lz); w.castShadow = true; g.add(w); const cap = new THREE.Mesh(new THREE.BoxGeometry(lw + 0.2, 0.22, ld + 0.2), bCap); cap.position.set(lx, 1.6, lz); g.add(cap) } // 築地塀＋瓦の笠
             const gate = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.3, 1.3), bWall); gate.position.set(0, 1.15, -4.7); gate.castShadow = true; g.add(gate); g.add(addOutline(gate)) // 長屋門
             const groof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 1.0, 4), bRoofM); groof.rotation.y = Math.PI / 4; groof.scale.set(1.3, 1, 0.55); groof.position.set(0, 2.7, -4.7); g.add(groof); g.add(addOutline(groof))
-            const house = new THREE.Mesh(new RoundedBoxGeometry(5.4, 2.6, 4.2, 1, 0.1), facadeMat('machiya', season === 'winter' ? 0xd9d3c5 : 0xd2c7ad)); house.position.set(0.4, 1.3, 0.6); house.castShadow = true; house.receiveShadow = true; g.add(house); g.add(addOutline(house)) // 主屋
+            const house = new THREE.Mesh(new RoundedBoxGeometry(5.4, 2.6, 4.2, 1, 0.1), machiyaMat(season === 'winter' ? 0xd9d3c5 : 0xd2c7ad)); house.position.set(0.4, 1.3, 0.6); house.castShadow = true; house.receiveShadow = true; g.add(house); g.add(addOutline(house)) // 主屋
             const hr = new THREE.Mesh(new THREE.ConeGeometry(4.0, 1.7, 4), bRoofM); hr.rotation.y = Math.PI / 4; hr.scale.set(1, 1, 0.86); hr.position.set(0.4, 3.5, 0.6); hr.castShadow = true; g.add(hr); g.add(addOutline(hr))
             for (const sgn of [1, -1]) { const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.34, 3), bWall); ridge.rotation.set(Math.PI / 2, 0, Math.PI / 2); ridge.position.set(0.4, 3.0, 0.6 + sgn * 1.7); g.add(ridge) } // 千鳥破風
             const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.4, 6), toon(0x6a4f38)); pt.position.set(3.0, 0.7, 3.0); g.add(pt); const pf = new THREE.Mesh(new THREE.ConeGeometry(1.4, 2.0, 7), toon(season === 'autumn' ? 0x8a6a32 : season === 'winter' ? 0xb8c0c4 : 0x46603a)); pf.position.set(3.0, 2.3, 3.0); pf.castShadow = true; g.add(pf) // 庭の松
