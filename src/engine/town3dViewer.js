@@ -614,6 +614,26 @@ export async function mountTown3d(parent, opts = {}) {
   let critters = [] // 舞う蝶/蜻蛉（frameでふわふわ）＝街/季節ごとの生きもの
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let seaUniforms = null // 海面シェーダーの時間（うねり・きらめき）
+  // 川・池・水路のきらめき（淡い真水の水面のゆらぎ＝歩いて水辺で映える。海より細かく穏やか）。共有uniformをframeで進める。
+  const freshUniforms = { uTime: { value: 0 } }
+  const freshWater = (mat) => {
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = freshUniforms.uTime
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWPosF;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPosF = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec3 vWPosF;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          float phf = uTime;
+          float rp = sin(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + sin(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.4 * sin((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.82, smoothstep(0.55, 1.5, -rp) * 0.30); // 谷はほのかに沈む（沈め過ぎない）
+          diffuseColor.rgb += vec3(1.0, 0.98, 0.9) * smoothstep(0.74, 1.4, rp) * 0.16; // 細かな陽のきらめき
+        `)
+    }
+    mat.customProgramCacheKey = () => 'freshWater'
+    return mat
+  }
   let lightBeam = null // 灯台の光芒（夜に回る）
   let train = null // 線路を走る電車
   let train2 = null // もう一本の電車（色違い・半周ずらして走る）
@@ -1636,7 +1656,7 @@ export async function mountTown3d(parent, opts = {}) {
     const wp = wgeo.attributes.position
     for (let i = 0; i < wp.count; i++) wp.setY(i, waterLevel(wp.getZ(i) - 36)) // mesh は z=-36 中心
     wgeo.computeVertexNormals()
-    const water = new THREE.Mesh(wgeo, new THREE.MeshToonMaterial({ color: 0xffffff, map: wtex, gradientMap: grad, fog: true }))
+    const water = new THREE.Mesh(wgeo, freshWater(new THREE.MeshToonMaterial({ color: 0xffffff, map: wtex, gradientMap: grad, fog: true })))
     water.position.set(rx, 0, -36); water.receiveShadow = true; town.add(water)
     // 護岸（水際の左右のコンクリ壁。天端は堤の肩＝grade、底は水面下。地形に沿わせ1メッシュへ）
     const bankGeos = []
@@ -2396,7 +2416,7 @@ export async function mountTown3d(parent, opts = {}) {
       else for (let i = 0; i < 30; i++) { pcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.05})`; pcx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
       const ptex = new THREE.CanvasTexture(pc)
       const pondGeo = new THREE.CircleGeometry(pondR + 0.1, 36); pondGeo.rotateX(-Math.PI / 2)
-      const pond = new THREE.Mesh(pondGeo, new THREE.MeshToonMaterial({ color: 0xffffff, map: ptex, gradientMap: grad, fog: true }))
+      const pond = new THREE.Mesh(pondGeo, freshWater(new THREE.MeshToonMaterial({ color: 0xffffff, map: ptex, gradientMap: grad, fog: true })))
       pond.position.set(px0, waterY, pz0); pond.receiveShadow = true; town.add(pond)
       // 石組みの縁（地形に沿って水際に段を作る＝池の輪郭がはっきりする。不揃いの石を1メッシュへ）。
       const rimGeos = []
@@ -6858,6 +6878,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
     if (seaUniforms) seaUniforms.uTime.value = t // 海面のうねり・きらめきの位相
+    freshUniforms.uTime.value = t // 川・池のきらめきの位相
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
     for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
     for (const c of critters) {
