@@ -5204,6 +5204,54 @@ export async function mountTown3d(parent, opts = {}) {
     return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
     // 港町の少女を home の要所にも数体（一枚絵の立ち絵＝常にこちらを向くビルボード）。
     for (const sp of [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]) placeGirl(sp.x + (R() - 0.5) * 3, sp.z + (R() - 0.5) * 3, girlCfg())
+    // ── 地被（草株＋小石）を開けた地面に広く散らして「むき出しの土」を埋める＝滞在したくなる豊かさ（実機FB: 空き地が殺風景）。
+    // 頂点色で1メッシュへ統合＝描画コール+1。R()依存の街生成の後に置くのでRNGずれ無し。建物/道/水際/木は避ける。LOWで半減。
+    if (!SNOW) {
+      const tuftGeos = []
+      const coverMat = toon(0xffffff); coverMat.vertexColors = true // bakeColGeo/clutterMatはこの位置ではスコープ外＝ローカルで自己完結（什器パスの教訓）
+      const bakeT = (arr, geo, hex, lx, ly, lz) => { geo.translate(lx, ly, lz); const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); arr.push(geo) }
+      const gC = season === 'spring' ? [0x6f9a44, 0x82ad4e, 0x5e8a38, 0x90b25a]
+        : season === 'autumn' ? [0x8c7c3e, 0x9c8a44, 0x7a6e36, 0xa8924a]
+        : [0x5c7a3a, 0x6e8c46, 0x7a9850, 0x547030] // 夏（くすんだ緑の幅）
+      const onRoad = (x, z) => Math.abs(x) < 4.8 && z < 26 && z > -100 // 中央通りの上は空ける
+      const wet = (x, z) => (x > SEA.coast - 2 && heightAt(x, z) < SEA.level + 0.9) || Math.abs(x - RIVER.x) < RIVER.halfW + 1 // 海際・川は避ける
+      const occ = (x, z) => { for (const s of spawnAvoid) if (Math.hypot(x - s.x, z - s.z) < s.r + 0.4) return true; return false }
+      const oneTuft = (x, z) => {
+        const y = heightAt(x, z); if (y < SEA.level + 0.55) return
+        const col = gC[(R() * gC.length) | 0], nb = 3 + ((R() * 3) | 0)
+        for (let k = 0; k < nb; k++) { const a = R() * 6.283, h = 0.14 + R() * 0.2, lean = 0.12 + R() * 0.22, ox = Math.cos(a) * 0.05, oz = Math.sin(a) * 0.05
+          const bl = new THREE.CylinderGeometry(0.004, 0.02, h, 3).toNonIndexed()
+          bl.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.cos(a) * lean)); bl.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.sin(a) * lean))
+          bakeT(tuftGeos, bl, col, x + ox, y + 0.02 + h / 2, z + oz) } // 葉を外へ倒した草株
+        if (R() < 0.14) { const s = 0.05 + R() * 0.1, st = new THREE.IcosahedronGeometry(s, 0).toNonIndexed(); st.scale(1.3, 0.6, 1.1); bakeT(tuftGeos, st, 0x8c877b, x + (R() - 0.5) * 0.4, y + s * 0.3, z + (R() - 0.5) * 0.4) } // たまに小石
+      }
+      const bC = season === 'spring' ? [0x5e8a3e, 0x6f9a48, 0x7aa850] : season === 'autumn' ? [0x7a7a3a, 0x8a6e38, 0x6e7a3e] : [0x4e7038, 0x5a7e40, 0x46682f] // 低木の葉
+      const oneBush = (x, z) => { // 低い茂み＝丸い葉の塊を2〜3重ねた株（むき出しを視覚的に埋める。木より低くまばらに）
+        const y = heightAt(x, z); if (y < SEA.level + 0.6) return
+        const col = bC[(R() * bC.length) | 0], colD = new THREE.Color(col).multiplyScalar(0.78).getHex(), r0 = 0.34 + R() * 0.34, lobes = 2 + ((R() * 2) | 0)
+        for (let k = 0; k < lobes; k++) { const ox = (R() - 0.5) * r0 * 1.3, oz = (R() - 0.5) * r0 * 1.3, rr = r0 * (0.7 + R() * 0.5)
+          const lf = new THREE.IcosahedronGeometry(rr, 0).toNonIndexed(); lf.scale(1, 0.82, 1)
+          bakeT(tuftGeos, lf, k === 0 ? colD : col, x + ox, y + rr * 0.72, z + oz) } // 下の塊は少し暗め/上は明るめ
+        for (let k = 0; k < 4; k++) { const a = R() * 6.283, h = 0.12 + R() * 0.16, bx = Math.cos(a) * r0 * 0.9, bz = Math.sin(a) * r0 * 0.9; const bl = new THREE.CylinderGeometry(0.004, 0.018, h, 3).toNonIndexed(); bakeT(tuftGeos, bl, gC[(R() * gC.length) | 0], x + bx, y + 0.02 + h / 2, z + bz) } // 株元の草
+      }
+      // 草株: 密なクランプで「草地のパッチ」を作る（疎な単発でなく群れて生える）
+      const NT = LIGHT ? 150 : 300
+      for (let i = 0; i < NT; i++) {
+        const cx = -125 + R() * 210, cz = -100 + R() * 135
+        if (onRoad(cx, cz) || wet(cx, cz) || occ(cx, cz) || blockedAt(cx, cz)) continue
+        const clump = 3 + ((R() * 4) | 0) // 1スポットに3〜6株＝草むらのまとまり
+        for (let j = 0; j < clump; j++) { const ox = (R() - 0.5) * 2.0, oz = (R() - 0.5) * 2.0; if (!onRoad(cx + ox, cz + oz) && !wet(cx + ox, cz + oz) && !blockedAt(cx + ox, cz + oz)) oneTuft(cx + ox, cz + oz) }
+      }
+      // 低木: 開けた所にまばらに置いて空間を埋める（木立より低く・点在）
+      const NB = LIGHT ? 50 : 110
+      for (let i = 0; i < NB; i++) {
+        const bx = -122 + R() * 204, bz = -98 + R() * 130
+        if (onRoad(bx, bz) || wet(bx, bz) || occ(bx, bz) || blockedAt(bx, bz)) continue
+        oneBush(bx, bz)
+        spawnAvoid.push({ x: bx, z: bz, r: 1.2 }) // 後続の地被/着地が茂みに重ならないよう
+      }
+      if (tuftGeos.length && BufferGeometryUtils.mergeGeometries) { const tm = BufferGeometryUtils.mergeGeometries(tuftGeos, false); if (tm) town.add(new THREE.Mesh(tm, coverMat)); tuftGeos.forEach((x) => x.dispose()) }
+    }
     // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
     if (/[?&]dev=1/.test(location.search)) window.__town3dFigShot = (yaw, cfgJson, faceZoom) => {
       const cfg = cfgJson ? JSON.parse(cfgJson) : { skin: 0xf7d8bc, hair: 0x241c18, iris: 0x4a3a2c, outfit: 'blouse', top: 0xf0ece2, bottom: 0x2e3a42, hairStyle: 'bob', prop: 'bag', bagCol: 0x8a7256 }
