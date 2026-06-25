@@ -3081,7 +3081,7 @@ export async function mountTown3d(parent, opts = {}) {
             const pine = R() < 0.4, s = pine ? 1 : 0.85 + R() * 0.5
             const trG = new THREE.CylinderGeometry(0.17 * s, 0.27 * s, 1.9 * s, 6); tmM2.makeTranslation(px, py + 0.95 * s, pz); trG.applyMatrix4(tmM2); trunkGeos.push(trG)
             if (pine) { const fG = new THREE.ConeGeometry(1.6, 2.3, 7); tmM2.makeTranslation(px, py + 2.8, pz); fG.applyMatrix4(tmM2); coneGeos.push(fG) } // 松/杉
-            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 0); tmM2.makeTranslation(px, py + 2.2 * s, pz); fG.applyMatrix4(tmM2); leafGeos.push(fG) } } // 雑木
+            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 1); tmM2.makeTranslation(px, py + 2.2 * s, pz); fG.applyMatrix4(tmM2); leafGeos.push(fG) } } // 雑木
           for (const [geos, mat] of [[trunkGeos, toon(0x6a4f38)], [coneGeos, toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)], [leafGeos, toon(leafC)]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         }
         // 大手門（西の参道。鏡柱＋冠木＋渡櫓＋築地塀＋松並木）
@@ -3665,7 +3665,7 @@ export async function mountTown3d(parent, opts = {}) {
           const tTrunkG = [], tLeafG = [], tmM4 = new THREE.Matrix4() // 木立を統合＝拡大した島の全域に緑を行き渡らせつつ描画コール据え置き
           for (let k = 0; k < 58; k++) { const a = R() * 6.28, r2 = 12 + R() * 94, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5 || taishoCanal(px, pz) < 4) continue; const s = 0.7 + R() * 0.5
             const trG = new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6); tmM4.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(tmM4); tTrunkG.push(trG)
-            const fG = new THREE.IcosahedronGeometry(1.3 * s, 0); tmM4.makeTranslation(px, py + 1.9 * s, pz); fG.applyMatrix4(tmM4); tLeafG.push(fG) }
+            const fG = new THREE.IcosahedronGeometry(1.3 * s, 1); tmM4.makeTranslation(px, py + 1.9 * s, pz); fG.applyMatrix4(tmM4); tLeafG.push(fG) }
           for (const [geos, mat] of [[tTrunkG, toon(0x6a4f38)], [tLeafG, toon(tfolC)]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } } } // 街のあちこちに木立（密度UP・統合）
         // 港を見下ろす高台の洋館（大正の見どころ。クリームの壁＋マンサード屋根＋並木）
         { const mx0 = tx - 44, mz0 = tz + 42, my0 = heightAt(mx0, mz0)
@@ -3716,7 +3716,7 @@ export async function mountTown3d(parent, opts = {}) {
             const pine = R() < 0.45, s = 0.8 + R() * 0.6
             const trG = new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.8 * s, 6); nM.makeTranslation(px, py + 0.9 * s, pz); trG.applyMatrix4(nM); beltTrunk.push(trG)
             if (pine) { const fG = new THREE.ConeGeometry(1.5 * s, 2.4 * s, 7); nM.makeTranslation(px, py + 2.7 * s, pz); fG.applyMatrix4(nM); beltCone.push(fG) } // 松/杉
-            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 0); nM.makeTranslation(px, py + 2.1 * s, pz); fG.applyMatrix4(nM); beltLeaf.push(fG) } } // 雑木
+            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 1); nM.makeTranslation(px, py + 2.1 * s, pz); fG.applyMatrix4(nM); beltLeaf.push(fG) } } // 雑木
           const rockN = Math.round(isle.r * 0.5)
           for (let i = 0; i < rockN; i++) { const a = R() * 6.2832, rr = isle.r * (0.96 + R() * 0.12), px = isle.x + Math.cos(a) * rr, pz = isle.z + Math.sin(a) * rr, py = heightAt(px, pz)
             if (py > SEA.level + 2.5 || py < SEA.level - 2.5) continue // 水際の岩のみ
@@ -4343,7 +4343,7 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < (LIGHT ? 9 : 16); i++) { const bx = 15 + R() * 6.5, bz = -16 - R() * 18, by = heightAt(bx, bz); if (by < SEA.level + 0.5) continue
         const h = 4.5 + R() * 2.8, tilt = (R() - 0.5) * 0.13
         const cg = new THREE.CylinderGeometry(0.05, 0.075, h, 5); cM.makeRotationZ(tilt).setPosition(bx, by + h / 2, bz); cg.applyMatrix4(cM); caneGeos.push(cg)
-        const lg = new THREE.IcosahedronGeometry(0.6 + R() * 0.4, 0); lg.scale(1, 1.6, 1); lg.translate(bx + Math.sin(tilt) * h, by + h - 0.3, bz); leafGeos.push(lg) }
+        const lg = new THREE.IcosahedronGeometry(0.6 + R() * 0.4, 1); lg.scale(1, 1.6, 1); lg.translate(bx + Math.sin(tilt) * h, by + h - 0.3, bz); leafGeos.push(lg) }
       if (caneGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(caneGeos, false); if (m) { const me = new THREE.Mesh(m, caneMat); me.castShadow = true; town.add(me) } caneGeos.forEach((g) => g.dispose())
         const lm = BufferGeometryUtils.mergeGeometries(leafGeos, false); if (lm) { const le = new THREE.Mesh(lm, bleafMat); le.castShadow = true; town.add(le) } leafGeos.forEach((g) => g.dispose()) }
     }
