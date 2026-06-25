@@ -6648,20 +6648,20 @@ export async function mountTown3d(parent, opts = {}) {
   // タイムスケール別の発火表。最初の発火は早め（眺めてすぐ何か起きる）、以降は間隔をあける。数値で調整可。
   const EV = {
     birds: { run: evBirdFlock },
-    balloon: { run: evBalloon, ok: () => !isNight },
-    star: { run: evShootingStars, ok: () => isNight },
+    balloon: { run: evBalloon, ok: () => !isNight && weather !== 'rain' && !rainActive }, // 気球は雨では飛ばさない（現実忠実）
+    star: { run: evShootingStars, ok: () => isNight && weather !== 'rain' && weather !== 'snow' && !rainActive }, // 流れ星は雨/雪の曇天では見えない
     contrail: { run: evContrail },
     cloudShade: { run: evCloudShade, ok: () => !isNight && !shadeActive }, // 雲の翳り（昼の静かな整う演出）
     duskLights: { run: evDuskLights, ok: () => isNight }, // 宵の口（夜・窓がぽっと灯る）
     rainbowSolo: { run: evRainbow, ok: () => !rainActive }, // 雨無しの単独虹（中バンドに低確率）＝見せ場を観られる機会を増やす
     rain: { run: () => evRain(30), ok: () => !rainActive },
-    fireworks: { run: evFireworks, ok: () => isNight },
-    fireworksFinale: { run: evFireworksFinale, ok: () => isNight }, // 花火大会のフィナーレ（波状の大当たり）
+    fireworks: { run: evFireworks, ok: () => isNight && weather !== 'rain' && weather !== 'snow' && !rainActive }, // 花火は雨/雪では中止が現実（祭りと同じ）
+    fireworksFinale: { run: evFireworksFinale, ok: () => isNight && weather !== 'rain' && weather !== 'snow' && !rainActive }, // 花火大会のフィナーレも雨天中止
     mist: { run: evMist }, // 通り過ぎるもや（朝もや/宵のもや・時間帯問わず静かに整う）
     drift: { run: evSeasonalDrift, ok: () => season !== 'summer' }, // 季節の風物詩（桜吹雪/落ち葉/粉雪）。夏は無し
     milkyway: { run: evMilkyWay, ok: () => isNight && weather !== 'rain' && weather !== 'snow' }, // 天の川（澄んだ夜空のみ）
     godRays: { run: evGodRays, ok: () => !isNight }, // 天使の梯子（雲間の光芒・昼夕）
-    aurora: { run: evAurora, ok: () => isNight },
+    aurora: { run: evAurora, ok: () => isNight && weather !== 'rain' && !rainActive }, // オーロラは雨の曇天では見えない
   }
   const fxBands = [
     { next: 10 + R() * 8, min: 24, max: 42, quiet: 0.3, pool: ['birds', 'balloon', 'star', 'cloudShade', 'duskLights'] },                 // 頻繁（小さな驚き）。3割は“何も起きない素の街”の余白
