@@ -1530,6 +1530,9 @@ export async function mountTown3d(parent, opts = {}) {
       const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz), pitch = Math.atan2(y1 - y0, len)
       aRot.makeRotationY(Math.atan2(dx, dz))
       const seg = new THREE.BoxGeometry(w, 0.12, len + 0.3)
+      // セグメント毎にUVを位置ハッシュでずらす＝同じmottleパターンが全路地で揃って斜めに反復するのを断つ（主R()非消費）。
+      const uv = seg.attributes.uv, ou = ((x0 * 0.37 + z0 * 0.19) % 1 + 1) % 1, ov = ((x0 * 0.13 - z0 * 0.29) % 1 + 1) % 1
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) + ou, uv.getY(i) + ov)
       aM.makeRotationX(-pitch).premultiply(aRot); aM.setPosition((x0 + x1) / 2, (y0 + y1) / 2 + 0.07, (z0 + z1) / 2); seg.applyMatrix4(aM); alleyGeos.push(seg)
       // 側溝（路地の片側のコンクリ蓋＝U字溝。歩く道が「街路」に締まる＝目線の生活感）
       const nx = -dz / len, nz = dx / len, goff = w / 2 + 0.17
