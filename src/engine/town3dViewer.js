@@ -1349,19 +1349,28 @@ export async function mountTown3d(parent, opts = {}) {
       const balMat = toon(0xbcb6a8), railMat = toon(0x68686c)
       const futCols = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xb0b8a8, 0xd8c8a0] // 布団・洗濯物のくすんだ色
       // 各階のベランダ床/手すり/布団は同材質なので1棟ごとに統合＝集合住宅1棟あたり描画コールを十数→3に（性能：実機の重さ対策）。
-      const slabGeos = [], railGeos = [], futGeos = []
+      const slabGeos = [], railGeos = [], futGeos = [], divGeos = [], acGeos = []
+      const units = Math.max(2, Math.round(w / 3.2)) // 1フロアあたりの住戸数＝隔て板で割る
+      let ahs = ((Math.floor(x) * 73856093) ^ (Math.floor(z) * 19349663)) >>> 0; const ahr = () => { ahs = (ahs * 1664525 + 1013904223) >>> 0; return ahs / 4294967296 } // 位置ハッシュ（室外機の有無＝主R()列を消費しない）
       for (let f = 1; f < floors; f++) {
         const yy = f * (h / floors)
-        const sg2 = new THREE.BoxGeometry(w * 0.96, 0.18, 0.85); sg2.translate(0, yy, d / 2 + 0.38); slabGeos.push(sg2)
-        const rg2 = new THREE.BoxGeometry(w * 0.96, 0.5, 0.1); rg2.translate(0, yy + 0.32, d / 2 + 0.78); railGeos.push(rg2)
+        const sg2 = new THREE.BoxGeometry(w * 0.96, 0.18, 0.9); sg2.translate(0, yy, d / 2 + 0.4); slabGeos.push(sg2)
+        const rg2 = new THREE.BoxGeometry(w * 0.96, 0.5, 0.1); rg2.translate(0, yy + 0.32, d / 2 + 0.82); railGeos.push(rg2)
+        const rg3 = new THREE.BoxGeometry(w * 0.96, 0.06, 0.14); rg3.translate(0, yy + 0.57, d / 2 + 0.82); railGeos.push(rg3) // 手すりの笠木（上端の水平材）＝のっぺり板を脱す
+        // 住戸の隔て板（各戸の境のすりガラス風パネル＝日本のアパートの象徴）。ベランダ幅を units で割る。
+        for (let u = 1; u < units; u++) { const dx = -w * 0.48 + (u / units) * w * 0.96; const dv = new THREE.BoxGeometry(0.05, 0.5, 0.82); dv.translate(dx, yy + 0.3, d / 2 + 0.42); divGeos.push(dv) }
+        // 室外機（一部の住戸のベランダに＝灰の小箱）
+        for (let u = 0; u < units; u++) if (ahr() < 0.32) { const ax = -w * 0.48 + (u + 0.5) / units * w * 0.96; const ac = new THREE.BoxGeometry(0.6, 0.42, 0.32); ac.translate(ax, yy + 0.23, d / 2 + 0.3); acGeos.push(ac) }
         if (R() < 0.4) { // 手すりに布団／洗濯物を干す（生活感）。色は頂点色で焼いて統合
-          const fw = w * 0.28 + R() * w * 0.32, fg2 = new THREE.BoxGeometry(fw, 0.66, 0.12); fg2.translate((R() - 0.5) * (w * 0.55), yy + 0.12, d / 2 + 0.85)
+          const fw = w * 0.28 + R() * w * 0.32, fg2 = new THREE.BoxGeometry(fw, 0.66, 0.12); fg2.translate((R() - 0.5) * (w * 0.55), yy + 0.12, d / 2 + 0.88)
           const fcol = new THREE.Color(futCols[(R() * futCols.length) | 0]); const fa = new Float32Array(fg2.attributes.position.count * 3); for (let i = 0; i < fa.length; i += 3) { fa[i] = fcol.r; fa[i + 1] = fcol.g; fa[i + 2] = fcol.b }; fg2.setAttribute('color', new THREE.BufferAttribute(fa, 3)); futGeos.push(fg2)
         }
       }
       if (BufferGeometryUtils.mergeGeometries) {
         if (slabGeos.length) { const m = BufferGeometryUtils.mergeGeometries(slabGeos, false); if (m) { const me = new THREE.Mesh(m, balMat); me.castShadow = true; g.add(me) } slabGeos.forEach((x) => x.dispose()) }
         if (railGeos.length) { const m = BufferGeometryUtils.mergeGeometries(railGeos, false); if (m) g.add(new THREE.Mesh(m, railMat)); railGeos.forEach((x) => x.dispose()) }
+        const dacGeos = divGeos.concat(acGeos) // 隔て板＋室外機は1メッシュへ統合（描画コール節約）。淡い灰で兼ねる
+        if (dacGeos.length) { const m = BufferGeometryUtils.mergeGeometries(dacGeos, false); if (m) { const me = new THREE.Mesh(m, toon(0xccc9c2)); me.castShadow = true; g.add(me) } dacGeos.forEach((x) => x.dispose()) } // すりガラス風の隔て板＋ベランダの室外機
         if (futGeos.length) { const m = BufferGeometryUtils.mergeGeometries(futGeos, false); if (m) { const fm = toon(0xffffff); fm.vertexColors = true; g.add(new THREE.Mesh(m, fm)) } futGeos.forEach((x) => x.dispose()) }
       }
     } else { // mid: 陸屋根＋屋上設備（塔屋・水タンク・室外機・アンテナ）
