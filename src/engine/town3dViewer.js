@@ -3313,6 +3313,17 @@ export async function mountTown3d(parent, opts = {}) {
         const samWall3 = facadeMat('sama', isNight ? 0x33302c : 0x55483a), samWall4 = mottleMat(season === 'winter' ? 0xe4ded2 : (isNight ? 0xb8b2a4 : 0xd8d0bf), 130, 0.1, [1.5, 1.5]) // 焼杉の黒板／漆喰の白壁(土蔵)
         const samRoofT = mottleMat(season === 'winter' ? 0xcfc8b6 : (isNight ? 0x3e352a : 0x6e5d44), 90, 0.18, [2, 1.4]) // 茅葺(かやぶき)の屋根
         samWall3.vertexColors = true; samWall4.vertexColors = true
+        // 切妻屋根の単位（ridge=X, 妻行=Z, 棟高Y 0→1）。家を「箱＋三角帽(4角錐)」でなく稜線のある家屋に＝戦国の城下町の質感。江戸のgableUnitと同手法。
+        const senGableUnit = (() => {
+          const g = new THREE.BufferGeometry()
+          const P = { a: [-0.5, 0, -0.5], b: [0.5, 0, -0.5], c: [0.5, 0, 0.5], d: [-0.5, 0, 0.5], e: [-0.5, 1, 0], f: [0.5, 1, 0] }
+          const v = [], push = (...pts) => pts.forEach((p) => v.push(p[0], p[1], p[2]))
+          push(P.a, P.b, P.f); push(P.a, P.f, P.e); push(P.d, P.e, P.f); push(P.d, P.f, P.c); push(P.a, P.e, P.d); push(P.b, P.c, P.f)
+          g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+          const uv = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1]
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(uv), 2))
+          g.setIndex([...Array(18).keys()]); g.computeVertexNormals(); return g
+        })()
         const sgWA = [], sgWB = [], sgWC = [], sgWD = [], sgR = [], sgR2 = [], sgRT = [], sgL = [], sgM = new THREE.Matrix4()
         // 城下町＝谷底の川沿いに、街道に沿って不規則な列で家々が並ぶ（的模様の同心円を脱す）。senHに載せ谷底〜中腹のみ。
         for (let s = 0; s < 46; s++) {
@@ -3335,7 +3346,7 @@ export async function mountTown3d(parent, opts = {}) {
               const hh = two ? 2.6 + R() * 0.9 : big ? 2.0 + R() * 0.5 : 1.3 + R() * 0.6
               sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); bakeAO(bg, hh); bg.applyMatrix4(sgM); wgeoArr.push(bg)
               const rh = thatch ? (two ? 1.9 : 1.4) : (two ? 1.3 : 0.85) // 茅葺は厚く高い屋根
-              sgM.makeRotationY(a).setPosition(px, py + hh + rh / 2 - 0.05, pz); const rg = new THREE.ConeGeometry(Math.max(hw, hd) * (thatch ? 0.86 : 0.78), rh, thatch ? 5 : 4); rg.applyMatrix4(sgM); (thatch ? sgRT : R() < 0.4 ? sgR2 : sgR).push(rg) // 茅葺は厚い寄棟／瓦は深い軒
+              const rg = senGableUnit.clone(); rg.scale(hw * 1.04, rh, hd * 1.24); sgM.makeRotationY(a).setPosition(px, py + hh - 0.04, pz); rg.applyMatrix4(sgM); (thatch ? sgRT : R() < 0.4 ? sgR2 : sgR).push(rg) // 切妻の屋根（稜線で家屋に＝箱＋4角錐の三角帽を脱す）。茅葺は厚く高い
               if (isNight && R() < 0.5) { sgM.makeRotationY(a).setPosition(px - side * hw * 0.45, py + hh * (two ? 0.6 : 0.45), pz); const lg = new THREE.BoxGeometry(0.5, 0.45, 0.12); lg.applyMatrix4(sgM); sgL.push(lg) }
             }
           }
