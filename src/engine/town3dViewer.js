@@ -4580,6 +4580,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (bathNight) for (const [hx, hz] of [[-8, -52], [16, -44], [-34, -60], [6, -30]]) { const gy = heightAt(hx, hz); if (gy < SEA.level + 0.6) continue; mkSmoke(hx, gy + 4.2, hz, 4, { rise: 6.5, drift: 2.2, maxSc: 1.3, op: 0.14 }) } // 細く淡く
   }
   let lastCloudHi = true // 雲海の世界の表示状態（変化時だけ visible を書き換える）
+  let cloudRevealMats = null // 雲海の世界の材（高度フェードで透明度を動かし、ポップでなく滲み出させる）。初回の高所フレームで収集
   let lastDeep = false // 雲海の奥深く（街が雲に隠れる高度）か。街を丸ごと隠して負荷半減
   let glory = null // ブロッケンの虹輪（雲海の上を晴れた日に飛ぶと自分の影を囲む円い虹）
   let cloudWalkInfo = null // 雲上の回遊群島（歩ける島＋吊り橋）。active生成後に active.cloudWalk へ渡す
@@ -7801,9 +7802,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 雲海をゆっくり漂うもの（雲海のぬし＝鯨／空の灯籠／渡りの群れ／雲の滝）。
     // 低空（窓辺・街の巡航）では雲海の世界は霧で見えない＝隠して更新も止める＝発熱低減（見た目は不変）。
     const cloudHi = (active.flyP || 0) > 0.4 && active.flyPos.y > 52
+    const cloudReveal = cloudHi ? Math.max(0, Math.min(1, (active.flyPos.y - 58) / 30)) * flyAmt : 0 // 雲海の世界の滲み出し量（y58→88）。島・漂うものを同期させてポップを廃す
     for (const d of skyDrifters) {
       if (!cloudHi) { if (d.o.visible) d.o.visible = false; continue } // 低空ではまとめて隠し、アニメも回さない
-      if (!d.o.visible && d.kind !== 'fall') d.o.visible = true // 高所で復帰（滝は自前の高度フェードに任せる）
+      if (d.kind !== 'fall') d.o.visible = cloudReveal > 0.25 // 漂うもの（鯨/灯籠/群れ/湯けむり）は雲海がある程度滲み出てから現れる＝空の何もない所に突然ポップしない（滝は自前の高度フェード）
       if (d.kind === 'whale') {
         d.o.position.x += 2.2 * dt; if (d.o.position.x > 470) d.o.position.x = -470 // ゆっくり横切り、端で戻る
         d.o.position.y = d.baseY + Math.sin(t * 0.18) * 2.4 // 雲海を上下にたゆたう（呼吸のように）
@@ -7847,6 +7849,11 @@ export async function mountTown3d(parent, opts = {}) {
       }
     }
     if (cloudHi !== lastCloudHi) { lastCloudHi = cloudHi; for (const o of cloudObjs) o.visible = cloudHi } // 低空では雲海の静的要素も一括で隠す（描画コール節約・見た目は霧で不変）
+    // 雲海の世界（島・入道雲・吊り橋）を高度でゆっくりフェードして滲み出させる＝boolのポップを廃し、雲海(seaOp)と同期した上質な切り替わりに。
+    if (cloudHi) {
+      if (!cloudRevealMats) { cloudRevealMats = []; for (const o of cloudObjs) o.traverse((c) => { if (c.isMesh) { const mm = Array.isArray(c.material) ? c.material : [c.material]; for (const m of mm) { if (m && m.__revBase === undefined) { m.__revBase = (m.opacity == null ? 1 : m.opacity); m.transparent = true; cloudRevealMats.push(m) } } } }) }
+      for (const m of cloudRevealMats) m.opacity = m.__revBase * cloudReveal // y58で滲み始めy88で実体化（雲海seaOp y70→92に重なり、白い霞seaCrossが仕上げを覆う）
+    }
     // 雲海の奥深く（雲の層の上＝眼下の街は雲deckに隠れる高度）では街を丸ごと非表示＝「雲海＋街」の二重描画を解消し負荷を半減（雲海の重さ対策）。ヒステリシスでチラつき防止。
     const deepCloud = cloudHi && active.flyPos.y > (lastDeep ? SEA_Y + 2 : SEA_Y + 10)
     if (deepCloud !== lastDeep) { lastDeep = deepCloud; town.visible = !deepCloud }
