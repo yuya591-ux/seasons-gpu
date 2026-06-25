@@ -4653,6 +4653,9 @@ export async function mountTown3d(parent, opts = {}) {
       const g = new THREE.Group()
       g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 2.4, 22), tn(isleGrass))) // 草の頂
       const rk = new THREE.Mesh(new THREE.ConeGeometry(r * 0.96, r * 1.2, 16), tn(isleRock)); rk.rotation.x = Math.PI; rk.position.y = -r * 0.62; g.add(rk) // 下へ細る岩肌
+      // 草の頂にぽつぽつ低木＝平らな草地を脱し雲の島に緑の生命感（少数・島は低空で一括カリング＝発熱安全）
+      const bushC = tn(isNight ? 0x2e4a36 : 0x4f7a4e), nb = 2 + ((r / 8) | 0)
+      for (let i = 0; i < nb; i++) { const a = R() * 6.28, rr = R() * r * 0.6, bs = 0.7 + R() * 0.7; const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(bs, 1), bushC); bush.scale.y = 0.68; bush.position.set(Math.cos(a) * rr, 1.2 + bs * 0.45, Math.sin(a) * rr); g.add(bush) }
       return g
     }
     const isles = []
