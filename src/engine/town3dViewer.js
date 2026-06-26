@@ -5492,16 +5492,24 @@ export async function mountTown3d(parent, opts = {}) {
   const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8, 0x4a5560, 0xcf6f93, 0xd0904e]
   const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e, 0x55504a], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24, 0x4c3727, 0x6b5038]
   const skinCols = [0xf0c49c, 0xf6d2b0, 0xe8b489]
+  const peepBodyMat = toon(0xffffff); peepBodyMat.vertexColors = true // 歩行者の静止部(胴/首/頭/髪/目)を1メッシュへ統合する共有材
   const makePeep = () => {
     const g = new THREE.Group(), legs = [], arms = []
-    const pm = toon(pantsCols[(R() * pantsCols.length) | 0]), tm = toon(peepCols[(R() * peepCols.length) | 0]), hm = toon(hairCols[(R() * hairCols.length) | 0]), sm = toon(skinCols[(R() * skinCols.length) | 0])
-    // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く。少し長く細く＝寸胴(壺)を解消。
+    // 色は先に確定（R()の消費順は従来通り: ズボン→上着→髪→肌）＝下流の決定的配置を崩さない
+    const pantHex = pantsCols[(R() * pantsCols.length) | 0], topHex = peepCols[(R() * peepCols.length) | 0], hairHex = hairCols[(R() * hairCols.length) | 0], skinHex = skinCols[(R() * skinCols.length) | 0]
+    const pm = toon(pantHex), tm = toon(topHex)
+    // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く。少し長く細く＝寸胴(壺)を解消。可動なので統合しない。
     for (const s of [-1, 1]) { const leg = new THREE.Group(); const lm = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.066, 0.68, 6), pm); lm.position.y = -0.34; lm.castShadow = true; leg.add(lm); leg.position.set(s * 0.1, 0.74, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点）
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.135, 0.6, 10), tm); torso.position.y = 1.04; torso.castShadow = true; g.add(torso) // 胴＝肩(上)から腰(下)へすぼまる一本のテーパー（壺の寸胴を避け肩を張る）
-    for (const s of [-1, 1]) { const arm = new THREE.Group(); const am = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.046, 0.52, 6), tm); am.position.y = -0.26; am.castShadow = true; arm.add(am); arm.position.set(s * 0.205, 1.28, 0); arm.rotation.z = s * 0.08; g.add(arm); arms.push(arm) } // 腕（肩支点。肩幅に合わせ内へ）
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 7), sm); neck.position.y = 1.37; neck.castShadow = true; g.add(neck) // 首（頭が肩にめり込まず頭身が伸びる＝こけし/壺感の解消）
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 9), sm); head.position.y = 1.55; head.scale.set(0.94, 1.06, 0.96); g.add(head) // 頭は小さめ＝約7頭身に
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.183, 10, 9, 0, Math.PI * 2, 0, Math.PI * 0.62), hm); hair.position.set(0, 1.58, -0.012); g.add(hair) // 髪（上＋後ろ。顔は出す）
+    for (const s of [-1, 1]) { const arm = new THREE.Group(); const am = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.046, 0.52, 6), tm); am.position.y = -0.26; am.castShadow = true; arm.add(am); arm.position.set(s * 0.205, 1.28, 0); arm.rotation.z = s * 0.08; g.add(arm); arms.push(arm) } // 腕（肩支点・可動なので別）
+    // 胴＋首＋頭＋髪＋目を頂点色で1メッシュへ統合＝歩行者1体の描画コールを 8→5 に（窓辺=発熱ホットスポットで効く。腕脚の可動は維持）。
+    const bgeos = []
+    const bbake = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); bgeos.push(geo) }
+    bbake(new THREE.CylinderGeometry(0.2, 0.135, 0.6, 10).toNonIndexed().translate(0, 1.04, 0), topHex) // 胴（肩→腰のテーパー）
+    bbake(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 7).toNonIndexed().translate(0, 1.37, 0), skinHex) // 首
+    const hg = new THREE.SphereGeometry(0.17, 10, 9).toNonIndexed(); hg.scale(0.94, 1.06, 0.96); hg.translate(0, 1.55, 0); bbake(hg, skinHex) // 頭（小さめ＝約7頭身）
+    bbake(new THREE.SphereGeometry(0.183, 10, 9, 0, Math.PI * 2, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.58, -0.012), hairHex) // 髪（上＋後ろ・顔は出す）
+    for (const s of [-1, 1]) bbake(new THREE.SphereGeometry(0.026, 5, 4).toNonIndexed().translate(s * 0.06, 1.56, 0.152), 0x241c16) // 目（歩いて寄ると顔のある人）
+    if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bgeos, false); if (m) { const body = new THREE.Mesh(m, peepBodyMat); body.castShadow = true; g.add(body) } bgeos.forEach((q) => q.dispose()) }
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
     g.userData = { legs, arms }
     return g
