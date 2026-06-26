@@ -2712,6 +2712,16 @@ export async function mountTown3d(parent, opts = {}) {
           leafG.concat(...buckets).forEach((g) => g.dispose())
         }
       }
+      // ── 蓮の葉（夏＝池に浮く緑の葉＋数輪の蓮の花。水面の彩り）。決定的配置＋統合で軽量。──
+      if (season === 'summer') {
+        const padG = [], flG = [], lotM = new THREE.Matrix4()
+        for (let i = 0; i < 9; i++) {
+          const a = i / 9 * 6.2832 + 0.5, rr = 1.0 + (i % 4) * 1.05, lx = px0 + Math.cos(a) * rr, lz = pz0 + Math.sin(a) * rr
+          const pad = new THREE.CircleGeometry(0.42 + (i % 3) * 0.12, 7); pad.rotateX(-Math.PI / 2); lotM.makeTranslation(lx, waterY + 0.06, lz); pad.applyMatrix4(lotM); padG.push(pad)
+          if (i % 4 === 0) { const fl = new THREE.IcosahedronGeometry(0.15, 0); fl.scale(1, 1.3, 1); lotM.makeTranslation(lx + 0.12, waterY + 0.2, lz); fl.applyMatrix4(lotM); flG.push(fl) } // 蓮の花（蕾）
+        }
+        if (BufferGeometryUtils.mergeGeometries) { const pm = padG.length && BufferGeometryUtils.mergeGeometries(padG, false); if (pm) town.add(new THREE.Mesh(pm, toon(0x5a8a4a))); const fm = flG.length && BufferGeometryUtils.mergeGeometries(flG, false); if (fm) town.add(new THREE.Mesh(fm, toon(0xe2aac6))); padG.concat(flG).forEach((g) => g.dispose()) }
+      }
       // ベンチ×3（広場に。池の方を向く）
       for (const bp of [[px0 - 8, pz0 - 1, 1.4], [px0 + 8.5, pz0 + 1, -1.4], [px0 - 1, pz0 + 8.5, 3.0]]) {
         const gy = heightAt(bp[0], bp[1]); const bg = new THREE.Group(); bg.position.set(bp[0], gy, bp[1]); bg.rotation.y = bp[2]; town.add(bg)
