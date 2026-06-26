@@ -402,10 +402,10 @@ export async function mountTown3d(parent, opts = {}) {
     stage.style.setProperty('--t3d-glow', rgbStr(sunCol))
     stage.style.setProperty('--t3d-shade', rgbStr(shadeCol))
     // 統一ウォッシュの濃さ＝昼は控えめに暖色で空気を一枚に、夜/雪は弱める（白飛び・寒色の濁りを避ける）
-    stage.style.setProperty('--t3d-wash-a', isNight ? '0.10' : weather === 'snow' ? '0.12' : '0.20')
+    stage.style.setProperty('--t3d-wash-a', isNight ? '0.10' : weather === 'snow' ? '0.07' : '0.20') // 雪は暖色ウォッシュを更に弱める＝高反射の白に暖色が乗って白飛び・乳白化するのを防ぐ（雪は寒色で澄ませる）
   }
   // 光（やわらかなトゥーン陰影。夜は月明かりへ）
-  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.62 : 1.02) // 方向光を主役に＝セルの明部/影部をはっきり（線形トーン用に白飛び防止）
+  const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.62 : weather === 'snow' ? 0.86 : 1.02) // 方向光を主役に＝セルの明部/影部をはっきり（線形トーン用に白飛び防止／雪は高反射で白飛びしやすいので一段抑える）
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
   sun.shadow.mapSize.set(SHADOW_SIZE, SHADOW_SIZE) // 影は一度だけ焼く静的影なので高精細化してもコスト増ゼロ。light端末は1024に落として焼き負荷とメモリを抑える
@@ -459,8 +459,8 @@ export async function mountTown3d(parent, opts = {}) {
     sgr.addColorStop(0.47, 'rgba(176,198,255,0.10)'); sgr.addColorStop(0.53, 'rgba(188,236,200,0.11)') // 彩雲リング（青→緑）
     sgr.addColorStop(0.59, 'rgba(255,226,168,0.12)'); sgr.addColorStop(0.65, 'rgba(255,184,172,0.10)') // 黄→赤
     sgr.addColorStop(0.76, 'rgba(255,184,172,0)'); sgx.fillStyle = sgr; sgx.fillRect(0, 0, 128, 128)
-    sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(scv), transparent: true, opacity: 0.92, depthWrite: false, fog: false }))
-    sunGlow.scale.set(155, 155, 1); scene.add(sunGlow)
+    sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(scv), transparent: true, opacity: weather === 'snow' ? 0.58 : 0.92, depthWrite: false, fog: false })) // 雪は窓ごしに白飛びしやすい＝光輪を弱め小さく（暖かいにじみは残す）
+    { const sgS = weather === 'snow' ? 124 : 155; sunGlow.scale.set(sgS, sgS, 1); scene.add(sunGlow) }
     // 見える太陽は主視界(街=-z)の上・低めに置く（陽が街の向こうにある絵。夕焼け情景では茜の空に沈む）。影は様式化で微差を許容。
     sunDir.set(0.06, 0.26, -1).normalize()
   }
