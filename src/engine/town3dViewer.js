@@ -6512,15 +6512,22 @@ export async function mountTown3d(parent, opts = {}) {
     return false
   }
   // 着地点の開放度＝8方位で歩ける距離の最大。降りた所が箱詰め（密集の谷間）なら低い。
-  const maxClearAt = (x, z) => { let best = 0; for (let a = 0; a < 8; a++) { const yaw = a / 8 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw); let d = 1.0; for (; d < 14; d += 1.4) { if (blockedAt(x + hx * d, z + hz * d)) break } if (d > best) best = d } return best }
+  const maxClearAt = (x, z) => { let best = 0; for (let a = 0; a < 8; a++) { const yaw = a / 8 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw); let d = 1.0; for (; d < 24; d += 1.6) { if (blockedAt(x + hx * d, z + hz * d)) break } if (d > best) best = d } return best } // 24uまで測る＝「狭いが空いてる(14)」と「本当に開けた(24)」を区別し、抜けのある着地点を選べるようにする（旧14だと閾16に届かず全て同等扱いだった）
   active.resolveSpawn = (x, z) => {
     // 「建物/水を避ける」だけでなく「歩いて出られる開けた所」を選ぶ＝降りた途端に透明の壁で詰まらない。
     // さらに、屋台/門/群衆の際に降りると一人称の前方が近接物で塞がるため、十分に開けた地点を優先する
     // （前方視界の抜けを確保＝降り立った景色を気持ちよく）。16u以上開けた所を見つけたら即採用、無ければ最も開けた所。
     let best = null, bestClear = -1
-    const consider = (nx, nz) => { if (spawnBad(nx, nz)) return false; const c = maxClearAt(nx, nz); if (c > bestClear) { bestClear = c; best = [nx, nz] }; return c >= 16 } // 十分に開けた所を優先（旧: 9u即採用→近接物で塞がりやすかった）
+    const consider = (nx, nz) => {
+      if (spawnBad(nx, nz)) return false
+      const c = maxClearAt(nx, nz); if (c > bestClear) { bestClear = c; best = [nx, nz] } // 最も開けた所をフォールバックに保持（従来どおり）
+      // 急斜面の縁に降りると視界が斜面の地肌で埋まる（評価指摘の着地景色の悪化）。前後左右8u先の高低差が小さい平場を「良い着地点」とする。
+      const h0 = heightAt(nx, nz); let maxRise = 0
+      for (const [ox, oz] of [[8, 0], [-8, 0], [0, 8], [0, -8]]) { const dh = Math.abs(heightAt(nx + ox, nz + oz) - h0); if (dh > maxRise) maxRise = dh }
+      return c >= 16 && maxRise < 6 // 抜けがあり かつ 平場（斜面の縁を避ける）＝即採用。無ければ最も開けた所へフォールバック
+    }
     if (consider(x, z)) return [x, z]
-    for (let r = 1.5; r <= 22; r += 1.5) {
+    for (let r = 1.5; r <= 28; r += 1.5) { // 抜けのある所まで少し広く探す（斜面の縁など詰まった所からも開けた景色へ寄せる）
       for (let a = 0; a < 12; a++) {
         const nx = x + Math.cos(a / 12 * 6.2832) * r, nz = z + Math.sin(a / 12 * 6.2832) * r
         if (consider(nx, nz)) return [nx, nz]
