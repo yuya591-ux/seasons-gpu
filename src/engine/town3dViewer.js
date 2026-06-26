@@ -2623,7 +2623,7 @@ export async function mountTown3d(parent, opts = {}) {
       const px0 = PARK.x, pz0 = PARK.z, pondR = PARK.pondR
       const pondGround = heightAt(px0, pz0) + PARK.pondDepth // 掘る前の中心地面
       const waterY = pondGround - 0.7
-      const stoneMat = toon(0x9a958c), woodMat = toon(0x8a6a48)
+      const stoneMat = mottleMat(0x9a958c, 90, 0.1, [2, 2]), woodMat = toon(0x8a6a48) // 池の縁石・灯籠に石のムラ質感（近接で映える）
       // 水面（空を映す水鏡。MeshToonの空グラデで白飛びを防ぐ）。冬は氷の張った淡い面に。
       const iced = season === 'winter'
       const pc = document.createElement('canvas'); pc.width = pc.height = 64; const pcx = pc.getContext('2d')
