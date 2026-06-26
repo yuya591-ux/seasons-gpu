@@ -134,8 +134,11 @@ export function pickNowScene(date = new Date()) {
     let score = 0
     if (s.axes.season === season) score += 2
     if (s.axes.time === time) score += 2
-    if (s.render === 'town3d') score += 4 // 本物の3Dの街を主役に（その季節の立体の街で開く）
-    else if (s.render === 'cornerRoom') score += 1 // 角部屋は次点
+    // 第一印象は「差別化の核」へ（評価 全員一致）。最も心を掴む旗艦＝実写の窓・雨ガラスを「いま」の顔に。
+    // 季節＋時間帯(最大+4)を主軸に保ちつつ、劇的な時間帯(夕/雨)では旗艦の窓が前へ、ふだんの昼は立体の街が出る。
+    if (s.render === 'photoWindow' || s.render === 'rainGlass') score += 3 // 旗艦の窓（実写・雨ガラス）
+    else if (s.render === 'town3d') score += 2 // 本物の3Dの街（その季節の立体の街）＝日常の眺め
+    else if (s.render === 'cornerRoom') score += 2 // 角部屋の見回し
     if (score > bestScore) {
       bestScore = score
       best = s

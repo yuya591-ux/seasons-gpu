@@ -309,8 +309,10 @@ export function createRenderer(canvas) {
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, DPR_BY_QUALITY[quality] || 1.5) * renderScale
-    const w = Math.floor(canvas.clientWidth * dpr)
-    const h = Math.floor(canvas.clientHeight * dpr)
+    // 非表示中(town3d/splat表示中はcanvasがdisplay:none＝clientWidth 0)に0サイズのFBO/ビューポートを作ると
+    // INVALID_FRAMEBUFFER_OPERATION(zero size)で1フレーム黒くなる。最低1pxへクランプして回避（評価 技術-重要1）。
+    const w = Math.max(1, Math.floor(canvas.clientWidth * dpr))
+    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr))
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w
       canvas.height = h
@@ -360,6 +362,7 @@ export function createRenderer(canvas) {
     rafId = requestAnimationFrame(render)
     if (now - lastRenderTime < 30) return // ~33fps上限（描画をスキップしてGPUを休ませる）
     lastRenderTime = now
+    if (canvas.clientWidth < 1 || canvas.clientHeight < 1) return // 非表示中(town3d/splat表示中など)はサイズ0描画を避ける（FBO不完全エラー回避・評価 技術-重要1）
     // フレーム時間を測り、重い端末では描画解像度を自動調整（発熱を抑え滑らかさを保つ）
     if (lastFrame > 0) {
       const dt = now - lastFrame

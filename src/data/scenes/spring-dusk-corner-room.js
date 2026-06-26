@@ -35,7 +35,7 @@ export default {
 
   // 春の宵の気配: うぐいす＋渡る風（春の郷愁）。カエルの合唱は街の窓辺に合わず不快なため差し替え。CREDITS.md に全数記録。
   sounds: [
-    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.3, loop: true },
+    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', loop: false, interval: [9, 22], gain: 0.3 },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.12, loop: true },
   ],
 }

@@ -30,7 +30,7 @@ export default {
 
   // 山あいの朝＝うぐいす＋谷の沢のせせらぎ＋渡る風（既存のCC0素材を再利用）。風だけでは寂しいので朝の山の音を重ねる。
   sounds: [
-    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', gain: 0.34, loop: true },
+    { id: 'uguisu', label: 'うぐいす', src: 'audio/shishigaya-morning-yato/uguisu.mp3', loop: false, interval: [7, 19], gain: 0.34 },
     { id: 'stream', label: 'せせらぎ', src: 'audio/shishigaya-morning-yato/stream.mp3', gain: 0.26, loop: true },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.16, loop: true },
   ],

@@ -298,6 +298,15 @@ export async function mountTown3d(parent, opts = {}) {
   // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
   renderer.shadowMap.autoUpdate = false
   stage.appendChild(renderer.domElement)
+  // WebGLコンテキスト喪失への備え（評価 技術-致命3）。preventDefault しないと二度と復帰できず黒画面が固定化する。
+  // 立体の街は全構築物をmount時に生成するため、その場での再構築は非現実的→復帰時は同じ情景を「組み直す」(onContextRestore)。
+  let contextLost = false
+  renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); contextLost = true }, false)
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    contextLost = false
+    if (opts.onContextRestore) { try { opts.onContextRestore() } catch (_) { /* 無視 */ } } // 親(main)が情景を組み直す＝GPU資源を新コンテキストで作り直す
+    else { try { renderer.shadowMap.needsUpdate = true; applySize() } catch (_) { /* 無視 */ } } // フォールバック（最低限の描画継続）
+  }, false)
 
   const scene = new THREE.Scene()
   const pal = opts.palette || {}
@@ -6497,6 +6506,10 @@ export async function mountTown3d(parent, opts = {}) {
         for (const e of winEmis) e.dispose()
         grad.dispose()
       } catch (e) { /* 無視 */ }
+      // 後処理(EffectComposer/Bloom/FXAA)のRenderTargetをGPUから解放（評価 技術-致命2）。
+      // これを怠ると情景往復のたびにMSAA RT＋composerのrenderTarget1/2＋bloomの内部RTがGPUに残留し、
+      // 低メモリ端末で数往復すると（コード全体が避けようとしている）コンテキスト枯渇/黒画面を誘発する。
+      try { if (composer) { for (const p of composer.passes) { if (p && p.dispose) p.dispose() } composer.dispose() } } catch (e) { /* 無視 */ }
       // forceContextLoss() は呼ばない: 上で geometry/material/texture を解放済みなので不要で、
       // 情景往復のたびにコンテキストを強制喪失・再生成するとモバイルでコンテキスト枯渇→3D表示不能の温床になる（評価 技術-H5）。
       renderer.dispose()
@@ -7336,6 +7349,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
     if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
+    if (contextLost) return // WebGLコンテキスト喪失中は描画/更新を止める（GLエラーの洪水を避ける。復帰でonContextRestoreが組み直す）
     const t = (performance.now() - startT) / 1000
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
     // ぼーっと眺めている長い時間は約22fpsへ落とす＝電池/発熱を抑える（dtは実クロックなので動きは滑らかなまま）。
