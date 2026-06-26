@@ -397,10 +397,12 @@ export function createAudio(opts) {
     // 人混みのざわめき：人声の中域(低音の歪み無し)。スローLFOで“ざわざわ”と満ち引き。
     const csrc = ctx.createBufferSource(); csrc.buffer = buf; csrc.loop = true
     const chp = ctx.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = 360; chp.Q.value = 0.5
-    const cbp = ctx.createBiquadFilter(); cbp.type = 'bandpass'; cbp.frequency.value = 650; cbp.Q.value = 0.7 // 人声の帯
-    const clp = ctx.createBiquadFilter(); clp.type = 'lowpass'; clp.frequency.value = 1600
+    const cbp = ctx.createBiquadFilter(); cbp.type = 'bandpass'; cbp.frequency.value = 650; cbp.Q.value = 0.8 // 人声の第1フォルマント（スローLFOで母音を揺らす）
+    const cbp2 = ctx.createBiquadFilter(); cbp2.type = 'bandpass'; cbp2.frequency.value = 1150; cbp2.Q.value = 0.9 // 第2フォルマント＝二つの母音帯で「人声のざわめき」に近づける（単一帯の定常ノイズを脱す）
+    const cbp2g = ctx.createGain(); cbp2g.gain.value = 0.55
+    const clp = ctx.createBiquadFilter(); clp.type = 'lowpass'; clp.frequency.value = 1900
     const cg = ctx.createGain(); cg.gain.value = 0.0
-    csrc.connect(chp).connect(cbp).connect(clp).connect(cg).connect(master)
+    csrc.connect(chp); chp.connect(cbp).connect(clp); chp.connect(cbp2).connect(cbp2g).connect(clp); clp.connect(cg).connect(master)
     waterNode = { wg, rg, cg, wAmp: null, rAmp: null, cAmp: null }
     try { // 波のスウェル（寄せて返す）。LFOの振幅(wAmp)は setAmbience が海の近さで持たせる＝海に近いほど大きく寄せる。
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11      // 約9秒周期の大きなうねり
@@ -413,6 +415,7 @@ export function createAudio(opts) {
       const cAmp = ctx.createGain(); cAmp.gain.value = 0; clfo.connect(cAmp).connect(cg.gain); clfo.start()
       const clfo2 = ctx.createOscillator(); clfo2.frequency.value = 0.16
       const cAmp2 = ctx.createGain(); cAmp2.gain.value = 0; clfo2.connect(cAmp2).connect(cg.gain); clfo2.start()
+      const cfMod = ctx.createOscillator(); cfMod.frequency.value = 0.13; const cfg = ctx.createGain(); cfg.gain.value = 170; cfMod.connect(cfg).connect(cbp.frequency); cfMod.start() // 母音帯をゆっくり上下に揺らし「ざわざわ」と表情を変える（定常ノイズ脱却）
       waterNode.wAmp = wAmp; waterNode.wAmp2 = wAmp2; waterNode.rAmp = rAmp; waterNode.cAmp = cAmp; waterNode.cAmp2 = cAmp2
     } catch { /* LFO非対応でもベース音量で鳴る */ }
     try { wsrc.start(); rsrc.start(); csrc.start() } catch { /* 無視 */ }
@@ -789,12 +792,16 @@ export function createAudio(opts) {
         }
         const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4 // 口の開き（母音フォルマント）
         bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + 0.1); bp.frequency.linearRampToValueAtTime(720, t + 0.42)
-        const bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 2600; bp2.Q.value = 3 // 第2フォルマント（鼻にかかる）
+        const bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.Q.value = 3 // 第2フォルマント（鼻にかかる）＝時間で動かし母音の表情を出す（固定だと電子音っぽい）
+        bp2.frequency.setValueAtTime(1750, t); bp2.frequency.linearRampToValueAtTime(2800, t + 0.1); bp2.frequency.linearRampToValueAtTime(2050, t + 0.42)
         const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t)
         const dur = kind === 'short' ? 0.22 : 0.55, peak = 0.055
         g.gain.linearRampToValueAtTime(peak, t + 0.05); g.gain.setTargetAtTime(0.0001, t + dur * 0.5, dur * 0.28)
         osc.connect(bp); bp.connect(bp2); bp2.connect(g); g.connect(indoorBus) // 猫は室内＝窓の防音を受けない
-        try { const vib = ctx.createOscillator(); vib.frequency.value = 22; const vg = ctx.createGain(); vg.gain.value = base * 0.045; vib.connect(vg).connect(osc.frequency); vib.start(t); vib.stop(t + dur + 0.1) } catch { /* 震え無しでも鳴る */ }
+        // ビブラート＝鳴くたびに速さ/深さを変え、二つの非整数比の周期を重ねて「規則的すぎる電子ビブラート」を脱す（生体の揺らぎ）
+        try { const vr = 17 + Math.random() * 9
+          const vib = ctx.createOscillator(); vib.frequency.value = vr; const vg = ctx.createGain(); vg.gain.value = base * (0.038 + Math.random() * 0.02); vib.connect(vg).connect(osc.frequency); vib.start(t); vib.stop(t + dur + 0.1)
+          const vib2 = ctx.createOscillator(); vib2.frequency.value = vr * 0.43; const vg2 = ctx.createGain(); vg2.gain.value = base * 0.016; vib2.connect(vg2).connect(osc.frequency); vib2.start(t); vib2.stop(t + dur + 0.1) } catch { /* 震え無しでも鳴る */ }
         osc.start(t); osc.stop(t + dur + 0.1)
       } catch { /* 無視 */ }
     },
