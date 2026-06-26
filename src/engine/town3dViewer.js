@@ -3864,6 +3864,22 @@ export async function mountTown3d(parent, opts = {}) {
             } }
             if (BufferGeometryUtils.mergeGeometries) { const lm = lf2.length && BufferGeometryUtils.mergeGeometries(lf2, false); if (lm) { const me = new THREE.Mesh(lm, toon(0x4e6e3a)); me.castShadow = true; town.add(me) } bk.forEach((b2, i) => { if (b2.length) { const m = BufferGeometryUtils.mergeGeometries(b2, false); if (m) { const me2 = new THREE.Mesh(m, toon(ajiCols[i])); me2.castShadow = true; town.add(me2) } } }); lf2.concat(...bk).forEach((g) => g.dispose()) }
           }
+          { // ── 大正の運河沿いの並木（銀杏並木＝大正モダンの街路樹。広い灰色の道の単調を脱す）。決定的配置＋統合で軽量。秋は黄葉。──
+            const trunkG = [], leafG = [], tM = new THREE.Matrix4()
+            const leafHex = season === 'autumn' ? 0xd2a23e : season === 'spring' ? 0x8aa858 : weather === 'snow' ? 0x6e7a64 : 0x6f9a52
+            for (let cxa = -16; cxa <= 24; cxa += 8) { for (const sd of [-1, 1]) {
+              const px = tx + cxa, pz = cz0 + 6.8 * sd, py = heightAt(px, pz)
+              if (py < SEA.level + 0.8 || taishoCanal(px, pz) < 4.5) continue // 運河の水・汀は避ける
+              const tg = new THREE.CylinderGeometry(0.16, 0.24, 3.0, 6); tM.makeTranslation(px, py + 1.5, pz); tg.applyMatrix4(tM); trunkG.push(tg)
+              if (season !== 'winter') { for (const [ox, oy, oz, r] of [[0, 3.4, 0, 1.3], [-0.7, 3.0, 0.3, 0.85], [0.7, 3.1, -0.3, 0.9], [0.1, 3.9, 0.2, 0.8]]) { const lg = new THREE.IcosahedronGeometry(r, 1); tM.makeTranslation(px + ox, py + oy, pz + oz); lg.applyMatrix4(tM); leafG.push(lg) } }
+              else { const lg = new THREE.IcosahedronGeometry(0.95, 1); tM.makeTranslation(px, py + 3.3, pz); lg.applyMatrix4(tM); leafG.push(lg) } // 冬は雪をかぶった樹冠
+              colliders.push({ x: px, z: pz, r: 0.5 }) // 歩行で幹を抜けない
+            } }
+            if (BufferGeometryUtils.mergeGeometries) {
+              if (trunkG.length) { const m = BufferGeometryUtils.mergeGeometries(trunkG, false); if (m) { const me = new THREE.Mesh(m, toon(0x6b4a2e)); me.castShadow = true; town.add(me) } trunkG.forEach((g) => g.dispose()) }
+              if (leafG.length) { const m = BufferGeometryUtils.mergeGeometries(leafG, false); if (m) { const me = new THREE.Mesh(m, toon(leafHex)); me.castShadow = true; town.add(me) } leafG.forEach((g) => g.dispose()) }
+            }
+          }
         }
         const brick = brickMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 2.4, 2.2) // 赤煉瓦（イギリス積み＝近接で本物の煉瓦壁）
         const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
