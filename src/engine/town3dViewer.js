@@ -373,7 +373,20 @@ export async function mountTown3d(parent, opts = {}) {
       side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
       uniforms: { top: skyUniTop, bot: skyUniBot },
       vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
-      fragmentShader: 'varying vec3 vP; uniform vec3 top; uniform vec3 bot; void main(){ float h=clamp(vP.y/560.0*1.7+0.2,0.0,1.0); gl_FragColor=vec4(mix(bot,top,h),1.0);} ',
+      // 3色グラデ＋ディザ。2色の直線ぼかしだと中空がのっぺりし8bitのバンディング(縞)が出る。
+      // 地平=淡く暖、中空=いちばん青が濃い帯、天頂=やや締まる ＝本物の空の層。最後に微小ディザで縞を散らす。
+      fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 bot;
+        void main(){
+          float h = clamp(vP.y/560.0*1.7+0.2, 0.0, 1.0);
+          vec3 base = mix(bot, top, 0.5);
+          float lum = dot(base, vec3(0.299, 0.587, 0.114));
+          vec3 mid = clamp(mix(vec3(lum), base, 1.18), 0.0, 1.0); // 中空の帯を少し彩度上げ＝青の伸び
+          vec3 col = mix(bot, mid, smoothstep(0.0, 0.55, h));
+          col = mix(col, top, smoothstep(0.45, 1.0, h));
+          float d = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+          col += (d - 0.5) / 255.0; // ディザ＝階調の縞を画素ノイズで散らす
+          gl_FragColor = vec4(col, 1.0);
+        }`,
     })
     skyDome = new THREE.Mesh(skyGeo, skyMat); skyDome.frustumCulled = false; skyDome.renderOrder = -1; scene.add(skyDome)
   }
@@ -1321,7 +1334,7 @@ export async function mountTown3d(parent, opts = {}) {
       rp.setY(i, heightAt(lx, lz - 35) + 0.07)
       // 低周波の路面の濃淡（補修跡・日焼け・轍の汚れ）。テクスチャの反復に乗らない地形ベースの長い
       // うねりで、のっぺり灰の平面を脱して「使い込まれた路面」に（俯瞰で効く）。
-      const m = 0.9 + 0.15 * Math.sin(lz * 0.16 + 1.3) + 0.08 * Math.sin(lz * 0.43 + lx)
+      const m = Math.min(1, 0.9 + 0.15 * Math.sin(lz * 0.16 + 1.3) + 0.08 * Math.sin(lz * 0.43 + lx)) // 1.0で頭打ち＝明部が白飛びしない（暗い補修跡だけ残す）
       rcol.push(m, m, m)
     }
     rg.setAttribute('color', new THREE.Float32BufferAttribute(rcol, 3))
@@ -1334,7 +1347,8 @@ export async function mountTown3d(parent, opts = {}) {
     rtx.fillStyle = 'rgba(206,196,150,0.55)'; for (let y = 0; y < 256; y += 44) rtx.fillRect(31, y + 8, 3, 22) // 黄色のセンターライン（破線）
     rtx.fillStyle = 'rgba(198,198,198,0.26)'; rtx.fillRect(6, 0, 2, 256); rtx.fillRect(56, 0, 2, 256) // 路肩線
     const roadTex = new THREE.CanvasTexture(rtc); roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 8)
-    const road = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: roadTex, vertexColors: true }))
+    // トゥーン材＝周りの舗装(mottleMat)と同じ平坦な光の乗り。Lambertは陽光を全受けして路面だけ白飛び/夕方に金色へ浮いていた（評価アート）。
+    const road = new THREE.Mesh(rg, snowify(new THREE.MeshToonMaterial({ map: roadTex, gradientMap: grad, vertexColors: true })))
     road.position.z = -35; road.receiveShadow = true; town.add(road)
     // 縁石（道の両肩）。短い箱を地形に沿って並べ1メッシュへ統合＝歩くと路肩が立ち、街路が地に着く。
     {
@@ -1803,7 +1817,7 @@ export async function mountTown3d(parent, opts = {}) {
     const promY = (px, pz) => heightAt(px, pz)
     for (let i = 0; i < 5; i++) { const pz = mhz - 10 + i * 5.5, px = 69, py = promY(px, pz); if (py < SEA.level + 0.5) continue
       const bench = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.45, 0.6), deckMat); bench.position.set(px, py + 0.3, pz); bench.rotation.y = Math.PI / 2; town.add(bench)
-      if (i % 2 === 0) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6), toon(0x6a4f38)); tr.position.set(px - 2, py + 0.9, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e8a52)); fo.position.set(px - 2, py + 2.3, pz); fo.castShadow = true; town.add(fo) } }
+      if (i % 2 === 0) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6), toon(0x6a4f38)); tr.position.set(px - 2, py + 0.9, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 2), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e8a52)); fo.position.set(px - 2, py + 2.3, pz); fo.castShadow = true; town.add(fo) } }
   }
 
   // ── 沖を行く帆船（home↔時代エリアの開けた海を渡る飛行に、穏やかな見どころの焦点を置く）。静的＋波にゆれるだけ＝発熱/リーク無し。R()不使用で生成列を保つ。──
@@ -3615,7 +3629,13 @@ export async function mountTown3d(parent, opts = {}) {
       }
       // ── 海の渡りの演出（帆船・島影）。退屈な海にせず、瞑想的な“渡り”に（海鳥は海鳥のループへ）。──
       {
-        const mkPine = (px, py, pz, s = 1) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.9 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.95 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.ConeGeometry(1.5 * s, 2.2 * s, 7), toon(season === 'autumn' ? 0x8a7a40 : season === 'winter' ? 0x9aa6a0 : 0x4e6e44)); fo.position.set(px, py + 2.6 * s, pz); town.add(fo) }
+        const mkPine = (px, py, pz, s = 1) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.9 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.95 * s, pz); town.add(tr)
+          // 樹冠＝段重ねの円錐（単一の尖りを脱し層のある常緑樹に）。3段を1メッシュに統合＝描画コール不変。
+          const tmM = new THREE.Matrix4(), pineGeos = []
+          for (const [cy, cr, ch] of [[1.7, 1.5, 1.9], [2.7, 1.06, 1.6], [3.5, 0.6, 1.35]]) { const fG = new THREE.ConeGeometry(cr * s, ch * s, 7); tmM.makeTranslation(px, py + cy * s, pz); fG.applyMatrix4(tmM); pineGeos.push(fG) }
+          const fGeo = BufferGeometryUtils.mergeGeometries ? (BufferGeometryUtils.mergeGeometries(pineGeos, false) || pineGeos[0]) : pineGeos[0]
+          if (fGeo !== pineGeos[0]) pineGeos.forEach((g) => g.dispose())
+          const fo = new THREE.Mesh(fGeo, toon(season === 'autumn' ? 0x8a7a40 : season === 'winter' ? 0x9aa6a0 : 0x4e6e44)); fo.castShadow = true; town.add(fo) }
         const addShip = (sx, sz, ry) => { // 弁才船ふうの大きな四角帆。波にゆれる（boats配列で揺らす）
           const ship = new THREE.Group(); ship.position.set(sx, SEA.level + 0.15, sz); ship.rotation.y = ry; ship.userData = { ph: R() * 6.28 }
           const hull = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.1, 1.9), toon(0x55402a)); hull.position.y = 0.15; ship.add(hull)
