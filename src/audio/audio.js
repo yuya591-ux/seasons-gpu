@@ -10,7 +10,9 @@
 export function createAudio(opts) {
   const onCue = (opts && opts.onCue) || null // 音の発火を画面に伝える（遠雷フラッシュ等）
   let ctx = null
-  let master = null
+  let master = null // 外の音のバス（→窓の防音→fadeGain）。全ての外音はここへ繋ぐ
+  let fadeGain = null // 全体フェード/音量（起動/おやすみ/復帰/音量設定）。外も室内も最後にここを通る＝防音の外で効かせる
+  let indoorBus = null // 室内の音（窓辺の猫）＝窓の防音を受けない。部屋の中で鳴くものはここへ繋ぐ
   let openFilter = null // 窓のあけ具合で外音を澄ませる/こもらせるローパス（閉=ガラス越し／開=外気が澄む）
   let muffleGain = null // 窓を閉じると外音の音量も下げる防音ゲイン（ローパスだけでは虫の高域が抜けて静かにならないため）
   let windowOpenAmt = 0
@@ -101,9 +103,12 @@ export function createAudio(opts) {
     if (!AC) return
     ctx = new AC()
     master = ctx.createGain()
-    master.gain.value = 0.0001 // 無音から始めてフェードイン
-    // 窓のあけ具合で外音のこもり/澄み＋音量を切り替える（master→openFilter→muffleGain→destination）。
-    // 閉=ガラス越しに低くこもり音量も落ちる(防音)／開=高域まで澄んで音量も戻る。
+    master.gain.value = 1 // 外音バスは素通し（全体フェード/音量は最終段のfadeGainが持つ）
+    fadeGain = ctx.createGain()
+    fadeGain.gain.value = 0.0001 // 無音から始めてフェードイン（最終段＝全体の音量/フェード。防音の外で効く）
+    indoorBus = ctx.createGain() // 室内の音（猫）＝防音を通さず最終段へ直結
+    // 外の音: master→openFilter→muffleGain→fadeGain（窓を閉じるとガラス越しにこもり音量も落ちる防音）。
+    // 室内の音: indoorBus→fadeGain（部屋の中で鳴く猫は窓の開閉に左右されず常に近く澄んで聞こえる）。
     if (ctx.createBiquadFilter) {
       openFilter = ctx.createBiquadFilter()
       openFilter.type = 'lowpass'
@@ -111,10 +116,12 @@ export function createAudio(opts) {
       openFilter.Q.value = 0.5
       muffleGain = ctx.createGain()
       muffleGain.gain.value = windowOpenAmt > 0.5 ? 1 : 0.4 // 閉=しっかり防音で小さく／開=外気の音が戻る
-      master.connect(openFilter).connect(muffleGain).connect(ctx.destination)
+      master.connect(openFilter).connect(muffleGain).connect(fadeGain)
     } else {
-      master.connect(ctx.destination)
+      master.connect(fadeGain)
     }
+    indoorBus.connect(fadeGain)
+    fadeGain.connect(ctx.destination)
     // 割り込みで running から外れたら、復帰操作時に起こし直せるよう監視
     ctx.onstatechange = () => {
       // バックグラウンド中は起こし直さない（音を止めたまま）。前面に戻ったら rearm が再開する。
@@ -282,9 +289,9 @@ export function createAudio(opts) {
     if (!started || !ctx) return
     // 情景切替: master を一旦沈めてから差し替え（映像の暗転と尺を合わせる）
     if (crossfade) {
-      master.gain.cancelScheduledValues(now())
-      master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now())
-      master.gain.linearRampToValueAtTime(0.0001, now() + 0.25)
+      fadeGain.gain.cancelScheduledValues(now())
+      fadeGain.gain.setValueAtTime(Math.max(0.0001, fadeGain.gain.value), now())
+      fadeGain.gain.linearRampToValueAtTime(0.0001, now() + 0.25)
       await new Promise((r) => setTimeout(r, 260))
       if (!ctx) return
     }
@@ -315,9 +322,9 @@ export function createAudio(opts) {
       }
     }
     // master を戻す（起動は長く、切替は短くフェードイン）
-    master.gain.cancelScheduledValues(now())
-    master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now())
-    master.gain.linearRampToValueAtTime(targetVol(), now() + (crossfade ? 0.8 : 2.5))
+    fadeGain.gain.cancelScheduledValues(now())
+    fadeGain.gain.setValueAtTime(Math.max(0.0001, fadeGain.gain.value), now())
+    fadeGain.gain.linearRampToValueAtTime(targetVol(), now() + (crossfade ? 0.8 : 2.5))
   }
 
   // ── 生成的な風レイヤー（常時・素材ゼロ）。ピンクノイズ近似をゆっくり揺れるバンドパスに通し、
@@ -357,7 +364,7 @@ export function createAudio(opts) {
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480; lp.Q.value = 0.4
     const pt = ctx.createGain(); pt.gain.value = 0.55                 // トレモロの土台
     const pg = ctx.createGain(); pg.gain.value = 0.0001              // 全体音量（setPurrで上下）
-    a.connect(lp); b.connect(lp); lp.connect(pt).connect(pg).connect(master)
+    a.connect(lp); b.connect(lp); lp.connect(pt).connect(pg).connect(indoorBus) // 猫は室内＝窓の防音を受けない
     try { const trem = ctx.createOscillator(); trem.type = 'sine'; trem.frequency.value = 25; const td = ctx.createGain(); td.gain.value = 0.45; trem.connect(td).connect(pt.gain); trem.start() } catch { /* 震え無しでも鳴る */ }
     try { a.start(); b.start() } catch { /* 無視 */ }
     purrNode = { pg }
@@ -739,17 +746,17 @@ export function createAudio(opts) {
     setMuted(m) {
       muted = m
       if (master) {
-        master.gain.cancelScheduledValues(now())
-        master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now())
-        master.gain.linearRampToValueAtTime(targetVol(), now() + 0.2)
+        fadeGain.gain.cancelScheduledValues(now())
+        fadeGain.gain.setValueAtTime(Math.max(0.0001, fadeGain.gain.value), now())
+        fadeGain.gain.linearRampToValueAtTime(targetVol(), now() + 0.2)
       }
     },
     setVolume(v) {
       volume = v
       if (master && !muted) {
-        master.gain.cancelScheduledValues(now())
-        master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now())
-        master.gain.linearRampToValueAtTime(Math.max(0.0001, v), now() + 0.1)
+        fadeGain.gain.cancelScheduledValues(now())
+        fadeGain.gain.setValueAtTime(Math.max(0.0001, fadeGain.gain.value), now())
+        fadeGain.gain.linearRampToValueAtTime(Math.max(0.0001, v), now() + 0.1)
       }
     },
     /** 窓のあけ具合(0..1)で外音のこもり/澄みをクロスフェード（閉=ガラス越し→開=外気が澄む）。 */
@@ -815,7 +822,7 @@ export function createAudio(opts) {
         const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t)
         const dur = kind === 'short' ? 0.22 : 0.55, peak = 0.055
         g.gain.linearRampToValueAtTime(peak, t + 0.05); g.gain.setTargetAtTime(0.0001, t + dur * 0.5, dur * 0.28)
-        osc.connect(bp); bp.connect(bp2); bp2.connect(g); g.connect(master)
+        osc.connect(bp); bp.connect(bp2); bp2.connect(g); g.connect(indoorBus) // 猫は室内＝窓の防音を受けない
         try { const vib = ctx.createOscillator(); vib.frequency.value = 22; const vg = ctx.createGain(); vg.gain.value = base * 0.045; vib.connect(vg).connect(osc.frequency); vib.start(t); vib.stop(t + dur + 0.1) } catch { /* 震え無しでも鳴る */ }
         osc.start(t); osc.stop(t + dur + 0.1)
       } catch { /* 無視 */ }
