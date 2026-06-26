@@ -211,7 +211,7 @@ export function setTown3dLand(land) {
         active.flyYaw = active.flyYawTarget = (Math.abs(ox) + Math.abs(oz) > 1) ? Math.atan2(ox, -oz) : 0
         active.walkCamYaw = active.flyYaw // カメラも進む向きの後ろから始める
         active.flyPitchTarget = -0.02; active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
-        active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1
+        active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1; active.pendingHint = true
         return
       }
     }
@@ -226,6 +226,7 @@ export function setTown3dLand(land) {
     active.landedFired = false // 接地した瞬間に砂ぼこり＋沈み込みを起こす
     active.mode = 'walk'
     active.flyTarget = 1
+    active.pendingHint = true // 初見の操作ヒント（左で歩く/右で見まわす）をそっと出す
   } else {
     setTown3dFly(true) // 歩きから空へ（飛び立つ）
   }
@@ -6323,6 +6324,16 @@ export async function mountTown3d(parent, opts = {}) {
   const frame2 = document.createElement('div')
   frame2.className = 'town3d-frame'
   stage.appendChild(frame2)
+  // ── 初見の操作ヒント（着地して歩き出す時に、左=歩く/右=見まわす を左右に出してそっと消える）。──
+  // 操作が分かりにくい（スティックは触れるまで出ない）ので、初回の数秒だけ案内。触れたら即消える。フレームより前に宣言（TDZ回避）。
+  const ctrlHint = document.createElement('div')
+  ctrlHint.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:7;opacity:0;transition:opacity .9s ease'
+  ctrlHint.innerHTML = '<div style="position:absolute;left:8%;bottom:22%;font:600 13px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,.95);text-shadow:0 1px 5px rgba(0,0,0,.55);text-align:center">◉<br><span style="font-weight:500">左で歩く</span></div>' +
+    '<div style="position:absolute;right:8%;bottom:22%;font:600 13px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,.95);text-shadow:0 1px 5px rgba(0,0,0,.55);text-align:center">⟲<br><span style="font-weight:500">右で見まわす</span></div>'
+  stage.appendChild(ctrlHint)
+  let ctrlHintT = 0
+  const showCtrlHint = () => { ctrlHint.style.opacity = '1'; ctrlHintT = 5 } // 5秒後にそっと消える
+  const hideCtrlHint = () => { if (ctrlHintT > 0) { ctrlHintT = 0; ctrlHint.style.opacity = '0' } } // 触れたら即消える
   // 室内の薄暗がり（周辺減光）。巨大box-shadowブラーは毎フレームの合成が重い→静的なradial-gradientの
   // 不透明度だけを動かす（合成が軽い＝端末が重くならない）。部屋の中ほど濃く、窓を開け/乗り出すと晴れる。
   const roomVig = document.createElement('div'); roomVig.className = 'town3d-roomvig'; stage.appendChild(roomVig)
@@ -7849,6 +7860,10 @@ export async function mountTown3d(parent, opts = {}) {
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
     const showJump = active.mode === 'walk' && active.flyP > 0.5 // ジャンプボタンは歩行のときだけ出す
     if (showJump !== jumpShown) { jumpShown = showJump; jumpBtn.classList.toggle('jump--show', showJump) }
+    // 初見の操作ヒント: 着地して歩き出す瞬間に出し、数秒でそっと消える（触れたら即消える）
+    if (active.pendingHint) { active.pendingHint = false; showCtrlHint() }
+    if (ctrlHintT > 0) { ctrlHintT -= dt; if (ctrlHintT <= 0) ctrlHint.style.opacity = '0' }
+    if (active.mode !== 'walk' && ctrlHintT > 0) hideCtrlHint() // 歩行を抜けたら消す
     const showZoom = active.mode === 'window' || active.flyP > 0.4 // 部屋の中（窓辺）でも空/地上でもズームボタンを出す
     if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
     const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
@@ -8366,7 +8381,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (steerId === null) { steerId = e.pointerId; steerLX = e.clientX; steerLY = e.clientY } // 飛行＝どこをドラッグしても操舵
     } else if (active.mode === 'walk' && stickId === null && lx < rect.width * 0.5) {
       stickId = e.pointerId; stickOX = e.clientX; stickOY = e.clientY // 歩行の左半分＝スティック発生
-      showStick(lx, e.clientY - rect.top); setStick(0, 0)
+      showStick(lx, e.clientY - rect.top); setStick(0, 0); hideCtrlHint() // 操作し始めたら案内を消す
     } else if (pettingId === null && hitToy(e.clientX, e.clientY)) {
       batTheToy() // 毛糸玉をタップ＝猫がじゃれてバット（タップで消費・ドラッグしない）
     } else if (pettingId === null && hitCat(e.clientX, e.clientY)) {
@@ -8375,7 +8390,7 @@ export async function mountTown3d(parent, opts = {}) {
     } else if (lookId === null) {
       lookId = e.pointerId; lookLX = e.clientX; lookLY = e.clientY // 歩行の右半分/窓辺＝見回し
       lookDownT = performance.now(); lookDX0 = e.clientX; lookDY0 = e.clientY; lookMoved = false // タップ(ジャンプ)判定の起点
-      active.lookDragging = true
+      active.lookDragging = true; hideCtrlHint() // 操作し始めたら案内を消す
     }
   }
   const onMove = (e) => {
