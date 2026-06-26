@@ -3880,6 +3880,26 @@ export async function mountTown3d(parent, opts = {}) {
               if (leafG.length) { const m = BufferGeometryUtils.mergeGeometries(leafG, false); if (m) { const me = new THREE.Mesh(m, toon(leafHex)); me.castShadow = true; town.add(me) } leafG.forEach((g) => g.dispose()) }
             }
           }
+          { // ── 人力車（大正モダンの賑わい。運河沿いの遊歩道に数台）。決定的配置＋材ごとに統合で軽量。──
+            const darkG = [], lacqG = [], woodG = []
+            const addRickshaw = (cx, cz, rot) => {
+              const cy = heightAt(cx, cz); if (cy < SEA.level + 0.8) return
+              const base = new THREE.Matrix4().makeRotationY(rot).setPosition(cx, cy, cz)
+              const put = (geo, arr, lx, ly, lz, rx = 0, ry = 0, rz = 0) => { const g = geo.clone(); if (rx || ry || rz) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz))); g.applyMatrix4(new THREE.Matrix4().makeTranslation(lx, ly, lz)); g.applyMatrix4(base); arr.push(g) }
+              const rim = new THREE.TorusGeometry(0.5, 0.07, 6, 16), disc = new THREE.CylinderGeometry(0.44, 0.44, 0.05, 12)
+              for (const s of [-1, 1]) { put(rim, darkG, s * 0.5, 0.5, -0.1, 0, Math.PI / 2, 0); put(disc, woodG, s * 0.5, 0.5, -0.1, 0, 0, Math.PI / 2) } // 車輪（黒いリム＋木の輻）
+              put(new THREE.BoxGeometry(0.92, 0.66, 0.8), lacqG, 0, 0.92, -0.15); put(new THREE.BoxGeometry(0.92, 0.5, 0.1), lacqG, 0, 1.2, -0.5) // 漆の朱の座席＋背
+              put(new THREE.SphereGeometry(0.56, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), darkG, 0, 1.25, -0.3) // 黒い幌
+              for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.06, 0.06, 2.4), woodG, s * 0.34, 0.62, 1.2, -0.18, 0, 0) // 梶棒（前へ伸びる木の棒）
+              colliders.push({ x: cx, z: cz, r: 1.0 })
+            }
+            addRickshaw(tx - 9, cz0 + 5, Math.PI / 2); addRickshaw(tx + 7, cz0 + 5, -Math.PI / 2); addRickshaw(tx + 18, cz0 - 5, Math.PI / 2)
+            if (BufferGeometryUtils.mergeGeometries) {
+              for (const [arr, hex] of [[darkG, 0x2a221c], [lacqG, isNight ? 0x5a2420 : 0x7a2c26], [woodG, 0x8a6a44]]) {
+                if (arr.length) { const m = BufferGeometryUtils.mergeGeometries(arr, false); if (m) { const me = new THREE.Mesh(m, toon(hex)); me.castShadow = true; town.add(me) } arr.forEach((g) => g.dispose()) }
+              }
+            }
+          }
         }
         const brick = brickMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 2.4, 2.2) // 赤煉瓦（イギリス積み＝近接で本物の煉瓦壁）
         const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
