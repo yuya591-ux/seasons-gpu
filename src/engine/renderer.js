@@ -552,6 +552,13 @@ export function createRenderer(canvas) {
     resume() {
       play()
     },
+    // town3d/splat表示中は描画を止めるので、最大GPUメモリ(フルスクリーンFBOテクスチャ)を解放しメモリ圧を下げる
+    // ＝iOSの「メモリ逼迫でWebGLコンテキストを失わせる」誘発を抑える（評価エンジニア: マルチコンテキスト枯渇の緩和）。
+    // 通常情景へ戻ると描画ループの ensureFBO が同期で自動再作成するので安全。
+    freeFBO() {
+      try { if (fboTex) gl.deleteTexture(fboTex); if (fbo) gl.deleteFramebuffer(fbo) } catch { /* 無視 */ }
+      fbo = null; fboTex = null; fboW = 0; fboH = 0
+    },
     // 指スワイプなどから見回しの目標値を動かす（相対）
     addPan(dx, dy) {
       panTarget.x = clamp(panTarget.x + dx, PAN_LIMIT.x)

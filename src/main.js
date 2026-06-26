@@ -130,7 +130,7 @@ function start() {
     if (next.render === 'splat') {
       splatMode = true
       canvas.style.display = 'none'
-      renderer.pause()
+      renderer.pause(); if (renderer.freeFBO) renderer.freeFBO() // 別エンジン描画中はメインのGPUメモリを解放（コンテキスト枯渇の緩和）
       if (town3dMode) { town3dMode = false; await unmountTown3d() }
       try {
         // 読み込み中の下地は情景の空色に（黒からの唐突な切替を避ける）
@@ -154,7 +154,7 @@ function start() {
       // 本物の3Dの街（Three.js）。窓から立体の街を見下ろす。
       town3dMode = true
       canvas.style.display = 'none'
-      renderer.pause()
+      renderer.pause(); if (renderer.freeFBO) renderer.freeFBO() // 立体の街の描画中はメインのGPUメモリを解放（コンテキスト枯渇の緩和・評価エンジニア）
       if (splatMode) { splatMode = false; await unmountSplat() }
       try {
         await mountTown3d(document.body, {
