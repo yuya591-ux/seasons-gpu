@@ -537,7 +537,12 @@ export function buildUI(opts) {
       open() {
         markCurrent()
         el.classList.add('panel--open')
-        requestAnimationFrame(() => close.focus()) // 開いたらパネル内へフォーカス
+        requestAnimationFrame(() => {
+          close.focus({ preventScroll: true }) // 開いたらパネル内へフォーカス（スクロールはカードへ譲る）
+          // いま見ている情景のカードを画面内へ＝開いた瞬間に「自分の居場所」が分かる（長いギャラリーで現在地が画面外だった・評価UX）
+          const cur = cards.find(({ id }) => id === currentScene.id)
+          if (cur && cur.card.scrollIntoView) cur.card.scrollIntoView({ block: 'center', behavior: 'auto' })
+        })
       },
     }
   }
