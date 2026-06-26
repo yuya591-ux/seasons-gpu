@@ -658,11 +658,11 @@ export async function mountTown3d(parent, opts = {}) {
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let seaUniforms = null // 海面シェーダーの時間（うねり・きらめき）
   // 川・池・水路のきらめき（淡い真水の水面のゆらぎ＝歩いて水辺で映える。海より細かく穏やか）。共有uniformをframeで進める。
-  const freshUniforms = { uTime: { value: 0 } }
+  const freshUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() } } // uSky=水面が映す空の色（地平寄り）。frameで日の傾きに追従＝夕方は水も金色に
   const freshWater = (mat) => {
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = freshUniforms.uTime
-      sh.uniforms.uSkyF = { value: skyTop.clone() } // 空の色（フレネルで視線が浅い所に映す＝静的な空グラデに動く反射を足す）
+      sh.uniforms.uSkyF = freshUniforms.uSky // 共有＝frameで日の傾きに追従（静的な空グラデに動く反射＋時刻で水も染まる）
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPosF;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPosF = (modelMatrix * vec4(transformed, 1.0)).xyz;')
@@ -3198,7 +3198,7 @@ export async function mountTown3d(parent, opts = {}) {
       const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       // そこへシェーダーで「動くうねり・谷の濃藍・うろこ雲のような波頭・水平線のきらめき」を重ね、ぱっと見て海と分かる水面に。
-      seaUniforms = { uTime: { value: 0 }, uSky: { value: skyTop.clone() } } // uSky=空の色（フレネルで遠い水面に映す＝時間帯で暖/藍に追従）
+      seaUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() } } // uSky=空の色（地平寄り）。frameで日の傾きに追従＝夕方は海も金色に
       const seaMat = new THREE.MeshBasicMaterial({ map: wtex, fog: true })
       seaMat.onBeforeCompile = (sh) => {
         sh.uniforms.uTime = seaUniforms.uTime
@@ -7765,6 +7765,8 @@ export async function mountTown3d(parent, opts = {}) {
     { const dd = drift.on ? drift.t / DRIFT_SECS : 0
       skyTop0.copy(SKY_TOP_O).lerp(GOLD_TOP, dd); skyHor0.copy(SKY_HOR_O).lerp(GOLD_HOR, dd); baseFogCol.copy(FOG_O).lerp(GOLD_FOG, dd)
       sun.intensity = SUN_INT_O * (1 - 0.2 * dd); sun.color.copy(SUN_COL_O).lerp(GOLD_SUN, dd) }
+    // 水面が映す空も日の傾きへ追従＝夕方は海/川/運河/池も金色に染まる（評価アート/エンジニア: uSkyがmount時固定で水だけ昼のままだった）。色コピーのみで軽い。
+    freshUniforms.uSky.value.copy(skyHor0); if (seaUniforms) seaUniforms.uSky.value.copy(skyHor0)
     // 別世界感: 飛ぶほど霧を晴らして遠くの街を壮大に見せ、目的地に近いほどその時代の空気（色・露出）へ移す。
     if (flyAmt > 0.02) {
       active.fogTouched = true
