@@ -7364,13 +7364,18 @@ export async function mountTown3d(parent, opts = {}) {
   // 異時代の街に近づくと画面全体がその時代の色に染まる（別世界に入る気配）。frameで色・濃さを更新。
   const eraGrade = document.createElement('div'); eraGrade.className = 'town3d-era'; stage.appendChild(eraGrade)
   let eraGradeCur = -1, eraColCur = ''
-  // とまる／すすむ トグル（飛行のときだけ・下中央）。タップでその場ホバリング⇄自動巡航。ボタンは1つだけ＝迷わない。
-  const cruiseBtn = document.createElement('button'); cruiseBtn.className = 'town3d-cruise'; cruiseBtn.textContent = 'とまる'
+  // とまる／すすむ トグル（飛行のときだけ・下中央）。両状態を並べ、いま「すすむ/とまる」どちらかを明示＝
+  // 一語だけだと押すと何になるのか曖昧だった（評価UX: cruise両状態表示）。タップで巡航⇄ホバリングを切替。
+  const cruiseBtn = document.createElement('button'); cruiseBtn.className = 'town3d-cruise'
+  cruiseBtn.innerHTML = '<span class="town3d-cruise__seg" data-s="go">すすむ</span><span class="town3d-cruise__seg" data-s="stop">とまる</span>'
+  cruiseBtn.setAttribute('aria-label', 'すすむ・とまるの切替')
   stage.appendChild(cruiseBtn)
+  const reflectCruise = () => { cruiseBtn.classList.toggle('is-cruising', !!(active && active.cruise)) } // 巡航中=「すすむ」側を点灯／停止中=「とまる」側を点灯
   let cruiseShown = false
   // ジャンプボタン（歩行の右下）。ボタン／右側タップで跳ぶ。連打しても押すたびにフラッシュ＝押下判定が見える（実際の跳躍は接地時のみ＝二段ジャンプはしない）。
   const jumpBtn = document.createElement('button'); jumpBtn.className = 'town3d-jump'; jumpBtn.type = 'button'; jumpBtn.setAttribute('aria-label', 'ジャンプ'); jumpBtn.textContent = 'JUMP'; stage.appendChild(jumpBtn)
   let jumpShown = false, jumpFlashClr = null
+  let stickRestShown = false // 歩行の常駐スティックを出しているか（変化時だけ class を書く）
   const flashJumpBtn = () => { jumpBtn.classList.remove('jump--press'); void jumpBtn.offsetWidth; jumpBtn.classList.add('jump--press'); if (jumpFlashClr) clearTimeout(jumpFlashClr); jumpFlashClr = setTimeout(() => jumpBtn.classList.remove('jump--press'), 180) } // 押すたびに再生（連打でも毎回光る）
   const triggerJump = () => { if (!active || active.mode !== 'walk') return; active.jumpQueued = true; flashJumpBtn(); active.lastInputT = performance.now(); active.cinema = 0 }
   jumpBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); triggerJump() })
@@ -7379,7 +7384,7 @@ export async function mountTown3d(parent, opts = {}) {
     e.stopPropagation()
     if (!active) return
     active.cruise = !active.cruise
-    cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ'
+    reflectCruise()
   })
 
   // ── 操作トレイ（左下＝左親指の一角に飛行の補助操作を集約。バラけたボタンを一塊に） ──
@@ -8311,9 +8316,12 @@ export async function mountTown3d(parent, opts = {}) {
     camera.lookAt(lookX, lookY, lookZ)
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
     const showCruise = active.mode === 'fly' && active.flyP > 0.4
-    if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
+    if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) reflectCruise() }
     const showJump = active.mode === 'walk' && active.flyP > 0.5 // ジャンプボタンは歩行のときだけ出す
     if (showJump !== jumpShown) { jumpShown = showJump; jumpBtn.classList.toggle('jump--show', showJump) }
+    // スティック常駐: 歩行で触れていない間も既定位置に淡く出す（触れたらそこへ移る）。ドラッグ中(stickId)は触れた点の表示を優先。
+    const wantRest = active.mode === 'walk' && active.flyP > 0.5 && stickId === null
+    if (wantRest !== stickRestShown) { stickRestShown = wantRest; if (wantRest) restStick(); else if (stickId === null) stickWrap.classList.remove('stick--on', 'stick--rest') }
     // 初見の操作ヒント: 着地して歩き出す/初めて空へ飛ぶ瞬間に出し、数秒でそっと消える（触れたら即消える）
     if (active.pendingHint) { showCtrlHint(active.pendingHint); active.pendingHint = null }
     if (ctrlHintT > 0) { ctrlHintT -= dt; if (ctrlHintT <= 0) ctrlHint.style.opacity = '0' }
@@ -8813,9 +8821,11 @@ export async function mountTown3d(parent, opts = {}) {
   }
   const showStick = (x, y) => {
     stickBase.style.left = x + 'px'; stickBase.style.top = y + 'px'
-    stickWrap.classList.add('stick--on'); stickKnob.style.transform = 'translate(0,0)'
+    stickWrap.classList.add('stick--on'); stickWrap.classList.remove('stick--rest'); stickKnob.style.transform = 'translate(0,0)' // 触れた点へ濃く出す
   }
-  const hideStick = () => { stickWrap.classList.remove('stick--on'); if (active) { active.moveX = 0; active.moveY = 0 } }
+  // 常駐スティック: 歩行で触れていない間も既定位置(左下)に淡く出す＝スティックの在りかが分かる。触れた瞬間そこへ移って濃くなる（puniコン）。
+  const restStick = () => { stickBase.style.left = '20%'; stickBase.style.top = '74%'; stickWrap.classList.add('stick--on', 'stick--rest'); stickKnob.style.transform = 'translate(0,0)' }
+  const hideStick = () => { if (active) { active.moveX = 0; active.moveY = 0 } if (active && active.mode === 'walk' && active.flyP > 0.5) restStick(); else stickWrap.classList.remove('stick--on', 'stick--rest') }
   const pointers = new Map() // 全ポインタ id->{x,y}（ピンチ＝2本指ズームの判定用）
   let pinchD0 = 0, pinchZoom0 = 1
   const onDown = (e) => {

@@ -53,6 +53,8 @@ export function buildUI(opts) {
   gate.setAttribute('aria-label', '眺めて、整う。画面にふれて始める')
   gate.appendChild(h('p', 'gate__title', '眺めて、整う'))
   gate.appendChild(h('p', 'gate__lead', '画面にふれて始める'))
+  // 機能予告: 立体の街では窓をあけて空へ出られる＝主役機能を起動前にそっと知らせる（評価UX/プロデューサー: 第一印象で発見されにくい）。
+  if (currentScene.render === 'town3d') gate.appendChild(h('p', 'gate__teaser', '窓をあけて、空へ出られます'))
   root.appendChild(gate)
   let gateStarted = false
   async function startExperience() {
@@ -164,6 +166,11 @@ export function buildUI(opts) {
   modePill.setAttribute('aria-label', '操作のヒントをもう一度みる')
   modePill.addEventListener('click', () => { if (aloft && onShowHint) onShowHint(); poke() }) // 迷ったら押すと案内が戻る
   root.appendChild(modePill)
+  // 段階表示（●○○○）: 立体の街の旅「窓をあける→乗り出す→空へ→地上」のどこまで来たかを点で示す＝stageBtnが何段あるか分かる（評価UX）。
+  const stageDots = h('div', 'stagedots')
+  stageDots.setAttribute('aria-hidden', 'true') // 視覚補助。意味はstageBtnのラベルが担う
+  for (let i = 0; i < 4; i++) stageDots.appendChild(h('span', 'stagedots__d'))
+  root.appendChild(stageDots)
   let windowIsOpen = false
   let leanIsOut = false
   let aloft = null // null=窓辺 / 'fly'=空を飛ぶ / 'walk'=地上を歩く
@@ -193,18 +200,10 @@ export function buildUI(opts) {
     if (windowIsOpen) return closeLabel()
     return null
   }
-  // 空/地上へ出た時に一度だけ、そっと操作を伝える。静かな文言・数秒で消える。
-  const walkHint = h('div', 'walk-hint', '画面をドラッグして飛ぶ　上=上昇 下=下降 左右=旋回　「とまる」で停止')
-  root.appendChild(walkHint)
-  let walkHintShown = false
-  let walkHintTimer = null
-  function showWalkHint() {
-    if (walkHintShown) return
-    walkHintShown = true
-    walkHint.classList.add('walk-hint--on')
-    clearTimeout(walkHintTimer)
-    walkHintTimer = setTimeout(() => walkHint.classList.remove('walk-hint--on'), 5000)
-  }
+  // 操作ヒントは town3d エンジン側の案内（画面内のスティック/ドラッグ位置に合わせた正確な文言＝
+  // 飛行「ドラッグで進む・すすむ/とまる」、歩行「左で歩く・右で見まわす」）に一本化。
+  // 以前ここにあった walk-hint は「上=上昇 下=下降」と実装(高さは↑↓ボタン・縦ドラッグは見回し)に反する
+  // 誤記＋二重表示だったため撤去（評価UX: 操作ヒント一本化・縦反転誤記修正）。
   function stopAloft() {
     if (aloft) { aloft = null; onToggleFly && onToggleFly(false) } // 空/地上から窓辺へ戻す
   }
@@ -224,11 +223,19 @@ export function buildUI(opts) {
     const mode = aloft === 'fly' ? '空を飛ぶ' : aloft === 'walk' ? '地上を歩く' : ''
     modePill.textContent = mode + (mode && currentLoc ? '　' + currentLoc : '')
     modePill.classList.toggle('modepill--on', !!mode)
+    // 段階表示（●○○○）: 空まで飛べる立体の街でだけ、旅の進み具合を点で示す。屋上/非対応情景では隠す。
+    const journey = show && canFly() && !isRoof()
+    stageDots.classList.toggle('stagedots--on', journey)
+    if (journey) {
+      const pos = aloft ? 3 : leanIsOut ? 2 : windowIsOpen ? 1 : 0 // 窓辺→窓あけ→乗り出し→空/地上
+      const ds = stageDots.children
+      for (let i = 0; i < ds.length; i++) ds[i].classList.toggle('is-on', i <= pos)
+    }
   }
   function advance() {
     if (!windowIsOpen) { windowIsOpen = true; onToggleWindow && onToggleWindow(true) }
     else if (!isRoof() && !leanIsOut && !aloft) { leanIsOut = true; onToggleLean && onToggleLean(true) }
-    else if (canFly() && !aloft) { aloft = 'fly'; windowIsOpen = true; leanIsOut = true; onToggleFly && onToggleFly(true); showWalkHint() }
+    else if (canFly() && !aloft) { aloft = 'fly'; windowIsOpen = true; leanIsOut = true; onToggleFly && onToggleFly(true) } // 操作案内はエンジン側ctrlHintが出す（一本化）
     else if (aloft === 'fly') { aloft = 'walk'; onToggleLand && onToggleLand(true) }
     else if (aloft === 'walk') { aloft = 'fly'; onToggleLand && onToggleLand(false) }
     updateWindowBtn()
