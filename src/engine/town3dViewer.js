@@ -542,6 +542,14 @@ export async function mountTown3d(parent, opts = {}) {
         g.fillStyle = `rgba(118,120,128,${0.05 + rnd() * 0.06})`
         g.fillRect(sx, rnd() * S * 0.4, 1.2 + rnd() * 1.4, S * (0.3 + rnd() * 0.5))
       }
+      // 各階の見切り（横のスラブ境界＝コンクリの階の継ぎ目）。見上げ角(grazing)では縦の窓が潰れるが、
+      // 横の目地は残って壁に構造が出る＝近接で平らに見えるのを脱す。テクスチャのみ＝描画コール/発熱の増なし。
+      const fr = opt.rows ?? 4, pY = (S - 8) / fr // 窓の段ピッチに合わせ、階の継ぎ目（窓段の境）に目地を置く
+      for (let yy = 1; yy < fr; yy++) {
+        const ly = Math.round(6 + yy * pY)
+        g.fillStyle = 'rgba(146,144,138,0.18)'; g.fillRect(0, ly - 1, S, 2)            // 目地の影
+        g.fillStyle = 'rgba(250,249,246,0.28)'; g.fillRect(0, ly + 1, S, 1)            // すぐ下の見切りの照り（立体の継ぎ目）
+      }
     }
     // 窓の格子（列数×段数は建物ごとに変える＝全建物が同じ窓割りで量産クローンに見えるのを脱す）。各窓にサッシ枠＋十字桟＋窓台。
     const cols = opt.cols ?? 3, rows = opt.rows ?? 4
