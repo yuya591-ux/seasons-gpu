@@ -6392,13 +6392,17 @@ export async function mountTown3d(parent, opts = {}) {
     let ic = centers[0], icd = 1e9
     for (const c of centers) { const d = (c.x - x) ** 2 + (c.z - z) ** 2; if (d > 100 && d < icd) { icd = d; ic = c } } // 自分から少し離れた最寄りの中心
     const toCenter = Math.atan2(ic.x - x, -(ic.z - z))
+    const gy0 = heightAt(x, z) // 足元の高さ（前方の上り具合の基準）
     let best = toCenter, bestScore = -1
     for (let a = 0; a < 16; a++) {
       const yaw = a / 16 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw)
       let d = 1.0
       for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break }
       let dd = yaw - toCenter; dd = Math.atan2(Math.sin(dd), Math.cos(dd))
-      const score = d + (1 - Math.abs(dd) / Math.PI) * 9 // 抜けの距離(最大34)＋中心へ向く度合い(最大+9)＝景色の深い街並みを正面に
+      // 急な上り斜面を正面にすると丘の地肌が画面を覆い視界が詰まる（評価指摘の着地景色の悪化）。前方が眼の高さより高く迫る方位を避ける。
+      let rise = 0; for (const ad of [6, 10, 14]) { const gh = heightAt(x + hx * ad, z + hz * ad); if (gh - gy0 > rise) rise = gh - gy0 }
+      const uphill = Math.max(0, rise - 2.0) // 2mを超える上りからペナルティ（緩い起伏は許容、丘の壁は強く避ける）
+      const score = d + (1 - Math.abs(dd) / Math.PI) * 9 - uphill * 2.5 // 抜け(最大34)＋中心へ向く度合い(+9)−上り斜面の覆い(急なほど減点)
       if (score > bestScore) { bestScore = score; best = yaw }
     }
     return best
