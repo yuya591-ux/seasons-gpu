@@ -716,6 +716,7 @@ export async function mountTown3d(parent, opts = {}) {
   let train2 = null // もう一本の電車（色違い・半周ずらして走る）
   let crossing = null // 踏切（電車が近づくと遮断機が下り警報灯が点滅）
   let gulls = [] // 海鳥（湾の上を旋回する）
+  const sparrows = [] // 電線にとまるスズメ（窓辺の微小イベント＝時々ぴょこっと跳ね、尾を振る＝静止した影でなく生きた小鳥）
   let crane = null // ガントリークレーンの動く部分（トロリー＋フック）
   let tug = null // 湾を行き来するタグボート
   let ferry = null // 湾を渡る連絡船
@@ -2416,6 +2417,7 @@ export async function mountTown3d(parent, opts = {}) {
           const tail = new THREE.Mesh(sparrowTail, sparrowMat); tail.position.set(0, 0.03, -0.16); tail.rotation.x = 0.55; bird.add(tail)
           bird.position.set(p.x, p.y + 0.12, p.z); bird.rotation.y = (row ? -0.3 : 0) + (R() - 0.5) * 1.4 // ほぼ同じ向き＋少しばらす
           town.add(bird)
+          sparrows.push({ g: bird, py: p.y + 0.12, ry: bird.rotation.y, tail, ph: R() * 6.28, hop: 0, hopT: 3 + R() * 10 }) // フレームでぴょこっと跳ねさせる
         }
       }
     }
@@ -6622,6 +6624,8 @@ export async function mountTown3d(parent, opts = {}) {
         })
         winMapBase.dispose()
         for (const e of winEmis) e.dispose()
+        // 樹冠フェードのクローン材（近づいた木の半透明版）は userData 上に残り scene の traverse から漏れる＝個別に解放。
+        for (const tr of treesArr) { if (tr.userData && tr.userData.fadeMat) tr.userData.fadeMat.dispose() }
         grad.dispose()
       } catch (e) { /* 無視 */ }
       // 後処理(EffectComposer/Bloom/FXAA)のRenderTargetをGPUから解放（評価 技術-致命2）。
@@ -7273,8 +7277,13 @@ export async function mountTown3d(parent, opts = {}) {
   ]
   function scheduleFx(dt) {
     if (reduceMotion) return // 視差軽減では定期イベント（突発・大きな動き）を起こさない。ぼーっと眺める静けさは保つ
+    // 深く眺めるほど（無操作が長いほど）発火間隔を伸ばす＝騒がしくせず静けさへ沈める（整う・評価エモ）。
+    // 触れれば lastInputT が更新されて通常の頻度へ戻る。最大でも間隔は約1.8倍まで（イベントが完全に止まりはしない）。
+    const idleMs = performance.now() - ((active && active.lastInputT) || 0)
+    const calm = Math.min(1, Math.max(0, (idleMs - 25000) / 120000)) // 25秒以降ゆっくり、約2分強で最大
+    const slow = 1 + calm * 0.8
     for (const b of fxBands) {
-      b.next -= dt
+      b.next -= dt / slow // タイマーの減りを遅くする＝実効間隔を伸ばす（深い静けさほど発火率↓）
       if (b.next > 0) continue
       b.next = b.min + R() * (b.max - b.min)
       if (b.quiet && R() < b.quiet) continue // 何も起きない“余白”をたまに挟む（アンビエントの締まり）
@@ -7651,6 +7660,19 @@ export async function mountTown3d(parent, opts = {}) {
         } else if (tr.userData.fadeMat && leaf.material === tr.userData.fadeMat) { leaf.material = tr.userData.origMat } // 遠ざかる/飛行で不透明に戻す
       }
     }
+    // 電線のスズメ＝時々ぴょこっと跳ねて尾を振る（窓辺の微小イベント＝静止した影でなく生きた小鳥）。
+    // 深い高空(town非表示)では更新を省く。十数羽ぶんの軽い計算。
+    if (sparrows.length && (active.mode === 'window' || (active.flyP || 0) < 0.85)) {
+      for (const sp of sparrows) {
+        sp.hopT -= dt
+        if (sp.hopT <= 0) { sp.hop = 1; sp.hopT = 4 + Math.random() * 11 } // 数秒おきにひと跳ね
+        if (sp.hop > 0) sp.hop = Math.max(0, sp.hop - dt * 2.6)
+        const hk = sp.hop > 0 ? Math.sin((1 - sp.hop) * Math.PI) : 0 // 跳ねの山(0→1→0)
+        sp.g.position.y = sp.py + Math.sin(t * 0.7 + sp.ph) * 0.004 + hk * 0.05 // 呼吸の微動＋跳ねの上下
+        sp.tail.rotation.x = 0.55 + Math.sin(t * 1.4 + sp.ph) * 0.05 + hk * 0.35 // 尾をひょいと上げる
+        sp.g.rotation.y = sp.ry + hk * (sp.ph > 3.14 ? 0.4 : -0.4) // 跳ねると向きが少し変わる
+      }
+    }
     // アドバルーンがふわり揺れる
     for (const ab of adBalloons) { ab.rotation.z = Math.sin(t * 0.6) * 0.05; ab.position.x += Math.sin(t * 0.5) * 0.002 }
     // 観覧車がゆっくり回り、ゴンドラは水平を保つ
@@ -7899,7 +7921,14 @@ export async function mountTown3d(parent, opts = {}) {
         if (w.road) { // 街道を蛇行に沿って往復する旅人（戦国の谷）
           if (Math.hypot(fp.x - w.x0, fp.z - w.z0) > 150) continue
           const tt = (t * w.sp + w.ph) % 2, f = tt < 1 ? tt : 2 - tt, p = w.fn(f * w.len)
-          w.g.position.set(p.x, p.y + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06, p.z); w.g.rotation.y = tt < 1 ? 0 : Math.PI // 歩みに合わせ上下（mkCrowdPersonは統合メッシュ＝子を持たないので本体yへ反映）
+          const ty = p.y + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
+          // ワープ補間: fn が水際で経路の起点へ飛ばす等の不連続でも瞬間移動せず、現在位置から滑らかに寄せる
+          // （通常の小刻みな歩みは即反映＝遅延なし。初回は posed=false で素直に置く）。
+          const jump = w.posed ? Math.hypot(p.x - w.g.position.x, p.z - w.g.position.z) : 0
+          if (w.posed && jump > 2.5) { const k = 1 - Math.exp(-7 * dt); w.g.position.x += (p.x - w.g.position.x) * k; w.g.position.y += (ty - w.g.position.y) * k; w.g.position.z += (p.z - w.g.position.z) * k }
+          else w.g.position.set(p.x, ty, p.z)
+          w.posed = true
+          w.g.rotation.y = tt < 1 ? 0 : Math.PI // 歩みに合わせ上下（mkCrowdPersonは統合メッシュ＝子を持たないので本体yへ反映）
           continue
         }
         if (Math.hypot(fp.x - w.cx, fp.z - w.cz) > 150) continue

@@ -9,10 +9,10 @@ export default {
   label: '朝の谷戸、鶴見・獅子ヶ谷',
   desc: '森の尾根に抱かれた谷戸。田んぼと茅葺の屋敷、坂の住宅地。出身の町の昭和の風景。',
   status: 'ready',
-  public: false, // 評価で隔離推奨（2Dの抽象描画）。同じ谷戸は3D版 shishigaya-window-3d が上位互換。dev=1でのみ表示。
+  // 本物の3D版 shishigaya-window-3d に主役を譲り、ギャラリーからは隠す（2Dの抽象描画。?dev=1でのみ表示）。
+  public: false,
   render: 'shishigaya',
   intensityLabel: '朝靄',
-  public: false, // 本物の3D版 shishigaya-window-3d に主役を譲り、ギャラリーからは隠す（?dev=1で確認可）
 
   palette: {
     early: {
