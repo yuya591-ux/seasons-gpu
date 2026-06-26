@@ -1299,6 +1299,15 @@ body.idle .modepill.modepill--on {
   opacity: 0;
   transition: opacity 1s ease, transform 1s ease;
 }
+.lookhint {
+  text-align: center;
+  line-height: 1.7;
+}
+.lookhint__sub {
+  font-size: 0.78em;
+  opacity: 0.66;
+  letter-spacing: 0.1em;
+}
 .lookhint--show {
   opacity: 1;
   transform: translate(-50%, 0);

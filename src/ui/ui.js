@@ -89,7 +89,9 @@ export function buildUI(opts) {
     } catch {
       /* localStorage不可でも続行 */
     }
-    const hint = h('div', 'lookhint', '指でなぞって見渡す　／　窓をあける')
+    const hint = h('div', 'lookhint')
+    // 操作に加え、目玉の「時間の移ろい」を静かに予告＝ぼーっと眺める人が変化に気づく前に閉じないように（評価エモ）。
+    hint.innerHTML = '指でなぞって見渡す　／　窓をあける<br><span class="lookhint__sub">しばらく眺めると、陽が傾きます</span>'
     root.appendChild(hint)
     requestAnimationFrame(() => hint.classList.add('lookhint--show'))
     const dismiss = () => {

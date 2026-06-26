@@ -448,6 +448,7 @@ export async function mountTown3d(parent, opts = {}) {
   const GOLD_TOP = skyTop0.clone().multiplyScalar(0.82), GOLD_HOR = skyHor0.clone().lerp(new THREE.Color(0xf2b878), 0.5), GOLD_FOG = baseFogCol.clone().lerp(new THREE.Color(0xe8c79a), 0.42), GOLD_SUN = SUN_COL_O.clone().lerp(new THREE.Color(0xffca96), 0.45)
   const DRIFT_SECS = 1080 // 約18分かけて夕方へ（ごくゆっくり＝眺めるうちにいつの間にか）
   let sunGlow = null // 昼/夕の空の太陽の光輪（彩雲リング付き）。カメラへ追従させて空に置く
+  let firstStar = null // 一番星: 日の傾き(dd)が深まると空にひとつだけ薄く灯る＝18分の移ろいの「暮れきった一拍」（評価エモ）
   const sunDir = new THREE.Vector3()
   let starMat = null // 夜の星（per-starできらめく）。frameで uT を進める
   // 夜は月と星
@@ -491,6 +492,9 @@ export async function mountTown3d(parent, opts = {}) {
     sgr.addColorStop(0.76, 'rgba(255,184,172,0)'); sgx.fillStyle = sgr; sgx.fillRect(0, 0, 128, 128)
     sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(scv), transparent: true, opacity: weather === 'snow' ? 0.58 : 0.92, depthWrite: false, fog: false })) // 雪は窓ごしに白飛びしやすい＝光輪を弱め小さく（暖かいにじみは残す）
     { const sgS = weather === 'snow' ? 124 : 155; sunGlow.scale.set(sgS, sgS, 1); scene.add(sunGlow) }
+    // 一番星のスプライト（昼ドリフトが深まると上空にひとつ灯る）。夜情景では既存の星空があるので作らない。
+    if (!isNight) { const stc = document.createElement('canvas'); stc.width = stc.height = 32; const stx = stc.getContext('2d'); const stg = stx.createRadialGradient(16, 16, 0.4, 16, 16, 10); stg.addColorStop(0, 'rgba(255,255,250,1)'); stg.addColorStop(0.3, 'rgba(232,240,255,0.45)'); stg.addColorStop(1, 'rgba(232,240,255,0)'); stx.fillStyle = stg; stx.fillRect(0, 0, 32, 32)
+      firstStar = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(stc), transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); firstStar.scale.set(7, 7, 1); firstStar.visible = false; scene.add(firstStar) }
     // 見える太陽は主視界(街=-z)の上・低めに置く（陽が街の向こうにある絵。夕焼け情景では茜の空に沈む）。影は様式化で微差を許容。
     sunDir.set(0.06, 0.26, -1).normalize()
   }
@@ -8251,6 +8255,10 @@ export async function mountTown3d(parent, opts = {}) {
     camera.position.set(camX, camY, camZ)
     if (skyDome) skyDome.position.set(camX, camY, camZ) // 空ドームをカメラへ追従＝拡大世界のどこへ飛んでも空が常に周囲を覆う（黒い虚空を防ぐ）
     if (sunGlow) sunGlow.position.set(camX + sunDir.x * 470, camY + sunDir.y * 470, camZ + sunDir.z * 470) // 太陽の光輪を太陽の向きの空に追従配置
+    if (firstStar) { // 一番星: 日の傾きが0.8を越えると上空にひとつ薄く灯り、淡くまたたく＝「暮れきった一拍」
+      const sd = drift.on ? Math.max(0, (drift.t / DRIFT_SECS - 0.8) / 0.2) : 0
+      const op = sd * sd * 0.85 * (0.72 + 0.28 * Math.sin(t * 2.1))
+      firstStar.visible = op > 0.01; if (firstStar.visible) { firstStar.material.opacity = op; firstStar.position.set(camX + 0.42 * 470, camY + 0.8 * 470, camZ - 0.45 * 470) } }
     if (starMat) starMat.uniforms.uT.value = t // 星のきらめき（twinkle）
     if (Math.abs(fov - active.fovCur) > 0.04) { active.fovCur = fov; camera.fov = fov; camera.updateProjectionMatrix() }
     camera.lookAt(lookX, lookY, lookZ)
