@@ -1133,6 +1133,7 @@ export async function mountTown3d(parent, opts = {}) {
     const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
     const mesh = new THREE.Mesh(m, contactShadowMat); mesh.renderOrder = 1; town.add(mesh)
   }
+  const homeTreeShadows = [] // 静的影の範囲(原点±60)の外に立つhome/谷戸の木の接地影を集めて1メッシュに（tree()が遠い木の足元をここへ積む）
   // ── 夏祭り（獅子ヶ谷の夏の夜祭り。やぐら＋放射状の提灯＋屋台＋盆踊りの輪）。会場へ配置できる再利用関数。──
   // 日替わりで開催/非開催（実カレンダーの日付で決定＝同じ日は同じ・日が変わると変わる）。夏の夕夜のみ。
   const festDay = Math.floor(Date.now() / 864e5) // 今日(エポックからの日数)
@@ -2543,6 +2544,7 @@ export async function mountTown3d(parent, opts = {}) {
   const trunkGeos = [] // 全ての幹を1メッシュへ統合（静止＝ドローコール大幅削減）
   function tree(x, z, scale) {
     const gy = heightAt(x, z)
+    if (Math.hypot(x, z) > 58) homeTreeShadows.push([x, gy, z, 1.5 + scale * 0.5]) // 静的影の外(遠い)木は足元に接地影を敷いて浮きを消す（範囲内の木は焼き影があるので不要）
     const g = new THREE.Group()
     const r = 1.6 + R() * 1.4
     const ci = (R() * leafBaseMats.length) | 0
@@ -7278,6 +7280,7 @@ export async function mountTown3d(parent, opts = {}) {
   const moteMat = new THREE.PointsMaterial({ map: moteTex, size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
   const motes = new THREE.Points(moteGeo, moteMat); motes.frustumCulled = false; motes.visible = false; scene.add(motes)
 
+  addContactShadows(homeTreeShadows) // 静的影の外に立つhome/谷戸の遠い木の足元へ接地影を一括(1メッシュ)＝浮きを消す（評価アート: 接地影が時代の木だけだった）
   // ── 時代エリアの距離カリング：遠い時代の街(±640)は海/霧で見えない。時代ごとに群へまとめ、カメラが遠い時は丸ごと
   //    非表示にして render traversal から外す＝基礎負荷(描画コール/カリング)を下げる。共視界禁止の設計なので安全。
   const eraCull = []
