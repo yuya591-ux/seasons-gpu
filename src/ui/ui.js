@@ -37,8 +37,9 @@ export function buildUI(opts) {
   let currentScene = initialScene
   let intensityLabelEl = null // 設定の「強さ」スライダーの名前（情景で変わる）
   let intensityRowEl = null // 「強さ」行（town3d等では効かないので隠す＝評価UX-H4）
-  // 「強さ」が効くのはシェーダー情景（雨脚・陽炎・雲など uIntensity を使う）。3Dの街/谷戸では無効→隠す。
-  const intensityApplies = (s) => s && s.render !== 'town3d'
+  // 「強さ」が効くのは uIntensity を使うシェーダー情景（雨脚・陽炎・雲など）。3Dの街と実写の窓(photoWindow)は
+  // uIntensity を持たず効かない＝隠す。特に実写の窓では「明るさ」という名で出ていて全体の「明るさ」と二重で紛らわしかった（評価UX-U5）。
+  const intensityApplies = (s) => s && s.render !== 'town3d' && s.render !== 'photoWindow'
   function syncIntensityRow() {
     if (intensityRowEl) intensityRowEl.style.display = intensityApplies(currentScene) ? '' : 'none'
   }
@@ -537,6 +538,9 @@ export function buildUI(opts) {
     head.appendChild(close)
     el.appendChild(head)
 
+    // 設定系（眺める/操作）と閲覧系（ふりかえり）を見出しで区切る＝物置感を解消（評価UX-U4）。
+    el.appendChild(h('div', 'panel__section', '眺める'))
+
     // 音（♪オンオフ＋音量）。常時表示のスライダーを設定へ集約＝画面はただ眺める一枚に。
     const audioSetRow = h('div', 'setrow')
     audioSetRow.appendChild(h('span', 'setrow__label', '音'))
@@ -655,6 +659,9 @@ export function buildUI(opts) {
     })
     sleepRow.appendChild(sleepChips)
     el.appendChild(sleepRow)
+
+    // ── ここから閲覧系（ふりかえり）。設定の操作とは別カテゴリなので見出しで分ける。
+    el.appendChild(h('div', 'panel__section', 'ふりかえり'))
 
     // 通い帳：訪れた窓辺・過ごした時間・立ち会ったまれな現象を静かに振り返る
     const journalRow = h('div', 'setrow')

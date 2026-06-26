@@ -1002,6 +1002,20 @@ body.idle .modepill.modepill--on {
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
 }
+/* 設定パネルの小見出し（「眺める」「ふりかえり」）＝操作系と閲覧系を区切る。控えめに */
+.panel__section {
+  margin: 1.15rem 0 0.2rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.42);
+}
+.panel__section:first-of-type {
+  margin-top: 0.4rem;
+  padding-top: 0;
+  border-top: none;
+}
 
 .axis,
 .setrow {
