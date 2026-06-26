@@ -80,11 +80,11 @@
 
 | レイヤー | ファイル | 作品 / 作者 | ライセンス | 出典 |
 | --- | --- | --- | --- | --- |
-| ウグイス | `uguisu.mp3` | "Uguisu5707" / Jnn | CC BY 2.1 JP — https://creativecommons.org/licenses/by/2.1/jp/ | https://commons.wikimedia.org/wiki/File:Uguisu5707.ogg |
+| ウグイス | `uguisu.mp3` | "Japanese bush warbler (uguisu) in a city ambiance" / warukunai | CC0 (パブリックドメイン) — https://creativecommons.org/publicdomain/zero/1.0/ | https://freesound.org/people/warukunai/sounds/524526/ |
 | せせらぎ | `stream.mp3` | "Flowing-water-100019" / Fg2 | パブリックドメイン | https://commons.wikimedia.org/wiki/File:Flowing-water-100019.ogg |
 
-- ウグイスは実在種 *Horornis diphone*（ウグイス）の本物のさえずり。2006年、岐阜県・谷汲山 華厳寺で録音。
-- 変更点：いずれも Ogg→MP3 へ変換。せせらぎはループ、ウグイスはゆらぎのある間隔でそっと再生。CC BY 素材は表示で帰属。
+- ウグイスは実在種 *Horornis diphone*（ウグイス）の本物のさえずり。横浜市で録音された 48kHz の CC0 素材へ差し替え（旧 Wikimedia 素材は 11kHz と低品質だったため、高域の艶が出る高音質版へ・2026-06）。
+- 変更点：ウグイスは原音(48kHz/56秒・街の生活音まじり)から、最もきれいな一声(約4.0〜6.4秒)を切り出し、ハイパスで車/風の低域を除き、旧素材と同じ音量へ整えて 44.1kHz MP3 化（ゆらぎのある間隔でそっと再生＝interval）。せせらぎはループ。CC0 は表示義務はないが出典を全数記録。
 - 風（`winter-snow-night/wind.mp3`）も谷戸の朝に薄く再利用（下記）。
 
 ### 情景「冬の雪の夜／夏の朝（山）」 — `public/audio/winter-snow-night/`
