@@ -2605,14 +2605,18 @@ export async function mountTown3d(parent, opts = {}) {
       const sx = SHRINE.x, sz = SHRINE.z, baseY = heightAt(sx, sz)
       const woodMat = toon(0x8a6a48), vermilion = toon(0xc1442e), stoneMat = mottleMat(0x9a958c, 80, 0.1, [2, 2]), roofMat = toon(0x55585e)
       const grp = new THREE.Group(); grp.position.set(sx, baseY, sz); grp.rotation.y = Math.atan2(-sx, -sz) // 参道(+z)を街の中心へ向ける
-      const plat = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 9, 1.4, 24), stoneMat); plat.position.y = 0.2; plat.receiveShadow = true; grp.add(plat) // 石の基壇
+      const baseStoneGeos = [] // 基壇＋石段（静止・石材）を1メッシュへ統合（描画コール削減・見た目は完全同一）
+      { const g0 = new THREE.CylinderGeometry(8.5, 9, 1.4, 24); g0.translate(0, 0.2, 0); baseStoneGeos.push(g0) } // 石の基壇
       const body = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 3.8), woodMat); body.position.set(0, 2.2, -3.5); body.castShadow = true; grp.add(body) // 拝殿
       const rg = new THREE.CylinderGeometry(2.5, 2.5, 6, 3, 1); rg.rotateZ(Math.PI / 2); rg.rotateY(Math.PI / 2)
       const roof = new THREE.Mesh(rg, roofMat); roof.position.set(0, 3.9, -3.5); roof.scale.set(1, 0.78, 1.15); roof.castShadow = true; grp.add(roof); grp.add(addOutline(roof)) // 切妻屋根
-      for (const px of [-2.3, 2.3]) { const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 5.2, 10), vermilion); pil.position.set(px, 3.5, 5.2); pil.castShadow = true; grp.add(pil) } // 鳥居の柱
-      const kasagi = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.55, 0.8), vermilion); kasagi.position.set(0, 6.0, 5.2); kasagi.castShadow = true; grp.add(kasagi)
-      const nuki = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.34, 0.42), vermilion); nuki.position.set(0, 5.0, 5.2); grp.add(nuki)
-      for (let s = 0; s < 4; s++) { const st = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 0.7), stoneMat); st.position.set(0, 0.78 - s * 0.16, 6.6 + s * 0.7); st.receiveShadow = true; grp.add(st) } // 石段
+      { const vermGeos = [], vM = new THREE.Matrix4() // 鳥居（柱2＋笠木＋貫＝静止・朱）を1メッシュへ統合（見た目は完全同一）
+        for (const px of [-2.3, 2.3]) { const pil = new THREE.CylinderGeometry(0.26, 0.3, 5.2, 10); vM.makeTranslation(px, 3.5, 5.2); pil.applyMatrix4(vM); vermGeos.push(pil) } // 鳥居の柱
+        const kasagi = new THREE.BoxGeometry(6.4, 0.55, 0.8); kasagi.translate(0, 6.0, 5.2); vermGeos.push(kasagi)
+        const nuki = new THREE.BoxGeometry(5.6, 0.34, 0.42); nuki.translate(0, 5.0, 5.2); vermGeos.push(nuki)
+        if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(vermGeos, false); if (m) { const me = new THREE.Mesh(m, vermilion); me.castShadow = true; grp.add(me) } vermGeos.forEach((g) => g.dispose()) } }
+      for (let s = 0; s < 4; s++) { const st = new THREE.BoxGeometry(3.4, 0.22, 0.7); st.translate(0, 0.78 - s * 0.16, 6.6 + s * 0.7); baseStoneGeos.push(st) } // 石段
+      if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(baseStoneGeos, false); if (m) { const me = new THREE.Mesh(m, stoneMat); me.receiveShadow = true; grp.add(me) } baseStoneGeos.forEach((g) => g.dispose()) } // 基壇＋石段を1メッシュに
       for (const lx of [-2.7, 2.7]) { // 灯籠×2
         const lan = new THREE.Group(); lan.position.set(lx, 0.9, 2.2)
         const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.5, 8), stoneMat)
