@@ -165,6 +165,7 @@ function start() {
           bg3d: next.bg3d || null, // 奥に敷く実写背景（Flux生成）。遠景を写真級にする任意の格上げ層
           quality: getState().settings.quality, // 描き込み品質＝low端末の発熱/カクつきを抑える（town3dにも効かせる）
           brightness: getState().settings.brightness, // 明るさ設定を3Dにも反映
+          timeStay: getState().settings.timeStay, // 「時間をとどめる」＝日の傾きのドリフトを凍結（3Dにも反映）
           reduceMotion: !!(mqReduce && mqReduce.matches), // 視差軽減: 定期イベントを止める
           onEvent: (kind) => {
             const k2 = kind === 'fireworksFinale' ? 'fireworks' : kind // 花火大会フィナーレも花火の音
@@ -320,8 +321,8 @@ function start() {
       updateSettings(patch)
       renderer.setSettings(getState().settings)
       // 3Dの街モードでは明るさ・描き込みをtown3dへ反映（シェーダーは一時停止中なので renderer.setSettings は効かない）
-      if (town3dMode && (patch.brightness !== undefined || patch.quality !== undefined)) {
-        setTown3dSettings({ brightness: patch.brightness, quality: patch.quality })
+      if (town3dMode && (patch.brightness !== undefined || patch.quality !== undefined || patch.timeStay !== undefined)) {
+        setTown3dSettings({ brightness: patch.brightness, quality: patch.quality, timeStay: patch.timeStay })
       }
       if (patch.tilt !== undefined) {
         if (patch.tilt) {

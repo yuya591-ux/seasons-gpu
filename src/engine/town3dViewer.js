@@ -250,6 +250,7 @@ export function setTown3dSettings(s) {
   if (!active || !s) return
   if (s.brightness != null && active.setBrightness) active.setBrightness(s.brightness)
   if (s.quality && active.setQuality) active.setQuality(s.quality)
+  if (s.timeStay != null && active.setStay) active.setStay(s.timeStay) // 「時間をとどめる」で日の傾きを凍結
 }
 
 export async function unmountTown3d() {
@@ -437,6 +438,13 @@ export async function mountTown3d(parent, opts = {}) {
   // 回り込み光を抑えて平坦フィルを脱す（影側が残る＝セルの陰影と形が出る）。地面側は暖色。
   scene.add(new THREE.HemisphereLight(skyTop.clone().lerp(new THREE.Color(0xffffff), 0.4).getHex(), 0x9a8a6e, isNight ? 0.34 : 0.34))
   scene.add(new THREE.AmbientLight(0xfff2e0, isNight ? 0.12 : 0.10)) // 夜の近景が真っ黒に沈まない程度に底上げ
+  // 時間の移ろい（日が傾く）：ぼーっと眺める十数分で「昼→黄金色の夕方」へそっと寄せる（評価エモ「世界が時間とともに移ろわない」が最大の情緒欠落）。
+  // 夜は据え置き（夜は夜）。golden hour止まりで night までは行かない＝焼いた建物色/AOと破綻させず、陽が低くなる気配(空/霧/陽の暖かさと翳り)だけを足す。
+  // 毎フレーム「原色→金色」をdd(0..1)で補間し直す＝累積しない。空の色base(skyTop0/skyHor0)・霧base(baseFogCol)・方向光を一括で動かすので窓辺も飛行も歩行も連動する。
+  const drift = { t: 0, on: !isNight, stay: !!opts.timeStay }
+  const SKY_TOP_O = skyTop0.clone(), SKY_HOR_O = skyHor0.clone(), FOG_O = baseFogCol.clone(), SUN_INT_O = sun.intensity, SUN_COL_O = sun.color.clone()
+  const GOLD_TOP = skyTop0.clone().multiplyScalar(0.82), GOLD_HOR = skyHor0.clone().lerp(new THREE.Color(0xf2b878), 0.5), GOLD_FOG = baseFogCol.clone().lerp(new THREE.Color(0xe8c79a), 0.42), GOLD_SUN = SUN_COL_O.clone().lerp(new THREE.Color(0xffca96), 0.45)
+  const DRIFT_SECS = 1080 // 約18分かけて夕方へ（ごくゆっくり＝眺めるうちにいつの間にか）
   let sunGlow = null // 昼/夕の空の太陽の光輪（彩雲リング付き）。カメラへ追従させて空に置く
   const sunDir = new THREE.Vector3()
   let starMat = null // 夜の星（per-starできらめく）。frameで uT を進める
@@ -6702,6 +6710,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (bloomPass) bloomPass.enabled = bloomWanted && q !== 'light' // 軽やかでは後処理ブルームも切る＝解像度に加えGPU負荷を一段下げる（眺め時の発熱対策）
     applySize() // pixelRatio＋size＋aspect をまとめて更新
   }
+  active.setStay = (v) => { drift.stay = !!v } // 「時間をとどめる」：日の傾きのドリフトを今の時刻で凍結／解除
 
   // ════════════════════════════════════════════════════════════════════════
   // 「いつもと違う光景」定期イベント（ぼーっと眺めていると時々おきる小さな驚き）。
@@ -7739,6 +7748,12 @@ export async function mountTown3d(parent, opts = {}) {
     // 踏み出す閾: 窓を越える序盤(flyP 0→0.45)だけ立ち上がる山型。部屋から夢の空へ身を乗り出して踏み出す一瞬の身体性。
     const thr = (active.flyTarget > 0.5 && active.flyP > 0.001 && active.flyP < 0.5) ? Math.sin(Math.min(1, active.flyP / 0.45) * Math.PI) : 0
     { const openOp = thr * 0.34; if (Math.abs(openOp - openCur) > 0.015) { openCur = openOp; openFlash.style.opacity = openOp.toFixed(2) } } // 光がふわっと開ける
+    // 日の傾き（ドリフト）：原色→金色を dd(0..1) で補間し直し、空(skyTop0/skyHor0)・霧(baseFogCol)・方向光の base を
+    // 一括で動かす＝窓辺/飛行/歩行が同じ時刻で連動する。累積しない（毎フレーム原色から）。
+    if (drift.on && !drift.stay) drift.t = Math.min(DRIFT_SECS, drift.t + dt)
+    { const dd = drift.on ? drift.t / DRIFT_SECS : 0
+      skyTop0.copy(SKY_TOP_O).lerp(GOLD_TOP, dd); skyHor0.copy(SKY_HOR_O).lerp(GOLD_HOR, dd); baseFogCol.copy(FOG_O).lerp(GOLD_FOG, dd)
+      sun.intensity = SUN_INT_O * (1 - 0.2 * dd); sun.color.copy(SUN_COL_O).lerp(GOLD_SUN, dd) }
     // 別世界感: 飛ぶほど霧を晴らして遠くの街を壮大に見せ、目的地に近いほどその時代の空気（色・露出）へ移す。
     if (flyAmt > 0.02) {
       active.fogTouched = true
@@ -7772,10 +7787,11 @@ export async function mountTown3d(parent, opts = {}) {
       const eraCol = eMax < 0.05 ? '' : (edoP >= senP && edoP >= taiP ? (isNight ? '92,76,50' : '226,170,82') : (senP >= taiP ? (isNight ? '40,52,68' : '74,102,130') : (isNight ? '78,56,66' : '216,154,122')))
       const eraOp = Math.min(0.26, eMax * 0.36) // 通常合成の控えめな色フィルム＝別世界の空気（濃すぎると安いフィルタになる）
       if (Math.abs(eraOp - eraGradeCur) > 0.02 || eraCol !== eraColCur) { eraGradeCur = eraOp; eraColCur = eraCol; if (eraCol) eraGrade.style.backgroundColor = `rgb(${eraCol})`; eraGrade.style.opacity = eraOp.toFixed(2) }
-    } else if (active.fogTouched) {
+    } else {
+      // 窓辺/室内: 日の傾きでドリフトした基準色をそのまま使う（毎フレーム反映＝ぼーっと眺めるうちに陽が傾く）。色のコピーだけで軽い。
       active.fogTouched = false
       scene.fog.near = FOG.near; scene.fog.far = FOG.far; scene.fog.color.copy(baseFogCol); renderer.toneMappingExposure = baseExposure
-      skyUniTop.value.copy(skyTop0); skyUniBot.value.copy(skyHor0) // 窓辺に戻ったら空の色を基準へ復元
+      skyUniTop.value.copy(skyTop0); skyUniBot.value.copy(skyHor0)
       if (eraGradeCur > 0.001) { eraGradeCur = 0; eraGrade.style.opacity = '0' } // 別世界グレードも解く
     }
     // 別世界の気配: 時代の粒子（江戸=桜/蛍・戦国=火の粉）と霞の帯の白いベール（関門をくぐる瞬間に白む）
@@ -8583,6 +8599,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     window.__town3dSoundCounts = () => ({ chime: chimeCount, wing: wingCount }) // 検証用: 鈴・羽音の発火数
     window.__town3dPalProbe = () => ({ duskAmt: +duskAmt.toFixed(2), isNight, snowy: SNOWY, skyTop: '#' + skyTop.getHexString(), skyBright: +skyBright.toFixed(3) }) // 検証用: 時間帯
+    window.__town3dDrift = (f) => { drift.t = DRIFT_SECS * Math.max(0, Math.min(1, f || 0)) } // 検証用: 日の傾きのドリフトを任意の進み具合(0..1)へ早送り
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
