@@ -3735,6 +3735,20 @@ export async function mountTown3d(parent, opts = {}) {
             const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: emberTex, color: 0xff8a3a, transparent: true, opacity: isNight ? 0.6 : 0.26, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glow.position.set(px, py + 2.2, zz); glow.scale.set(1.8, 1.8, 1); town.add(glow); litFlicker(glow.material, 0.28, 7.4) // 松明（炎の揺らぎ）
           }
         }
+        // ── 城下の市の幟旗（戦国の街道に色とりどりの幟が連なる＝市の賑わい・木立の上に覗いて城下の目印に）。決定的配置(R()非消費)＋色ごとに統合で軽量。──
+        { const poleG = [], clothByCol = [[], [], []], pM = new THREE.Matrix4(), clothCols = [0xb03a30, 0x3a5a8a, 0xd8cabe] // 朱・藍・生成り
+          let bi = 0
+          for (let s = 4; s <= 36; s += 4) { const zz = sz + 30 - s * 2.2, cl = senValley(zz), px = sx + cl + 6.4, py = senH(px, zz)
+            if (py < SEA.level + 0.8 || py > 13) continue
+            const pole = new THREE.CylinderGeometry(0.05, 0.06, 3.6, 4); pM.makeTranslation(px, py + 1.8, zz); pole.applyMatrix4(pM); poleG.push(pole)
+            const cloth = new THREE.BoxGeometry(0.04, 2.2, 0.5); pM.makeTranslation(px - 0.3, py + 2.7, zz); cloth.applyMatrix4(pM); clothByCol[bi % 3].push(cloth) // 幟の布（縦長）
+            colliders.push({ x: px, z: zz, r: 0.4 }); bi++
+          }
+          if (BufferGeometryUtils.mergeGeometries) {
+            if (poleG.length) { const m = BufferGeometryUtils.mergeGeometries(poleG, false); if (m) { const me = new THREE.Mesh(m, toon(0x4a3a28)); me.castShadow = true; town.add(me) } poleG.forEach((g) => g.dispose()) }
+            clothByCol.forEach((arr, ci) => { if (arr.length) { const m = BufferGeometryUtils.mergeGeometries(arr, false); if (m) { const me = new THREE.Mesh(m, toon(clothCols[ci])); me.castShadow = true; town.add(me) } arr.forEach((g) => g.dispose()) } })
+          }
+        }
         // ── 棚田（西の尾根の谷側斜面に、等高線に沿って段々に連なる水田）。段に高さをスナップして水平な田を連ね、
         //    谷側に石の畦(擁壁)を立てる＝バラけた板でなく「階段状に揃う棚田」。夏春は水鏡、秋は刈田、冬は雪。統合で軽量。 ──
         { const isWaterSeason = season === 'summer' || season === 'spring'
