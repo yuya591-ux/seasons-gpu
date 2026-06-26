@@ -327,6 +327,8 @@ export async function mountTown3d(parent, opts = {}) {
   const onPurr = typeof opts.onPurr === 'function' ? opts.onPurr : () => {} // 窓辺の猫を撫でるとゴロゴロ鳴る（0..1）
   const onMeow = typeof opts.onMeow === 'function' ? opts.onMeow : () => {} // 窓辺の猫がタップ反応で鳴く（pitch, kind）
   const onFlockWing = typeof opts.onFlockWing === 'function' ? opts.onFlockWing : () => {} // 渡りの群れに近づいて飛ぶと羽音
+  const onLocation = typeof opts.onLocation === 'function' ? opts.onLocation : () => {} // いまの居場所の名(現代の街/江戸の城下町/雲海 等)を外へ伝える＝飛行中に迷子にならない
+  let lastLoc = '' // 直近に伝えた居場所（変化時だけ通知）
   const onChime = typeof opts.onChime === 'function' ? opts.onChime : () => {} // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
@@ -7394,6 +7396,21 @@ export async function mountTown3d(parent, opts = {}) {
     // 固定330で切ると、大きな島(半径〜240)の中心が330でも近縁は90u＝霧の手前で鮮明なまま現れ「ポップ」した（評価エモ指摘）。
     // fog.far基準にすると、縁が霧で完全に溶けた所で切替＝見た目の瞬断が消え、近づくと霞からゆっくり立ち現れる（現代home建物と同じ方式）。
     for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz) - e.r; const ff = scene.fog.far; const want = d < (e.vis ? ff + 30 : ff); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
+    // いまの居場所をそっと伝える（飛行/歩行中の迷子防止）。窓辺は空文字＝表示を消す。変化時だけ通知。
+    { let loc = ''
+      if (active.mode !== 'window') {
+        if (kind === 'yato') loc = '獅子ヶ谷の谷戸'
+        else { const fp = active.flyPos
+          if (fp.y > SEA_Y - 16) loc = '雲海'
+          else if (Math.hypot(fp.x - EDO.x, fp.z - EDO.z) < 250) loc = '江戸の城下町'
+          else if (Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) < 210) loc = '戦国の城下町'
+          else if (Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) < 250) loc = '大正の港町'
+          else if (Math.hypot(fp.x, fp.z) < 155) loc = '現代の街'
+          else loc = heightAt(fp.x, fp.z) < SEA.level + 0.5 ? '海の上' : 'まちはずれ'
+        }
+      }
+      if (loc !== lastLoc) { lastLoc = loc; onLocation(loc) }
+    }
     // 現代home建物の霧距離カリング：fog.farより遠い建物は完全に霧で見えない＝隠しても見た目不変で描画コール減。
     // 影は初回に全建物で焼く(autoUpdate=false)ので、影焼き後(数フレーム後)から開始。窓辺(fog.far≈132)で特に効く。
     bcFrame++

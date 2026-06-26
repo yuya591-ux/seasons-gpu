@@ -182,6 +182,7 @@ function start() {
           onMeow: (pitch, kind) => { if (!sleepFading) audio.meow(pitch, kind) }, // 窓辺の猫がタップ反応で鳴く（にゃーん）
           onFlockWing: () => { if (!sleepFading) audio.flockWing() }, // 渡りの群れに並走すると羽音
           onChime: () => { if (!sleepFading) audio.chime() }, // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
+          onLocation: (name) => { if (ui && ui.setLocation) ui.setLocation(name) }, // いまの居場所をモードピルに表示＝飛行中の迷子防止（評価UX-U2）
           onContextRestore: () => { applyScene(next, false) }, // WebGLコンテキスト喪失（実機のバックグラウンド復帰/メモリ逼迫）から復帰したら、同じ情景を組み直して黒画面固定を防ぐ（評価 技術-致命3）
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }

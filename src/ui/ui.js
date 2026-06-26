@@ -162,6 +162,7 @@ export function buildUI(opts) {
   let windowIsOpen = false
   let leanIsOut = false
   let aloft = null // null=窓辺 / 'fly'=空を飛ぶ / 'walk'=地上を歩く
+  let currentLoc = '' // いまの居場所（現代の街/江戸の城下町/雲海 等）＝飛行中に迷子にならない
   function isRoof() {
     return currentScene.render === 'kitateraoRooftop'
   }
@@ -214,9 +215,9 @@ export function buildUI(opts) {
     stageBtn.style.display = sl ? '' : 'none'; if (sl) stageBtn.textContent = sl
     backBtn.style.display = bl ? '' : 'none'; if (bl) backBtn.textContent = bl
     stageBtn.classList.toggle('is-aloft', !!aloft) // 空/地上は空色寄りの強調
-    // モード表示（空/地上のときだけ、いまの居場所をそっと）
+    // モード表示（空/地上のときだけ、いまの居場所＝モード＋エリア名をそっと）
     const mode = aloft === 'fly' ? '空を飛ぶ' : aloft === 'walk' ? '地上を歩く' : ''
-    modePill.textContent = mode
+    modePill.textContent = mode + (mode && currentLoc ? '　' + currentLoc : '')
     modePill.classList.toggle('modepill--on', !!mode)
   }
   function advance() {
@@ -721,11 +722,17 @@ export function buildUI(opts) {
       sceneName.textContent = text
       showSceneToast()
     },
+    // いまの居場所（現代の街/江戸の城下町/雲海 等）をモードピルに反映＝飛行中に迷子にならない。
+    setLocation(name) {
+      currentLoc = name || ''
+      updateWindowBtn()
+    },
     // 情景を替えたら窓は閉じた状態から（ボタン表示と描画のズレを防ぐ）。通知はしない。
     resetWindow() {
       windowIsOpen = false
       leanIsOut = false
       aloft = null // 空/地上からも畳む（情景切替で残らない）
+      currentLoc = ''
       updateWindowBtn()
     },
   }
