@@ -2375,6 +2375,12 @@ export async function mountTown3d(parent, opts = {}) {
     const line = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.03, 0.42), new THREE.MeshLambertMaterial({ color: 0xc8c4ba }))
     line.position.set(-1.6, heightAt(-1.6, sz) + 0.085, sz); town.add(line)
   }
+  // ── 横断歩道（停止線の先・白い縞＝近景の路面標示。窓から見下ろす中央の道に現実感を）。縞は道幅いっぱいの横長を奥行きに数本。道の勾配に沿わせ1メッシュへ統合。──
+  {
+    const geos = []
+    for (let i = 0; i < 4; i++) { const zc = -2.3 - i * 0.72, sy = heightAt(0, zc) + 0.085; const g2 = new THREE.BoxGeometry(5.4, 0.03, 0.46); g2.translate(0, sy, zc); geos.push(g2) } // 白い縞4本（道幅いっぱい・奥行きに並ぶ）
+    if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const cw = new THREE.Mesh(m, new THREE.MeshLambertMaterial({ color: 0xcac6bc })); cw.receiveShadow = true; town.add(cw) } geos.forEach((g2) => g2.dispose()) }
+  }
   // ── バス停の標識（細い支柱＋丸看板＝通りの生活感） ──
   {
     const px = -4.2, pz = -26, py = heightAt(px, pz)
