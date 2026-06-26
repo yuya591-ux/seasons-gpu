@@ -1913,6 +1913,13 @@ export async function mountTown3d(parent, opts = {}) {
     ncx.fillStyle = '#2a3a4a'; ncx.font = 'bold 26px sans-serif'; ncx.textAlign = 'center'; ncx.textBaseline = 'middle'; ncx.fillText('みなみ', 64, 20)
     const sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 0.1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc) })); sign.position.set(-2, 2.1, -3.9); grp.add(sign)
     for (const sp of [-3, -1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6), toon(0x8a8680)); post.position.set(sp, 0.85, -3.9); grp.add(post) }
+    // ホームのベンチ×2（電車を待つ駅の情景）＋時刻表
+    for (const bx of [-3.8, 3.6]) {
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.5), toon(0x8a6a48)); seat.position.set(bx, 1.06, -4.6); seat.castShadow = true; grp.add(seat)
+      const bk = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.42, 0.1), toon(0x8a6a48)); bk.position.set(bx, 1.32, -4.84); grp.add(bk)
+      for (const lx of [-0.7, 0.7]) { const lg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.46, 0.42), toon(0x6a5238)); lg.position.set(bx + lx, 0.83, -4.6); grp.add(lg) }
+    }
+    { const board = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.08), toon(0xe8e2d2)); board.position.set(4.6, 2.0, -3.95); grp.add(board); const bp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.0, 6), toon(0x8a8680)); bp.position.set(4.6, 1.0, -3.95); grp.add(bp) } // 時刻表の掲示
     // 線路（枕木＋2本のレール。ホームの外側に短く）
     const sleepGeos = [], railGeos = []
     for (let t = -6.5; t <= 6.5; t += 0.9) { const sl = new THREE.BoxGeometry(2.6, 0.12, 0.4); sl.applyMatrix4(new THREE.Matrix4().makeTranslation(t, 0.06, -7.4)); sleepGeos.push(sl) }
