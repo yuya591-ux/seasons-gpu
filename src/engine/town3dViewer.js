@@ -5164,10 +5164,15 @@ export async function mountTown3d(parent, opts = {}) {
     // 群島（鳥居・五重塔・御神木・茅葺き）。それぞれ違うシルエットの発見。雲海をくぼませて据える。
     const isleGrass = isNight ? 0x3a5642 : 0x6f9a5c, isleRock = isNight ? 0x484540 : 0x7b6f60
     const tn = (col) => new THREE.MeshToonMaterial({ color: col, gradientMap: grad })
+    const collarMat = new THREE.MeshBasicMaterial({ color: isNight ? 0xb0b6c8 : 0xf4f3ee, transparent: true, opacity: isNight ? 0.42 : 0.62, depthWrite: false, fog: false }) // 雲の襟（島の腰に巻く薄雲）
     const makeFloatIsle = (r) => {
       const g = new THREE.Group()
       g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 2.4, 22), tn(isleGrass))) // 草の頂
-      const rk = new THREE.Mesh(new THREE.ConeGeometry(r * 0.96, r * 1.2, 16), tn(isleRock)); rk.rotation.x = Math.PI; rk.position.y = -r * 0.62; g.add(rk) // 下へ細る岩肌
+      const rk = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.96, r * 0.2, r * 1.0, 16), tn(isleRock)); rk.position.y = -r * 0.5; g.add(rk) // 下へ細る岩肌（先を切った台形＝針のように尖った逆円錐を脱す）
+      // 雲の襟＝島の腰に薄い雲のクッションを巻き、岩の底を雲海に溶かす（とがった底が宙に浮いて見えるのを防ぐ）。1メッシュに統合＝描画コール+1のみ。
+      { const collarGeos = [], nc = 5 + ((r / 7) | 0), cM = new THREE.Matrix4()
+        for (let i = 0; i < nc; i++) { const a = (i / nc) * 6.283 + R() * 0.6, rr = r * (0.82 + R() * 0.28), pf = new THREE.IcosahedronGeometry(r * (0.32 + R() * 0.18), 1); pf.scale(1.25, 0.5, 1.25); cM.makeTranslation(Math.cos(a) * rr, -r * (0.08 + R() * 0.22), Math.sin(a) * rr); pf.applyMatrix4(cM); collarGeos.push(pf) }
+        const cm = BufferGeometryUtils.mergeGeometries ? BufferGeometryUtils.mergeGeometries(collarGeos, false) : null; collarGeos.forEach((g2) => g2.dispose()); if (cm) g.add(new THREE.Mesh(cm, collarMat)) }
       // 草の頂にぽつぽつ低木＝平らな草地を脱し雲の島に緑の生命感（少数・島は低空で一括カリング＝発熱安全）
       const bushC = tn(isNight ? 0x2e4a36 : 0x4f7a4e), nb = 2 + ((r / 8) | 0)
       for (let i = 0; i < nb; i++) { const a = R() * 6.28, rr = R() * r * 0.6, bs = 0.7 + R() * 0.7; const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(bs, 1), bushC); bush.scale.y = 0.68; bush.position.set(Math.cos(a) * rr, 1.2 + bs * 0.45, Math.sin(a) * rr); g.add(bush) }
@@ -5255,6 +5260,20 @@ export async function mountTown3d(parent, opts = {}) {
           const fire = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0x000000), emissiveIntensity: isNight ? 1.0 : 0 })); fire.position.set(lx, GY + 1.8, lz); g.add(fire)
           const cap = new THREE.Mesh(new THREE.ConeGeometry(1.0, 0.7, 6), lantStone); cap.position.set(lx, GY + 2.7, lz); g.add(cap)
         }
+        // 雲海を眺める人＝東屋の縁に腰かけ、外（雲の海）へ顔を向けて佇む。休息の世界に人の気配を添える（東屋に人物・評価）。
+        const skSit = tn(isNight ? 0xc6a886 : 0xe6c6a4), clSit = tn(isNight ? 0x55617a : 0x7a8aa0), hairSit = tn(0x2a1f18)
+        const mkSitter = (bi) => {
+          const a = (bi + 0.5) / NP * Math.PI * 2 + Math.PI / NP, sx = Math.cos(a) * (br0 - 0.2), sz = Math.sin(a) * (br0 - 0.2)
+          const grp = new THREE.Group(); grp.position.set(sx, GY + 1.21, sz); grp.rotation.y = Math.PI / 2 - a // 前(+z)を外向き＝雲海へ顔を向ける
+          const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.24, 0.6), clSit); thigh.position.set(0, 0, 0.26); grp.add(thigh) // 腿（前へ）
+          for (const s of [-1, 1]) { const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.62, 6), clSit); shin.position.set(s * 0.13, -0.4, 0.5); grp.add(shin) } // すね（下へ）
+          const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.17, 0.66, 8), clSit); torso.position.set(0, 0.42, -0.04); grp.add(torso) // 胴
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), skSit); head.position.set(0, 0.92, -0.02); grp.add(head) // 頭
+          const hr = new THREE.Mesh(new THREE.SphereGeometry(0.17, 9, 7, 0, 6.2832, 0, Math.PI * 0.6), hairSit); hr.position.set(0, 0.94, -0.05); grp.add(hr) // 髪
+          for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.52, 5), clSit); arm.position.set(s * 0.22, 0.42, 0.06); arm.rotation.x = 0.45; grp.add(arm) } // 腕（膝の上へ）
+          grp.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); g.add(grp)
+        }
+        mkSitter(0); mkSitter(3) // 向かい合わぬ二辺に二人＝静かに雲を眺める
       } else if (n.kind === 'teahouse') {
         const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3.0, 5), tn(isNight ? 0x6a6052 : 0xd8cdb2)); body.position.set(0, GY + 1.5, -1); g.add(body)
         const roof = new THREE.Mesh(new THREE.ConeGeometry(5.4, 3.0, 4), tn(isNight ? 0x4a4236 : 0x8a7a54)); roof.rotation.y = Math.PI / 4; roof.position.set(0, GY + 4.3, -1); g.add(roof) // 茅葺の茶屋
@@ -5322,7 +5341,7 @@ export async function mountTown3d(parent, opts = {}) {
         const gb = new THREE.IcosahedronGeometry(sB, 1); gb.scale(1.18, 0.4, 1.18); gb.translate(jx, baseY, jz); cloudTint(gb, -16, 42, seaLowC, hiJ); seaGeos.push(gb) // 広く平たい底＝隣と重なって連続面に
         const bumps = 1 + ((R() * 1.6) | 0)
         for (let bI = 0; bI < bumps; bI++) { const sBu = sB * (0.6 + R() * 0.4), bx = jx + (R() - 0.5) * sB * 0.6, bz = jz + (R() - 0.5) * sB * 0.6, by = baseY + sB * 0.22 + R() * 3; const gg = new THREE.IcosahedronGeometry(sBu, 1); gg.scale(1.1, 0.54, 1.1); gg.translate(bx, by, bz); cloudTint(gg, -16, 42, seaLowC, hiJ); seaGeos.push(gg) } // 低くゆるい膨らみ
-        if (R() < 0.3) { const st = 5 + R() * 4, gt = new THREE.IcosahedronGeometry(st, 1); gt.scale(1.1, 0.64, 1.1); gt.translate(jx + (R() - 0.5) * sB * 0.5, baseY + sB * 0.38 + R() * 3, jz + (R() - 0.5) * sB * 0.5); cloudTint(gt, -16, 42, seaLowC, hiJ); seaGeos.push(gt) } // 控えめな頂
+        if (R() < 0.3) { const st = 5 + R() * 4, gt = new THREE.IcosahedronGeometry(st, 2); gt.scale(1.1, 0.64, 1.1); gt.translate(jx + (R() - 0.5) * sB * 0.5, baseY + sB * 0.38 + R() * 3, jz + (R() - 0.5) * sB * 0.5); cloudTint(gt, -16, 50, seaLowC, seaHighC); seaGeos.push(gt) } // 控えめな頂＝丸い輪郭(det2)＋頂をいちばん明るく＝雲のもくもくが空に映える(輪郭・評価)
       }
     }
     const seaMerged = BufferGeometryUtils.mergeGeometries(seaGeos, false); seaGeos.forEach((g) => g.dispose())
