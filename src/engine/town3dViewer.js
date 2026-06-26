@@ -8199,7 +8199,10 @@ export async function mountTown3d(parent, opts = {}) {
       const sP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) / 255) // 戦国の近さ＝低く翳る
       const tP = flyAmt * Math.max(0, 1 - Math.hypot(fp.x - TAISHO.x, fp.z - TAISHO.z) / 255) // 大正の近さ＝港の郷愁
       let terrain = 'land'
-      if (flyAmt > 0.3) { const gh = heightAt(fp.x, fp.z); if (gh < SEA.level - 2) terrain = 'sea'; else if (gh > 20) terrain = 'mountain' } // 海上＝開放/山上＝荘厳
+      if (flyAmt > 0.3) {
+        if (fp.y > SEA_Y - 18) terrain = 'cloud' // 雲海の高さ＝空の上の夢見心地（不気味なマイナーでなく高く澄んだ響きへ）
+        else { const gh = heightAt(fp.x, fp.z); if (gh < SEA.level - 2) terrain = 'sea'; else if (gh > 20) terrain = 'mountain' } // 海上＝開放/山上＝荘厳
+      }
       onScene({ mode: active.mode, flyAmt, speed: windSpeed01, terrain, edoP: eP, senP: sP, taiP: tP, night: isNight })
     }
 

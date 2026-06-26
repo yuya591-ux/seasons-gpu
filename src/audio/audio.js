@@ -444,13 +444,13 @@ export function createAudio(opts) {
       const v = ctx.createOscillator(); v.frequency.value = 5.5; const vg = ctx.createGain(); vg.gain.value = freq * 0.008; v.connect(vg).connect(o.frequency)
       o.connect(g).connect(bright); try { o.start(tt); o.stop(tt + dur + 0.1); v.start(tt); v.stop(tt + dur + 0.1) } catch { /* 無視 */ }
     }
-    const kane = (tt) => {  // 鉦（チャンチキ）＝金属質の高い点
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(0.13, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.16) // 鉦の高い点を立てる＝祭りらしさ
+    const kane = (tt, vol = 0.13) => {  // 鉦（チャンチキ）＝金属質の高い点。volで強弱（チャン=強/チキ=弱）＝祭りらしい金物の刻み
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(vol, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + (vol > 0.1 ? 0.16 : 0.1)) // 鉦の高い点を立てる＝祭りらしさ
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600; hp.connect(g).connect(bright)
       for (const f of [2700, 3550, 4300]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hp); try { o.start(tt); o.stop(tt + 0.18) } catch { /* 無視 */ } }
     }
     // 囃子のパターン（1小節=8ステップ。盆踊り風の繰り返し）。2=大太鼓 1=締太鼓 0=休。
-    const STEP = 0.3, taikoPat = [2, 0, 1, 0, 2, 0, 1, 0]
+    const STEP = 0.3, taikoPat = [2, 0, 1, 0, 2, 0, 1, 0], kanePat = [0.15, 0, 0.08, 0, 0.15, 0, 0.08, 0] // 鉦のチャンチキ刻み（強拍=チャン／裏拍=チキ＝祭りらしい金物の律動を効かせる）
     const fueA = [880, 0, 1047, 1175, 1047, 0, 880, 0], fueB = [1175, 0, 1047, 880, 784, 0, 880, 0]   // 2小節で交互＝単調さを避ける
     const schedule = () => {
       if (!festNode) return
@@ -460,7 +460,7 @@ export function createAudio(opts) {
           const tt = festNode.nextNote, s = festNode.step % 8, bar = Math.floor(festNode.step / 8)
           const tp = taikoPat[s]; if (tp === 2) taiko(tt, false); else if (tp === 1) taiko(tt, true)
           const fn = (bar % 2 ? fueB : fueA)[s]; if (fn) fue(tt, fn, STEP * 0.9)
-          if (s === 0 || s === 4) kane(tt)
+          const kp = kanePat[s]; if (kp) kane(tt, kp)
         }
         festNode.nextNote += STEP; festNode.step++
       }
@@ -472,7 +472,7 @@ export function createAudio(opts) {
   function setFestival(amt) {
     if (!festNode) return
     const t = now(), a = Math.max(0, Math.min(1, amt || 0))
-    festNode.fg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.3, t, 0.8) // 実機FBで音量を下げる（0.5→0.3）
+    festNode.fg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.2, t, 0.8) // 実機FBで音量を下げる（0.5→0.3→0.2＝もっと控えめに）
     festNode.bright.frequency.setTargetAtTime(560 + a * a * 3600, t, 0.8)   // 遠=太鼓だけがこもって届く／近=笛・鉦が際立つ
     festState.amt = a
   }
@@ -582,6 +582,7 @@ export function createAudio(opts) {
     edo: [220, 293.7, 440],     // A3 D4 A4＝温かなsus。箏のような和の響き
     sengoku: [164.8, 220, 261.6], // E3 A3 C4＝やや低く翳る。戦国の張りつめた静けさ
     taisho: [261.6, 392, 523.3], // C4 G4 C5＝明るくほのかに切ない。大正の港の郷愁
+    cloud: [440, 659.3, 880],    // A4 E5 A5＝高く開いた澄んだ響き。雲海の上の夢見心地（山のマイナーの翳り＝不気味を脱し、心地よい開放感へ）
   }
   function startMusicBed() {
     if (!ctx || bedNodes || !ctx.createBiquadFilter) return
@@ -623,6 +624,7 @@ export function createAudio(opts) {
       const eMax = Math.max(c.edoP || 0, c.senP || 0, c.taiP || 0)
       // 和音の選択: 時代の近さが勝てばその時代、次に地形(海/山)、なければ基調。
       if (eMax > 0.2) voice = (c.edoP >= c.senP && c.edoP >= c.taiP) ? VOICE.edo : (c.senP >= c.taiP ? VOICE.sengoku : VOICE.taisho)
+      else if (c.terrain === 'cloud') voice = VOICE.cloud // 雲海の上＝高く開いた澄んだ響き（心地よい夢見心地）
       else if (c.terrain === 'sea') voice = VOICE.sea
       else if (c.terrain === 'mountain') voice = VOICE.mountain
       else voice = VOICE.home
@@ -634,7 +636,8 @@ export function createAudio(opts) {
       gain = Math.min(0.036, gain)
       // 音色（明るさ）: 海/速度で開け、山/戦国で翳り、大正は華やぎ、夜は全体に落ち着ける。高めの帯で柔らかく。
       cut = 1400 + spd * 600 + eMax * 300
-      if (voice === VOICE.sea) cut += 500
+      if (voice === VOICE.cloud) cut = 2600        // 雲海＝高く澄んで開ける（柔らかく明るい・夢見心地）
+      else if (voice === VOICE.sea) cut += 500
       else if (voice === VOICE.mountain) cut = 1150
       else if (voice === VOICE.sengoku) cut = 1050
       else if (voice === VOICE.taisho) cut = 2200
@@ -645,7 +648,7 @@ export function createAudio(opts) {
     // がドローンに聞こえる。ユーザーが繰り返し嫌うため、当面は完全無音化＝自然音(風・鳥・虫・波)だけにする。
     // 【画面録画FB（2026-06-23）「録画で変な機械音」】＝0.0001でも残響＋呼吸LFOの±が録画のAGCで増幅されていた。
     // 真の0にして、呼吸LFOの深さもgainに比例(=0)させ、合成パッドを完全に止める。
-    gain = 0.0
+    gain = (voice === VOICE.cloud) ? 0.014 * Math.min(1, (c.flyAmt || 0) * 1.3) : 0.0 // 雲海の上だけ、高く澄んだ和音をそっと添える（夢見心地）。他は完全無音のまま＝繰り返し嫌われた持続ドローンは出さない
     // 細かな変化は無視（無駄なスケジューリングを抑える）。
     if (Math.abs(gain - bedState.gain) > 0.0008) { bedState.gain = gain; try { bedNodes.bedGain.gain.setTargetAtTime(gain, t, 1.8); if (bedNodes.lfo2G) bedNodes.lfo2G.gain.setTargetAtTime(gain * 0.3, t, 1.8) } catch { /* 無視 */ } }
     if (Math.abs(cut - bedState.cut) > 24) { bedState.cut = cut; try { bedNodes.lp.frequency.setTargetAtTime(cut, t, 2.4) } catch { /* 無視 */ } }
