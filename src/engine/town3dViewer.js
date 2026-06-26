@@ -2162,11 +2162,25 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 自動販売機（街角に灯る。昼夜とも光る前面＝平成の郷愁） ──
   const vmCols = [0xc83838, 0x3a64c8, 0xe0a420]
+  // 前面に商品サンプルの列＋購入ボタン＋取り出し口を描いた1枚のテクスチャ＝メッシュを増やさず細部を出す。R()不使用。
+  const vendTex = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 96; const x = c.getContext('2d')
+    x.fillStyle = '#26262c'; x.fillRect(0, 0, 64, 96) // 庫内の暗がり
+    const cans = ['#d83a3a', '#e0a420', '#3a8cc8', '#5aa84a', '#e87a30', '#c84a8a', '#7a5ad8', '#d0c040', '#3aa0a0', '#e2e2e6']
+    for (let row = 0; row < 4; row++) for (let col = 0; col < 5; col++) { const cx = 4 + col * 12, cy = 5 + row * 13 // 商品サンプルの列
+      x.fillStyle = cans[(row * 7 + col * 3) % cans.length]; x.fillRect(cx, cy, 9, 11) // 缶/ボトル
+      x.fillStyle = 'rgba(255,255,255,0.28)'; x.fillRect(cx + 1, cy + 1, 2, 9) // 缶の縦のハイライト
+      x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(cx, cy + 10, 9, 1) } // 棚の影
+    x.fillStyle = '#15151a'; x.fillRect(0, 60, 64, 6) // 商品列の下の見切り
+    for (let b = 0; b < 5; b++) { x.fillStyle = '#eee8d8'; x.fillRect(5 + b * 12, 62, 9, 4); x.fillStyle = '#c23a3a'; x.fillRect(6 + b * 12, 63, 3, 2) } // 購入ボタンの列（赤ランプ）
+    x.fillStyle = '#0b0b0f'; x.fillRect(8, 74, 48, 15); x.fillStyle = 'rgba(255,255,255,0.1)'; x.fillRect(8, 74, 48, 2) // 取り出し口
+    const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; return t
+  })()
   for (const spot of [[-30, -7, 3], [11, -5, 2], [-7, -31, 2], [26, -8, 2]]) {
     for (let k = 0; k < spot[2]; k++) {
       const x = spot[0] + k * 1.3, z = spot[1], gy = heightAt(x, z)
       const vm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.8), toon(vmCols[k % 3])); vm.position.set(x, gy + 1.0, z); vm.castShadow = true; town.add(vm)
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.4, 0.06), new THREE.MeshBasicMaterial({ color: 0xfff2cc, fog: true })); panel.position.set(x, gy + 1.15, z + 0.44); town.add(panel)
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.5, 0.06), new THREE.MeshBasicMaterial({ map: vendTex, fog: true })); panel.position.set(x, gy + 1.18, z + 0.44); town.add(panel) // 商品サンプル＋ボタン＋取り出し口の灯る前面
     }
   }
   // 師岡町公園は tree() 定義後にまとめて作る（丘＋樹林で囲むため）。下の「師岡町公園」ブロックを参照。
