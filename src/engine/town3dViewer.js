@@ -3162,15 +3162,16 @@ export async function mountTown3d(parent, opts = {}) {
       const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       // そこへシェーダーで「動くうねり・谷の濃藍・うろこ雲のような波頭・水平線のきらめき」を重ね、ぱっと見て海と分かる水面に。
-      seaUniforms = { uTime: { value: 0 } }
+      seaUniforms = { uTime: { value: 0 }, uSky: { value: skyTop.clone() } } // uSky=空の色（フレネルで遠い水面に映す＝時間帯で暖/藍に追従）
       const seaMat = new THREE.MeshBasicMaterial({ map: wtex, fog: true })
       seaMat.onBeforeCompile = (sh) => {
         sh.uniforms.uTime = seaUniforms.uTime
+        sh.uniforms.uSky = seaUniforms.uSky
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
         sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec3 vWPos;')
+          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSky;\nvarying vec3 vWPos;')
           .replace('#include <map_fragment>', `#include <map_fragment>
             float ph = uTime;
             // 大きなうねり＋斜めのさざ波（複数周波の和＝規則的すぎない水面）
@@ -3184,6 +3185,11 @@ export async function mountTown3d(parent, opts = {}) {
             diffuseColor.rgb = mix(diffuseColor.rgb, deep, trough * 0.55);
             diffuseColor.rgb = mix(diffuseColor.rgb, shal, crest * 0.30);
             diffuseColor.rgb += foam * crest * 0.16;
+            // 空の映り込み（フレネル）＝足元は深い藍、視線が浅い遠方ほど空を映して明るむ＝塗りの板でなく「水」の手応え。
+            // 波のうねりで法線を少し傾け、映り込みのエッジを揺らす（鏡面のっぺりを避ける）。
+            vec3 vDir = normalize(cameraPosition - vWPos);
+            float fres = pow(1.0 - clamp(vDir.y + sw * 0.03, 0.0, 1.0), 4.0);
+            diffuseColor.rgb = mix(diffuseColor.rgb, uSky, fres * 0.5);
             // 水平線まわりのきらめき（カメラから遠い帯でちらちら＝夕日の道のような輝き）
             float dC = distance(vWPos.xz, cameraPosition.xz);
             float band = smoothstep(170.0, 360.0, dC) * (1.0 - smoothstep(470.0, 650.0, dC));
