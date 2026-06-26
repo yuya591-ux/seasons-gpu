@@ -1272,7 +1272,7 @@ export async function mountTown3d(parent, opts = {}) {
       }
       if (BufferGeometryUtils.mergeGeometries) {
         const cm = BufferGeometryUtils.mergeGeometries(curbGeos, false)
-        if (cm) { const curb = new THREE.Mesh(cm, toon(season === 'winter' ? 0xc4c0b6 : 0xb6b0a4)); curb.receiveShadow = true; town.add(curb) }
+        if (cm) { const curb = new THREE.Mesh(cm, mottleMat(season === 'winter' ? 0xc4c0b6 : 0xb6b0a4, 70, 0.08, [3, 1])); curb.receiveShadow = true; town.add(curb) } // 縁石に淡いコンクリのムラ＝近接で使い込まれた路肩の質感
       }
       curbGeos.forEach((g) => g.dispose())
     }
