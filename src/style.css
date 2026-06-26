@@ -792,17 +792,22 @@ body.idle .topbar button {
 
 .iconbtn {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  /* どんな景色でも読めるよう、濃い半透明のピル背景にする */
-  background: rgba(20, 16, 26, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  /* どんな景色でも読めるよう、濃い半透明のピル背景にする（明るい空でも溶けないよう不透明度を一段上げた） */
+  background: rgba(20, 16, 26, 0.44);
   backdrop-filter: blur(6px);
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.96);
   font-size: 0.85rem;
   letter-spacing: 0.1em;
-  padding: 0.5rem 0.8rem;
+  /* タップ領域を最低44px(2.75rem)確保＝指で押しやすく（Apple HIG/Material）。高さは中央寄せで保つ。 */
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.95rem;
   border-radius: 999px;
   cursor: pointer;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   transition: background 0.25s ease;
 }
 .iconbtn:hover {

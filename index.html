@@ -2,9 +2,11 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
+    <!-- OSのピンチ拡大を許可（弱視のアクセシビリティ）。没入の3D舞台は touch-action:none、操作ボタンは
+         touch-action:manipulation で誤拡大を防ぐので、拡大はメニュー等の文字でだけ効く。 -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
     />
     <meta name="theme-color" content="#1a1320" />
     <title>窓辺 — 眺めて整う、四季と天気のアンビエント</title>
