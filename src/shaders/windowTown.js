@@ -299,9 +299,11 @@ const FRAGMENT_BODY = /* glsl */ `
 `
 
 const QUALITY_DEFINES = {
-  soft: '#define OCTAVES 5\n',
-  standard: '#define OCTAVES 4\n',
-  light: '#define OCTAVES 3\n',
+  // lookDownGround の見下ろしレイマーチ歩数/影サンプルも品質で落とす（cornerRoomと同方針）。
+  // 渡さないと ground.js のフォールバック(GR_STEPS 36)固定で、軽やか品質でも最重量シェーダーが減速できない（評価エンジニア）。
+  soft: '#define OCTAVES 5\n#define GR_STEPS 40\n',
+  standard: '#define OCTAVES 4\n#define GR_STEPS 36\n',
+  light: '#define OCTAVES 3\n#define GR_STEPS 28\n#define GR_SHADOW 2\n',
 }
 
 /** 品質に応じたフラグメントシェーダー文字列を組み立てる。ガラス現象の関数を main 直前に挿入する。 */

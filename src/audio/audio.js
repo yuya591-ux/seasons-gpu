@@ -659,7 +659,7 @@ export function createAudio(opts) {
     const g = ctx.createGain()
     g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(amp * 0.5, at + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.6)
     const sub = ctx.createOscillator(); sub.type = 'sine'
-    sub.frequency.setValueAtTime(92, at); sub.frequency.exponentialRampToValueAtTime(44, at + 0.5)
+    sub.frequency.setValueAtTime(150, at); sub.frequency.exponentialRampToValueAtTime(105, at + 0.5) // 44Hzの純サブは実機スピーカーで歪む→太鼓(190Hz)と同方針で100Hz超の締まったドンに（評価エンジニア）
     const sg = ctx.createGain(); sg.gain.setValueAtTime(0.0001, at); sg.gain.linearRampToValueAtTime(amp * 0.5, at + 0.02); sg.gain.exponentialRampToValueAtTime(0.0001, at + 0.55)
     const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null
     const out = pan || master
