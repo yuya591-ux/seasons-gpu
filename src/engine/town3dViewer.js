@@ -3137,6 +3137,57 @@ export async function mountTown3d(parent, opts = {}) {
       }
       const seaMesh = new THREE.Mesh(seaGeo, seaMat)
       seaMesh.position.set(0, SEA.level, -300); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-880..880・z≈-890..290 を広く覆う（Phase0で遠ざけた西=大正/東=江戸/北=戦国への長い渡りの海）
+      // ── 渚（波打ち際）。東岸の汀に沿って白い波が寄せて返す＝「海を眺めに降りる」癒しの足場。汀(heightAt=SEA.level)を z沿いに辿り、砂(陸)→海へ垂れるリボンを張る。寄せ返しはシェーダー（海と同じuTimeを共有＝フレーム追加負荷ゼロ）。──
+      {
+        const fcols = []
+        for (let z = -30; z <= 118; z += 2.5) {
+          let wx = null, prev = heightAt(63, z)
+          for (let x = 64; x <= 94; x += 0.7) { const y = heightAt(x, z); if (prev > SEA.level && y <= SEA.level) { wx = x - 0.35; break } prev = y }
+          fcols.push(wx) // 入江/水路で汀が無い z は null（リボンを切る）
+        }
+        const fpos = [], fuv = [], zAt = (i) => -30 + i * 2.5
+        for (let i = 0; i + 1 < fcols.length; i++) {
+          const w0 = fcols[i], w1 = fcols[i + 1]
+          if (w0 === null || w1 === null) continue
+          const z0 = zAt(i), z1 = zAt(i + 1), a0 = (z0 + 30) / 148, a1 = (z1 + 30) / 148
+          const L0 = [w0 - 3.4, heightAt(w0 - 3.4, z0) + 0.06, z0], S0 = [w0 + 2.6, SEA.level + 0.05, z0] // 陸側(砂)は地面に沿わせ、海側は海面へ
+          const L1 = [w1 - 3.4, heightAt(w1 - 3.4, z1) + 0.06, z1], S1 = [w1 + 2.6, SEA.level + 0.05, z1]
+          const pv = (p, ax, al) => { fpos.push(p[0], p[1], p[2]); fuv.push(ax, al) } // uv=(across:0陸..1海, along:0..1)
+          pv(L0, 0, a0); pv(S0, 1, a0); pv(S1, 1, a1)
+          pv(L0, 0, a0); pv(S1, 1, a1); pv(L1, 0, a1)
+        }
+        if (fpos.length) {
+          const fg = new THREE.BufferGeometry()
+          fg.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3))
+          fg.setAttribute('uv', new THREE.Float32BufferAttribute(fuv, 2))
+          fg.computeVertexNormals()
+          const nc = document.createElement('canvas'); nc.width = nc.height = 64; const ncx = nc.getContext('2d') // 泡のレース（柔らかい白斑＝のっぺり白帯を脱す）
+          ncx.fillStyle = '#000'; ncx.fillRect(0, 0, 64, 64)
+          for (let q = 0; q < 260; q++) { ncx.fillStyle = `rgba(255,255,255,${0.3 + R() * 0.7})`; ncx.beginPath(); ncx.arc(R() * 64, R() * 64, 0.6 + R() * 2.2, 0, 6.2832); ncx.fill() }
+          const ntex = new THREE.CanvasTexture(nc); ntex.wrapS = ntex.wrapT = THREE.RepeatWrapping
+          const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true })
+          foamMat.onBeforeCompile = (sh) => {
+            sh.uniforms.uTime = seaUniforms.uTime; sh.uniforms.uNoise = { value: ntex }
+            sh.vertexShader = sh.vertexShader
+              .replace('#include <common>', '#include <common>\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
+              .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vUvF = uv;\n  vWPf = (modelMatrix * vec4(transformed,1.0)).xyz;')
+            sh.fragmentShader = sh.fragmentShader
+              .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform sampler2D uNoise;\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
+              .replace('#include <fog_fragment>', `#include <fog_fragment>
+                float aw = vUvF.x;                                          // 0=陸(砂) .. 1=海。汀(heightAt=SEA.level)は概ね aw≈0.57
+                float wf = 0.50 + 0.34 * sin(uTime * 0.45 - vWPf.z * 0.045); // 寄せ返しの先端（汀沿いに位相がずれ斜めに寄せる）
+                float band = smoothstep(0.16, 0.0, abs(aw - wf));           // 先端の白いレース（最も明るい筋）
+                float behind = smoothstep(wf - 0.02, 1.0, aw) * 0.55;       // 先端より海側＝波の面に残る泡
+                float lace = texture2D(uNoise, vUvF * vec2(2.5, 8.0) + vec2(uTime * 0.03, uTime * 0.07)).r;
+                float foam = clamp(band + behind, 0.0, 1.0) * (0.5 + 0.5 * lace);
+                float endFade = smoothstep(0.0, 0.05, vUvF.y) * smoothstep(1.0, 0.95, vUvF.y); // リボンの z端をそっと消す
+                gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.95, 0.98, 1.0), 0.85); // 白い泡（近くは白く・遠くは少し景色に溶ける）
+                gl_FragColor.a *= clamp(foam, 0.0, 1.0) * 0.95 * endFade;
+              `)
+          }
+          const foam = new THREE.Mesh(fg, foamMat); foam.renderOrder = 2; foam.frustumCulled = false; town.add(foam)
+        }
+      }
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
       {
         const ex = EDO.x, ez = EDO.z, gy = heightAt(ex, ez)
