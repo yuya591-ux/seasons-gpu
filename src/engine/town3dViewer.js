@@ -6552,9 +6552,11 @@ export async function mountTown3d(parent, opts = {}) {
       for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break }
       let dd = yaw - aim; dd = Math.atan2(Math.sin(dd), Math.cos(dd))
       // 急な上り斜面を正面にすると丘の地肌が画面を覆い視界が詰まる（評価指摘の着地景色の悪化）。前方が眼の高さより高く迫る方位を避ける。
-      let rise = 0; for (const ad of [6, 10, 14]) { const gh = heightAt(x + hx * ad, z + hz * ad); if (gh - gy0 > rise) rise = gh - gy0 }
+      // 遠めの丘(〜22u先)も拾えるよう走査を延ばす＝丘の縁でも斜面でなく街並みの抜けへ向く。
+      let rise = 0, drop = 0; for (const ad of [6, 10, 14, 18, 22]) { const gh = heightAt(x + hx * ad, z + hz * ad); if (gh - gy0 > rise) rise = gh - gy0; if (gy0 - gh > drop) drop = gy0 - gh }
       const uphill = Math.max(0, rise - 2.0) // 2mを超える上りからペナルティ（緩い起伏は許容、丘の壁は強く避ける）
-      const score = d + (1 - Math.abs(dd) / Math.PI) * 9 - uphill * 2.5 // 抜け(最大34)＋中心へ向く度合い(+9)−上り斜面の覆い(急なほど減点)
+      const vista = Math.min(6, Math.max(0, drop - 1.5)) // 前方が下って開ける＝坂の街を見はるかす眺め（高台の景色）。ほどよく加点
+      const score = d + (1 - Math.abs(dd) / Math.PI) * 9 - uphill * 3.0 + vista * 1.0 // 抜け(最大34)＋中心(+9)−上り斜面(急なほど減点)＋下る眺め(最大+6)
       if (score > bestScore) { bestScore = score; best = yaw }
     }
     return best
