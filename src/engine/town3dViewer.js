@@ -7432,24 +7432,8 @@ export async function mountTown3d(parent, opts = {}) {
       }
       f.pts.geometry.attributes.position.needsUpdate = true
     }
-    if (nearFall) { // 歩く人に追従する近景の舞い散り（カメラ周りで循環。歩くと濃く＝桜吹雪/落ち葉の中に降り立つ）
-      const op = flyAmt * (isWalk ? 0.82 : 0.16)
-      nearFall.pts.visible = op > 0.02
-      if (nearFall.pts.visible) {
-        const f = nearFall, mp = f.pos
-        for (let i = 0; i < f.N; i++) {
-          const k = i * 3
-          mp[k + 1] -= f.spd[i] * dt
-          mp[k] += Math.sin(t * 0.7 + f.phs[i]) * f.swirl * dt
-          mp[k + 2] += Math.cos(t * 0.5 + f.phs[i]) * f.swirl * 0.4 * dt
-          if (mp[k] - camX > f.HX) mp[k] -= 2 * f.HX; else if (mp[k] - camX < -f.HX) mp[k] += 2 * f.HX
-          if (mp[k + 2] - camZ > f.HX) mp[k + 2] -= 2 * f.HX; else if (mp[k + 2] - camZ < -f.HX) mp[k + 2] += 2 * f.HX
-          if (mp[k + 1] < camY - 2.5) mp[k + 1] = camY + f.HY * 0.5 + Math.random() * 3 // 足元より下に抜けたら頭上へ
-        }
-        f.pts.geometry.attributes.position.needsUpdate = true
-        f.mat.opacity = Math.min(0.88, op)
-      }
-    }
+    // （近景の舞い散り nearFall の更新は、カメラ位置 camX/camY/camZ と flyAmt/isWalk が確定する後段＝光の粒(motes)の隣で行う。
+    //   ここ(宣言前)で参照すると flyAmt/isWalk/camX… が TDZ となり角部屋など nearFall を持つ情景の3D描画が丸ごと落ちていた）
     // 鳥がはばたきながら空を渡る。自機が近いと驚いて上へ逃げ、羽ばたきが大きくなる（＋羽音）。
     const flyerAloft = active && (active.mode === 'fly' || active.mode === 'walk') && active.flyP > 0.5
     birdFlushCool = Math.max(0, birdFlushCool - dt)
@@ -7922,6 +7906,24 @@ export async function mountTown3d(parent, opts = {}) {
         moteMat.opacity = moteOp
         moteMat.size = isWalk ? 0.6 : 0.5
         moteMat.color.setRGB(1, 0.99 - duskAmt * 0.07, 0.94 - duskAmt * 0.18) // 昼=淡い白／夕夜=暖色
+      }
+      if (nearFall) { // 歩く人に追従する近景の舞い散り（カメラ周りで循環。歩くと濃く＝桜吹雪/落ち葉の中に降り立つ）。camX/Y/Z・flyAmt・isWalk 確定後に更新。
+        const op = flyAmt * (isWalk ? 0.82 : 0.16)
+        nearFall.pts.visible = op > 0.02
+        if (nearFall.pts.visible) {
+          const f = nearFall, mp = f.pos
+          for (let i = 0; i < f.N; i++) {
+            const k = i * 3
+            mp[k + 1] -= f.spd[i] * dt
+            mp[k] += Math.sin(t * 0.7 + f.phs[i]) * f.swirl * dt
+            mp[k + 2] += Math.cos(t * 0.5 + f.phs[i]) * f.swirl * 0.4 * dt
+            if (mp[k] - camX > f.HX) mp[k] -= 2 * f.HX; else if (mp[k] - camX < -f.HX) mp[k] += 2 * f.HX
+            if (mp[k + 2] - camZ > f.HX) mp[k + 2] -= 2 * f.HX; else if (mp[k + 2] - camZ < -f.HX) mp[k + 2] += 2 * f.HX
+            if (mp[k + 1] < camY - 2.5) mp[k + 1] = camY + f.HY * 0.5 + Math.random() * 3 // 足元より下に抜けたら頭上へ
+          }
+          f.pts.geometry.attributes.position.needsUpdate = true
+          f.mat.opacity = Math.min(0.88, op)
+        }
       }
       // 高空を速く飛ぶと飛行機雲を引く（後ろへ。一定距離ごとに一粒を撒く）
       if (!isWalk && active.flyPos.y > 38 && speedMag > FLY.speed * 0.45) {

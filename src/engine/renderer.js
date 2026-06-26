@@ -19,7 +19,11 @@ const FXAA_VS = /* glsl */ `
   void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
 `
 const FXAA_FS = /* glsl */ `
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
   precision highp float;
+  #else
+  precision mediump float;
+  #endif
   uniform sampler2D uTex;
   uniform vec2 uResolution;
   void main() {
