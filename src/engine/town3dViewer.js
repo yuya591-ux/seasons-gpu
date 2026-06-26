@@ -643,16 +643,21 @@ export async function mountTown3d(parent, opts = {}) {
   const freshWater = (mat) => {
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = freshUniforms.uTime
+      sh.uniforms.uSkyF = { value: skyTop.clone() } // 空の色（フレネルで視線が浅い所に映す＝静的な空グラデに動く反射を足す）
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPosF;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPosF = (modelMatrix * vec4(transformed, 1.0)).xyz;')
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec3 vWPosF;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSkyF;\nvarying vec3 vWPosF;')
         .replace('#include <map_fragment>', `#include <map_fragment>
           float phf = uTime;
           float rp = sin(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + sin(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.4 * sin((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.82, smoothstep(0.55, 1.5, -rp) * 0.30); // 谷はほのかに沈む（沈め過ぎない）
           diffuseColor.rgb += vec3(1.0, 0.98, 0.9) * smoothstep(0.74, 1.4, rp) * 0.16; // 細かな陽のきらめき
+          // 空の映り込み（フレネル）＝視線が浅い水面ほど空を映す。さざ波で映りの境を揺らす（ベタ塗りの板を脱す）。
+          vec3 vDirF = normalize(cameraPosition - vWPosF);
+          float fresF = pow(1.0 - clamp(vDirF.y + rp * 0.05, 0.0, 1.0), 4.0);
+          diffuseColor.rgb = mix(diffuseColor.rgb, uSkyF, fresF * 0.34);
         `)
     }
     mat.customProgramCacheKey = () => 'freshWater'
