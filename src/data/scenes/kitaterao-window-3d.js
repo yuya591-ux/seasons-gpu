@@ -4,7 +4,9 @@
 
 export default {
   id: 'kitaterao-window-3d',
-  axes: { season: 'summer', weather: 'clear', time: 'dusk' },
+  // 昼の青空(bg=town3d-day/skyMid=#c0dcf0)＝実体は「霞む昼」。time:'dusk'は誤記で、本物の夕暮れ版
+  // kitaterao-window-3d-sunset と軸が衝突し片方が死蔵だった。noonへ正し、昼=この一枚／夕=sunsetに分離（評価プロデューサー）。
+  axes: { season: 'summer', weather: 'clear', time: 'noon' },
   label: '北寺尾の窓辺、立体の街',
   desc: '本物の3Dで組んだ坂の街を、窓から見下ろす。電柱が遠近に伸び、雲が流れる立体の眺め。',
   status: 'ready',

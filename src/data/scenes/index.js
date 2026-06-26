@@ -128,21 +128,28 @@ export function nowAxes(date = new Date()) {
 export function pickNowScene(date = new Date()) {
   const { season, time } = nowAxes(date)
   const candidates = SCENES.filter((s) => s.status === 'ready' && s.public !== false)
+  // スコア＝季節＋時間帯の一致(最大+4)を主軸に、第一印象を旗艦の窓へ寄せる（評価 全員一致）。
+  const score = (s) => {
+    let v = 0
+    if (s.axes.season === season) v += 2
+    if (s.axes.time === time) v += 2
+    if (s.render === 'photoWindow' || s.render === 'rainGlass') v += 3 // 旗艦の窓（実写・雨ガラス）
+    else if (s.render === 'town3d') v += 2 // 本物の3Dの街（その季節の立体の街）
+    else if (s.render === 'cornerRoom') v += 2 // 角部屋の見回し
+    return v
+  }
+  // 「いま」の季節も時間帯も合う情景たちは“日替わりで巡回”＝同じ軸に複数あっても日が変われば別の一枚に
+  // 出会える（評価プロデューサー: 同一軸で先頭の一枚だけが出て他が死蔵だった問題の解消）。
+  // スコア降順→id で安定整列し、年内通算日でローテート（同じ日は決定的に同じ・日が替われば次の候補へ）。
+  const fit = candidates.filter((s) => s.axes.season === season && s.axes.time === time)
+  if (fit.length) {
+    fit.sort((a, b) => score(b) - score(a) || (a.id < b.id ? -1 : 1))
+    const dayIdx = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000)
+    return fit[dayIdx % fit.length]
+  }
+  // 季節も時間帯も合う公開情景が無い時間帯は、最も近い一枚（従来どおりの最高スコア）。
   let best = DEFAULT_SCENE
   let bestScore = -1
-  for (const s of candidates) {
-    let score = 0
-    if (s.axes.season === season) score += 2
-    if (s.axes.time === time) score += 2
-    // 第一印象は「差別化の核」へ（評価 全員一致）。最も心を掴む旗艦＝実写の窓・雨ガラスを「いま」の顔に。
-    // 季節＋時間帯(最大+4)を主軸に保ちつつ、劇的な時間帯(夕/雨)では旗艦の窓が前へ、ふだんの昼は立体の街が出る。
-    if (s.render === 'photoWindow' || s.render === 'rainGlass') score += 3 // 旗艦の窓（実写・雨ガラス）
-    else if (s.render === 'town3d') score += 2 // 本物の3Dの街（その季節の立体の街）＝日常の眺め
-    else if (s.render === 'cornerRoom') score += 2 // 角部屋の見回し
-    if (score > bestScore) {
-      bestScore = score
-      best = s
-    }
-  }
+  for (const s of candidates) { const v = score(s); if (v > bestScore) { bestScore = v; best = s } }
   return best
 }
