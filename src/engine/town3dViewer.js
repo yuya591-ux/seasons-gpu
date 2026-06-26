@@ -283,6 +283,8 @@ export async function mountTown3d(parent, opts = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
+  let curQual = QUAL // 現在の描き込み（setQualityで変わる）。'light'では灯りのブルームも切る＝解像度に加え後処理も軽くする
+  let bloomWanted = false // この情景でブルームを焚きたいか（夜/はっきりした夕）。light品質ではこれが真でも切る
   let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
   let lastDDT = 0 // 直近の描画間隔（検証用）
   let idleLowApplied = false, idlePrevPR = 0 // 「眺めている時」の追加省電力: 静止＆無操作で解像度も一段下げる（発熱対策）。復帰時に元へ戻す
@@ -6040,7 +6042,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (bloomMod && bloomMod.UnrealBloomPass) {
       const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.18 + duskAmt * 0.34 : 0 // 夜は強め・はっきりした夕はほのか・明るい昼や薄暮の霞む昼は無し
       bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, 0.6, 0.72)
-      bloomPass.enabled = bs > 0.1 // 明るい昼/霞む昼はパス自体を無効化＝downsample/upsampleの負荷もゼロ（発熱回避）
+      bloomWanted = bs > 0.1
+      bloomPass.enabled = bloomWanted && curQual !== 'light' // 明るい昼/霞む昼は無効＝downsample/upsampleの負荷ゼロ。軽やか品質でも切る（発熱回避）
       composer.addPass(bloomPass)
     }
     composer.addPass(new OutputPass())
@@ -6668,10 +6671,11 @@ export async function mountTown3d(parent, opts = {}) {
   }
   applyStageFilter() // 起動時のユーザ明るさを即反映
   active.setBrightness = (b) => { userBright = b || 1; applyStageFilter() }
-  active.setQuality = (q) => { // 描き込み変更で解像度を即反映（影/密度は次の情景読み込みでフル反映）
+  active.setQuality = (q) => { // 描き込み変更で解像度＋灯りのブルームを即反映（影/密度は次の情景読み込みでフル反映）
     const cap = q === 'light' ? 1.25 : q === 'soft' ? 2 : 1.6
-    qCap = cap; prFly = false
+    qCap = cap; prFly = false; curQual = q
     curPR = Math.min(window.devicePixelRatio || 1, cap)
+    if (bloomPass) bloomPass.enabled = bloomWanted && q !== 'light' // 軽やかでは後処理ブルームも切る＝解像度に加えGPU負荷を一段下げる（眺め時の発熱対策）
     applySize() // pixelRatio＋size＋aspect をまとめて更新
   }
 
