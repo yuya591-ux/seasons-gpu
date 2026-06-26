@@ -186,6 +186,7 @@ export function setTown3dFly(on) {
     active.cruise = true // スキームA: 飛び立ったら自動巡航から
     active.mode = 'fly'
     active.flyTarget = 1
+    if (!active.flyHintDone) { active.flyHintDone = true; active.pendingHint = 'fly' } // 初めて空へ飛ぶ時だけ操舵ヒントをそっと出す
   } else {
     active.mode = 'window'
     active.flyTarget = 0
@@ -211,7 +212,7 @@ export function setTown3dLand(land) {
         active.flyYaw = active.flyYawTarget = (Math.abs(ox) + Math.abs(oz) > 1) ? Math.atan2(ox, -oz) : 0
         active.walkCamYaw = active.flyYaw // カメラも進む向きの後ろから始める
         active.flyPitchTarget = -0.02; active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0; active.camReady = false
-        active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1; active.pendingHint = true
+        active.landedFired = false; active.mode = 'walk'; active.flyTarget = 1; active.pendingHint = 'walk'
         return
       }
     }
@@ -226,7 +227,7 @@ export function setTown3dLand(land) {
     active.landedFired = false // 接地した瞬間に砂ぼこり＋沈み込みを起こす
     active.mode = 'walk'
     active.flyTarget = 1
-    active.pendingHint = true // 初見の操作ヒント（左で歩く/右で見まわす）をそっと出す
+    active.pendingHint = 'walk' // 初見の操作ヒント（左で歩く/右で見まわす）をそっと出す
   } else {
     setTown3dFly(true) // 歩きから空へ（飛び立つ）
   }
@@ -6364,11 +6365,13 @@ export async function mountTown3d(parent, opts = {}) {
   // 操作が分かりにくい（スティックは触れるまで出ない）ので、初回の数秒だけ案内。触れたら即消える。フレームより前に宣言（TDZ回避）。
   const ctrlHint = document.createElement('div')
   ctrlHint.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:7;opacity:0;transition:opacity .9s ease'
-  ctrlHint.innerHTML = '<div style="position:absolute;left:8%;bottom:22%;font:600 13px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,.95);text-shadow:0 1px 5px rgba(0,0,0,.55);text-align:center">◉<br><span style="font-weight:500">左で歩く</span></div>' +
-    '<div style="position:absolute;right:8%;bottom:22%;font:600 13px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,.95);text-shadow:0 1px 5px rgba(0,0,0,.55);text-align:center">⟲<br><span style="font-weight:500">右で見まわす</span></div>'
   stage.appendChild(ctrlHint)
+  const HINT_CSS = 'font:600 13px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,.95);text-shadow:0 1px 5px rgba(0,0,0,.55);text-align:center'
+  const HINT_WALK = `<div style="position:absolute;left:8%;bottom:22%;${HINT_CSS}">◉<br><span style="font-weight:500">左で歩く</span></div>` +
+    `<div style="position:absolute;right:8%;bottom:22%;${HINT_CSS}">⟲<br><span style="font-weight:500">右で見まわす</span></div>`
+  const HINT_FLY = `<div style="position:absolute;left:0;right:0;bottom:21%;${HINT_CSS};text-align:center">指でドラッグして空をすすむ<br><span style="font-weight:500">「すすむ／とまる」で巡航・自動で前へ</span></div>`
   let ctrlHintT = 0
-  const showCtrlHint = () => { ctrlHint.style.opacity = '1'; ctrlHintT = 5 } // 5秒後にそっと消える
+  const showCtrlHint = (kind) => { ctrlHint.innerHTML = kind === 'fly' ? HINT_FLY : HINT_WALK; ctrlHint.style.opacity = '1'; ctrlHintT = 5 } // 5秒後にそっと消える
   const hideCtrlHint = () => { if (ctrlHintT > 0) { ctrlHintT = 0; ctrlHint.style.opacity = '0' } } // 触れたら即消える
   // 室内の薄暗がり（周辺減光）。巨大box-shadowブラーは毎フレームの合成が重い→静的なradial-gradientの
   // 不透明度だけを動かす（合成が軽い＝端末が重くならない）。部屋の中ほど濃く、窓を開け/乗り出すと晴れる。
@@ -7896,10 +7899,9 @@ export async function mountTown3d(parent, opts = {}) {
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) cruiseBtn.textContent = active.cruise ? 'とまる' : 'すすむ' }
     const showJump = active.mode === 'walk' && active.flyP > 0.5 // ジャンプボタンは歩行のときだけ出す
     if (showJump !== jumpShown) { jumpShown = showJump; jumpBtn.classList.toggle('jump--show', showJump) }
-    // 初見の操作ヒント: 着地して歩き出す瞬間に出し、数秒でそっと消える（触れたら即消える）
-    if (active.pendingHint) { active.pendingHint = false; showCtrlHint() }
+    // 初見の操作ヒント: 着地して歩き出す/初めて空へ飛ぶ瞬間に出し、数秒でそっと消える（触れたら即消える）
+    if (active.pendingHint) { showCtrlHint(active.pendingHint); active.pendingHint = null }
     if (ctrlHintT > 0) { ctrlHintT -= dt; if (ctrlHintT <= 0) ctrlHint.style.opacity = '0' }
-    if (active.mode !== 'walk' && ctrlHintT > 0) hideCtrlHint() // 歩行を抜けたら消す
     const showZoom = active.mode === 'window' || active.flyP > 0.4 // 部屋の中（窓辺）でも空/地上でもズームボタンを出す
     if (showZoom !== zoomShown) { zoomShown = showZoom; zoomWrap.classList.toggle('zoom--on', showZoom); if (!showZoom) stopZoomHold() }
     const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
