@@ -2058,6 +2058,23 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 縁台（軒先の木の腰掛け＝夕涼みに腰掛けて街を眺める。「眺めて整う」の足場）。決定的配置(R()非消費)＋統合で軽量。 ──
+  { const benG = [], legG = [], potG = [], plG = []
+    for (const [bx, bz] of [[7.2, -16], [-6.8, -34], [8.2, -52], [-7.2, -64]]) {
+      const by = heightAt(bx, bz); if (by < SEA.level + 0.6) continue
+      const top = new THREE.BoxGeometry(1.5, 0.1, 0.46); top.translate(bx, by + 0.42, bz); benG.push(top) // 座面の板
+      for (const lx of [-0.6, 0.6]) { const leg = new THREE.BoxGeometry(0.1, 0.42, 0.4); leg.translate(bx + lx, by + 0.21, bz); legG.push(leg) } // 脚
+      const pot = new THREE.CylinderGeometry(0.13, 0.1, 0.22, 7); pot.translate(bx + 0.86, by + 0.11, bz); potG.push(pot) // 端の素焼き鉢
+      const pl = new THREE.IcosahedronGeometry(0.17, 0); pl.scale(1, 0.9, 1); pl.translate(bx + 0.86, by + 0.32, bz); plG.push(pl) // 鉢の緑
+      colliders.push({ x: bx, z: bz, r: 0.9 })
+    }
+    if (BufferGeometryUtils.mergeGeometries) {
+      for (const [arr, hex] of [[benG, 0x9a7e58], [legG, 0x6a5640], [potG, 0xa8694a], [plG, season === 'autumn' ? 0x9a7a3e : 0x5e7a44]]) {
+        if (arr.length) { const m = BufferGeometryUtils.mergeGeometries(arr, false); if (m) { const me = new THREE.Mesh(m, toon(hex)); me.castShadow = true; town.add(me) } arr.forEach((gg) => gg.dispose()) }
+      }
+    }
+  }
+
   // ── 足元の野花（草地に咲く近景＝降り立った時の季節感）。茎＋花を頂点色で1メッシュへ統合＝軽量。 ──
   if (!SNOW) {
     const flowerGeos = []
