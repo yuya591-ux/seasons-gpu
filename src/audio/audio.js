@@ -133,12 +133,16 @@ export function createAudio(opts) {
     bindRearm()
   }
 
+  const bufferCache = new Map() // src→デコード済みAudioBuffer。情景往復で同じ素材の decodeAudioData を再実行する無駄(モバイルのメインスレッドjank)を防ぐ（評価エンジニア）
   async function loadBuffer(src) {
+    if (bufferCache.has(src)) return bufferCache.get(src)
     try {
       const res = await fetch(urlOf(src))
       if (!res.ok) return null
       const arr = await res.arrayBuffer()
-      return await ctx.decodeAudioData(arr)
+      const buf = await ctx.decodeAudioData(arr)
+      if (buf) bufferCache.set(src, buf)
+      return buf
     } catch {
       return null // 素材未配置・デコード不可は無音扱い
     }
@@ -319,7 +323,9 @@ export function createAudio(opts) {
               ? (li / Math.max(1, loops.length - 1) - 0.5) * 0.5
               : 0
         li++
-        startLoop(buffer, def.gain != null ? def.gain : 1, pan, myGen, !!def.swell)
+        const lgain = def.gain != null ? def.gain : 1
+        // 鈴虫(16kHz素材)は高域が8kHzで切れ、48kHzの虫(crickets)と並ぶと高域落差が目立つ→控えめにし虫を主役へ（評価サウンド）。
+        startLoop(buffer, /suzumushi/.test(def.src || '') ? lgain * 0.72 : lgain, pan, myGen, !!def.swell)
       } else if (def.interval) {
         scheduleInterval(def, buffer, myGen)
       } else {
@@ -406,8 +412,9 @@ export function createAudio(opts) {
     const cbp2 = ctx.createBiquadFilter(); cbp2.type = 'bandpass'; cbp2.frequency.value = 1150; cbp2.Q.value = 0.9 // 第2フォルマント＝二つの母音帯で「人声のざわめき」に近づける（単一帯の定常ノイズを脱す）
     const cbp2g = ctx.createGain(); cbp2g.gain.value = 0.55
     const clp = ctx.createBiquadFilter(); clp.type = 'lowpass'; clp.frequency.value = 1900
+    const cSyl = ctx.createGain(); cSyl.gain.value = 0.85 // 音節リズムの土台（速いLFOで±＝話し声の粒立ち）。乗算なので無音時は漏れない
     const cg = ctx.createGain(); cg.gain.value = 0.0
-    csrc.connect(chp); chp.connect(cbp).connect(clp); chp.connect(cbp2).connect(cbp2g).connect(clp); clp.connect(cg).connect(master)
+    csrc.connect(chp); chp.connect(cbp).connect(clp); chp.connect(cbp2).connect(cbp2g).connect(clp); clp.connect(cSyl).connect(cg).connect(master)
     waterNode = { wg, rg, cg, wAmp: null, rAmp: null, cAmp: null }
     try { // 波のスウェル（寄せて返す）。LFOの振幅(wAmp)は setAmbience が海の近さで持たせる＝海に近いほど大きく寄せる。
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11      // 約9秒周期の大きなうねり
@@ -421,6 +428,9 @@ export function createAudio(opts) {
       const clfo2 = ctx.createOscillator(); clfo2.frequency.value = 0.16
       const cAmp2 = ctx.createGain(); cAmp2.gain.value = 0; clfo2.connect(cAmp2).connect(cg.gain); clfo2.start()
       const cfMod = ctx.createOscillator(); cfMod.frequency.value = 0.13; const cfg = ctx.createGain(); cfg.gain.value = 170; cfMod.connect(cfg).connect(cbp.frequency); cfMod.start() // 母音帯をゆっくり上下に揺らし「ざわざわ」と表情を変える（定常ノイズ脱却）
+      // 音節リズム＝4〜7Hzの非整数比2つを重ね、規則的すぎない「話し声の粒立ち」を cSyl(乗算)へ。定常ノイズ→人混みへ寄せる（評価サウンド）。
+      const sy1 = ctx.createOscillator(); sy1.type = 'triangle'; sy1.frequency.value = 4.3; const syg1 = ctx.createGain(); syg1.gain.value = 0.09; sy1.connect(syg1).connect(cSyl.gain); sy1.start()
+      const sy2 = ctx.createOscillator(); sy2.type = 'sine'; sy2.frequency.value = 6.7; const syg2 = ctx.createGain(); syg2.gain.value = 0.06; sy2.connect(syg2).connect(cSyl.gain); sy2.start()
       waterNode.wAmp = wAmp; waterNode.wAmp2 = wAmp2; waterNode.rAmp = rAmp; waterNode.cAmp = cAmp; waterNode.cAmp2 = cAmp2
     } catch { /* LFO非対応でもベース音量で鳴る */ }
     try { wsrc.start(); rsrc.start(); csrc.start() } catch { /* 無視 */ }
@@ -878,6 +888,11 @@ export function createAudio(opts) {
         let node = o
         if (ctx.createBiquadFilter) { const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.1; node = o.connect(bp) } // 笛らしく
         if (ctx.createStereoPanner) { const pan = ctx.createStereoPanner(); pan.pan.value = (Math.random() - 0.5) * 1.3; node.connect(g).connect(pan).connect(master) } else node.connect(g).connect(master)
+        // 声のよろめき＝単純な鋸歯グライドの「シンセの鳥」を脱す。鳴くたびに揺れの速さ/深さを変える。
+        try { const vib = ctx.createOscillator(); vib.type = 'sine'; vib.frequency.value = 9 + Math.random() * 7; const vg = ctx.createGain(); vg.gain.value = f0 * (0.025 + Math.random() * 0.02); vib.connect(vg).connect(o.frequency); vib.start(at); vib.stop(at + 0.4) } catch { /* 揺れ無しでも鳴る */ }
+        // 終端の「カスレ」＝喉の擦れ。ごく短いノイズを声と同じ帯域へ少しだけ。生体感。
+        try { const nl = Math.floor(0.07 * ctx.sampleRate), nb = ctx.createBuffer(1, nl, ctx.sampleRate), nd = nb.getChannelData(0); for (let i = 0; i < nl; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nl)
+          const ns = ctx.createBufferSource(); ns.buffer = nb; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 1400; nf.Q.value = 0.8; const ng = ctx.createGain(); ng.gain.value = 0.018; ns.connect(nf).connect(ng).connect(master); ns.start(at + 0.2); ns.stop(at + 0.28) } catch { /* 無視 */ }
         try { o.start(at); o.stop(at + 0.38) } catch { /* 無視 */ }
       }
     },
