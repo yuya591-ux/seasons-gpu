@@ -2558,7 +2558,7 @@ export async function mountTown3d(parent, opts = {}) {
     // ── 鎮守の森の神社（飛んでいく目的地のランドマーク）。鳥居・社・石段・灯籠＋囲む木立。──
     {
       const sx = SHRINE.x, sz = SHRINE.z, baseY = heightAt(sx, sz)
-      const woodMat = toon(0x8a6a48), vermilion = toon(0xc1442e), stoneMat = toon(0x9a958c), roofMat = toon(0x55585e)
+      const woodMat = toon(0x8a6a48), vermilion = toon(0xc1442e), stoneMat = mottleMat(0x9a958c, 80, 0.1, [2, 2]), roofMat = toon(0x55585e)
       const grp = new THREE.Group(); grp.position.set(sx, baseY, sz); grp.rotation.y = Math.atan2(-sx, -sz) // 参道(+z)を街の中心へ向ける
       const plat = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 9, 1.4, 24), stoneMat); plat.position.y = 0.2; plat.receiveShadow = true; grp.add(plat) // 石の基壇
       const body = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 3.8), woodMat); body.position.set(0, 2.2, -3.5); body.castShadow = true; grp.add(body) // 拝殿
@@ -2760,7 +2760,7 @@ export async function mountTown3d(parent, opts = {}) {
     // ── 寺（五重塔のある仏閣）。谷の右奥の中腹に。観覧車と対をなす高い目印・飛んでいく目的地。──
     {
       const tx = TEMPLE.x, tz = TEMPLE.z, baseY = heightAt(tx, tz)
-      const wood = toon(0x8a5a3c), beam = toon(0xb5503f), roofMat = toon(0x4a4e52), stoneMat = toon(0x9a958c), gold = toon(0xc9a84a)
+      const wood = toon(0x8a5a3c), beam = toon(0xb5503f), roofMat = toon(0x4a4e52), stoneMat = mottleMat(0x9a958c, 80, 0.1, [2, 2]), gold = toon(0xc9a84a)
       const grp = new THREE.Group(); grp.position.set(tx, baseY, tz); town.add(grp) // 参道(+z)を街の中心へ向ける（回転なし）
       const plat = new THREE.Mesh(new THREE.CylinderGeometry(12, 12.6, 0.9, 10), stoneMat); plat.position.y = 0.15; plat.receiveShadow = true; grp.add(plat) // 寺地の石の基壇
       // 五重塔（積み上がる五つの屋根＋相輪）。塔のかたわらに立てる。
