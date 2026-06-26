@@ -27,6 +27,7 @@ export function buildUI(opts) {
     isFlyable, // () => boolean  いま「空へ/おりる」を出してよいか（立体の街のとき）
     onSleepTimer, // (minutes) => void  おやすみタイマー（0=なし）
     getJournal, // () => journal  通い帳の記録（訪れた窓辺・累計時間・まれな現象）
+    onShowHint, // () => void  消えた操作ヒントをもう一度出す（モードピルのタップで）
   } = opts
 
   const root = h('div', 'ui')
@@ -157,7 +158,9 @@ export function buildUI(opts) {
   const backBtn = h('button', 'iconbtn iconbtn--back', 'もどる')        // 一歩もどる
   topbar.insertBefore(stageBtn, sceneBtn)
   topbar.insertBefore(backBtn, sceneBtn)
-  const modePill = h('div', 'modepill', '') // いまの居場所（空/地上）をそっと表示
+  const modePill = h('button', 'modepill', '') // いまの居場所（空/地上＋エリア名）をそっと表示。タップで操作ヒントを再表示
+  modePill.setAttribute('aria-label', '操作のヒントをもう一度みる')
+  modePill.addEventListener('click', () => { if (aloft && onShowHint) onShowHint(); poke() }) // 迷ったら押すと案内が戻る
   root.appendChild(modePill)
   let windowIsOpen = false
   let leanIsOut = false

@@ -194,6 +194,13 @@ export function setTown3dFly(on) {
   }
 }
 
+// いまのモードの操作ヒントをもう一度そっと出す（一過性で消えた案内を再表示＝初見が詰まらない・評価UX-U1）。
+export function setTown3dHint() {
+  if (!active) return
+  if (active.mode === 'walk') active.pendingHint = 'walk'
+  else if (active.mode === 'fly') active.pendingHint = 'fly'
+}
+
 // 飛び降りて着地して歩く／また飛び立つ（一人称散策）。land=true で現在地の真下へなめらかに下りる。
 export function setTown3dLand(land) {
   if (!active || !active.flyEnabled) return

@@ -881,9 +881,14 @@ body.idle .topbar button {
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
-  padding: 0.32rem 0.95rem;
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0.4rem 0.95rem;
+  min-height: 2.2rem;
   border-radius: 999px;
-  background: rgba(20, 16, 26, 0.28);
+  background: rgba(20, 16, 26, 0.4);
   backdrop-filter: blur(6px);
   color: rgba(255, 255, 255, 0.86);
   font-size: 0.82rem;
@@ -894,8 +899,15 @@ body.idle .topbar button {
   pointer-events: none;
   transition: opacity 0.6s ease;
 }
+/* タップで操作ヒントが戻ることをそっと示す「?」（控えめ） */
+.modepill::after {
+  content: " ?";
+  opacity: 0.5;
+  font-size: 0.78em;
+}
 .modepill.modepill--on {
   opacity: 1;
+  pointer-events: auto;
 }
 body.idle .modepill.modepill--on {
   opacity: 0;

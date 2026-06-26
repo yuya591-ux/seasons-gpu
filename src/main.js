@@ -17,6 +17,7 @@ import {
   setTown3dLean,
   setTown3dFly,
   setTown3dLand,
+  setTown3dHint,
   isTown3dFlyable,
   setTown3dSettings,
   triggerTown3dFlash,
@@ -364,6 +365,9 @@ function start() {
     },
     isFlyable() {
       return town3dMode && isTown3dFlyable() // 「空へ／おりる」を出してよい情景か（立体の街のとき）
+    },
+    onShowHint() {
+      if (town3dMode) setTown3dHint() // モードピルをタップ＝消えた操作ヒントをもう一度出す（迷った時に・評価UX-U1）
     },
   })
 
