@@ -664,16 +664,16 @@ export async function mountTown3d(parent, opts = {}) {
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let seaUniforms = null // 海面シェーダーの時間（うねり・きらめき）
   // 川・池・水路のきらめき（淡い真水の水面のゆらぎ＝歩いて水辺で映える。海より細かく穏やか）。共有uniformをframeで進める。
-  const freshUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() } } // uSky=水面が映す空の色（地平寄り）。frameで日の傾きに追従＝夕方は水も金色に
+  const freshUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() }, uSky2: { value: skyTop.clone() } } // uSky=地平の色/uSky2=天頂の色。映り込みを縦グラデにする(地平=暖/天頂=空)＝単色の板を脱す。frameで日の傾きに追従
   const freshWater = (mat) => {
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = freshUniforms.uTime
-      sh.uniforms.uSkyF = freshUniforms.uSky // 共有＝frameで日の傾きに追従（静的な空グラデに動く反射＋時刻で水も染まる）
+      sh.uniforms.uSkyF = freshUniforms.uSky; sh.uniforms.uSky2F = freshUniforms.uSky2 // 共有＝frameで日の傾きに追従（静的な空グラデに動く反射＋時刻で水も染まる）
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPosF;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPosF = (modelMatrix * vec4(transformed, 1.0)).xyz;')
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSkyF;\nvarying vec3 vWPosF;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSkyF;\nuniform vec3 uSky2F;\nvarying vec3 vWPosF;')
         .replace('#include <map_fragment>', `#include <map_fragment>
           float phf = uTime;
           float rp = sin(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + sin(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.4 * sin((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
@@ -681,8 +681,10 @@ export async function mountTown3d(parent, opts = {}) {
           diffuseColor.rgb += vec3(1.0, 0.98, 0.9) * smoothstep(0.74, 1.4, rp) * 0.16; // 細かな陽のきらめき
           // 空の映り込み（フレネル）＝視線が浅い水面ほど空を映す。さざ波で映りの境を揺らす（ベタ塗りの板を脱す）。
           vec3 vDirF = normalize(cameraPosition - vWPosF);
-          float fresF = pow(1.0 - clamp(vDirF.y + rp * 0.05, 0.0, 1.0), 4.0);
-          diffuseColor.rgb = mix(diffuseColor.rgb, uSkyF, fresF * 0.34);
+          float grazeF = 1.0 - clamp(vDirF.y + rp * 0.05, 0.0, 1.0);
+          float fresF = pow(grazeF, 4.0);
+          vec3 reflF = mix(uSky2F, uSkyF, grazeF); // 視線が浅い(遠い水面)ほど地平の暖色、見下ろすほど天頂の空色＝縦グラデの映り込み
+          diffuseColor.rgb = mix(diffuseColor.rgb, reflF, fresF * 0.34);
         `)
     }
     mat.customProgramCacheKey = () => 'freshWater'
@@ -1288,6 +1290,7 @@ export async function mountTown3d(parent, opts = {}) {
     const cDry = new THREE.Color(snow ? 0xdde4e7 : season === 'spring' ? 0xa9ab69 : season === 'autumn' ? 0x9c7f42 : 0x9b9560) // 乾いた草地
     const cEarth = new THREE.Color(snow ? 0xd2d9dc : season === 'winter' ? 0x9c968c : 0x8a7550) // 斜面に覗く土
     const cSand = new THREE.Color(snow ? 0xd9d8d1 : 0xccbd98) // 渚の砂（東岸の汀ほど強い＝草地の斜面でなく本物の浜に）
+    const cWet = new THREE.Color(snow ? 0xb9c0bf : 0x8f8467) // 波打ち際の濡れ砂（水際だけ一段暗く湿る＝乾いた砂と海の境目に本物の汀の帯）
     const nrm = g.attributes.normal, gcol = [], tmpG = new THREE.Color()
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), ny = nrm.getY(i)
@@ -1296,7 +1299,7 @@ export async function mountTown3d(parent, opts = {}) {
       const dry = Math.max(0, Math.min(1, zone))
       tmpG.copy(cGrass).lerp(cDry, dry * 0.66) // 草地→乾いた草地
       tmpG.lerp(cEarth, slope * 0.82) // 斜面ほど土が覗く
-      if (x > SEA.coast) { const beach = Math.max(0, Math.min(1, 1 - (pos.getY(i) - SEA.level) / 9)); if (beach > 0.01) tmpG.lerp(cSand, beach * 0.82) } // 東岸の渚＝汀ほど砂色（草地の斜面を浜に）
+      if (x > SEA.coast) { const beach = Math.max(0, Math.min(1, 1 - (pos.getY(i) - SEA.level) / 9)); if (beach > 0.01) { tmpG.lerp(cSand, beach * 0.82); const wet = Math.max(0, Math.min(1, 1 - (pos.getY(i) - SEA.level) / 2.4)); if (wet > 0.01) tmpG.lerp(cWet, wet * 0.7) } } // 東岸の渚＝汀ほど砂色＋水際は濡れ砂で一段暗く（乾砂と海の境に汀の帯）
       const v = 0.95 + 0.1 * Math.sin(x * 0.7 + z * 0.55) // 細かな明暗（水彩の手触り）
       gcol.push(tmpG.r * v, tmpG.g * v, tmpG.b * v)
     }
@@ -3206,16 +3209,17 @@ export async function mountTown3d(parent, opts = {}) {
       const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       // そこへシェーダーで「動くうねり・谷の濃藍・うろこ雲のような波頭・水平線のきらめき」を重ね、ぱっと見て海と分かる水面に。
-      seaUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() } } // uSky=空の色（地平寄り）。frameで日の傾きに追従＝夕方は海も金色に
+      seaUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() }, uSky2: { value: skyTop.clone() } } // uSky=空の色（地平寄り）/uSky2=天頂寄り。frameで日の傾きに追従＝夕方は海も金色に
       const seaMat = new THREE.MeshBasicMaterial({ map: wtex, fog: true })
       seaMat.onBeforeCompile = (sh) => {
         sh.uniforms.uTime = seaUniforms.uTime
         sh.uniforms.uSky = seaUniforms.uSky
+        sh.uniforms.uSky2 = seaUniforms.uSky2
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
         sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSky;\nvarying vec3 vWPos;')
+          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSky;\nuniform vec3 uSky2;\nvarying vec3 vWPos;')
           .replace('#include <map_fragment>', `#include <map_fragment>
             float ph = uTime;
             // 大きなうねり＋斜めのさざ波（複数周波の和＝規則的すぎない水面）
@@ -3232,8 +3236,11 @@ export async function mountTown3d(parent, opts = {}) {
             // 空の映り込み（フレネル）＝足元は深い藍、視線が浅い遠方ほど空を映して明るむ＝塗りの板でなく「水」の手応え。
             // 波のうねりで法線を少し傾け、映り込みのエッジを揺らす（鏡面のっぺりを避ける）。
             vec3 vDir = normalize(cameraPosition - vWPos);
-            float fres = pow(1.0 - clamp(vDir.y + sw * 0.03, 0.0, 1.0), 4.0);
-            diffuseColor.rgb = mix(diffuseColor.rgb, uSky, fres * 0.5);
+            float graze = 1.0 - clamp(vDir.y + sw * 0.03, 0.0, 1.0);
+            float fres = pow(graze, 4.0);
+            // 縦グラデ＝近く（見下ろし）は天頂の色、遠く（浅い視線）は地平の色。塗りの板でなく空を映す水面。
+            vec3 refl = mix(uSky2, uSky, graze);
+            diffuseColor.rgb = mix(diffuseColor.rgb, refl, fres * 0.5);
             // 水平線まわりのきらめき（カメラから遠い帯でちらちら＝夕日の道のような輝き）
             float dC = distance(vWPos.xz, cameraPosition.xz);
             float band = smoothstep(170.0, 360.0, dC) * (1.0 - smoothstep(470.0, 650.0, dC));
@@ -7775,7 +7782,8 @@ export async function mountTown3d(parent, opts = {}) {
       skyTop0.copy(SKY_TOP_O).lerp(GOLD_TOP, dd); skyHor0.copy(SKY_HOR_O).lerp(GOLD_HOR, dd); baseFogCol.copy(FOG_O).lerp(GOLD_FOG, dd)
       sun.intensity = SUN_INT_O * (1 - 0.2 * dd); sun.color.copy(SUN_COL_O).lerp(GOLD_SUN, dd) }
     // 水面が映す空も日の傾きへ追従＝夕方は海/川/運河/池も金色に染まる（評価アート/エンジニア: uSkyがmount時固定で水だけ昼のままだった）。色コピーのみで軽い。
-    freshUniforms.uSky.value.copy(skyHor0); if (seaUniforms) seaUniforms.uSky.value.copy(skyHor0)
+    freshUniforms.uSky.value.copy(skyHor0); freshUniforms.uSky2.value.copy(skyTop0)
+    if (seaUniforms) { seaUniforms.uSky.value.copy(skyHor0); seaUniforms.uSky2.value.copy(skyTop0) }
     { const dp = drift.on ? drift.t / DRIFT_SECS : 0; if (Math.abs(dp - lastDayPhase) > 0.03) { lastDayPhase = dp; onDayPhase(dp) } } // 音も時刻に連れ添う（夕方は外音がやわらぐ）。変化時だけ通知
     // 別世界感: 飛ぶほど霧を晴らして遠くの街を壮大に見せ、目的地に近いほどその時代の空気（色・露出）へ移す。
     if (flyAmt > 0.02) {

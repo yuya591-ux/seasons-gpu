@@ -1,21 +1,14 @@
 import { chromium } from 'playwright'
-const b = await chromium.launch()
-const p = await b.newPage({ viewport: { width: 900, height: 540 }, deviceScaleFactor: 2 })
-const errs = []
-p.on('pageerror', (e) => errs.push(String(e)))
-p.on('console', (m)=>{ if(m.type()==='error') errs.push(m.text()) })
-await p.goto('http://localhost:4801/seasons/?dev=1', { waitUntil: 'networkidle' })
-await p.locator('.gate').click().catch(()=>{})
-await p.waitForTimeout(700)
-await p.evaluate(()=>window.__applyScene('kitaterao-window-3d'))
-await p.waitForTimeout(2400)
-await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
-await p.evaluate(()=>window.__town3dCruise(false))
-// 江戸の東の汀を島の方(-x)へ見る
-await p.evaluate(()=>window.__town3dFlyPose(792, 14, -46, -Math.PI/2, -0.04)); await p.waitForTimeout(1300)
-await p.screenshot({ path: 'scripts/_shots/shore-edo.png' })
-// 大正の東の汀を島の方(-x)へ見る
-await p.evaluate(()=>window.__town3dFlyPose(-500, 14, -30, -Math.PI/2, -0.04)); await p.waitForTimeout(1100)
-await p.screenshot({ path: 'scripts/_shots/shore-taisho.png' })
-console.log(errs.length ? 'ERR '+errs.slice(0,3).join(' | ') : 'no errors')
+const PORT = process.env.PORT || 4930
+const b = await chromium.launch(); const p = await b.newPage()
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(2600)
+const info = await p.evaluate(()=>{
+  const g=window.__town3dGroundAt; if(!g) return 'no hook'
+  // 東の汀を横断: z=20 固定で x を海方向へ。SEA.level=-10。浜=海面より少し上(-9..0)の平坦帯があるか
+  const row=[]; for(let x=58;x<=84;x+=2){ row.push({x, y:+g(x,20).toFixed(2)}) }
+  return row
+})
+console.log(JSON.stringify(info))
 await b.close()

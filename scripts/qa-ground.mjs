@@ -1,26 +1,19 @@
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
+const PORT = process.env.PORT || 4930
 const b = await chromium.launch()
-const p = await b.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 2 })
-const errs = []
-p.on('pageerror', (e) => errs.push(String(e)))
-p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await p.locator('.gate').click().catch(() => {})
-await p.waitForTimeout(800)
-await p.evaluate(() => window.__applyScene('kitaterao-window-3d-sunset'))
-await p.waitForTimeout(2600)
-await p.evaluate(() => window.__town3dFly(true)); await p.waitForTimeout(600)
-await p.evaluate(() => window.__town3dCruise(false))
-for (const [sx,sz,n] of [[28,-58,0],[-30,-48,1],[14,-40,2]]) {
-  await p.evaluate(() => window.__town3dFly(true)); await p.waitForTimeout(150)
-  await p.evaluate(([x,z]) => window.__town3dFlyPose(x, 24, z, 0.2, -0.1), [sx,sz]); await p.waitForTimeout(500)
-  await p.evaluate(() => window.__town3dLand(true)); await p.waitForTimeout(1500)
-  // 少し前進して路地の上へ、視線を足元へ下げる
-  await p.evaluate(() => window.__town3dMove(0,1)); await p.waitForTimeout(1200); await p.evaluate(() => window.__town3dMove(0,0))
-  await p.evaluate(() => { for(let k=0;k<5;k++) window.__town3dLook(0,-0.16) }) // 下を向く
-  await p.waitForTimeout(500)
-  await p.screenshot({ path: `scripts/_shots/ground-${n}.png` })
+const p = await b.newPage({ viewport:{width:430,height:840}, deviceScaleFactor:2, isMobile:true, hasTouch:true })
+const errs=[]; p.on('pageerror',e=>errs.push(e.message))
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1500)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(2800)
+await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(300)
+// 住宅街・公園際・駅前・川沿いの路地に降り、歩行目線(一人称寄り)で近景を見る
+const spots=[['g1',6,8],['g2',16,-20],['g3',-8,-30],['g4',30,-10]]
+for(const [tag,x,z] of spots){
+  await p.evaluate(([x,z])=>window.__town3dFlyPose(x,7,z,Math.random()*6,-0.04),[x,z]).catch(()=>{}); await p.waitForTimeout(500)
+  await p.evaluate(()=>window.__town3dLand && window.__town3dLand(true)).catch(()=>{}); await p.waitForTimeout(2400)
+  await p.screenshot({ path:`grd-${tag}.png` }); console.log(tag)
+  await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(400)
 }
-console.log(errs.length ? 'ERR ' + errs.slice(0, 4).join(' | ') : 'no errors')
+console.log(errs.length?('ERR '+errs.slice(0,2).join(' | ')):'no err')
 await b.close()

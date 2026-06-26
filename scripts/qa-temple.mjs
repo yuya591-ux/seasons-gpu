@@ -1,35 +1,17 @@
-// 五重塔の寺の確認。遠望の全景／五重塔の全身／参道(山門・本堂)から。
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
-const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-page.on('pageerror', (e) => console.log('PAGE EXCEPTION:', e.message))
-page.on('console', (m) => { if (m.type() === 'error') console.log('PAGE ERROR:', m.text()) })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(700)
-await page.evaluate(() => window.__applyScene && window.__applyScene('kitaterao-window-3d'))
-await page.waitForTimeout(1800)
-await page.evaluate(() => window.__town3dWindow(true)); await page.waitForTimeout(1200)
-await page.evaluate(() => window.__town3dLean(true)); await page.waitForTimeout(1600)
-await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(400)
-await page.evaluate(() => window.__town3dCruise(false))
-await page.addStyleTag({ content: '.ui{display:none !important}' })
-
-// 寺(40,-74)の全景を斜め前から
-await page.evaluate(() => window.__town3dFlyPose(40, 14, -56, 0, -0.22))
-await page.waitForTimeout(600)
-await page.screenshot({ path: 'scripts/_shots/temple-0-far.png' })
-
-// 五重塔の全身に寄る（塔は本堂の左≈(34.5,-76)）
-await page.evaluate(() => window.__town3dFlyPose(34, 12, -64, 0, -0.18))
-await page.waitForTimeout(600)
-await page.screenshot({ path: 'scripts/_shots/temple-1-pagoda.png' })
-
-// 参道（山門→本堂）を見上げる
-await page.evaluate(() => window.__town3dFlyPose(40, 5, -62, 0, -0.05))
-await page.waitForTimeout(600)
-await page.screenshot({ path: 'scripts/_shots/temple-2-approach.png' })
-
-await browser.close()
-console.log('temple shots done')
+const PORT = process.env.PORT || 4930
+const b = await chromium.launch()
+const p = await b.newPage({ viewport:{width:520,height:620}, deviceScaleFactor:2 })
+const errs=[]; p.on('pageerror',e=>errs.push(e.message))
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1500)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(3000)
+const histo = await p.evaluate(()=>window.__town3dMeshHisto && window.__town3dMeshHisto())
+const t = histo && histo.topChildren && histo.topChildren.find(c=>c.x===40 && c.z===-74)
+console.log('temple meshes now:', t? t.n : '(not in top18)')
+// 寺(40,-74)に飛んで五重塔・本堂の見た目を確認
+await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(300)
+await p.evaluate(()=>window.__town3dFlyPose(40,12,-58,Math.PI,-0.06)).catch(()=>{}); await p.waitForTimeout(1700)
+await p.screenshot({ path:'temple.png' }); console.log('shot')
+console.log(errs.length?('ERR '+errs.slice(0,2).join(' | ')):'no err')
+await b.close()

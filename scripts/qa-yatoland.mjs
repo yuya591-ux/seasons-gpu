@@ -1,0 +1,16 @@
+import { chromium } from 'playwright'
+const PORT = process.env.PORT || 4930
+const b = await chromium.launch()
+const p = await b.newPage({ viewport:{width:430,height:850}, deviceScaleFactor:2, isMobile:true, hasTouch:true })
+const errs=[]; p.on('pageerror',e=>errs.push('PE:'+e.message)); p.on('console',m=>{if(m.type()==='error')errs.push('CE:'+m.text().slice(0,120))})
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1500)
+await p.evaluate(()=>window.__applyScene('shishigaya-window-3d')).catch(()=>{}); await p.waitForTimeout(2800)
+console.log('after load:', errs.length?errs.slice(0,3).join(' | '):'clean')
+await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(500)
+console.log('after fly:', errs.length?errs.slice(0,3).join(' | '):'clean')
+await p.evaluate(()=>window.__town3dFlyPose(-8, 10, -8, 0.2, -0.12)).catch(()=>{}); await p.waitForTimeout(500)
+await p.evaluate(()=>window.__town3dLand && window.__town3dLand(true)).catch(()=>{}); await p.waitForTimeout(2500)
+console.log('after land:', errs.length?errs.slice(0,3).join(' | '):'clean')
+await p.screenshot({ path: 'yatoland.png' })
+await b.close()

@@ -1,21 +1,13 @@
 import { chromium } from 'playwright'
-const browser = await chromium.launch()
-async function shot(page, id, file) {
-  await page.evaluate((s) => window.__applyScene && window.__applyScene(s), id)
-  await page.waitForTimeout(3000)
-  await page.screenshot({ path: `scripts/_shots/${file}.png` })
+const PORT = process.env.PORT || 4930
+const b = await chromium.launch()
+const p = await b.newPage({ viewport:{width:430,height:850}, deviceScaleFactor:2, isMobile:true, hasTouch:true })
+const errs=[]; p.on('pageerror',e=>errs.push(e.message))
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
+for(const s of ['summer-rain-dusk','summer-dusk-downtown','summer-clear-noon','winter-snow-night-downtown']){
+  await p.evaluate(x=>window.__applyScene(x), s).catch(()=>{}); await p.waitForTimeout(3200)
+  await p.screenshot({ path:`rn-${s}.png` }); console.log('shot '+s)
 }
-// 縦と横の両方（横長は粒が散ると指摘されたため）
-for (const [w,h,suf] of [[440,900,'v'],[900,440,'h']]) {
-  const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 })
-  await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
-  await page.evaluate(() => document.fonts.ready)
-  await page.locator('.gate').click().catch(() => {})
-  await page.waitForTimeout(600)
-  await page.addStyleTag({ content: '.ui{display:none !important}' })
-  await shot(page, 'summer-rain-dusk', `qa-rain-summer-${suf}`)
-  await shot(page, 'autumn-rain-dusk', `qa-rain-autumn-${suf}`)
-  await page.close()
-}
-console.log('done')
-await browser.close()
+console.log(errs.length?('ERR '+errs.slice(0,2).join(' | ')):'no err')
+await b.close()

@@ -1,16 +1,13 @@
 import { chromium } from 'playwright'
-const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-const errs = []
-page.on('pageerror', (e) => errs.push(e.message))
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
-await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(500)
-await page.addStyleTag({ content: '.ui{display:none !important}' })
-for (const [id,f] of [['kitaterao-rooftop','qa-roof-day'],['kitaterao-rooftop-night','qa-roof-night']]) {
-  await page.evaluate((s) => window.__applyScene && window.__applyScene(s), id)
-  await page.waitForTimeout(2600)
-  await page.screenshot({ path: `scripts/_shots/${f}.png` })
+const PORT = process.env.PORT || 4930
+const b = await chromium.launch()
+const p = await b.newPage({ viewport:{width:430,height:850}, deviceScaleFactor:2, isMobile:true, hasTouch:true })
+const errs=[]; p.on('pageerror',e=>errs.push(e.message))
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
+for(const s of ['kitaterao-rooftop','kitaterao-rooftop-night','summer-dusk-seaside','summer-morning-mountains']){
+  await p.evaluate(x=>window.__applyScene(x), s).catch(()=>{}); await p.waitForTimeout(3000)
+  await p.screenshot({ path:`rf-${s}.png` }); console.log('shot '+s)
 }
-console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0,4)) : 'エラー無し')
-await browser.close()
+console.log(errs.length?('ERR '+errs.slice(0,2).join(' | ')):'no err')
+await b.close()

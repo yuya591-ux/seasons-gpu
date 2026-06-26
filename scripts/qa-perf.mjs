@@ -1,30 +1,25 @@
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
+const PORT = process.env.PORT || 4930
 const b = await chromium.launch()
-const p = await b.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.6 })
-const errs = []
-p.on('pageerror', (e) => errs.push(String(e)))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await p.locator('.gate').click().catch(() => {})
-await p.waitForTimeout(800)
-await p.evaluate(() => window.__applyScene('kitaterao-window-3d-sunset'))
-await p.waitForTimeout(2600)
-const measFps = async (ms) => p.evaluate((ms) => new Promise((res) => {
-  let n = 0; const t0 = performance.now()
-  const tick = () => { n++; if (performance.now() - t0 < ms) requestAnimationFrame(tick); else res(Math.round(n / ((performance.now() - t0) / 1000))) }
-  requestAnimationFrame(tick)
-}), ms)
-const statsWindow = await p.evaluate(() => window.__town3dStats())
-const fpsIdle = await measFps(2500)
-// 飛び立って巡航（能動飛行＝30fps目標）
-await p.evaluate(() => window.__town3dFly(true)); await p.waitForTimeout(700)
-await p.evaluate(() => window.__town3dCruise(true)); await p.waitForTimeout(700)
-await p.evaluate(() => window.__town3dFlyPose(-30, 24, -20, 0.2, -0.05)); await p.waitForTimeout(400)
-await p.evaluate(() => window.__town3dCruise(true))
-const fpsFly = await measFps(2500)
-const statsFly = await p.evaluate(() => window.__town3dStats())
-console.log('window stats:', JSON.stringify(statsWindow))
-console.log('fly    stats:', JSON.stringify(statsFly))
-console.log('fps idle(窓辺):', fpsIdle, ' fps fly(巡航):', fpsFly)
-console.log(errs.length ? 'ERR ' + errs.slice(0, 3).join(' | ') : 'no errors')
+const p = await b.newPage({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true })
+const errs=[]; p.on('pageerror',e=>errs.push(e.message))
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1500)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(3000)
+const snap = async (tag) => {
+  await p.waitForTimeout(2200) // 移動平均を落ち着かせる
+  const d = await p.evaluate(()=>({ draw:window.__town3dDraw&&window.__town3dDraw(), stats:window.__town3dStats&&window.__town3dStats(), load:window.__town3dLoad&&window.__town3dLoad() }))
+  const D=d.draw||{}, S=d.stats||{}, L=d.load||{}
+  console.log(`${tag.padEnd(14)} calls=${D.calls} tris=${(D.tris/1000).toFixed(0)}k jsMs=${L.jsMs} DPR=${S.pr} objs=${S.objs} texN=${D.texMem} | residents=${L.residents} walkers=${L.cityWalkers} birds=${L.birds} trees=${L.trees} clouds=${L.clouds}`)
+}
+await snap('window')
+await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(300)
+await p.evaluate(()=>window.__town3dFlyPose(2,6,-18,Math.PI,-0.05)).catch(()=>{}); await p.waitForTimeout(300)
+await p.evaluate(()=>window.__town3dLand && window.__town3dLand(true)).catch(()=>{}); await snap('home-walk')
+await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(300)
+await p.evaluate(()=>window.__town3dFlyPose(0,40,40,Math.PI,-0.2)).catch(()=>{}); await snap('home-flyLow')
+await p.evaluate(()=>window.__town3dFlyPose(0,120,90,Math.PI,-0.3)).catch(()=>{}); await snap('home-flyHigh')
+await p.evaluate(()=>window.__town3dFlyPose(-636,24,-13,Math.PI,-0.1)).catch(()=>{}); await p.waitForTimeout(2500)
+await p.evaluate(()=>window.__town3dLand && window.__town3dLand(true)).catch(()=>{}); await snap('taisho-walk')
+console.log(errs.length?('ERR '+errs.slice(0,2).join(' | ')):'no err')
 await b.close()

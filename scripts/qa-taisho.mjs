@@ -1,18 +1,19 @@
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
+const PORT = process.env.PORT || 4930
 const b = await chromium.launch()
-const p = await b.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.6 })
-const errs=[]; p.on('pageerror',e=>errs.push(String(e)))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
-await p.locator('.gate').click().catch(()=>{})
-await p.waitForTimeout(700)
-await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')); await p.waitForTimeout(2600)
-await p.evaluate(()=>window.__town3dFly(true)); await p.waitForTimeout(700)
-for (const [tag,x,y,z,yaw,pit] of [['air',-640,62,58,0,-0.42],['low',-640,4,34,0,-0.05]]) {
-  await p.evaluate(([x,y,z,yaw,pit])=>window.__town3dFlyPose(x,y,z,yaw,pit), [x,y,z,yaw,pit])
-  await p.waitForTimeout(1200)
-  await p.screenshot({ path:`scripts/_shots/taisho2-${tag}.png` })
-  console.log(tag, 'draw:', JSON.stringify(await p.evaluate(()=>window.__town3dDraw&&window.__town3dDraw())))
+const p = await b.newPage({ viewport:{width:440,height:820}, deviceScaleFactor:2, isMobile:true, hasTouch:true })
+const errs=[]; p.on('pageerror',e=>errs.push(e.message))
+await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
+await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(2800)
+await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(400)
+// 大正(-640,-30) の街中をいくつか着地
+const spots=[['t1',-636,-8],['t2',-628,-40],['t3',-648,-22],['t4',-640,-50]]
+for(const [tag,x,z] of spots){
+  await p.evaluate(([x,z])=>window.__town3dFlyPose(x,18,z,Math.random()*6,-0.1),[x,z]).catch(()=>{}); await p.waitForTimeout(600)
+  await p.evaluate(()=>window.__town3dLand && window.__town3dLand(true)).catch(()=>{}); await p.waitForTimeout(2300)
+  await p.screenshot({ path:`taisho-${tag}.png` }); console.log(tag)
+  await p.evaluate(()=>window.__town3dFly && window.__town3dFly(true)).catch(()=>{}); await p.waitForTimeout(400)
 }
-console.log(errs.length?'ERR '+errs.slice(0,2):'no errors')
+console.log(errs.length?('ERR '+errs.slice(0,2).join(' | ')):'no err')
 await b.close()
