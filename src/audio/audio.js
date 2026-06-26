@@ -15,6 +15,7 @@ export function createAudio(opts) {
   let indoorBus = null // 室内の音（窓辺の猫）＝窓の防音を受けない。部屋の中で鳴くものはここへ繋ぐ
   let openFilter = null // 窓のあけ具合で外音を澄ませる/こもらせるローパス（閉=ガラス越し／開=外気が澄む）
   let muffleGain = null // 窓を閉じると外音の音量も下げる防音ゲイン（ローパスだけでは虫の高域が抜けて静かにならないため）
+  let duskShelf = null // 日の傾き(setDayPhase)で外音の高域をそっと落とす＝夕方の空気がやわらぐ。室内の猫は通さない
   let windowOpenAmt = 0
   let layers = [] // ループ中のレイヤー {layerGain, stopped, panner, basePan}
   let layer_lfos = [] // swellレイヤーの満ち引きLFO（情景切替で停止する）
@@ -110,13 +111,15 @@ export function createAudio(opts) {
     // 外の音: master→openFilter→muffleGain→fadeGain（窓を閉じるとガラス越しにこもり音量も落ちる防音）。
     // 室内の音: indoorBus→fadeGain（部屋の中で鳴く猫は窓の開閉に左右されず常に近く澄んで聞こえる）。
     if (ctx.createBiquadFilter) {
+      duskShelf = ctx.createBiquadFilter()
+      duskShelf.type = 'highshelf'; duskShelf.frequency.value = 2600; duskShelf.gain.value = 0 // 既定0=昼。日が傾くと負へ＝高域がやわらぐ
       openFilter = ctx.createBiquadFilter()
       openFilter.type = 'lowpass'
       openFilter.frequency.value = windowOpenAmt > 0.5 ? 20000 : 900 // 閉=ガラス越しに大きくこもる(虫の高域も抑える)／開=澄む
       openFilter.Q.value = 0.5
       muffleGain = ctx.createGain()
       muffleGain.gain.value = windowOpenAmt > 0.5 ? 1 : 0.4 // 閉=しっかり防音で小さく／開=外気の音が戻る
-      master.connect(openFilter).connect(muffleGain).connect(fadeGain)
+      master.connect(duskShelf).connect(openFilter).connect(muffleGain).connect(fadeGain)
     } else {
       master.connect(fadeGain)
     }
@@ -837,6 +840,12 @@ export function createAudio(opts) {
         if (l.stopped) continue
         try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.92)), t, 0.5) } catch { /* 無視 */ } // 海上ではほぼ無音まで
       }
+    },
+    /** 日の傾き(0=昼..1=夕方)で外の音をそっとやわらげる＝絵だけでなく音も時刻に連れ添う(評価エモ最優先)。室内の猫は不変。 */
+    setDayPhase(v) {
+      if (!ctx || !duskShelf) return
+      v = Math.max(0, Math.min(1, v || 0))
+      try { duskShelf.gain.setTargetAtTime(-v * 5.0, now(), 1.2) } catch { /* 無視 */ } // 高域を最大-5dB＝夕方の空気がやわらぐ（虫や鳥の刺さりが和らぐ）
     },
     /** 鳥が驚いて飛び立つ羽音（近づくと数回の柔らかい羽ばたき）。ごく控えめに。 */
     birdFlush() {

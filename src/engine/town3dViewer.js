@@ -337,6 +337,8 @@ export async function mountTown3d(parent, opts = {}) {
   const onFlockWing = typeof opts.onFlockWing === 'function' ? opts.onFlockWing : () => {} // 渡りの群れに近づいて飛ぶと羽音
   const onLocation = typeof opts.onLocation === 'function' ? opts.onLocation : () => {} // いまの居場所の名(現代の街/江戸の城下町/雲海 等)を外へ伝える＝飛行中に迷子にならない
   let lastLoc = '' // 直近に伝えた居場所（変化時だけ通知）
+  const onDayPhase = typeof opts.onDayPhase === 'function' ? opts.onDayPhase : () => {} // 日の傾き(0..1)を外へ伝える＝音も時刻に連れ添う（夕方は外音がやわらぐ）
+  let lastDayPhase = -1 // 直近に伝えた日の傾き（変化時だけ通知）
   const onChime = typeof opts.onChime === 'function' ? opts.onChime : () => {} // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
@@ -7767,6 +7769,7 @@ export async function mountTown3d(parent, opts = {}) {
       sun.intensity = SUN_INT_O * (1 - 0.2 * dd); sun.color.copy(SUN_COL_O).lerp(GOLD_SUN, dd) }
     // 水面が映す空も日の傾きへ追従＝夕方は海/川/運河/池も金色に染まる（評価アート/エンジニア: uSkyがmount時固定で水だけ昼のままだった）。色コピーのみで軽い。
     freshUniforms.uSky.value.copy(skyHor0); if (seaUniforms) seaUniforms.uSky.value.copy(skyHor0)
+    { const dp = drift.on ? drift.t / DRIFT_SECS : 0; if (Math.abs(dp - lastDayPhase) > 0.03) { lastDayPhase = dp; onDayPhase(dp) } } // 音も時刻に連れ添う（夕方は外音がやわらぐ）。変化時だけ通知
     // 別世界感: 飛ぶほど霧を晴らして遠くの街を壮大に見せ、目的地に近いほどその時代の空気（色・露出）へ移す。
     if (flyAmt > 0.02) {
       active.fogTouched = true

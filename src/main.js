@@ -185,6 +185,7 @@ function start() {
           onFlockWing: () => { if (!sleepFading) audio.flockWing() }, // 渡りの群れに並走すると羽音
           onChime: () => { if (!sleepFading) audio.chime() }, // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
           onLocation: (name) => { if (ui && ui.setLocation) ui.setLocation(name) }, // いまの居場所をモードピルに表示＝飛行中の迷子防止（評価UX-U2）
+          onDayPhase: (v) => { if (!sleepFading) audio.setDayPhase(v) }, // 日の傾きで外の音もそっとやわらぐ＝絵だけでなく音も時刻に連れ添う（評価エモ最優先）
           onContextRestore: () => { applyScene(next, false) }, // WebGLコンテキスト喪失（実機のバックグラウンド復帰/メモリ逼迫）から復帰したら、同じ情景を組み直して黒画面固定を防ぐ（評価 技術-致命3）
         })
         if (gen !== sceneGen) { await unmountTown3d(); return }
