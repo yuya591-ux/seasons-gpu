@@ -3754,6 +3754,15 @@ export async function mountTown3d(parent, opts = {}) {
           const body = new THREE.Mesh(new THREE.BoxGeometry(ww, wh, wd), brick); body.position.set(wx, wy + wh / 2, wz); body.castShadow = true; body.receiveShadow = true; town.add(body); town.add(addOutline(body))
           const roof = new THREE.Mesh(new THREE.BoxGeometry(ww + 0.5, 0.5, wd + 0.5), slate); roof.position.set(wx, wy + wh + 0.25, wz); town.add(roof)
           for (let w = 0; w < 4; w++) { const win = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.0, 0.62), isNight ? new THREE.MeshBasicMaterial({ color: 0xffdca0, fog: true }) : toon(0xe8e2d4)); win.position.set(wx - ww / 2 - 0.04, wy + 1.7, wz - wd / 2 + 1.8 + w * 2.7); town.add(win) } }
+        // 港の荷（赤レンガ倉庫の海側に積まれた木箱と樽＝波止場の生活感）。決定的配置＋統合で軽量。R()不使用。
+        { const crateMat = toon(0x8a6a44), barrelMat = toon(0x6e5236), crateG = [], barrelG = [], cgM = new THREE.Matrix4()
+          for (let i = 0; i < 7; i++) { const wx = tx - 58 + i * 6.0, wz = tz - 30 + (i % 2) * 3, wy = heightAt(wx, wz); if (wy < SEA.level + 1) continue
+            const fx = wx + 3.6, fz = wz - 3 + (i % 2) * 2.2; if (heightAt(fx, fz) < SEA.level + 0.5) continue // 倉庫の陸側の前（波止場の上のみ・海側は水なので陸側へ）
+            if (i % 2 === 0) { for (const [ox, oy, oz] of [[0, 0.5, 0], [0.04, 1.45, 0.06], [-0.92, 0.5, 0.25]]) { const s = 0.92; const g2 = new THREE.BoxGeometry(s, s, s); cgM.makeRotationY(((i + ox) * 0.7) % 0.5).setPosition(fx + ox, wy + oy * 0.92, fz + oz); g2.applyMatrix4(cgM); crateG.push(g2) } } // 木箱を積む
+            else { for (const ox of [-0.5, 0.5, 0]) { const br = new THREE.CylinderGeometry(0.4, 0.36, 1.0, 10); cgM.makeTranslation(fx + ox, wy + 0.5, fz + (ox === 0 ? 0.78 : 0)); br.applyMatrix4(cgM); barrelG.push(br) } } // 樽を並べる
+          }
+          if (BufferGeometryUtils.mergeGeometries) { const cm = crateG.length && BufferGeometryUtils.mergeGeometries(crateG, false); if (cm) { const me = new THREE.Mesh(cm, crateMat); me.castShadow = true; me.receiveShadow = true; town.add(me) } const bm = barrelG.length && BufferGeometryUtils.mergeGeometries(barrelG, false); if (bm) { const me2 = new THREE.Mesh(bm, barrelMat); me2.castShadow = true; town.add(me2) } crateG.concat(barrelG).forEach((g) => g.dispose()) }
+        }
         // 時計塔（港町のランドマーク。赤煉瓦＋白い時計＋緑青の尖塔）
         { const cx2 = tx + 6, cz2 = tz - 4, cy = heightAt(cx2, cz2)
           if (cy > SEA.level + 1) { const tower = new THREE.Mesh(new THREE.BoxGeometry(4.2, 16, 4.2), brick); tower.position.set(cx2, cy + 8, cz2); tower.castShadow = true; town.add(tower); town.add(addOutline(tower))
