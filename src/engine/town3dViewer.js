@@ -1096,23 +1096,34 @@ export async function mountTown3d(parent, opts = {}) {
   const festDancers = []    // 盆踊りの踊り手（frameで腕を上げ下げ・体を揺らす）
   // 祭りの立ち姿（浴衣の人影）。壺/こけしを避け、肩から裾へ広がる胴＋首＋小さめの頭＋髪＝人らしく（実機FB「ポットみたいなもの」の解消）。
   const folkBody = (parent, bodyMat, skinMat, hairMat) => {
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.27, 1.12, 9), bodyMat); body.position.y = 0.56; body.castShadow = true; parent.add(body) // 浴衣（肩→裾へ広がる一枚）
-    parent.add(new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.052, 0.09, 6), skinMat).translateY(1.16)) // 首
-    const h = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skinMat); h.position.y = 1.28; h.scale.set(0.95, 1.06, 0.96); parent.add(h) // 頭は小さめ＝頭身を伸ばす
-    parent.add(new THREE.Mesh(new THREE.SphereGeometry(0.162, 9, 8, 0, 6.2832, 0, Math.PI * 0.6), hairMat).translateY(1.3).translateZ(-0.012)) // 髪（後頭部）
+    // 胴＋脚×2＋足先を1メッシュに統合（描画コールを増やさず脚を足す）。下半身を二本に分け人のシルエットを明確化（瓶/こけしを脱す）
+    const geos = [new THREE.CylinderGeometry(0.19, 0.16, 0.62, 9).translate(0, 0.85, 0)] // 胴（腰→肩。肩を少し張らせ上半身と分かる）
+    for (const s of [-1, 1]) { geos.push(new THREE.CylinderGeometry(0.075, 0.058, 0.56, 6).translate(s * 0.095, 0.28, 0)); geos.push(new THREE.BoxGeometry(0.1, 0.05, 0.18).translate(s * 0.095, 0.025, 0.035)) }
+    const bodyGeo = BufferGeometryUtils.mergeGeometries ? (BufferGeometryUtils.mergeGeometries(geos, false) || geos[0]) : geos[0]
+    const body = new THREE.Mesh(bodyGeo, bodyMat); body.castShadow = true; parent.add(body) // 浴衣（胴＋二本の脚）
+    parent.add(new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6), skinMat).translateY(1.21)) // 首
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skinMat); h.position.y = 1.33; h.scale.set(0.95, 1.07, 0.96); parent.add(h) // 頭は小さめ＝頭身を伸ばす
+    parent.add(new THREE.Mesh(new THREE.SphereGeometry(0.163, 9, 8, 0, 6.2832, 0, Math.PI * 0.62), hairMat).translateY(1.35).translateZ(-0.012)) // 髪（後頭部）
     return body
   }
   // 群衆の一人＝人らしい体（裾広がりの胴＋首＋小頭＋髪）を頂点色で1メッシュに焼く。こけし人形(円柱＋球)を脱しつつ描画コールは1（市の人々で多用するので軽量化も兼ねる）。
   const crowdMat = toon(0xffffff); crowdMat.vertexColors = true
   const mkCrowdPerson = (px, py, pz, bodyCol, sc = 0.7) => {
     const skinHex = 0xe6c6a4, hairHex = 0x2a1f18, geos = []
-    const bake = (geo, hex, y) => { geo.translate(0, y, 0); const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(geo) }
-    bake(new THREE.CylinderGeometry(0.17, 0.27, 1.12, 8).toNonIndexed(), bodyCol, 0.56) // 胴（肩→裾へ広がる一枚）
-    bake(new THREE.CylinderGeometry(0.044, 0.052, 0.09, 6).toNonIndexed(), skinHex, 1.16) // 首
-    const hd = new THREE.SphereGeometry(0.15, 9, 7).toNonIndexed(); hd.scale(0.95, 1.06, 0.96); bake(hd, skinHex, 1.28) // 小さめの頭＝頭身を伸ばす
-    bake(new THREE.SphereGeometry(0.162, 8, 7, 0, 6.2832, 0, Math.PI * 0.6).toNonIndexed(), hairHex, 1.3) // 髪（後頭部）
-    const aM = new THREE.Matrix4() // 腕（肩から裾へ・胴色）＝人型の手応え。同じ統合メッシュに焼くので描画コール不変
-    for (const s of [-1, 1]) { const arm = new THREE.CylinderGeometry(0.03, 0.042, 0.5, 5).toNonIndexed(); aM.makeRotationZ(s * 0.2).setPosition(s * 0.19, 0.72, 0.01); arm.applyMatrix4(aM); const c = new THREE.Color(bodyCol), a = new Float32Array(arm.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } arm.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(arm) }
+    const legHex = new THREE.Color(bodyCol).multiplyScalar(0.62).getHex() // 下衣（袴/ズボン）＝胴より一段暗い二色で「服を着た人」と分かる
+    const bake = (geo, hex, y, x = 0, z = 0) => { geo.translate(x, y, z); const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(geo) }
+    // 脚×2＋足先＝下半身を二本に分け、人のシルエットを明確化（瓶/こけしを脱す）。同じ統合メッシュに焼くので描画コールは1のまま
+    for (const s of [-1, 1]) { bake(new THREE.CylinderGeometry(0.075, 0.058, 0.56, 6).toNonIndexed(), legHex, 0.28, s * 0.095); bake(new THREE.BoxGeometry(0.1, 0.05, 0.18).toNonIndexed(), legHex, 0.025, s * 0.095, 0.035) }
+    bake(new THREE.CylinderGeometry(0.19, 0.16, 0.62, 9).toNonIndexed(), bodyCol, 0.85) // 胴（腰→肩。肩を少し張らせ上半身と分かる）
+    bake(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed(), skinHex, 1.21) // 首
+    const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); bake(hd, skinHex, 1.33) // 小さめの頭＝頭身を伸ばす
+    bake(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed(), hairHex, 1.35, 0, -0.012) // 髪（後頭部）
+    const aM = new THREE.Matrix4() // 腕（肩から下へ・少し外へ）＋手先＝人型の手応え。同じ統合メッシュに焼くので描画コール不変
+    for (const s of [-1, 1]) {
+      const arm = new THREE.CylinderGeometry(0.032, 0.04, 0.5, 5).toNonIndexed(); aM.makeRotationZ(s * 0.14).setPosition(s * 0.215, 0.82, 0.02); arm.applyMatrix4(aM)
+      const c = new THREE.Color(bodyCol), a = new Float32Array(arm.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } arm.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(arm)
+      bake(new THREE.SphereGeometry(0.045, 6, 5).toNonIndexed(), skinHex, 0.575, s * 0.245, 0.03) // 手先
+    }
     if (!BufferGeometryUtils.mergeGeometries) return
     const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
     const mesh = new THREE.Mesh(m, crowdMat); mesh.position.set(px, py, pz); mesh.rotation.y = R() * 6.28; mesh.scale.setScalar(sc); mesh.castShadow = true; town.add(mesh)
