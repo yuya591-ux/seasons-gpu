@@ -3900,6 +3900,16 @@ export async function mountTown3d(parent, opts = {}) {
               }
             }
           }
+          { // ── 運河の艀(はしけ)＝大正の水運の名残。係留して静かに浮かぶ（運河沿いの賑わいを水面にも）。──
+            for (const [bx, bsd] of [[tx - 4, 0.5], [tx + 14, -0.6]]) {
+              const wy = heightAt(bx, cz0) + 0.28; if (wy < SEA.level + 0.8) continue // 運河の水面（運河水は地面+0.28）
+              const g = new THREE.Group(); g.position.set(bx, wy, cz0 + bsd); g.rotation.y = bsd * 0.15 // 運河に沿って(x)横たわる＋わずかな角度
+              const hull = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.42, 0.92), toon(0x5a4632)); hull.position.y = -0.02; hull.castShadow = true; g.add(hull) // 喫水（半ば水中）
+              const well = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.2, 0.58), toon(0x3a2c20)); well.position.y = 0.16; g.add(well) // 船内
+              const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 5), toon(0x8a6a44)); pole.position.set(0.8, 0.9, 0); pole.rotation.z = 0.32; g.add(pole) // 棹
+              town.add(g)
+            }
+          }
         }
         const brick = brickMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 2.4, 2.2) // 赤煉瓦（イギリス積み＝近接で本物の煉瓦壁）
         const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
