@@ -1825,7 +1825,7 @@ export async function mountTown3d(parent, opts = {}) {
         bankGeos.push(seg)
       }
     }
-    if (BufferGeometryUtils.mergeGeometries) { const bm = BufferGeometryUtils.mergeGeometries(bankGeos, false); if (bm) { const banks = new THREE.Mesh(bm, toon(0x908c84)); banks.receiveShadow = true; banks.castShadow = true; town.add(banks) } }
+    if (BufferGeometryUtils.mergeGeometries) { const bm = BufferGeometryUtils.mergeGeometries(bankGeos, false); if (bm) { const banks = new THREE.Mesh(bm, mottleMat(0x908c84, 110, 0.1, [2, 3])); banks.receiveShadow = true; banks.castShadow = true; town.add(banks) } } // 川辺の遊歩道で見るコンクリ護岸にムラ＝近接で使い込まれた質感
     bankGeos.forEach((g) => g.dispose())
     // 橋（川を渡る一本）。デッキ＋欄干＋橋脚。橋面は grade（堤の肩）に合わせる。
     const bz = -16, bTop = heightAt(rx, bz) + RIVER.depth
