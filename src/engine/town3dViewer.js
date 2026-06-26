@@ -6655,9 +6655,11 @@ export async function mountTown3d(parent, opts = {}) {
   let userBright = opts.brightness || 1
   function applyStageFilter() {
     const c = clarityCur < 0 ? 0 : clarityCur
-    const b = (lerp(1.03, 1.06, c) * userBright).toFixed(3)
+    // 水彩グレードはここ一本に統一（canvas側の二つ目のfilterは廃止）。二重がけ時より sepia/brightness を控えめにし、
+    // 澄んだ青空が黄ばむのを解消（評価アート指摘）。canvasの暖色/明度のひと匙ぶんだけ僅かに足して水彩味は保つ。
+    const b = (lerp(1.04, 1.07, c) * userBright).toFixed(3)
     stage.style.filter =
-      `saturate(${lerp(0.85, 0.96, c).toFixed(3)}) sepia(${lerp(0.045, 0.02, c).toFixed(3)}) brightness(${b}) contrast(0.99)`
+      `saturate(${lerp(0.88, 0.99, c).toFixed(3)}) sepia(${lerp(0.05, 0.025, c).toFixed(3)}) brightness(${b}) contrast(0.985)`
   }
   applyStageFilter() // 起動時のユーザ明るさを即反映
   active.setBrightness = (b) => { userBright = b || 1; applyStageFilter() }

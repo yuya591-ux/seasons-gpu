@@ -135,8 +135,9 @@ body {
   background: #11131a;
   opacity: 0;
   transition: opacity 0.9s ease;
-  /* 参考画像の手描き水彩調へ：彩度を落として暖かみと軽いコントラストを足す（プラスチック感を排除） */
-  filter: saturate(0.78) sepia(0.06) brightness(1.02) contrast(0.98);
+  /* 水彩グレードの初期フォールバック。実際はマウント時にJS(applyStageFilter)がインラインで上書きする
+     ＝ここは一瞬の保険。canvas側の二つ目のfilterは廃止し、グレードはこの一本のみ（青空の黄ばみ解消）。 */
+  filter: saturate(0.9) sepia(0.045) brightness(1.04) contrast(0.985);
   /* 長押しでテキスト選択/コンテキストメニューが出るのを抑止（ブラウザの既定挙動）＝操作の邪魔をしない */
   user-select: none;
   -webkit-user-select: none;
@@ -167,9 +168,8 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  /* 水彩の一枚へ寄せる: コントラストを少し緩めて締まり過ぎ（ゲームのレンダー感）を脱し、黒を紙色へ
-     わずかに起こす。彩度は保ちつつ暖色をひと匙足して郷愁に（参考: probiex007）。 */
-  filter: saturate(1.05) sepia(0.06) contrast(0.99) brightness(1.05);
+  /* 水彩グレードは親(.town3d-stage)の単一フィルタ(JSのapplyStageFilter)に一本化した。
+     ここに二つ目のfilterを重ねると sepia/brightness が二重がけになり澄んだ青空が黄ばむ（評価アート指摘）。 */
 }
 /* 速度のヴィネット。飛行が速いほど画面の縁がそっと締まり、前へ吸い込まれる速度感を出す */
 .town3d-speedvig {
@@ -642,9 +642,11 @@ body.idle .town3d-climb.climb--on {
   z-index: 1;
   pointer-events: none;
   mix-blend-mode: multiply;
-  opacity: 0.4;
+  /* 高周波の紙目を乗算で強く重ねると等倍ディスプレイで「汚れ/ザラつき」に見える（grade.jsで一度撤去した轍）。
+     opacityを0.4→0.2へ控えめにし、粒も少し粗く（170→205px）して点状のノイズ感を和らげる（評価アート指摘）。 */
+  opacity: 0.2;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 170px 170px;
+  background-size: 205px 205px;
 }
 /* 紙目2層め: 粗い斑(にじみ)をソフトライトで重ね、絵具が紙に染みた有機的なムラを足す＝水彩の深み */
 .town3d-paper2 {
