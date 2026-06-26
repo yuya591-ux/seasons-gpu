@@ -7565,15 +7565,13 @@ export async function mountTown3d(parent, opts = {}) {
         if (w.road) { // 街道を蛇行に沿って往復する旅人（戦国の谷）
           if (Math.hypot(fp.x - w.x0, fp.z - w.z0) > 150) continue
           const tt = (t * w.sp + w.ph) % 2, f = tt < 1 ? tt : 2 - tt, p = w.fn(f * w.len)
-          w.g.position.set(p.x, p.y, p.z); w.g.rotation.y = tt < 1 ? 0 : Math.PI
-          w.g.children[0].position.y = 0.4 + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
+          w.g.position.set(p.x, p.y + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06, p.z); w.g.rotation.y = tt < 1 ? 0 : Math.PI // 歩みに合わせ上下（mkCrowdPersonは統合メッシュ＝子を持たないので本体yへ反映）
           continue
         }
         if (Math.hypot(fp.x - w.cx, fp.z - w.cz) > 150) continue
         const tt = (t * w.sp + w.ph) % 2, f = tt < 1 ? tt : 2 - tt, r = w.r0 + (w.r1 - w.r0) * f
         const px = w.cx + Math.cos(w.ang) * r, pz = w.cz + Math.sin(w.ang) * r
-        w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0)
-        w.g.children[0].position.y = 0.4 + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06
+        w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0) // 歩みに合わせ上下（統合メッシュ＝本体yへ反映）
       }
       // 戦国の谷の霧がゆっくり横へ漂う（近くを飛ぶ時だけ更新＝軽量）
       if (senMist.length && Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) < 220) for (let i = 0; i < senMist.length; i++) { const m = senMist[i]; m.position.x += Math.sin(t * 0.12 + i * 1.7) * dt * 0.6 }
