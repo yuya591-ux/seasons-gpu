@@ -2834,13 +2834,18 @@ export async function mountTown3d(parent, opts = {}) {
       {
         const pag = new THREE.Group(); pag.position.set(-5.5, 0.5, -2); pag.scale.setScalar(1.12); grp.add(pag)
         let y = 0
+        const bodyGeos = [], bandGeos = [] // 各層の身（杉材）と朱の見切り（梁色）は静止＝層ごとに材ごとへ1メッシュへ統合（描画コール削減・見た目は完全同一）
         for (let i = 0; i < 5; i++) {
           const s = 1 - i * 0.12, bw = 3.4 * s, bh = 2.1
-          const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bw), wood); body.position.y = y + bh / 2; body.castShadow = true; pag.add(body)
-          const band = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.05, 0.2, bw + 0.05), beam); band.position.y = y + bh - 0.12; pag.add(band) // 各層の朱の見切り
+          const bodyG = new THREE.BoxGeometry(bw, bh, bw); bodyG.translate(0, y + bh / 2, 0); bodyGeos.push(bodyG)
+          const bandG = new THREE.BoxGeometry(bw + 0.05, 0.2, bw + 0.05); bandG.translate(0, y + bh - 0.12, 0); bandGeos.push(bandG) // 各層の朱の見切り
           const roofR = bw * 0.96 + 0.75
-          const roof = new THREE.Mesh(new THREE.ConeGeometry(roofR, 1.2, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.position.y = y + bh + 0.5; roof.castShadow = true; pag.add(roof); pag.add(addOutline(roof)) // 四注の深い軒
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(roofR, 1.2, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.position.y = y + bh + 0.5; roof.castShadow = true; pag.add(roof); pag.add(addOutline(roof)) // 四注の深い軒（輪郭付き＝個別のまま）
           y += bh + 1.0
+        }
+        if (BufferGeometryUtils.mergeGeometries) {
+          const bm = BufferGeometryUtils.mergeGeometries(bodyGeos, false); if (bm) { const me = new THREE.Mesh(bm, wood); me.castShadow = true; pag.add(me) } bodyGeos.forEach((g) => g.dispose())
+          const am = BufferGeometryUtils.mergeGeometries(bandGeos, false); if (am) pag.add(new THREE.Mesh(am, beam)); bandGeos.forEach((g) => g.dispose())
         }
         const sorin = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.4, 6), gold); sorin.position.y = y + 1.6; pag.add(sorin) // 相輪の心柱
         for (let r = 0; r < 6; r++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3 - r * 0.025, 0.05, 5, 12), gold); ring.rotation.x = Math.PI / 2; ring.position.y = y + 0.5 + r * 0.36; pag.add(ring) } // 九輪
@@ -2851,7 +2856,7 @@ export async function mountTown3d(parent, opts = {}) {
       {
         const hall = new THREE.Group(); hall.position.set(4.5, 0.5, -1); grp.add(hall)
         const body = new THREE.Mesh(new THREE.BoxGeometry(8.5, 3.4, 6), wood); body.position.y = 1.7; body.castShadow = true; hall.add(body)
-        for (const px of [-4, -1.3, 1.3, 4]) { const pil = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.2, 0.35), beam); pil.position.set(px, 1.6, 3.1); hall.add(pil) } // 縁の朱柱
+        { const pilGeos = []; for (const px of [-4, -1.3, 1.3, 4]) { const g = new THREE.BoxGeometry(0.35, 3.2, 0.35); g.translate(px, 1.6, 3.1); pilGeos.push(g) }; if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(pilGeos, false); if (m) hall.add(new THREE.Mesh(m, beam)); pilGeos.forEach((g) => g.dispose()) } } // 縁の朱柱4本を1メッシュへ統合（見た目同一）
         const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 3.0, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.scale.set(1.0, 1, 0.8); roof.position.y = 4.4; roof.castShadow = true; hall.add(roof); hall.add(addOutline(roof))
         const ridge = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.5, 0.7), roofMat); ridge.position.y = 5.55; hall.add(ridge)
         colliders.push({ x: tx + 4.5, z: tz - 1, r: 4.0 })
