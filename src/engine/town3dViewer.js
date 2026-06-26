@@ -2191,6 +2191,22 @@ export async function mountTown3d(parent, opts = {}) {
       const panel = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.5, 0.06), new THREE.MeshBasicMaterial({ map: vendTex, fog: true })); panel.position.set(x, gy + 1.18, z + 0.44); town.add(panel) // 商品サンプル＋ボタン＋取り出し口の灯る前面
     }
   }
+  // ── 電話ボックス（平成の街角の公衆電話。銀枠＋硝子＋赤い天井・夜は中が灯る）。通り沿いに1つ。R()不使用。──
+  {
+    const px = 5.6, pz = -6, py = heightAt(px, pz)
+    if (py > SEA.level + 0.5) {
+      const g = new THREE.Group(); g.position.set(px, py, pz)
+      const frame = toon(0xb0b4b8), glassM = new THREE.MeshBasicMaterial({ color: 0xbcd2dc, transparent: true, opacity: 0.5, depthWrite: false, fog: true, side: THREE.DoubleSide }), red = toon(0xc23a2e)
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.2, 1.0), frame); base.position.y = 0.1; g.add(base)
+      for (const [cx, cz] of [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.3, 0.1), frame); post.position.set(cx, 1.25, cz); post.castShadow = true; g.add(post) }
+      for (const [gx, gz, rot] of [[0, -0.48, 0], [0, 0.48, 0], [-0.48, 0, Math.PI / 2], [0.48, 0, Math.PI / 2]]) { const pane = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 2.0), glassM); pane.position.set(gx, 1.3, gz); pane.rotation.y = rot; g.add(pane) }
+      const top = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.32, 1.08), red); top.position.y = 2.56; top.castShadow = true; g.add(top); g.add(addOutline(top)) // 赤い天井
+      const ph = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.12), toon(0x4a6a44)); ph.position.set(0, 1.2, -0.36); g.add(ph) // 中の電話機
+      if (isNight || duskAmt > 0.3) { const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.06, 0.72), new THREE.MeshBasicMaterial({ color: 0xfff0d0, fog: true })); lamp.position.y = 2.36; g.add(lamp) } // 夜は中が灯る
+      town.add(g)
+      colliders.push({ x: px, z: pz, r: 0.8 }); spawnAvoid.push({ x: px, z: pz, r: 1.6 })
+    }
+  }
   // 師岡町公園は tree() 定義後にまとめて作る（丘＋樹林で囲むため）。下の「師岡町公園」ブロックを参照。
   // 銭湯（煙突＋立ちのぼる煙）は、frameループと同じスコープ（雲海の宣言の近く）でまとめて作る。下の townSmoke ブロックを参照。
 
