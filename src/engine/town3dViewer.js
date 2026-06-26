@@ -4869,30 +4869,24 @@ export async function mountTown3d(parent, opts = {}) {
     town.add(grp)
     const R0 = 12, hubY = 16
     const steelMat = toon(0xb0b6bc)
-    // 支柱（左右のA字脚＝ハブへ集まる）
-    for (const sx of [-1, 1]) {
-      for (const dz of [-3.4, 3.4]) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, hubY + 1, 6), steelMat)
-        leg.position.set(sx * 3.0, (hubY) / 2, dz)
-        leg.rotation.z = sx > 0 ? 0.34 : -0.34
-        grp.add(leg)
-      }
-    }
-    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 7.6, 8), steelMat)
-    axle.rotation.x = Math.PI / 2; axle.position.y = hubY; grp.add(axle)
-    // 回る車輪（XY平面・Z軸回り）。二重リング＋スポーク＋ゴンドラ。
+    // 支柱（左右のA字脚＝ハブへ集まる）＋軸＝静止の鉄骨。1メッシュへ統合（描画コール削減＝発熱対策）。
+    const frameGeos = [], fM = new THREE.Matrix4()
+    for (const sx of [-1, 1]) for (const dz of [-3.4, 3.4]) { const leg = new THREE.CylinderGeometry(0.32, 0.5, hubY + 1, 6); fM.makeRotationZ(sx > 0 ? 0.34 : -0.34).setPosition(sx * 3.0, hubY / 2, dz); leg.applyMatrix4(fM); frameGeos.push(leg) }
+    { const axle = new THREE.CylinderGeometry(0.55, 0.55, 7.6, 8); fM.makeRotationX(Math.PI / 2).setPosition(0, hubY, 0); axle.applyMatrix4(fM); frameGeos.push(axle) }
+    if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(frameGeos, false); if (m) { const me = new THREE.Mesh(m, steelMat); me.castShadow = true; grp.add(me) } frameGeos.forEach((g) => g.dispose()) }
+    // 回る車輪（XY平面・Z軸回り）。二重リング＋スポーク＋ゴンドラ。リング＋スポークは車輪と一緒に回る鉄骨＝1メッシュへ統合（後段でwheelへ）。
     const wheel = new THREE.Group()
     wheel.position.set(0, hubY, 0); grp.add(wheel)
-    for (const rr of [R0, R0 - 0.7]) wheel.add(new THREE.Mesh(new THREE.TorusGeometry(rr, 0.17, 6, 44), steelMat))
+    const wheelGeos = [], wM = new THREE.Matrix4()
+    for (const rr of [R0, R0 - 0.7]) wheelGeos.push(new THREE.TorusGeometry(rr, 0.17, 6, 44))
     const N = 12
     const gondMats = [toon(0xcf5a4e), toon(0xe6cf7a), toon(0x5a86b0), toon(0xe8e2d6), toon(0x6fae8f), toon(0xd98f5a)]
     const litMat = new THREE.MeshBasicMaterial({ color: 0xfff0c8, fog: true }) // 夕/夜のゴンドラの灯り
     const gondolas = []
     for (let i = 0; i < N; i++) {
       const a = (i / N) * Math.PI * 2
-      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, R0, 4), steelMat)
-      spoke.position.set(Math.cos(a) * R0 / 2, Math.sin(a) * R0 / 2, 0)
-      spoke.rotation.z = a - Math.PI / 2; wheel.add(spoke)
+      const spoke = new THREE.CylinderGeometry(0.07, 0.07, R0, 4)
+      wM.makeRotationZ(a - Math.PI / 2).setPosition(Math.cos(a) * R0 / 2, Math.sin(a) * R0 / 2, 0); spoke.applyMatrix4(wM); wheelGeos.push(spoke)
       const gond = new THREE.Group()
       gond.position.set(Math.cos(a) * (R0 + 0.9), Math.sin(a) * (R0 + 0.9), 0)
       const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 1.6), gondMats[i % gondMats.length]); gond.add(cab)
@@ -4901,6 +4895,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (duskAmt > 0.25) { const lit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.05), litMat); lit.position.z = 0.83; gond.add(lit) }
       wheel.add(gond); gondolas.push(gond)
     }
+    if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(wheelGeos, false); if (m) { const me = new THREE.Mesh(m, steelMat); me.castShadow = true; wheel.add(me) } wheelGeos.forEach((g) => g.dispose()) } // リング＋スポークを1メッシュに（車輪と一緒に回る）
     // 夕夜の電飾（リムに沿う豆電球＋ハブ＋スポークの灯り。車輪と一緒に回って瞬く）
     if (duskAmt > 0.25) {
       const bulbA = new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }), bulbB = new THREE.MeshBasicMaterial({ color: 0xff9a6a, fog: true }), bulbC = new THREE.MeshBasicMaterial({ color: 0x86c0e8, fog: true })
