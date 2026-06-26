@@ -1162,6 +1162,7 @@ export async function mountTown3d(parent, opts = {}) {
     bake(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed(), skinHex, 1.21) // 首
     const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); bake(hd, skinHex, 1.33) // 小さめの頭＝頭身を伸ばす
     bake(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed(), hairHex, 1.35, 0, -0.012) // 髪（後頭部）
+    for (const s of [-1, 1]) bake(new THREE.SphereGeometry(0.022, 5, 4).toNonIndexed(), hairHex, 1.35, s * 0.05, 0.118) // 目（歩いて寄ると「顔のある人」と分かる。統合メッシュに焼くので描画コール不変＝中距離LODの代わり）
     const aM = new THREE.Matrix4() // 腕（肩から下へ・少し外へ）＋手先＝人型の手応え。同じ統合メッシュに焼くので描画コール不変
     for (const s of [-1, 1]) {
       const arm = new THREE.CylinderGeometry(0.032, 0.04, 0.5, 5).toNonIndexed(); aM.makeRotationZ(s * 0.14).setPosition(s * 0.215, 0.82, 0.02); arm.applyMatrix4(aM)
@@ -3323,7 +3324,7 @@ export async function mountTown3d(parent, opts = {}) {
           { const folC = season === 'autumn' ? 0xb86a32 : season === 'winter' ? 0xd2dadd : season === 'spring' ? 0xe8bcd2 : 0x5e7e42, trunkM = toon(0x5a4632), foliM = toon(folC), trGeos = [], foGeos = []
             for (let k = 0; k < 40; k++) { const a = R() * 6.28, rr = 24 + R() * 84, fx = ex + Math.cos(a) * rr, fz = ez + Math.sin(a) * rr, fy = heightAt(fx, fz); if (fy < SEA.level + 1.6 || edoStream(fx, fz) < 5) continue
               const s = 0.8 + R() * 0.5, tg = new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 1.5 * s, 5); tg.translate(fx, fy + 0.75 * s, fz); trGeos.push(tg)
-              const fg = new THREE.IcosahedronGeometry(1.5 * s, 1); fg.scale(1, 0.94, 1); fg.translate(fx, fy + 2.1 * s, fz); foGeos.push(fg) } // det1で樹冠を丸く（統合済み＝三角形増のみ・描画コール不変）
+              const fg = new THREE.IcosahedronGeometry(1.5 * s, 2); fg.scale(1, 0.94, 1); fg.translate(fx, fy + 2.1 * s, fz); foGeos.push(fg) } // det1で樹冠を丸く（統合済み＝三角形増のみ・描画コール不変）
             if (trGeos.length && BufferGeometryUtils.mergeGeometries) { const tm = BufferGeometryUtils.mergeGeometries(trGeos, false); if (tm) { const me = new THREE.Mesh(tm, trunkM); me.castShadow = true; town.add(me) } trGeos.forEach((g) => g.dispose())
               const fm = BufferGeometryUtils.mergeGeometries(foGeos, false); if (fm) { const fe = new THREE.Mesh(fm, foliM); fe.castShadow = true; town.add(fe) } foGeos.forEach((g) => g.dispose()) }
           } } // 城下〜外周の田畑（外周の地肌を埋める）＋町なかの庭木
@@ -3490,7 +3491,7 @@ export async function mountTown3d(parent, opts = {}) {
             const pine = R() < 0.4, s = pine ? 1 : 0.85 + R() * 0.5
             const trG = new THREE.CylinderGeometry(0.17 * s, 0.27 * s, 1.9 * s, 6); tmM2.makeTranslation(px, py + 0.95 * s, pz); trG.applyMatrix4(tmM2); trunkGeos.push(trG)
             if (pine) { for (const [cy, cr, ch] of [[2.3, 1.7, 1.8], [3.3, 1.25, 1.55], [4.2, 0.82, 1.35]]) { const fG = new THREE.ConeGeometry(cr, ch, 8); tmM2.makeTranslation(px, py + cy, pz); fG.applyMatrix4(tmM2); coneGeos.push(fG) } } // 松/杉＝段重ねの円錐（単一の尖りを脱し層のある常緑樹に。統合済みで描画コール不変）
-            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 1); tmM2.makeTranslation(px, py + 2.2 * s, pz); fG.applyMatrix4(tmM2); leafGeos.push(fG) } // 雑木
+            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 2); tmM2.makeTranslation(px, py + 2.2 * s, pz); fG.applyMatrix4(tmM2); leafGeos.push(fG) } // 雑木
             edoTreeShadow.push([px, py, pz, 1.4 * s]) }
           for (const [geos, mat] of [[trunkGeos, toon(0x6a4f38)], [coneGeos, toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44)], [leafGeos, toon(leafC)]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
           addContactShadows(edoTreeShadow) // 城下の木立の足元に接地影＝浮きを消す
@@ -4172,7 +4173,7 @@ export async function mountTown3d(parent, opts = {}) {
           const tTrunkG = [], tLeafG = [], tShadowG = [], tmM4 = new THREE.Matrix4() // 木立を統合＝拡大した島の全域に緑を行き渡らせつつ描画コール据え置き
           for (let k = 0; k < 58; k++) { const a = R() * 6.28, r2 = 12 + R() * 94, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5 || taishoCanal(px, pz) < 7.5) continue; const s = 0.7 + R() * 0.5 // 運河の水面幅(中心線から〜6.8)より広く避ける＝幹が運河を貫通して浮くのを防ぐ（評価アート指摘）
             const trG = new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6); tmM4.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(tmM4); tTrunkG.push(trG)
-            const fG = new THREE.IcosahedronGeometry(1.3 * s, 1); tmM4.makeTranslation(px, py + 1.9 * s, pz); fG.applyMatrix4(tmM4); tLeafG.push(fG); tShadowG.push([px, py, pz, 1.4 * s]) }
+            const fG = new THREE.IcosahedronGeometry(1.3 * s, 2); tmM4.makeTranslation(px, py + 1.9 * s, pz); fG.applyMatrix4(tmM4); tLeafG.push(fG); tShadowG.push([px, py, pz, 1.4 * s]) }
           for (const [geos, mat] of [[tTrunkG, toon(0x6a4f38)], [tLeafG, toon(tfolC)]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
           addContactShadows(tShadowG) } // 街のあちこちに木立（密度UP・統合）＋足元の接地影で浮きを消す
         // 港を見下ろす高台の洋館（大正の見どころ。クリームの壁＋マンサード屋根＋並木）
@@ -4181,7 +4182,7 @@ export async function mountTown3d(parent, opts = {}) {
           const mans = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 6.4, 2.6, 4), tileMat(isNight ? 0x3a3030 : 0x5a4038, 2, 2, false)); mans.rotation.y = Math.PI / 4; mans.position.set(mx0, my0 + 6.3, mz0); mans.castShadow = true; town.add(mans); town.add(addOutline(mans)) // マンサード屋根
           const spire = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.0, 6), toon(0x6fae9c)); spire.position.set(mx0, my0 + 8.4, mz0); town.add(spire)
           for (let k = 0; k < 8; k++) { const a = R() * 6.28, rr = 8 + R() * 8, px = mx0 + Math.cos(a) * rr, pz = mz0 + Math.sin(a) * rr, py = heightAt(px, pz); if (py < my0 - 4) continue; const s = 1.0 + R() * 0.4
-            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.8 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.9 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 1), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48)); fo.position.set(px, py + 2.4 * s, pz); fo.castShadow = true; town.add(fo) } } // 高台の並木
+            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.8 * s, 6), toon(0x6a4f38)); tr.position.set(px, py + 0.9 * s, pz); town.add(tr); const fo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 2), toon(season === 'autumn' ? 0xc88a3c : season === 'winter' ? 0xd2dad6 : 0x5e7e48)); fo.position.set(px, py + 2.4 * s, pz); fo.castShadow = true; town.add(fo) } } // 高台の並木
         // ── 異人館街（東の高台＝拡大した新地区）。色とりどりの洋館＋教会。海を見下ろす丘の上のハイカラな一画 ──
         { const ijx = tx + 52, ijz = tz - 44 // 異人館の丘の中心
           const ijCols = [0xb86a52, 0xd8c49a, 0x9aafa0, 0xc8b8c4, 0xb8c2cc] // 異人館の壁色（くすんだ赤煉瓦/クリーム/淡緑/淡紫/淡青）
@@ -4224,7 +4225,7 @@ export async function mountTown3d(parent, opts = {}) {
             const pine = R() < 0.45, s = 0.8 + R() * 0.6
             const trG = new THREE.CylinderGeometry(0.16 * s, 0.26 * s, 1.8 * s, 6); nM.makeTranslation(px, py + 0.9 * s, pz); trG.applyMatrix4(nM); beltTrunk.push(trG)
             if (pine) { for (const [cy, cr, ch] of [[2.4, 1.5, 2.3], [3.6, 1.0, 1.9]]) { const fG = new THREE.ConeGeometry(cr * s, ch * s, 7); nM.makeTranslation(px, py + cy * s, pz); fG.applyMatrix4(nM); beltCone.push(fG) } } // 松/杉＝2段の円錐（本数が多いので2段に抑え発熱配慮）
-            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 1); nM.makeTranslation(px, py + 2.1 * s, pz); fG.applyMatrix4(nM); beltLeaf.push(fG) } } // 雑木
+            else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 2); nM.makeTranslation(px, py + 2.1 * s, pz); fG.applyMatrix4(nM); beltLeaf.push(fG) } } // 雑木
           const rockN = Math.round(isle.r * 0.5)
           for (let i = 0; i < rockN; i++) { const a = R() * 6.2832, rr = isle.r * (0.96 + R() * 0.12), px = isle.x + Math.cos(a) * rr, pz = isle.z + Math.sin(a) * rr, py = heightAt(px, pz)
             if (py > SEA.level + 2.5 || py < SEA.level - 2.5) continue // 水際の岩のみ
@@ -5800,7 +5801,7 @@ export async function mountTown3d(parent, opts = {}) {
     return { outfit: 'kimono', skin, hair, iris, hairStyle: r < 0.74 ? 'topknot' : 'short', top: pickC(EDO_KIMONO), accent: pickC(EDO_OBI) } }) // 町人
   // 大正: 書生(袴+学生帽)・モダンガール(洋装+ボブ)・洋装紳士(背広+中折れ帽)
   const TAI_DRESS = [0xb5677e, 0x6a8a9a, 0x9a7aa0, 0xc08a5a, 0x5a7a6a], TAI_SUIT = [0x3a3a42, 0x4a4036, 0x44484a, 0x55504a]
-  placeEra(TAISHO.x, TAISHO.z, 12, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS)
+  placeEra(TAISHO.x, TAISHO.z, 18, () => { const r = R(), skin = pickC(RES_SKIN), hair = pickC(RES_HAIR), iris = pickC(RES_IRIS) /* 大正は住人最少(12)で寂しかった→18へ（江戸20/戦国18と揃える・評価アート） */
     if (r < 0.34) return { outfit: 'hakama', skin, hair, iris, hairStyle: 'hat', hat: 'cap', top: pickC([0x3a4250, 0x40443a, 0x4a4038]), bottom: pickC([0x2e3038, 0x35302c]), accent: 0x2a2e30 } // 書生
     if (r < 0.66) return { outfit: 'dress', skin, hair, iris, hairStyle: 'bob', top: pickC(TAI_DRESS), accent: pickC([0xf0e6d2, 0xeae0cc, 0x8a3a44]) } // モダンガール
     return { outfit: 'suit', skin, hair, iris, hairStyle: 'hat', hat: 'fedora', top: pickC(TAI_SUIT), bottom: pickC(TAI_SUIT), accent: pickC([0x7a3a32, 0x3a4a5e]), prop: R() < 0.5 ? 'cane' : null } }) // 紳士
