@@ -1216,6 +1216,7 @@ export async function mountTown3d(parent, opts = {}) {
     const cGrass = new THREE.Color(snow ? 0xe8eef0 : season === 'spring' ? 0x8fb05a : season === 'autumn' ? 0xa6924c : 0x7f9a50) // 平地の草（くすませつつ少し豊かな緑）
     const cDry = new THREE.Color(snow ? 0xdde4e7 : season === 'spring' ? 0xa9ab69 : season === 'autumn' ? 0x9c7f42 : 0x9b9560) // 乾いた草地
     const cEarth = new THREE.Color(snow ? 0xd2d9dc : season === 'winter' ? 0x9c968c : 0x8a7550) // 斜面に覗く土
+    const cSand = new THREE.Color(snow ? 0xd9d8d1 : 0xccbd98) // 渚の砂（東岸の汀ほど強い＝草地の斜面でなく本物の浜に）
     const nrm = g.attributes.normal, gcol = [], tmpG = new THREE.Color()
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), ny = nrm.getY(i)
@@ -1224,6 +1225,7 @@ export async function mountTown3d(parent, opts = {}) {
       const dry = Math.max(0, Math.min(1, zone))
       tmpG.copy(cGrass).lerp(cDry, dry * 0.66) // 草地→乾いた草地
       tmpG.lerp(cEarth, slope * 0.82) // 斜面ほど土が覗く
+      if (x > SEA.coast) { const beach = Math.max(0, Math.min(1, 1 - (pos.getY(i) - SEA.level) / 9)); if (beach > 0.01) tmpG.lerp(cSand, beach * 0.82) } // 東岸の渚＝汀ほど砂色（草地の斜面を浜に）
       const v = 0.95 + 0.1 * Math.sin(x * 0.7 + z * 0.55) // 細かな明暗（水彩の手触り）
       gcol.push(tmpG.r * v, tmpG.g * v, tmpG.b * v)
     }
@@ -3163,7 +3165,7 @@ export async function mountTown3d(parent, opts = {}) {
           fg.computeVertexNormals()
           const nc = document.createElement('canvas'); nc.width = nc.height = 64; const ncx = nc.getContext('2d') // 泡のレース（柔らかい白斑＝のっぺり白帯を脱す）
           ncx.fillStyle = '#000'; ncx.fillRect(0, 0, 64, 64)
-          for (let q = 0; q < 260; q++) { ncx.fillStyle = `rgba(255,255,255,${0.3 + R() * 0.7})`; ncx.beginPath(); ncx.arc(R() * 64, R() * 64, 0.6 + R() * 2.2, 0, 6.2832); ncx.fill() }
+          for (let q = 0; q < 260; q++) { ncx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.7})`; ncx.beginPath(); ncx.arc(Math.random() * 64, Math.random() * 64, 0.6 + Math.random() * 2.2, 0, 6.2832); ncx.fill() } // 泡の見た目用ノイズ＝Math.random（種付きR()を消費せず後段の配置を乱さない）
           const ntex = new THREE.CanvasTexture(nc); ntex.wrapS = ntex.wrapT = THREE.RepeatWrapping
           const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true })
           foamMat.onBeforeCompile = (sh) => {
@@ -3186,6 +3188,20 @@ export async function mountTown3d(parent, opts = {}) {
               `)
           }
           const foam = new THREE.Mesh(fg, foamMat); foam.renderOrder = 2; foam.frustumCulled = false; town.add(foam)
+        }
+        // ── 渚の小物: 流木と寄り石（汀の少し上の乾いた砂に点在＝歩いて出会う海辺の手触り）。決定的配置＋統合で軽量。──
+        { const driftG = [], stoneG = [], dM = new THREE.Matrix4()
+          for (let i = 0; i < fcols.length; i += 5) { // 数本おきに点在（R()を使わず i で決定的に）
+            const w = fcols[i]; if (w === null) continue
+            const z = zAt(i), bx = w - 3.0 - (i % 3) * 1.1, by = heightAt(bx, z) // 汀の少し上＝乾いた砂
+            if (by < SEA.level + 0.3) continue
+            if (i % 2 === 0) { const len = 2.0 + (i % 4) * 0.5, dg = new THREE.BoxGeometry(len, 0.28, 0.34); dM.makeRotationY(0.6 + i * 0.4).setPosition(bx, by + 0.12, z); dg.applyMatrix4(dM); driftG.push(dg) } // 流木（寝かせた細長い材）
+            else { for (let s = 0; s < 3; s++) { const sg = new THREE.IcosahedronGeometry(0.26 + (s % 2) * 0.12, 0); sg.scale(1.3, 0.6, 1.1); dM.makeTranslation(bx + (s - 1) * 0.5, by + 0.1, z + (s % 2 ? 0.4 : -0.3)); sg.applyMatrix4(dM); stoneG.push(sg) } } // 寄り石（平たい石の小群）
+          }
+          if (BufferGeometryUtils.mergeGeometries) {
+            if (driftG.length) { const m = BufferGeometryUtils.mergeGeometries(driftG, false); if (m) { const me = new THREE.Mesh(m, toon(season === 'winter' ? 0x8a8278 : 0x9a8a72)); me.castShadow = true; town.add(me) } driftG.forEach((g) => g.dispose()) }
+            if (stoneG.length) { const m = BufferGeometryUtils.mergeGeometries(stoneG, false); if (m) { const me = new THREE.Mesh(m, toon(0x9a958c)); me.castShadow = true; town.add(me) } stoneG.forEach((g) => g.dispose()) }
+          }
         }
       }
       // ── 海の向こうの城下町（江戸）。海を渡るとやがて霞(fog)の向こうに天守が現れる＝M1の“reveal”。──
