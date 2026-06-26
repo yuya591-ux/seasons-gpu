@@ -3658,7 +3658,9 @@ export async function mountTown3d(parent, opts = {}) {
             vcol.push(tmpC.r * sh, tmpC.g * sh, tmpC.b * sh)
           }
           gI.setAttribute('color', new THREE.Float32BufferAttribute(vcol, 3)); gI.computeVertexNormals()
-          const mMat = toon(0xffffff); mMat.vertexColors = true
+          const mRep = Math.max(24, Math.round(isz / 6)) // home/江戸/大正と同じ密度の細かい草目＝近接で地面がベタ塗りに見えるのを脱す（評価アート）
+          const mMat = mottleMat(0xffffff, 150, 0.1, [mRep, mRep]); mMat.vertexColors = true // 戦国の地面だけ素のtoon=テクスチャ無しで近接がのっぺりしていた→他エリアと統一
+          if (mMat.map) { mMat.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); mMat.map.needsUpdate = true }
           const mtn = new THREE.Mesh(gI, mMat); mtn.position.set(sx, 0, sz); mtn.receiveShadow = true; town.add(mtn)
         }
         // ── 奥の山並み（重なり合う稜線を大気遠近で淡く。城の背後＝北と両袖に不均等に。接近路の南は海を開ける）──
