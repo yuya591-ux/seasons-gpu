@@ -2688,6 +2688,22 @@ export async function mountTown3d(parent, opts = {}) {
         for (const m of [foot, post, fire, cap]) { m.castShadow = true; lan.add(m) }
         colliders.push({ x: lp[0], z: lp[1], r: 0.5 })
       }
+      // ── 紫陽花（夏＝池のほとりに咲く。青/紫/桃の毬。梅雨〜夏の水辺の癒し）。決定的配置＋色ごとに統合で軽量。──
+      if (season === 'summer') {
+        const ajiCols = [0x6f8ad0, 0x9a7ec8, 0xc77aa8, 0x7ab0c0], buckets = ajiCols.map(() => []), leafG = [], ajiM = new THREE.Matrix4()
+        for (let i = 0; i < 11; i++) {
+          const a = i / 11 * 6.2832 + 0.35, rr = pondR + 1.2 + (i % 3) * 0.55
+          const fx = px0 + Math.cos(a) * rr, fz = pz0 + Math.sin(a) * rr, fy = heightAt(fx, fz)
+          if (Math.hypot(fx - px0, fz - pz0) < pondR + 0.3) continue // 池の中は避ける
+          const lf = new THREE.IcosahedronGeometry(0.5, 0).toNonIndexed(); lf.scale(1.25, 0.5, 1.25); ajiM.makeTranslation(fx, fy + 0.18, fz); lf.applyMatrix4(ajiM); leafG.push(lf) // 葉の茂み
+          for (const [ox, oy, oz, s] of [[0, 0.5, 0, 0.34], [-0.28, 0.42, 0.12, 0.24], [0.26, 0.44, -0.1, 0.25]]) { const h = new THREE.IcosahedronGeometry(s, 1); ajiM.makeTranslation(fx + ox, fy + oy, fz + oz); h.applyMatrix4(ajiM); buckets[i % 4].push(h) } // 花房（毬）
+        }
+        if (BufferGeometryUtils.mergeGeometries) {
+          const lm = leafG.length && BufferGeometryUtils.mergeGeometries(leafG, false); if (lm) { const lme = new THREE.Mesh(lm, toon(0x4e6e3a)); lme.castShadow = true; town.add(lme) }
+          buckets.forEach((bk, ci) => { if (bk.length) { const m = BufferGeometryUtils.mergeGeometries(bk, false); if (m) { const me = new THREE.Mesh(m, toon(ajiCols[ci])); me.castShadow = true; town.add(me) } } })
+          leafG.concat(...buckets).forEach((g) => g.dispose())
+        }
+      }
       // ベンチ×3（広場に。池の方を向く）
       for (const bp of [[px0 - 8, pz0 - 1, 1.4], [px0 + 8.5, pz0 + 1, -1.4], [px0 - 1, pz0 + 8.5, 3.0]]) {
         const gy = heightAt(bp[0], bp[1]); const bg = new THREE.Group(); bg.position.set(bp[0], gy, bp[1]); bg.rotation.y = bp[2]; town.add(bg)
