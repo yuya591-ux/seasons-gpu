@@ -17,7 +17,11 @@ export const vertexSource = /* glsl */ `
 `
 
 const FRAGMENT_BODY = /* glsl */ `
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
   precision highp float;
+  #else
+  precision mediump float;
+  #endif
 
   uniform vec2 uResolution;
   uniform float uTime;

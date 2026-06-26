@@ -273,8 +273,16 @@ export async function mountTown3d(parent, opts = {}) {
   const { RoundedBoxGeometry } = await import('three/examples/jsm/geometries/RoundedBoxGeometry.js')
   if (my !== token) return
   // 全建物の基礎（接地のコンクリ土台）を1メッシュに統合するためのジオメトリ結合ユーティリティ。
-  const BufferGeometryUtils = await import('three/examples/jsm/utils/BufferGeometryUtils.js')
+  const _bgu = await import('three/examples/jsm/utils/BufferGeometryUtils.js')
   if (my !== token) return
+  // 安全弁: mergeGeometries が欠落/例外でも null を返すラッパに包む。全呼び出し元が if(m) で分岐するので、
+  // 一箇所の統合失敗で throw して街全体が組み上がらず黒画面になるのを防ぐ（評価エンジニア: 統合フォールバックの安全弁）。
+  const BufferGeometryUtils = {
+    mergeGeometries: (geos, useGroups) => {
+      try { return typeof _bgu.mergeGeometries === 'function' ? _bgu.mergeGeometries(geos, useGroups) : null }
+      catch (e) { return null }
+    },
+  }
 
   const stage = document.createElement('div')
   stage.className = 'town3d-stage'
@@ -6587,7 +6595,6 @@ export async function mountTown3d(parent, opts = {}) {
     turnSmooth: 0,                // 旋回入力のスムージング値（手ブレを均し、急旋回を抑える＝快適な曲がり）
     vel: new THREE.Vector3(),     // 慣性つきの速度（離すと惰性で減速＝ホバリング）
     moveX: 0, moveY: 0,           // スティック入力(-1..1)。左で動かす（横=旋回・縦=前後）。離すと0
-    climb: 0,                     // （旧）上昇/下降入力。スキームAでは未使用
     cruise: true,                 // スキームA: 自動巡航中か（とまる/すすむトグル）。とまる=その場でホバリング
     zoom: 1.56,                   // カメラの引き具合（ピンチ/ズームボタンで0.4=寄り〜3.0=引き）。初期値は「縮小ボタン2回ぶん」引いた値＝窓辺の既定を少し引き気味に
     zoomTarget: 1.56,             // ズームの目標値（ボタン/ピンチで設定→zoomがこれへ滑らかに追従＝確実で酔わない寄り引き）
@@ -7464,7 +7471,9 @@ export async function mountTown3d(parent, opts = {}) {
     cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cend); cbtn.addEventListener('pointercancel', cend)
   }
   // 保険: 画面のどこで指を離しても昇降入力を確実に解除（setPointerCapture失敗時もボタンが押しっぱなしにならない）。
-  window.addEventListener('pointerup', () => { if (active) active.climb = 0 })
+  // 名前付き＝dispose で確実に外す（無名だと情景往復のたび window へ溜まる＝リスナー漏れ・評価エンジニア）。
+  const winClimbUp = () => { if (active) active.climb = 0 }
+  window.addEventListener('pointerup', winClimbUp)
 
   function frame() {
     if (!active) return
@@ -8717,7 +8726,6 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dToyPos = () => winCat && winCat.toyG ? { x: +winCat.toyG.position.x.toFixed(2), y: +winCat.toyG.position.y.toFixed(2), z: +winCat.toyG.position.z.toFixed(2), vx: +winCat.toyVX.toFixed(2) } : null
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2) } : null
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
-    window.__town3dResFront = (i, dist = 4, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dGirlFront = (i, dist = 5) => { const g = standees[i]; if (!g) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); g.position.set(t.x, t.y - 1.0, t.z) } // 検証用: 立ち絵をカメラ正面の視線上へ
     window.__town3dGirlCount = () => standees.length
@@ -8909,7 +8917,9 @@ export async function mountTown3d(parent, opts = {}) {
     window.removeEventListener('pointermove', onMove)
     window.removeEventListener('pointerup', onUp)
     window.removeEventListener('pointercancel', onUp)
+    window.removeEventListener('pointerup', winClimbUp) // 昇降解除の保険リスナーも外す（漏れ修正）
     window.removeEventListener('resize', resize)
+    stopZoomHold(); stopSpeedHold() // 長押し連続入力のintervalが途中なら止める（dispose時の取りこぼし）
     baseDispose()
   }
 }
