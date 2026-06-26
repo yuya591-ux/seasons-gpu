@@ -8027,7 +8027,8 @@ export async function mountTown3d(parent, opts = {}) {
       const back = active.camBackCur
       let dcx = fp.x - fwdX * back, dcz = fp.z - fwdZ * back
       let dcy = fp.y - fwdY * back + upOff
-      const camFloor = heightAt(dcx, dcz) + (isWalk ? 1.35 : 1.6) // 歩行は一人称寄り＝目線をやや低く許す
+      // 海上では海底基準だと水面より下に潜り「水中から水板を見る」変な絵になる→水面(SEA.level)を下限に。
+      const camFloor = Math.max(heightAt(dcx, dcz), SEA.level) + (isWalk ? 1.35 : 1.6) // 歩行は一人称寄り＝目線をやや低く許す
       if (dcy < camFloor) dcy = camFloor
       if (!active.camReady) { active.camPos.set(dcx, dcy, dcz); active.camReady = true } // 飛び立ち/着地直後はスナップ
       else { const cl = isWalk ? FLY.walkCamLag : FLY.camLag; active.camPos.x += (dcx - active.camPos.x) * cl; active.camPos.y += (dcy - active.camPos.y) * cl; active.camPos.z += (dcz - active.camPos.z) * cl } // 歩行は密着＝地に足のついた手応え／飛行は緩い遅れ＝空気の流れ
