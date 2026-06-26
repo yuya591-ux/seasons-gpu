@@ -6443,13 +6443,15 @@ export async function mountTown3d(parent, opts = {}) {
     let ic = centers[0], icd = 1e9
     for (const c of centers) { const d = (c.x - x) ** 2 + (c.z - z) ** 2; if (d > 100 && d < icd) { icd = d; ic = c } } // 自分から少し離れた最寄りの中心
     const toCenter = Math.atan2(ic.x - x, -(ic.z - z))
+    const onEastBeach = kind !== 'yato' && x > SEA.coast + 4 && x < SEA.shore + 2 && heightAt(x, z) < SEA.level + 6 // 東の渚（汀の近くの砂）
+    const aim = onEastBeach ? Math.PI / 2 : toCenter // 渚に降りたら海(東=+x)を正面に＝寄せ返す波打ち際を眺める。ほかは街の中心へ
     const gy0 = heightAt(x, z) // 足元の高さ（前方の上り具合の基準）
     let best = toCenter, bestScore = -1
     for (let a = 0; a < 16; a++) {
       const yaw = a / 16 * 6.2832, hx = Math.sin(yaw), hz = -Math.cos(yaw)
       let d = 1.0
       for (; d < 34; d += 1.2) { if (blockedAt(x + hx * d, z + hz * d)) break }
-      let dd = yaw - toCenter; dd = Math.atan2(Math.sin(dd), Math.cos(dd))
+      let dd = yaw - aim; dd = Math.atan2(Math.sin(dd), Math.cos(dd))
       // 急な上り斜面を正面にすると丘の地肌が画面を覆い視界が詰まる（評価指摘の着地景色の悪化）。前方が眼の高さより高く迫る方位を避ける。
       let rise = 0; for (const ad of [6, 10, 14]) { const gh = heightAt(x + hx * ad, z + hz * ad); if (gh - gy0 > rise) rise = gh - gy0 }
       const uphill = Math.max(0, rise - 2.0) // 2mを超える上りからペナルティ（緩い起伏は許容、丘の壁は強く避ける）
