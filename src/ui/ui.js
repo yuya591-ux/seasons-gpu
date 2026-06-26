@@ -180,7 +180,7 @@ export function buildUI(opts) {
     if (!windowIsOpen) return openLabel()
     if (!isRoof() && !leanIsOut && !aloft) return '乗り出す'
     if (canFly() && !aloft) return '空へ'
-    if (aloft === 'fly') return 'おりる' // 飛行→着地して歩く
+    if (aloft === 'fly') return '地上へ' // 飛行→着地して歩く（「おりる」は窓を閉じると紛らわしい→「空へ」と対称に・評価UX）
     if (aloft === 'walk') return '空へ' // 歩行→また飛ぶ
     return null
   }

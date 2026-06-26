@@ -877,7 +877,8 @@ body.idle .topbar button {
 /* いまの居場所（空を飛ぶ/地上を歩く）をそっと示すピル。上中央・控えめ。 */
 .modepill {
   position: fixed;
-  top: max(3.6rem, calc(env(safe-area-inset-top) + 3.2rem));
+  /* 情景名トースト(.hud top:3.6rem)と重ならないよう一段下げる（評価UX: 切替時に二重描画で判読不能だった） */
+  top: max(6.4rem, calc(env(safe-area-inset-top) + 6.0rem));
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
