@@ -1828,6 +1828,16 @@ export async function mountTown3d(parent, opts = {}) {
     }
     if (BufferGeometryUtils.mergeGeometries) { const bm = BufferGeometryUtils.mergeGeometries(bankGeos, false); if (bm) { const banks = new THREE.Mesh(bm, mottleMat(0x908c84, 110, 0.1, [2, 3])); banks.receiveShadow = true; banks.castShadow = true; town.add(banks) } } // 川辺の遊歩道で見るコンクリ護岸にムラ＝近接で使い込まれた質感
     bankGeos.forEach((g) => g.dispose())
+    // ── 紫陽花（夏＝川辺の遊歩道に咲く。梅雨〜夏の水辺の彩り）。決定的配置＋色ごとに統合で軽量。──
+    if (season === 'summer') {
+      const ajiCols = [0x6f8ad0, 0x9a7ec8, 0xc77aa8, 0x7ab0c0], bk = ajiCols.map(() => []), lf2 = [], aM = new THREE.Matrix4()
+      for (let z = 22; z > -90; z -= 7.5) { const fx = rx + 3.9, fy = heightAt(fx, z); if (fy < waterLevel(z) + 0.5) continue // 堤の上のみ（水際は避ける）
+        const lg = new THREE.IcosahedronGeometry(0.5, 0).toNonIndexed(); lg.scale(1.25, 0.5, 1.25); aM.makeTranslation(fx, fy + 0.18, z); lg.applyMatrix4(aM); lf2.push(lg) // 葉
+        const ci = ((z | 0) % 4 + 4) % 4
+        for (const [ox, oy, oz, s] of [[0, 0.5, 0, 0.32], [-0.26, 0.42, 0.1, 0.22], [0.24, 0.44, -0.1, 0.23]]) { const h = new THREE.IcosahedronGeometry(s, 1); aM.makeTranslation(fx + ox, fy + oy, z + oz); h.applyMatrix4(aM); bk[(ci + (ox < 0 ? 1 : 0)) % 4].push(h) } // 花房
+      }
+      if (BufferGeometryUtils.mergeGeometries) { const lm = lf2.length && BufferGeometryUtils.mergeGeometries(lf2, false); if (lm) { const me = new THREE.Mesh(lm, toon(0x4e6e3a)); me.castShadow = true; town.add(me) } bk.forEach((b2, i) => { if (b2.length) { const m = BufferGeometryUtils.mergeGeometries(b2, false); if (m) { const me2 = new THREE.Mesh(m, toon(ajiCols[i])); me2.castShadow = true; town.add(me2) } } }); lf2.concat(...bk).forEach((g) => g.dispose()) }
+    }
     // 橋（川を渡る一本）。デッキ＋欄干＋橋脚。橋面は grade（堤の肩）に合わせる。
     const bz = -16, bTop = heightAt(rx, bz) + RIVER.depth
     const deck = new THREE.Mesh(new THREE.BoxGeometry(RIVER.halfW * 2 + 4.4, 0.4, 4), toon(0x9a958c)); deck.position.set(rx, bTop, bz); deck.castShadow = true; deck.receiveShadow = true; town.add(deck)
@@ -3778,6 +3788,15 @@ export async function mountTown3d(parent, opts = {}) {
             for (const side of [-1, 1]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.2, 0.7), stone); wall.position.set(px, cy + 1.0, cz0 + 3.6 * side); wall.castShadow = true; town.add(wall) } } // 石積みの護岸
           { const bx = tx + 4, bbank = heightAt(bx, cz0 + 5.6); const br = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 9.4), stone); br.position.set(bx, bbank + 0.5, cz0); br.castShadow = true; town.add(br); town.add(addOutline(br))
             for (const rl of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 9.4), toon(0x6a6258)); rail.position.set(bx + 1.2 * rl, bbank + 1.0, cz0); town.add(rail) } } // 石橋＋欄干（広い水路に合わせて長く）
+          if (season === 'summer') { // 運河沿いの紫陽花（夏・水辺の彩り）。決定的配置＋色ごとに統合で軽量。
+            const ajiCols = [0x6f8ad0, 0x9a7ec8, 0xc77aa8, 0x7ab0c0], bk = ajiCols.map(() => []), lf2 = [], aM = new THREE.Matrix4()
+            for (let cxa = -18; cxa <= 24; cxa += 7) { for (const sd of [-1, 1]) { const fx = tx + cxa, fz = cz0 + 4.4 * sd, fy = heightAt(fx, fz); if (fy < SEA.level + 0.8) continue // 護岸の外側・陸の上のみ
+              const lg = new THREE.IcosahedronGeometry(0.5, 0).toNonIndexed(); lg.scale(1.25, 0.5, 1.25); aM.makeTranslation(fx, fy + 0.18, fz); lg.applyMatrix4(aM); lf2.push(lg) // 葉
+              const ci = ((cxa | 0) + (sd > 0 ? 1 : 0)) & 3
+              for (const [ox, oy, oz, s] of [[0, 0.5, 0, 0.32], [-0.26, 0.42, 0.1, 0.22], [0.24, 0.44, -0.1, 0.23]]) { const h = new THREE.IcosahedronGeometry(s, 1); aM.makeTranslation(fx + ox, fy + oy, fz + oz); h.applyMatrix4(aM); bk[(ci + (ox < 0 ? 1 : 0)) & 3].push(h) } // 花房
+            } }
+            if (BufferGeometryUtils.mergeGeometries) { const lm = lf2.length && BufferGeometryUtils.mergeGeometries(lf2, false); if (lm) { const me = new THREE.Mesh(lm, toon(0x4e6e3a)); me.castShadow = true; town.add(me) } bk.forEach((b2, i) => { if (b2.length) { const m = BufferGeometryUtils.mergeGeometries(b2, false); if (m) { const me2 = new THREE.Mesh(m, toon(ajiCols[i])); me2.castShadow = true; town.add(me2) } } }); lf2.concat(...bk).forEach((g) => g.dispose()) }
+          }
         }
         const brick = brickMat(season === 'winter' ? 0x8a5648 : 0x9a4f3e, 2.4, 2.2) // 赤煉瓦（イギリス積み＝近接で本物の煉瓦壁）
         const slate = mottleMat(isNight ? 0x3a3e44 : 0x586068, 160, 0.12, [2.2, 2.2]) // スレート屋根
@@ -4483,6 +4502,15 @@ export async function mountTown3d(parent, opts = {}) {
       const z = 5 - i * 1.6, x = Math.sin(z * 0.11 + 0.4) * 1.4 - 9.0, gy = heightAt(x, z)
       const seg = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.13, 1.95), brookMat)
       seg.position.set(x, gy + 0.16, z); town.add(seg)
+    }
+    if (season === 'summer') { // 谷戸の紫陽花（せせらぎの縁に咲く。獅子ヶ谷の梅雨〜夏の風物詩）。決定的＋色統合で軽量。
+      const ajiCols = [0x6f8ad0, 0x9a7ec8, 0xc77aa8, 0x7ab0c0], bk = ajiCols.map(() => []), lf2 = [], aM = new THREE.Matrix4()
+      for (let i = 1; i < 32; i += 3) { const z = 5 - i * 1.6, bxs = Math.sin(z * 0.11 + 0.4) * 1.4 - 9.0, fx = bxs - 1.0, fy = heightAt(fx, z) // せせらぎの里山側の縁
+        const lg = new THREE.IcosahedronGeometry(0.5, 0).toNonIndexed(); lg.scale(1.25, 0.5, 1.25); aM.makeTranslation(fx, fy + 0.18, z); lg.applyMatrix4(aM); lf2.push(lg) // 葉
+        const ci = (i + 4) & 3
+        for (const [ox, oy, oz, s] of [[0, 0.5, 0, 0.32], [-0.26, 0.42, 0.1, 0.22], [0.24, 0.44, -0.1, 0.23]]) { const h = new THREE.IcosahedronGeometry(s, 1); aM.makeTranslation(fx + ox, fy + oy, z + oz); h.applyMatrix4(aM); bk[(ci + (ox < 0 ? 1 : 0)) & 3].push(h) } // 花房
+      }
+      if (BufferGeometryUtils.mergeGeometries) { const lm = lf2.length && BufferGeometryUtils.mergeGeometries(lf2, false); if (lm) { const me = new THREE.Mesh(lm, toon(0x4e6e3a)); me.castShadow = true; town.add(me) } bk.forEach((b2, i2) => { if (b2.length) { const m = BufferGeometryUtils.mergeGeometries(b2, false); if (m) { const me2 = new THREE.Mesh(m, toon(ajiCols[i2])); me2.castShadow = true; town.add(me2) } } }); lf2.concat(...bk).forEach((g) => g.dispose()) }
     }
     // 寄棟(よせむね)屋根のジオメトリ: 水平の大棟＋四方の勾配＋深い軒＝四角錐の「段ボール箱」を脱す（評価指摘の核心）。
     // baseW/baseD=軒の外寸(壁より広く＝深い軒), ridgeLen=大棟の長さ(<baseW), h=棟の高さ。ridge は X 軸に通る。
@@ -5773,7 +5801,7 @@ export async function mountTown3d(parent, opts = {}) {
   if (kind !== 'yato' && (season === 'summer' || season === 'autumn')) {
     const isHimawari = season === 'summer'
     const stemGeos = [], headGeos = [], centerGeos = []
-    for (const cl of [[-20, -10], [22, -6], [-7, -52], [42, -34], [-46, -16]]) {
+    for (const cl of [[-20, -10], [22, -6], [-7, -52], [42, -34], [-46, -16], [10, -40], [-34, -42], [44, -12]]) {
       const n = 3 + ((R() * 3) | 0)
       for (let i = 0; i < n; i++) {
         const fx = cl[0] + (R() - 0.5) * 4, fz = cl[1] + (R() - 0.5) * 4, fgy = heightAt(fx, fz)
