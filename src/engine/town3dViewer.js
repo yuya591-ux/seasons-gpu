@@ -7236,7 +7236,7 @@ export async function mountTown3d(parent, opts = {}) {
     const moved = []
     for (const ch of town.children) { if (ch === grp) continue; const p = ch.position; if (Math.hypot(p.x - ec.c.x, p.z - ec.c.z) < ec.r) moved.push(ch) } // 時代の島の領域内（個別の建物/木/ランドマーク）を集める
     for (const ch of moved) grp.add(ch) // 群へ移す（位置は原点群なので不変）。merged済の地物(position原点)は対象外＝常時描画のまま（数個なので軽い）
-    if (moved.length) eraCull.push({ grp, cx: ec.c.x, cz: ec.c.z, vis: true })
+    if (moved.length) eraCull.push({ grp, cx: ec.c.x, cz: ec.c.z, r: ec.r, vis: true })
   }
 
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
@@ -7386,8 +7386,10 @@ export async function mountTown3d(parent, opts = {}) {
       else if (adQOk >= 40 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.22); applySize(); adQOk = 0 } // 安定したら素早く鮮やかさを戻す（重い所を抜けたら数秒で回復＝荒いまま固定しない）
     }
     const dt = Math.min(0.05, t - lastT); lastT = t
-    // 時代エリアの距離カリング：遠い時は群ごと非表示（海/霧で見えない距離で切替＝ポップ無し・基礎負荷ダウン）。
-    for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz); const want = d < (e.vis ? 330 : 295); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
+    // 時代エリアの距離カリング：群の「最も近い縁(中心距離−半径)」が霧(fog.far)の外に出たら非表示にする。
+    // 固定330で切ると、大きな島(半径〜240)の中心が330でも近縁は90u＝霧の手前で鮮明なまま現れ「ポップ」した（評価エモ指摘）。
+    // fog.far基準にすると、縁が霧で完全に溶けた所で切替＝見た目の瞬断が消え、近づくと霞からゆっくり立ち現れる（現代home建物と同じ方式）。
+    for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz) - e.r; const ff = scene.fog.far; const want = d < (e.vis ? ff + 30 : ff); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
     // 現代home建物の霧距離カリング：fog.farより遠い建物は完全に霧で見えない＝隠しても見た目不変で描画コール減。
     // 影は初回に全建物で焼く(autoUpdate=false)ので、影焼き後(数フレーム後)から開始。窓辺(fog.far≈132)で特に効く。
     bcFrame++
