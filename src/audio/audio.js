@@ -210,15 +210,17 @@ export function createAudio(opts) {
   function playCue(buffer, def) {
     const src = ctx.createBufferSource()
     src.buffer = buffer
-    src.playbackRate.value = def.cue ? 0.9 + Math.random() * 0.25 : 0.97 + Math.random() * 0.06
+    // 鳴くたびのピッチ揺れ。単発素材(うぐいす等)が同じ波形の反復に聞こえないよう ±3%→±7% へ広げる（評価サウンド）。
+    src.playbackRate.value = def.cue ? 0.9 + Math.random() * 0.25 : 0.93 + Math.random() * 0.14
     const g = ctx.createGain()
     const baseGain = def.gain != null ? def.gain : 0.5
-    g.gain.value = baseGain * (def.cue ? 0.55 + Math.random() * 0.55 : 0.75 + Math.random() * 0.4)
+    g.gain.value = baseGain * (def.cue ? 0.55 + Math.random() * 0.55 : 0.7 + Math.random() * 0.5)
     let node = src.connect(g)
-    if (ctx.createBiquadFilter && def.cue) {
+    if (ctx.createBiquadFilter) {
       const lp = ctx.createBiquadFilter()
       lp.type = 'lowpass'
-      lp.frequency.value = 600 + Math.random() * 2200 // 遠いほど高域が削れる（雷の距離感）
+      // 遠雷=600-2800Hzで距離感／うぐいす等の単発=4.5-11kHzで「近い藪/遠い藪」＝鳴くたびに高域が少し削れ反復臭が薄れる。
+      lp.frequency.value = def.cue ? 600 + Math.random() * 2200 : 5800 + Math.random() * 6500
       node = node.connect(lp)
     }
     if (ctx.createStereoPanner) {
@@ -340,7 +342,7 @@ export function createAudio(opts) {
   let altDuckV = 0 // 高度に応じた環境音のしぼり（setAltitudeDuck）。細かな変化を無視する基準
   function startWind() {
     if (!ctx || windNode || !ctx.createBiquadFilter) return
-    const len = Math.floor(2 * ctx.sampleRate)
+    const len = Math.floor(6 * ctx.sampleRate) // 2秒→6秒: ループ周期を伸ばし、静かな場面で「白ノイズの2秒周期」が知覚されるのを防ぐ（評価サウンド）
     const buf = ctx.createBuffer(1, len, ctx.sampleRate)
     const d = buf.getChannelData(0)
     let b0 = 0, b1 = 0, b2 = 0 // 明るめのノイズ（低音の「ぶぶぶ」を出さず、空気を切る「サー/ひゅー」寄りに）
@@ -380,7 +382,7 @@ export function createAudio(opts) {
   const waterState = { sea: 0, river: 0, crowd: 0 }
   function startWater() {
     if (!ctx || waterNode || !ctx.createBiquadFilter) return
-    const len = Math.floor(2 * ctx.sampleRate)
+    const len = Math.floor(6 * ctx.sampleRate) // 2秒→6秒: ループ周期を伸ばし、静かな場面で「白ノイズの2秒周期」が知覚されるのを防ぐ（評価サウンド）
     const buf = ctx.createBuffer(1, len, ctx.sampleRate)
     const d = buf.getChannelData(0)
     let b0 = 0, b1 = 0
@@ -433,7 +435,7 @@ export function createAudio(opts) {
     const fg = ctx.createGain(); fg.gain.value = 0; fg.connect(master)                    // 祭り全体の音量（近さで満ち引き＝離れたら無音）
     const bright = ctx.createBiquadFilter(); bright.type = 'lowpass'; bright.frequency.value = 650; bright.Q.value = 0.5; bright.connect(fg) // 笛/鉦の明るさ（遠=こもる→近=澄む）
     // ざわめき（祭りの人声・常時）
-    const len = Math.floor(2 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0)
+    const len = Math.floor(6 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0) // 2秒→6秒で周期感を消す（評価サウンド）
     let mb = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; mb = 0.9 * mb + w * 0.1; dd[i] = (mb * 0.8 + w * 0.2) * 0.4 }
     const msrc = ctx.createBufferSource(); msrc.buffer = buf; msrc.loop = true
     const mhp = ctx.createBiquadFilter(); mhp.type = 'highpass'; mhp.frequency.value = 380
@@ -497,7 +499,7 @@ export function createAudio(opts) {
     if (!ctx || staNode || !ctx.createBufferSource) return
     const sg = ctx.createGain(); sg.gain.value = 0; sg.connect(master)
     const bright = ctx.createBiquadFilter(); bright.type = 'lowpass'; bright.frequency.value = 700; bright.Q.value = 0.5; bright.connect(sg) // ベルの明るさ（遠=こもる→近=澄む）
-    const len = Math.floor(2 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0)
+    const len = Math.floor(6 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0) // 2秒→6秒で周期感を消す（評価サウンド）
     let mb = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; mb = 0.9 * mb + w * 0.1; dd[i] = (mb * 0.8 + w * 0.2) * 0.4 }
     staNode = { sg, bright, timer: null }
     // 発車ベルは「チン」が不快との実機FBで廃止（合成のベル関数ごと削除＝死蔵コードを残さない）。駅は遠い電車の通過音だけ。
