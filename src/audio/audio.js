@@ -494,14 +494,7 @@ export function createAudio(opts) {
     const len = Math.floor(2 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0)
     let mb = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; mb = 0.9 * mb + w * 0.1; dd[i] = (mb * 0.8 + w * 0.2) * 0.4 }
     staNode = { sg, bright, timer: null }
-    const bell = (tt, freq) => {  // 発車ベルの一音（非整数倍音でベルらしく・残響）
-      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq
-      const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = freq * 2.76
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.22, tt + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, tt + 1.1)
-      const g2 = ctx.createGain(); g2.gain.value = 0.16
-      o.connect(g); o2.connect(g2).connect(g); g.connect(bright)
-      try { o.start(tt); o.stop(tt + 1.2); o2.start(tt); o2.stop(tt + 1.2) } catch { /* 無視 */ }
-    }
+    // 発車ベルは「チン」が不快との実機FBで廃止（合成のベル関数ごと削除＝死蔵コードを残さない）。駅は遠い電車の通過音だけ。
     const trainPass = (tt) => {  // 電車の通過音（中域のゴーッ＋レールのカタンカタン。寄せて返す）
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 130
@@ -513,7 +506,6 @@ export function createAudio(opts) {
         const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = 500; cl.Q.value = 0.9
         const nb = ctx.createBufferSource(); nb.buffer = buf; nb.loop = true; nb.connect(cl).connect(cg).connect(sg); try { nb.start(ct); nb.stop(ct + 0.09) } catch { /* 無視 */ } }
     }
-    void bell // 発車ベルは「チン」が不快との実機FBで廃止（関数は残すが鳴らさない）
     let beat = 0
     const tick = () => {
       if (!staNode) return
@@ -531,27 +523,7 @@ export function createAudio(opts) {
     staNode.bright.frequency.setTargetAtTime(640 + a * a * 3200, t, 0.7)  // 遠=こもったベル／近=澄んだベル
     staState.amt = a
   }
-  //  夏の風鈴（窓をあけると風でそっと鳴る）。素材ゼロの合成（高いガラスの鈴＝非整数倍音）。夏の情景＋窓開け時だけ風まかせに鳴る。
-  let furinNode = null
-  function startFurin() {
-    if (!ctx || furinNode || !ctx.createOscillator) return
-    const fg = ctx.createGain(); fg.gain.value = 1; fg.connect(master); furinNode = { fg, timer: null }
-    const chime = () => {
-      const t = now() + 0.02, f0 = 2080 + Math.random() * 280
-      for (const [mul, g0, dec] of [[1, 0.12, 1.4], [2.41, 0.06, 1.0], [3.86, 0.028, 0.7]]) { // ガラスの鈴＝非整数倍音
-        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f0 * mul
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(g0, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dec)
-        o.connect(g).connect(fg); try { o.start(t); o.stop(t + dec + 0.1) } catch { /* 無視 */ }
-      }
-    }
-    const tick = () => {
-      if (!furinNode) return
-      const summer = currentScene && currentScene.axes && currentScene.axes.season === 'summer'
-      if (summer && windowOpenAmt > 0.5 && Math.random() < 0.7) chime() // 夏に窓をあけた時だけ・風まかせで時々
-      furinNode.timer = setTimeout(tick, 2800 + Math.random() * 4500) // ~2.8-7.3秒ごと（風まかせ）
-    }
-    tick()
-  }
+  // 夏の風鈴の「チリン」は実機FBで不快につき廃止（合成関数ごと削除＝死蔵コードを残さない）。風鈴の見た目は3D側に残す。
   // 海の近さ・川の近さ・人混みの近さ・夏祭り・駅(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
   function setAmbience(sea, river, crowd, fest, sta) {
     setFestival(fest)  // 夏祭りの囃子（場所への近さで満ち引き）
@@ -720,7 +692,6 @@ export function createAudio(opts) {
       startWater() // 場所に応じた水の音（波/せせらぎ）の源を立ち上げる（音量0＝setAmbienceが近さで満ち引き）
       startFestival() // 夏祭りの囃子の源を立ち上げる（音量0＝祭りに近づくと満ちる。離れている間は音符を作らない）
       startStation() // 駅の音の源を立ち上げる（音量0＝駅に近づくと遠い電車の音がたまに。ベルは廃止）
-      // startFurin() ← 風鈴の「チリン」が不快との実機FBで停止（風鈴の見た目だけ残す）
       // 生成BGMの下地(合成パッド)は実機で終始「ぶー」というドローンに聞こえ、ユーザーが繰り返し強く嫌う。
       // setMusicBedで基準音量を0にしても、bedGainに繋いだ呼吸LFO(±0.004)が乗って微かに鳴り続け、窓を開けた瞬間(防音解除)に目立つ。
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
