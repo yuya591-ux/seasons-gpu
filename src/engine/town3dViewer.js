@@ -5654,6 +5654,21 @@ export async function mountTown3d(parent, opts = {}) {
       }
       scene.add(mistG); skyDrifters.push({ o: mistG, kind: 'mistveil' })
     }
+    // 蝶＝昼、島々の花の上をひらひら舞い羽ばたく（夏の生命の気配。夜の灯りの粒と対の昼の生命）。
+    if (!isNight) {
+      const bCols = [tn(0xf4f0e0), tn(0xf0d86a), tn(0xe6b0c8), tn(0xcfe0f0)]; bCols.forEach((m) => { m.side = THREE.DoubleSide }) // 白/黄/桃/淡青
+      const lwGeo = new THREE.PlaneGeometry(0.5, 0.62); lwGeo.translate(-0.25, 0, 0)
+      const rwGeo = new THREE.PlaneGeometry(0.5, 0.62); rwGeo.translate(0.25, 0, 0)
+      const bflyG = new THREE.Group()
+      for (let i = 0; i < (LIGHT ? 5 : 9); i++) {
+        const b = new THREE.Group(), wm = bCols[(R() * bCols.length) | 0]
+        b.add(new THREE.Mesh(lwGeo, wm)); b.add(new THREE.Mesh(rwGeo, wm))
+        const bx = -30 + (R() - 0.5) * 190, bz = -330 + (R() - 0.5) * 170, by = SEA_Y + 16 + R() * 16
+        b.position.set(bx, by, bz); b.userData = { x0: bx, z0: bz, y0: by, ph: R() * 6.28, spd: 0.4 + R() * 0.45 }
+        bflyG.add(b)
+      }
+      scene.add(bflyG); skyDrifters.push({ o: bflyG, kind: 'butterfly' })
+    }
 
     // ブロッケンの虹輪＝晴れた日に雲海の上を飛ぶと、自分の影を囲む円い虹が雲に映る（実在の現象＝静かな幻想）。
     // 自分の真下（反太陽点に近い）に淡い分光の輪を置き、frameで追従＋高度/昼でフェード。
@@ -8919,6 +8934,12 @@ export async function mountTown3d(parent, opts = {}) {
           sp.position.x += u.spd * dt; if (sp.position.x > 240) sp.position.x = -240
           sp.position.y = u.y0 + Math.sin(t * 0.1 + u.ph) * 2
           sp.material.opacity = cloudReveal * 0.17 }
+      } else if (d.kind === 'butterfly') { // 蝶：ひらひら舞い、羽ばたく
+        for (const b of d.o.children) { const u = b.userData, flap = Math.sin(t * 9 + u.ph) * 0.7
+          b.children[0].rotation.z = 0.3 + flap; b.children[1].rotation.z = -(0.3 + flap)
+          b.position.x = u.x0 + Math.sin(t * u.spd + u.ph) * 8
+          b.position.z = u.z0 + Math.cos(t * u.spd * 0.8 + u.ph * 1.3) * 8
+          b.position.y = u.y0 + Math.sin(t * 0.7 + u.ph) * 2.5 }
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
