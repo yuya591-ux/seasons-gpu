@@ -5263,10 +5263,11 @@ export async function mountTown3d(parent, opts = {}) {
       { x: 58, z: -334, r: 15, topY: SEA_Y + 22, kind: 'paddy' },     // 空の棚田と水鏡（谷戸を空へ＝故郷の幹と直結。段々田が空/夕陽を映す）
       { x: -34, z: -366, r: 17, topY: SEA_Y + 20, kind: 'market' },   // 無人の灯籠市（売り手のいない夜店＋連なる提灯＝逢魔が時の郷愁）
       { x: -100, z: -360, r: 16, topY: SEA_Y + 25, kind: 'colonnade' }, // 眠る石像の回廊（苔むした石柱の並木＋顔のない石の番人＝安心の守り手）
+      { x: 90, z: -340, r: 13, topY: SEA_Y + 19, kind: 'well' },      // 天の井戸（覗くと下界の街の灯がかすかに見える＝天と地をつなぐ縦の没入）
     ]
     const cwBridges = []
     const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6, ra: a.r - 1, rb: b.r - 1 }) }
-    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7); link(5, 8) // 中心から各島へ／見晴らし台→社跡→石像の回廊／茶屋→空の棚田／祠→灯籠市
+    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7); link(5, 8); link(6, 9) // 中心から各島へ／見晴らし台→社跡→回廊／茶屋→棚田→天の井戸／祠→灯籠市
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
       const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
@@ -5427,6 +5428,19 @@ export async function mountTown3d(parent, opts = {}) {
           const cap = new THREE.IcosahedronGeometry(0.7, 0); cap.scale(1, 0.5, 1); cap.translate(0, GY + 3.5, -10.4); mGeo.push(cap) }
         const mergeAdd = (geos, mat) => { if (!geos.length) return; const ni = geos.map((x) => x.toNonIndexed()); geos.forEach((x) => x.dispose()); const m = BufferGeometryUtils.mergeGeometries(ni, false); if (m) g.add(new THREE.Mesh(m, mat)); ni.forEach((x) => x.dispose()) }
         mergeAdd(sGeo, stoneMat); mergeAdd(mGeo, mossMat); mergeAdd(bGeo, bibMat)
+      } else if (n.kind === 'well') { // 天の井戸＝覗くと下界の街の灯がかすかに映る暗い水面。天と地をつなぐ縦の没入（独自意匠）
+        const stoneMat = tn(isNight ? 0x55524c : 0x8b867b), woodM = tn(isNight ? 0x4a3a2c : 0x6e5640)
+        const curbOut = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 1.7, 16), stoneMat); curbOut.position.y = GY + 0.85; g.add(curbOut) // 石枠
+        const curbIn = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.72, 1.8, 16, 1, true), tn(isNight ? 0x14181c : 0x2a2e34)); curbIn.position.y = GY + 0.9; g.add(curbIn) // 内側の暗がり（井戸の闇）
+        const wellW = new THREE.Mesh(new THREE.CircleGeometry(1.66, 20), new THREE.MeshBasicMaterial({ color: isNight ? 0x0c1014 : 0x18202c, fog: false })); wellW.rotation.x = -Math.PI / 2; wellW.position.y = GY + 0.5; g.add(wellW) // 下界が覗く暗い水鏡
+        const lightGeos = []; for (let i = 0; i < 16; i++) { const a = R() * 6.28, rr = R() * 1.4, d = new THREE.SphereGeometry(0.05 + R() * 0.04, 5, 4); d.translate(Math.cos(a) * rr, GY + 0.53, Math.sin(a) * rr); lightGeos.push(d) }
+        if (lightGeos.length && BufferGeometryUtils.mergeGeometries) { const lm = BufferGeometryUtils.mergeGeometries(lightGeos, false); lightGeos.forEach((x) => x.dispose()); if (lm) g.add(new THREE.Mesh(lm, new THREE.MeshBasicMaterial({ color: 0xffcaa0, fog: false }))) } // はるか下界の街の灯（水面にかすかに映る暖かい点）
+        for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 4.2, 6), woodM); post.position.set(sx * 2.0, GY + 2.1, 0); g.add(post) } // 二本柱
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.3, 0.3), woodM); beam.position.set(0, GY + 4.0, 0); g.add(beam)
+        const pulley = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 10), woodM); pulley.rotation.z = Math.PI / 2; pulley.position.set(0, GY + 3.7, 0); g.add(pulley) // 滑車
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.4, 4), tn(isNight ? 0x4a4236 : 0x8a7a54)); roof.rotation.y = Math.PI / 4; roof.position.set(0, GY + 5.0, 0); g.add(roof) // 小屋根
+        const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.34, 0.5, 8), woodM); bucket.position.set(2.45, GY + 1.5, 0); g.add(bucket) // 縁の釣瓶
+        for (let i = 0; i < 5; i++) { const a = R() * 6.28, rr = 3.5 + R() * 4; const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6 + R() * 0.5, 0), tn(isNight ? 0x33473a : 0x5f7a4c)); m.scale.y = 0.5; m.position.set(Math.cos(a) * rr, GY + 0.5, Math.sin(a) * rr); g.add(m) } // 苔のむら
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
         for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
@@ -5627,6 +5641,18 @@ export async function mountTown3d(parent, opts = {}) {
         sp.position.set(mx, my, mz); sp.scale.setScalar(0.8 + R() * 0.6); sp.userData = { x0: mx, z0: mz, y0: my, ph: R() * 6.28 }; moteG.add(sp)
       }
       scene.add(moteG); skyDrifters.push({ o: moteG, kind: 'motes' })
+    }
+    // 島々の間を流れる霧のヴェール＝群島を夢想的につなぐ薄もや（ゆっくり横切り端で戻る・昼夜とも）。
+    { const wispCv = document.createElement('canvas'); wispCv.width = wispCv.height = 64
+      const wctx = wispCv.getContext('2d'), wgr = wctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+      wgr.addColorStop(0, 'rgba(255,255,255,0.5)'); wgr.addColorStop(1, 'rgba(255,255,255,0)'); wctx.fillStyle = wgr; wctx.fillRect(0, 0, 64, 64)
+      const wispTex = new THREE.CanvasTexture(wispCv), mistG = new THREE.Group()
+      for (let i = 0; i < (LIGHT ? 4 : 7); i++) {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: wispTex, color: isNight ? 0xb8c0d0 : 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: true }))
+        const mx = -40 + (R() - 0.5) * 220, mz = -330 + (R() - 0.5) * 180, my = SEA_Y + 14 + R() * 16, sc = 24 + R() * 22
+        sp.position.set(mx, my, mz); sp.scale.set(sc, sc * 0.55, 1); sp.userData = { spd: 1.4 + R() * 1.6, y0: my, ph: R() * 6.28 }; mistG.add(sp)
+      }
+      scene.add(mistG); skyDrifters.push({ o: mistG, kind: 'mistveil' })
     }
 
     // ブロッケンの虹輪＝晴れた日に雲海の上を飛ぶと、自分の影を囲む円い虹が雲に映る（実在の現象＝静かな幻想）。
@@ -8888,6 +8914,11 @@ export async function mountTown3d(parent, opts = {}) {
           sp.position.z = u.z0 + Math.cos(t * 0.24 + u.ph) * 4
           sp.position.y = u.y0 + Math.sin(t * 0.2 + u.ph * 1.7) * 2.5
           sp.material.opacity = (0.45 + 0.5 * Math.sin(t * 1.3 + u.ph)) * 0.6 } // 明滅
+      } else if (d.kind === 'mistveil') { // 島々の間を流れる霧のヴェール：ゆっくり横切り端で戻る・淡く漂う
+        for (const sp of d.o.children) { const u = sp.userData
+          sp.position.x += u.spd * dt; if (sp.position.x > 240) sp.position.x = -240
+          sp.position.y = u.y0 + Math.sin(t * 0.1 + u.ph) * 2
+          sp.material.opacity = cloudReveal * 0.17 }
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
