@@ -5261,10 +5261,11 @@ export async function mountTown3d(parent, opts = {}) {
       { x: 30, z: -256, r: 12, topY: SEA_Y + 21, kind: 'onsen' },     // 雲の温泉（露天＝湯けむり）
       { x: -84, z: -318, r: 17, topY: SEA_Y + 27, kind: 'ruin' },     // 緑に還る空の社跡（廃墟＋御神木＝静かな驚き。雲海の感情のクライマックス）
       { x: 58, z: -334, r: 15, topY: SEA_Y + 22, kind: 'paddy' },     // 空の棚田と水鏡（谷戸を空へ＝故郷の幹と直結。段々田が空/夕陽を映す）
+      { x: -34, z: -366, r: 17, topY: SEA_Y + 20, kind: 'market' },   // 無人の灯籠市（売り手のいない夜店＋連なる提灯＝逢魔が時の郷愁）
     ]
     const cwBridges = []
     const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6, ra: a.r - 1, rb: b.r - 1 }) }
-    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6) // 中心から各島へ吊り橋／見晴らし台→社跡／茶屋→空の棚田
+    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7) // 中心から各島へ／見晴らし台→社跡／茶屋→空の棚田／祠→灯籠市
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
       const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
@@ -5385,6 +5386,26 @@ export async function mountTown3d(parent, opts = {}) {
         const arms = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 0.12), scWood); arms.position.set(0, scTop + 1.6, 0); g.add(arms)
         const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.12), tn(isNight ? 0x6a5550 : 0xb08858)); cloth.position.set(0, scTop + 1.45, 0); g.add(cloth)
         const hat = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.42, 9), tn(isNight ? 0x6a6450 : 0xc4b078)); hat.position.set(0, scTop + 2.2, 0); g.add(hat)
+      } else if (n.kind === 'market') { // 無人の灯籠市＝売り手のいない夜店が弧を描き、連なる提灯の暖かな天蓋が灯る（祭りの余韻・逢魔が時の郷愁）
+        const glowOn = isNight || dk > 0.2
+        const woodM = tn(isNight ? 0x4a3a2c : 0x6e5640), stallRoof = tn(isNight ? 0x6a2e2a : 0xb24a3e), stone = tn(isNight ? 0x55524c : 0x8b867b)
+        const lamp = new THREE.MeshToonMaterial({ color: isNight ? 0xffcaa0 : 0xf0e0c0, gradientMap: grad, emissive: new THREE.Color(glowOn ? 0xff8a3c : 0x000000), emissiveIntensity: glowOn ? (isNight ? 1.15 : 0.5) : 0 }) // 提灯の灯り（夕夜に灯る・Bloomで滲む）。全提灯で共有
+        const path = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.4, 0.3, 18), stone); path.position.y = GY + 0.15; g.add(path) // 石畳の広場
+        const stalls = LIGHT ? 4 : 5
+        for (let s = 0; s < stalls; s++) {
+          const a = (-0.62 + s / (stalls - 1) * 1.24) * Math.PI, sx = Math.cos(a) * 6.4, sz = Math.sin(a) * 6.4
+          const st = new THREE.Group(); st.position.set(sx, GY, sz); st.rotation.y = Math.atan2(-sz, -sx) // 中央(広場)を向く
+          const counter = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 1.2), woodM); counter.position.set(0, 0.5, 0); st.add(counter) // 台
+          for (const px of [-1.1, 1.1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6), woodM); post.position.set(px, 1.2, 0.2); st.add(post) }
+          const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.18, 1.6), stallRoof); roof.position.set(0, 2.4, 0.1); roof.rotation.x = -0.12; st.add(roof) // 赤い庇
+          const noren = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.62, 0.06), stallRoof); noren.position.set(0, 2.0, 0.86); st.add(noren) // 暖簾
+          const ln = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.26, 0.58, 8), lamp); ln.position.set(1.0, 1.85, 0.66); st.add(ln) // 軒の提灯
+          g.add(st)
+        }
+        const poles = [[-7, 2.5], [0, -6.8], [7, 2.5]] // 提灯を渡す3本の柱
+        for (const [pxx, pzz] of poles) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 5.4, 6), woodM); pl.position.set(pxx, GY + 2.7, pzz); g.add(pl) }
+        const strand = (ax, az, bx, bz) => { const N = LIGHT ? 5 : 6; for (let i = 1; i < N; i++) { const t = i / N, lx = ax + (bx - ax) * t, lz = az + (bz - az) * t, ly = GY + 5.1 - Math.sin(Math.PI * t) * 1.3; const lan = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 7), lamp); lan.scale.y = 1.25; lan.position.set(lx, ly, lz); g.add(lan) } } // カテナリに連なる提灯
+        strand(-7, 2.5, 0, -6.8); strand(0, -6.8, 7, 2.5); strand(7, 2.5, -7, 2.5) // 三辺に灯りの天蓋
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
         for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
