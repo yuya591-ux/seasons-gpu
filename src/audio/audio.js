@@ -249,12 +249,13 @@ export function createAudio(opts) {
       const delay = (min + Math.random() * (max - min)) * 1000
       const id = setTimeout(() => {
         if (myGen !== gen) return
-        if (started && ctx) {
+        // 高空（雲海の上）では単発音（遠雷・鳥）を鳴らさない＝雲を抜けたら下界の音は届かない開放感。altDuckVは高度で1へ（setAltitudeDuck）。
+        if (started && ctx && altDuckV < 0.82) {
           // 稲光は音より先に届く: フラッシュを少し先行させてから雷鳴を鳴らす
           if (onCue && def.cue) onCue(def)
           const lead = onCue && def.cue ? 220 : 0
           setTimeout(() => {
-            if (myGen === gen && started && ctx) playCue(buffer, def)
+            if (myGen === gen && started && ctx && altDuckV < 0.82) playCue(buffer, def)
           }, lead)
         }
         next()
@@ -705,6 +706,8 @@ export function createAudio(opts) {
   }
 
   return {
+    /** 検証用(dev): 現在の高度ダック量と、生きているループ音の実ゲイン。雲海の上で雨/虫が無音になるか確認する。 */
+    _dbg() { return { altDuck: +altDuckV.toFixed(3), loops: layers.filter((l) => !l.stopped).map((l) => +l.layerGain.gain.value.toFixed(4)) } },
     /** 最初のユーザー操作で呼ぶ。音脈を起こし、現在の情景の音を静かに立ち上げる。 */
     async start() {
       ensureContext()
@@ -856,7 +859,7 @@ export function createAudio(opts) {
       const t = now()
       for (const l of layers) {
         if (l.stopped) continue
-        try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.92)), t, 0.5) } catch { /* 無視 */ } // 海上ではほぼ無音まで
+        try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.985)), t, 0.5) } catch { /* 無視 */ } // 雲海の上・海上ではほぼ完全な無音まで（雨も虫も消え、風だけの開放感）
       }
     },
     /** 日の傾き(0=昼..1=夕方)で外の音をそっとやわらげる＝絵だけでなく音も時刻に連れ添う(評価エモ最優先)。室内の猫は不変。 */

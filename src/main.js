@@ -78,7 +78,7 @@ function start() {
     isLive: () => !sleepFading && !document.hidden, // おやすみ中・非表示では出さない
     reduceMotion: !!(mqReduce && mqReduce.matches),
   })
-  if (location.search.includes('dev=1')) window.__events2d = events2d // dev: 流れ星の手動発火など
+  if (location.search.includes('dev=1')) { window.__events2d = events2d; window.__audio = audio } // dev: 流れ星の手動発火・音の高度ダック確認(__audio._dbg())
   let splatMode = false
   let town3dMode = false
   // 端末の傾き: スプラット情景は3Dの見回し、それ以外はシェーダーの視差に振り分ける
