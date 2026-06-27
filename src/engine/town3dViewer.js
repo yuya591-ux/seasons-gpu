@@ -7505,6 +7505,11 @@ export async function mountTown3d(parent, opts = {}) {
   // 名前付き＝dispose で確実に外す（無名だと情景往復のたび window へ溜まる＝リスナー漏れ・評価エンジニア）。
   const winClimbUp = () => { if (active) active.climb = 0 }
   window.addEventListener('pointerup', winClimbUp)
+  // ── 補助操作の畳み込み: 既定は「すすむ/とまる＋↑↓昇降＋ズーム」のみ常駐し、補助の「速く/遅く・広く」は
+  //    この⚙トグルを押した時だけ展開＝飛行時に操作子が一斉に出る"コックピット化"を解消し画面を一枚の絵に保つ（評価UX致命1）。──
+  const moreBtn = document.createElement('button'); moreBtn.className = 'town3d-more'; moreBtn.textContent = '⚙'; moreBtn.setAttribute('aria-label', '速さ・視界の操作を開く'); pad.appendChild(moreBtn)
+  let padShown = false // 補助トレイの表示状態(=showSpeedと同期)。⚙自体の出し入れ用
+  moreBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); pad.classList.toggle('pad--open'); moreBtn.classList.toggle('more--on', pad.classList.contains('pad--open')) })
 
   function frame() {
     if (!active) return
@@ -8409,6 +8414,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (showSpeed !== speedShown) { speedShown = showSpeed; speedWrap.classList.toggle('speed--on', showSpeed); if (!showSpeed) stopSpeedHold() }
     if (showSpeed !== wideShown) { wideShown = showSpeed; wideWrap.classList.toggle('wide--on', showSpeed) }
     if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) active.climb = 0 }
+    if (showSpeed !== padShown) { padShown = showSpeed; moreBtn.classList.toggle('more--on', showSpeed); if (!showSpeed) pad.classList.remove('pad--open') } // ⚙は飛行時のみ＝飛行を出る時は補助トレイを畳んで次回また素の状態から
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
     // 場所に応じた水の音の満ち引き（足元が海＝波／川・運河の近く＝せせらぎ）。飛行/歩行で外に出ている時だけ。

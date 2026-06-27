@@ -378,6 +378,34 @@ body {
   gap: 0.5rem;
   pointer-events: none; /* 空白は操舵ドラッグへ透過。ボタンだけが受け取る */
 }
+/* 補助操作の畳み込みトグル(⚙)。飛行時だけ出て、押すと「速く/遅く・広く」を展開（既定は畳む＝飛行画面を一枚の絵に保つ・評価UX致命1） */
+.town3d-more {
+  order: 6;
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 16, 26, 0.42);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1.1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, background 0.15s ease;
+}
+.town3d-more.more--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.town3d-pad.pad--open .town3d-more {
+  background: rgba(72, 116, 158, 0.5);
+}
+/* 既定（畳む）では補助の「速く/遅く・広く」を隠す。⚙で pad--open になると現れる。 */
+.town3d-pad:not(.pad--open) .town3d-speed,
+.town3d-pad:not(.pad--open) .town3d-wide {
+  display: none;
+}
 /* ズームボタン（＋/−を横に。トレイ内・空/地上でだけ出る＝ピンチに頼らず確実に寄れる/引ける） */
 .town3d-zoom {
   position: static;
@@ -568,6 +596,7 @@ body.idle .town3d-cruise.cruise--on,
 body.idle .town3d-zoom.zoom--on,
 body.idle .town3d-speed.speed--on,
 body.idle .town3d-wide.wide--on,
+body.idle .town3d-more.more--on,
 body.idle .town3d-climb.climb--on {
   opacity: 0;
   pointer-events: none;
