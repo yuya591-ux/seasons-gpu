@@ -5119,6 +5119,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 空を旅する立体感：雲海・入道雲・浮島の群島（街townのみ。谷戸は低空 yMax74 で届かないため敷かない） ──
   const SEA_Y = 88 // 雲海の基準高度（巡航 y30-60 の上・最高高度 y132 まで18-44u の見晴らし＝海原を見渡せる）
   let cloudSea = null
+  let seaUni = null // 雲海のうねり/陽光シェーダーの共有uniform（frameで uTime を進める）
   const seaMats = [] // 雲海の材（高度フェードで opacity を動かす）
   const towerCenters = [] // 入道雲の中心（突き抜けの白包み判定用）
   const skyDrifters = [] // 雲海をゆっくり漂うもの（雲海のぬし・灯籠）。frameで更新
@@ -5335,8 +5336,29 @@ export async function mountTown3d(parent, opts = {}) {
     const cloudSeaG = new THREE.Group(); cloudSeaG.position.y = SEA_Y; cloudSeaG.visible = false
     const seaR = 500
     // 焼いた頂点階調(暖頂→冷底)が雲の陰影＝トゥーンの硬い帯やグレーの濁りを出さず、やわらかく明るい水彩の雲に。
-    const seaMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false })
-    const discMat = new THREE.MeshBasicMaterial({ color: seaLowC, transparent: true, opacity: 0, depthWrite: false, fog: false })
+    // さらに onBeforeCompile で「生きたうねり（低周波の波＋流れ）＋陽の差す斜面の持ち上げ・きらめき＋外周の霞溶かし」を加える。
+    // 波の解析勾配から法線を作る自己完結シェーダー（geometryのnormal attributeに依存しない＝MeshBasicでも堅牢）。
+    seaUni = { uTime: { value: 0 } }
+    const seaSunDir = sun.position.clone().normalize()
+    const seaSunCol = new THREE.Color(isNight ? 0x9fb0d8 : 0xfff2d8).lerp(new THREE.Color(0xffc070), dk)
+    const applySeaShader = (mat) => {
+      mat.onBeforeCompile = (sh) => {
+        sh.uniforms.uTime = seaUni.uTime
+        sh.uniforms.uSunDir = { value: seaSunDir }
+        sh.uniforms.uSunCol = { value: seaSunCol }
+        sh.uniforms.uSeaR = { value: seaR }
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nuniform float uTime; varying vec3 vSeaN; varying float vSeaC;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  float _wx = transformed.x, _wz = transformed.z;\n  float _p1 = _wx*0.020 + uTime*0.16, _p2 = _wz*0.024 - uTime*0.12, _p3 = (_wx+_wz)*0.012 + uTime*0.08;\n  transformed.y += sin(_p1)*cos(_p2)*3.0 + sin(_p3)*1.8;\n  float _dx = 0.020*cos(_p1)*cos(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  float _dz = -0.024*sin(_p1)*sin(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  vSeaN = normalize(vec3(-_dx, 1.0, -_dz));\n  vSeaC = length((modelMatrix * vec4(transformed,1.0)).xz);')
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uSeaR; varying vec3 vSeaN; varying float vSeaC;')
+          .replace('#include <dithering_fragment>', '  float _ndl = dot(normalize(vSeaN), uSunDir);\n  gl_FragColor.rgb *= (0.84 + smoothstep(-0.2, 0.7, _ndl) * 0.40);\n  gl_FragColor.rgb += uSunCol * pow(max(_ndl, 0.0), 8.0) * 0.22;\n  gl_FragColor.a *= 1.0 - smoothstep(uSeaR*0.80, uSeaR*0.998, vSeaC);\n#include <dithering_fragment>')
+      }
+      mat.customProgramCacheKey = () => 'cloudsea'
+      return mat
+    }
+    const seaMat = applySeaShader(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false }))
+    const discMat = applySeaShader(new THREE.MeshBasicMaterial({ color: seaLowC, transparent: true, opacity: 0, depthWrite: false, fog: false }))
     seaMats.push(seaMat, discMat)
     // 雲の切れ間＝雲海の所々に穴を開け、はるか下の地上が覗く（高さの実感＝奥行き）。下地に穴・その部分は雲塊も置かない。
     const gaps = [{ x: 15, z: -25, r: 40 }, { x: 120, z: 28, r: 44 }, { x: -135, z: -120, r: 46 }, { x: 210, z: -300, r: 44 }] // 街・東の海・西の住宅・渡りの空の上に開ける
@@ -8323,7 +8345,8 @@ export async function mountTown3d(parent, opts = {}) {
       if (cloudSea) {
         const seaOp = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 70) / 22)) * flyAmt // y70で現れy92で満ちる（巡航では消えている）
         cloudSea.visible = seaOp > 0.02
-        if (cloudSea.visible) for (const m of seaMats) m.opacity = seaOp
+        if (cloudSea.visible) { for (const m of seaMats) m.opacity = seaOp; if (seaUni) seaUni.uTime.value = t } // 雲海が見えている間だけ、うねりの時刻を進める
+
       }
       // 虹のアーチ＝晴れた日に雲海の上で現れ、くぐると淡い分光のベールに包まれる
       if (rainbowArch) {
