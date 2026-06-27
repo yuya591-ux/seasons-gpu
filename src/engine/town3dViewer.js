@@ -7554,7 +7554,12 @@ export async function mountTown3d(parent, opts = {}) {
           else loc = heightAt(fp.x, fp.z) < SEA.level + 0.5 ? '海の上' : 'まちはずれ'
         }
       }
-      if (loc !== lastLoc) { lastLoc = loc; onLocation(loc) }
+      if (loc !== lastLoc) {
+        // 到達の一拍: 渡りの果ての名所(江戸/戦国/大正/雲海)へ入った瞬間、澄んだ鈴がひとつ満ちる＝「着いた」の余韻（エモ: 到達の感動がゼロ）。
+        // loc!==lastLoc で入域ごと1回・名所のみ(海上/まちはずれ/現代は鳴らさない)・飛行中のみ。
+        if (loc && lastLoc !== loc && /城下町|港町|雲海/.test(loc) && (active.flyP || 0) > 0.5) onChime()
+        lastLoc = loc; onLocation(loc)
+      }
     }
     // 現代home建物の霧距離カリング：fog.farより遠い建物は完全に霧で見えない＝隠しても見た目不変で描画コール減。
     // 影は初回に全建物で焼く(autoUpdate=false)ので、影焼き後(数フレーム後)から開始。窓辺(fog.far≈132)で特に効く。
