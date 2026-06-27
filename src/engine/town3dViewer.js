@@ -5612,6 +5612,9 @@ export async function mountTown3d(parent, opts = {}) {
     { x: STADIUM.x, z: STADIUM.z + 18, n: 6, rad: 4.4 },             // 競技場のゲート前（観客）
   ]
   crowdCenters = crowdSpots.map((s) => ({ x: s.x, z: s.z, r: s.rad + 9 })) // 音のざわめき用（人だまりの少し広めの範囲）
+  // 時代の人の街(江戸/大正)も広い人だまりとして加える＝渡って低空/地上へ降りると、その街のざわめきが満ちる。
+  // 戦国は山城＝人より自然(風/沢/鴉)が主役なので加えず静けさを個性に＝「時代を渡ると音が変わる」（評価サウンド: 時代が無音の致命傷）。
+  if (kind !== 'yato') crowdCenters.push({ x: EDO.x, z: EDO.z, r: 92 }, { x: TAISHO.x, z: TAISHO.z, r: 84 })
   for (const s of crowdSpots) for (let i = 0; i < (LIGHT ? Math.ceil(s.n * 0.5) : s.n); i++) {
     const g = makePeep()
     let hx = s.x + (R() - 0.5) * s.rad * 1.4, hz = s.z + (R() - 0.5) * s.rad * 1.4
@@ -8430,7 +8433,8 @@ export async function mountTown3d(parent, opts = {}) {
       const rivLow = Math.max(0, Math.min(1, (30 - Math.max(0, fp.y - SEA.level)) / 24)) // 川・運河は低空/地上でだけ聞こえる
       const riverAmt = Math.max(0, Math.min(1, (8 - rivD) / 8)) * rivLow * outAmt * (1 - seaAmt) // 川の近く（海の時は波を優先）
       let crowdAmt = 0; for (const c of crowdCenters) { const d = Math.hypot(fp.x - c.x, fp.z - c.z); if (d < c.r) crowdAmt = Math.max(crowdAmt, 1 - d / c.r) } // 人だまりの近さ
-      crowdAmt *= rivLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
+      const grdLow = Math.max(0, Math.min(1, (28 - Math.max(0, fp.y - heightAt(fp.x, fp.z))) / 22)) // 地面からの高さ＝標高の高い時代エリア(江戸/大正の台地)でも降りればざわめきが満ちる
+      crowdAmt *= grdLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
       // 夏祭りの囃子＝遠くでほんのり聞こえ、近づくほど大きくなる（音で会場を探す）。窓辺でも遠くの祭りが届く。
       let festAmt = 0
       if (festivalSpots.length) {
