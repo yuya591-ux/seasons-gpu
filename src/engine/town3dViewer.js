@@ -6219,10 +6219,14 @@ export async function mountTown3d(parent, opts = {}) {
     composer.addPass(fxaaPass)
     // 夕夜の灯り（窓/街灯/提灯/自販機）がふわっと滲んで光るブルーム。ハーフ解像度＋高しきい値で「灯りだけ」を控えめに。昼/非力端末はstrength0で無効化＝負荷ゼロ。
     if (bloomMod && bloomMod.UnrealBloomPass) {
-      const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.18 + duskAmt * 0.34 : 0 // 夜は強め・はっきりした夕はほのか・明るい昼や薄暮の霞む昼は無し
-      bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, 0.6, 0.72)
-      bloomWanted = bs > 0.1
-      bloomPass.enabled = bloomWanted && curQual !== 'light' // 明るい昼/霞む昼は無効＝downsample/upsampleの負荷ゼロ。軽やか品質でも切る（発熱回避）
+      // 夜=強め／はっきりした夕=ほのか／昼=ごく淡く「いちばん明るい所」だけ滲ませる（雲海のきらめき・クジラのリム光・水面・雲頂・窓灯り）。
+      // 昼は高しきい値で水彩の中間調を濁さず、雪天の昼は白飛び回避でさらに弱く。
+      const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.20 + duskAmt * 0.36 : (weather === 'snow' ? 0.07 : 0.15)
+      const bThr = isNight ? 0.72 : duskAmt > 0.25 ? 0.74 : 0.82 // 昼は高しきい値＝最も明るい所だけ光らせる
+      const bRad = isNight ? 0.62 : 0.5
+      bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, bRad, bThr)
+      bloomWanted = bs > 0.04
+      bloomPass.enabled = bloomWanted && curQual !== 'light' // 軽やか品質では後処理ブルームを切る（発熱回避）
       composer.addPass(bloomPass)
     }
     composer.addPass(new OutputPass())
