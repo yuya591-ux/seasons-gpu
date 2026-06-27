@@ -1190,7 +1190,9 @@ export async function mountTown3d(parent, opts = {}) {
     const bake = (geo, hex, y, x = 0, z = 0) => { geo.translate(x, y, z); const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(geo) }
     // 脚×2＋足先＝下半身を二本に分け、人のシルエットを明確化（瓶/こけしを脱す）。同じ統合メッシュに焼くので描画コールは1のまま
     for (const s of [-1, 1]) { bake(new THREE.CylinderGeometry(0.075, 0.058, 0.56, 6).toNonIndexed(), legHex, 0.28, s * 0.095); bake(new THREE.BoxGeometry(0.1, 0.05, 0.18).toNonIndexed(), legHex, 0.025, s * 0.095, 0.035) }
-    bake(new THREE.CylinderGeometry(0.19, 0.16, 0.62, 9).toNonIndexed(), bodyCol, 0.85) // 胴（腰→肩。肩を少し張らせ上半身と分かる）
+    // 胴は「胸(上衣)＋腰(下衣)」の二段＝くびれた腰と二色の服で、のっぺりした円柱(=瓶/こけし)を脱す（評価アート①-d）。統合メッシュなので描画コール不変。
+    bake(new THREE.CylinderGeometry(0.2, 0.165, 0.34, 9).toNonIndexed(), bodyCol, 1.0) // 胸（肩0.2を張り→腰0.165へ細る上衣）
+    bake(new THREE.CylinderGeometry(0.165, 0.2, 0.34, 9).toNonIndexed(), legHex, 0.69) // 腰（くびれ0.165→腰0.2へ広がる下衣＝袴/スカートの裾）
     bake(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed(), skinHex, 1.21) // 首
     const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); bake(hd, skinHex, 1.33) // 小さめの頭＝頭身を伸ばす
     bake(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed(), hairHex, 1.35, 0, -0.012) // 髪（後頭部）
