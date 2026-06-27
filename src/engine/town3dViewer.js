@@ -5177,8 +5177,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // 夕焼けは雲海のいちばんの見せ場＝頂を茜金、谷を青紫の影に染める（duskで補間）。夜/雪は別色なので染めない。
     const dk = (SNOWY || isNight) ? 0 : duskAmt
-    const seaLowC = new THREE.Color(SNOWY ? 0xdfe3e9 : (isNight ? 0x636a83 : 0xcdd2da)).lerp(new THREE.Color(0x8e7896), dk * 0.7).getHex() // 谷の翳り（夕は青紫へ）
-    const seaHighC = new THREE.Color(SNOWY ? 0xf8f9fc : (isNight ? 0xb2b8cc : 0xfffdf8)).lerp(new THREE.Color(0xffc486), dk * 0.9).getHex() // 陽の当たる頂（夕は茜金へ）
+    const seaLowC = new THREE.Color(SNOWY ? 0xccd2dc : (isNight ? 0x636a83 : 0xa9b4c4)).lerp(new THREE.Color(0x8e7896), dk * 0.7).getHex() // 谷の翳り（雲の底＝粒の立体感のため深めの灰青／夕は青紫へ）
+    const seaHighC = new THREE.Color(SNOWY ? 0xe9edf2 : (isNight ? 0xb2b8cc : 0xeee7d6)).lerp(new THREE.Color(0xf0bf8c), dk * 0.72).getHex() // 陽の当たる頂（純白を避けた柔らかいクリーム＝白飛び防止／夕はほのか茜金へ）
     // 群島（鳥居・五重塔・御神木・茅葺き）。それぞれ違うシルエットの発見。雲海をくぼませて据える。
     const isleGrass = isNight ? 0x3a5642 : 0x6f9a5c, isleRock = isNight ? 0x484540 : 0x7b6f60
     const tn = (col) => new THREE.MeshToonMaterial({ color: col, gradientMap: grad })
@@ -5352,7 +5352,7 @@ export async function mountTown3d(parent, opts = {}) {
           .replace('#include <begin_vertex>', '#include <begin_vertex>\n  float _wx = transformed.x, _wz = transformed.z;\n  float _p1 = _wx*0.020 + uTime*0.16, _p2 = _wz*0.024 - uTime*0.12, _p3 = (_wx+_wz)*0.012 + uTime*0.08;\n  transformed.y += sin(_p1)*cos(_p2)*3.0 + sin(_p3)*1.8;\n  float _dx = 0.020*cos(_p1)*cos(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  float _dz = -0.024*sin(_p1)*sin(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  vSeaN = normalize(vec3(-_dx, 1.0, -_dz));\n  vSeaC = length((modelMatrix * vec4(transformed,1.0)).xz);')
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uSeaR; varying vec3 vSeaN; varying float vSeaC;')
-          .replace('#include <dithering_fragment>', '  float _ndl = dot(normalize(vSeaN), uSunDir);\n  gl_FragColor.rgb *= (0.84 + smoothstep(-0.2, 0.7, _ndl) * 0.40);\n  gl_FragColor.rgb += uSunCol * pow(max(_ndl, 0.0), 8.0) * 0.22;\n  gl_FragColor.a *= 1.0 - smoothstep(uSeaR*0.80, uSeaR*0.998, vSeaC);\n#include <dithering_fragment>')
+          .replace('#include <dithering_fragment>', '  float _ndl = dot(normalize(vSeaN), uSunDir);\n  gl_FragColor.rgb *= (0.90 + smoothstep(-0.2, 0.7, _ndl) * 0.10);\n  gl_FragColor.rgb += uSunCol * pow(max(_ndl, 0.0), 10.0) * 0.05;\n  gl_FragColor.a *= 1.0 - smoothstep(uSeaR*0.80, uSeaR*0.998, vSeaC);\n#include <dithering_fragment>')
       }
       mat.customProgramCacheKey = () => 'cloudsea'
       return mat
@@ -6221,8 +6221,8 @@ export async function mountTown3d(parent, opts = {}) {
     if (bloomMod && bloomMod.UnrealBloomPass) {
       // 夜=強め／はっきりした夕=ほのか／昼=ごく淡く「いちばん明るい所」だけ滲ませる（雲海のきらめき・クジラのリム光・水面・雲頂・窓灯り）。
       // 昼は高しきい値で水彩の中間調を濁さず、雪天の昼は白飛び回避でさらに弱く。
-      const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.20 + duskAmt * 0.36 : (weather === 'snow' ? 0.07 : 0.15)
-      const bThr = isNight ? 0.72 : duskAmt > 0.25 ? 0.74 : 0.82 // 昼は高しきい値＝最も明るい所だけ光らせる
+      const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.09 + duskAmt * 0.16 : (weather === 'snow' ? 0.03 : 0.05) // 昼/夕はごく控えめ（広く明るい雲面が眩しく白飛びするのを防ぐ・実機FB）
+      const bThr = isNight ? 0.72 : duskAmt > 0.25 ? 0.84 : 0.90 // 昼はかなり高いしきい値＝太陽のきらめき/灯りだけ滲ませ、白い雲の面は光らせない
       const bRad = isNight ? 0.62 : 0.5
       bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, bRad, bThr)
       bloomWanted = bs > 0.04
