@@ -5,12 +5,20 @@ const KEY = 'seasons.state.v1'
 
 // 初回だけ端末性能から初期品質を推定（非力な端末は軽く始めて第一印象の滑らかさを守る）。
 // 一度でも品質を選んだ人＝保存値を尊重（ここは新規利用者のみに効く）。
+// 方針=「鮮明さ優先」: capable端末は標準(鮮明)のまま始め、明確に非力な端末だけ軽量で始める。
+// 重要: navigator.deviceMemory は iOS Safari では未提供（undefined）。旧コードの `mem||4 → mem<=3`
+// は iOS で永遠に発火せず（4扱い）、逆に「不在＝非力」と決めつけると全iPhoneが降格して鮮明さを損なう。
+// → deviceMemory は「取れた時だけ」低RAM判定に使い、不在を非力とみなさない。
+// 旧型iPhone(A9/A10世代=iPhone 6s/7/SE1)等は論理コアが2で報告される＝ここで拾う。
+// それ以外（熱いと感じる現行機を含む capable 端末）は標準を維持し、走行中の自動品質(curPR/renderScale)を
+// 実測ベースの安全網にする（=先回りで眠くしない）。
 function autoQuality() {
   try {
-    const mem = navigator.deviceMemory || 4 // GB（非対応ブラウザは4扱い）
     const cores = navigator.hardwareConcurrency || 4
-    if (mem <= 3 || cores <= 3) return 'light' // 非力な端末は軽量で
-    return 'standard' // 既定は標準（こまやか=soft は手動選択に委ねる＝重さの事故を防ぐ）
+    const mem = navigator.deviceMemory // 一部ブラウザのみ（iOSは undefined）
+    if (cores <= 2) return 'light' // 明確に非力（旧型スマホ）。論理コア2以下
+    if (typeof mem === 'number' && mem <= 2) return 'light' // 低RAM端末（取れた時だけ・2GB以下）
+    return 'standard' // 既定は標準（鮮明）。こまやか=soft は手動選択に委ねる
   } catch {
     return 'standard'
   }

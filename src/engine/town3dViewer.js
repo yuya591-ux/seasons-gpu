@@ -6733,6 +6733,7 @@ export async function mountTown3d(parent, opts = {}) {
   let lastT = 0
   let lastDraw = -1
   const TMP_DIR = new THREE.Vector3(), TMP_UP2 = new THREE.Vector3() // 引いたカメラのバンク計算用（毎フレーム確保しない）
+  const TMP_LOOK = new THREE.Vector3() // 窓ビューの注視点（毎フレーム確保せず使い回す＝GCヒッチを生まない）
 
   // ── 窓枠のHTMLオーバーレイ（最前景のサッシ＋横桟＋窓台＋ガラスの映り込み＋紙目）──
   // frame() から参照するので先に生成する。あける／乗り出すで毎フレーム動かす。
@@ -7043,7 +7044,7 @@ export async function mountTown3d(parent, opts = {}) {
         for (const m of mats) m.opacity = env
         const a = evAnchor(); grp.position.set(a.x, (a.fly ? a.y - EYEY2 : 0) + 46, a.z).addScaledVector(sh, 62) // 太陽の方角の空へ・自分に追従（光芒は地へ降りる）
         const cp = camera.position // 各帯をカメラへ向ける（薄板の面が正面＝光芒に見える）
-        for (const beam of grp.children) { const wp = new THREE.Vector3(); beam.getWorldPosition(wp); beam.rotation.y = Math.atan2(cp.x - wp.x, cp.z - wp.z) }
+        for (const beam of grp.children) { beam.getWorldPosition(TMP_DIR); beam.rotation.y = Math.atan2(cp.x - TMP_DIR.x, cp.z - TMP_DIR.z) }
         return age < dur
       },
       cleanup: () => { scene.remove(grp); disposeObj(grp); tex.dispose() },
@@ -8035,7 +8036,7 @@ export async function mountTown3d(parent, opts = {}) {
     const ez = eye.z - wo * CAM.winFwd - lean * CAM.leanFwd
     // 部屋の中でもズーム可（FOVで寄り引き。zoom 0.4=寄り→画角を狭めて窓の外を引き寄せる／3.0=引き）。
     const winFov = Math.max(26, Math.min(100, (CAM.fov0 + wo * CAM.winFov + lean * CAM.leanFov) * (0.55 + 0.45 * active.zoom)))
-    const look = new THREE.Vector3(
+    const look = TMP_LOOK.set(
       ex + Math.sin(yaw) * 18,
       ey - 10.5 - lean * CAM.leanLook + pitch * CAM.lookPitch + Math.sin(t * 0.5) * 0.014, // 既定は見下ろし（手前の木に落ち込み過ぎない程度に）／上スワイプで空・ビル上層も仰げる
       ez - Math.cos(yaw) * 22,
@@ -8682,6 +8683,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に。輪郭のギザギザはFXAAでなめらかに（発熱をほぼ増やさず）。
     if (composer) { try { composer.render() } catch (e) { composer = null; renderer.render(scene, camera) } } else renderer.render(scene, camera)
   }
+  // 初回フレームでの「可視マテリアルの一斉シェーダーコンパイル」(progs多数=数百msのヒッチ)を、
+  // 描画を始める前にまとめて済ませる＝マウント直後の最初のframe()が固まらない（暗転の裏で温める）。
+  // 対象は現在可視のマテリアルのみ（時代群は reveal 時に別途・本丸の段階生成は将来）。失敗しても従来どおり初回frameで遅延コンパイルされる。
+  try { renderer.compile(scene, camera) } catch { /* コンパイル先行に失敗しても描画は継続 */ }
   renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
   frame()
   requestAnimationFrame(() => stage.classList.add('town3d-stage--in'))
