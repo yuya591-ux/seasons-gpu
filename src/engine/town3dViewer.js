@@ -5362,6 +5362,9 @@ export async function mountTown3d(parent, opts = {}) {
         const lintel = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.8, 1.0), stone); lintel.position.set(-3.6, GY + 5.5, 5); lintel.rotation.z = 0.17; g.add(lintel) // 倒れかけた石の門（鳥居の名残）＝立ち柱に横石が斜めに架かる
         for (let k = 0; k < 4; k++) { const t = k / 4, ss = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.18, 7), stone); ss.position.set(9 - t * 7, GY + 0.5, 9 - t * 8); ss.rotation.y = k; g.add(ss) } // 飛び石の小径（橋から歩いてきた誰かの気配）
         const pool = new THREE.Mesh(new THREE.CircleGeometry(1.9, 18), freshWater(new THREE.MeshToonMaterial({ color: isNight ? 0x33484a : 0x86a8a0, gradientMap: grad, fog: true }))); pool.rotation.x = -Math.PI / 2; pool.position.set(-1.4, GY + 0.46, 2.4); g.add(pool) // 根元から滴る水＝空を映す静かな水鏡
+        const leafG = new THREE.Group(); const leafMat = tn(isNight ? 0x4a5a3a : 0x9ab36a); leafMat.side = THREE.DoubleSide // 御神木から舞い落ちる葉（エモさの白眉＝ゆっくり舞い、根元で湧き直す）
+        for (let i = 0; i < (LIGHT ? 7 : 12); i++) { const lf2 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.7), leafMat); const lx = 1 + (R() - 0.5) * 11, lz = -2 + (R() - 0.5) * 11; lf2.position.set(lx, GY + 2 + R() * 11, lz); lf2.userData = { x0: lx, z0: lz, ph: R() * 6.28, spd: 0.5 + R() * 0.5 }; leafG.add(lf2) }
+        g.add(leafG); skyDrifters.push({ o: leafG, kind: 'leaffall' })
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
         for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
@@ -8800,6 +8803,13 @@ export async function mountTown3d(parent, opts = {}) {
           sp.position.set(u.x0 + Math.sin(u.ph * 6.28 + u.x0) * 1.3, 0.4 + h, u.z0)
           sp.material.opacity = Math.sin(u.ph * Math.PI) * 0.4
           const sc = 2.6 + u.ph * 3.4; sp.scale.set(sc, sc * 1.15, 1) }
+      } else if (d.kind === 'leaffall') { // 御神木から舞い落ちる葉：ゆっくり落ち、揺れ・回り、根元で上から湧き直す（島ローカル座標）
+        for (const lf2 of d.o.children) { const u = lf2.userData
+          lf2.position.y -= u.spd * dt
+          lf2.position.x = u.x0 + Math.sin(t * 0.6 + u.ph) * 1.4
+          lf2.position.z = u.z0 + Math.cos(t * 0.5 + u.ph) * 1.0
+          lf2.rotation.x += dt * 1.2; lf2.rotation.z += dt * 0.8
+          if (lf2.position.y < GY + 0.5) lf2.position.y = GY + 13 }
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
