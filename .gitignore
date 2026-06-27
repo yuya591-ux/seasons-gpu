@@ -7,6 +7,8 @@ dist
 scripts/_shots
 scripts/tools
 scripts/_sr
+.qa-shots
+scripts/bg-jobs*.json
 # 外部AI生成の鍵は開発環境のみ・Gitに上げない（外部AI生成の組み込み方針）
 .env
 .env.local

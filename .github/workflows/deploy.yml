@@ -26,6 +26,10 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run build
+      # 全公開情景のスモークテスト（安全網）＝コンソールエラー/GLSLコンパイル失敗/マウント失敗があれば
+      # ここで落としてデプロイを止める。回帰を手動qa頼みでなく自動で捕まえる（評価エンジニア最重要・分割の前提）。
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
