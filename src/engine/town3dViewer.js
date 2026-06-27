@@ -437,6 +437,10 @@ export async function mountTown3d(parent, opts = {}) {
   // 飛行中の空ドームの暖色（昼=黄昏の琥珀、夜=ぶどう色の宵）。霧の FLIGHT_WARM と揃えて世界全体を懐かしい色へ。
   const SKY_WARM_TOP = new THREE.Color(isNight ? 0x2c2740 : 0x9fb0c0)
   const SKY_WARM_BOT = new THREE.Color(isNight ? 0x3a2f3e : 0xf0cda0)
+  // 天上界の光（雲海＝下界の街とは別世界）。情景の時刻に関係なく、雲海では常に幻想的な金桃の magic hour に寄せる＝街との明確な差別化。
+  const CEL_FOG = new THREE.Color(isNight ? 0x4a3a55 : 0xf3c69e) // 雲海の空気＝夜は菫の宵/昼夕は金桃の暁
+  const CEL_SKY_TOP = new THREE.Color(isNight ? 0x352f4c : 0xc3aec6) // 天頂＝淡い菫
+  const CEL_SKY_BOT = new THREE.Color(isNight ? 0x4e3a50 : 0xf7cf9a) // 地平＝暖かな金桃
   // 大気オーバーレイ(CSS)を「その情景の光」に同調させる。固定の暖色グローでなく、各情景の
   // 太陽/地平の色で空がにじみ、隅は空色を深く沈めた冷色で翳る＝どの時間帯でも“一つの光に
   // 包まれた一枚の絵”へ局所色をまとめる（水彩の最高到達点が持つ色の調和を低ポリ3Dにも与える）。
@@ -8286,6 +8290,13 @@ export async function mountTown3d(parent, opts = {}) {
       const skyWarm = flyAmt * 0.5 * (1 - 0.6 * Math.max(edoP, senP, taiP))
       skyUniTop.value.copy(skyTop0).lerp(SKY_WARM_TOP, skyWarm)
       skyUniBot.value.copy(skyHor0).lerp(SKY_WARM_BOT, skyWarm)
+      // 天上界の光: 雲海（高度SEA_Y付近〜）に出ると、情景の時刻によらず常に幻想的な金桃の magic hour の空気へ寄せる＝下界の街とは明確に別世界（差別化の核）。時代に近い時は控える（時代の空気を優先）。
+      const aloft = active.mode === 'walk' ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - (SEA_Y - 6)) / 26)) * flyAmt * (1 - 0.7 * eraMax)
+      if (aloft > 0.01) {
+        TMP_FOGC.lerp(CEL_FOG, aloft * 0.5); scene.fog.color.copy(TMP_FOGC) // 雲海の空気を金桃/菫へ
+        skyUniTop.value.lerp(CEL_SKY_TOP, aloft * 0.5); skyUniBot.value.lerp(CEL_SKY_BOT, aloft * 0.58) // 空ドームも天上の色へ
+        renderer.toneMappingExposure *= (1 + aloft * 0.045) // ほのかに発光（白飛びを避ける微量）
+      }
       // 別世界グレード: 近づいた時代の色で画面全体をそっと染める（近景まで時代の空気に＝霧だけでは出ない「入る」気配）。
       const eMax = Math.max(edoP, senP, taiP)
       const eraCol = eMax < 0.05 ? '' : (edoP >= senP && edoP >= taiP ? (isNight ? '92,76,50' : '226,170,82') : (senP >= taiP ? (isNight ? '40,52,68' : '74,102,130') : (isNight ? '78,56,66' : '216,154,122')))
