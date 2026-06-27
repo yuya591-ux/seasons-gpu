@@ -8659,12 +8659,18 @@ export async function mountTown3d(parent, opts = {}) {
       if (d.kind === 'whale') {
         if (d.uni) d.uni.uTime.value = t // 進行波で体がうねって泳ぐ（頭は静か・尾が大きくポンプ＝シェーダー）
         d.o.position.x += 2.2 * dt; if (d.o.position.x > 470) d.o.position.x = -470 // ゆっくり横切り、端で戻る
-        d.o.position.y = d.baseY + Math.sin(t * 0.18) * 2.4 // 雲海を上下にたゆたう（呼吸のように）
-        d.o.rotation.z = Math.sin(t * 0.18) * 0.04 // ゆるやかな横揺れ（縦のうねりは進行波シェーダーが担う）
+        // ごくたまに雲海へ静かに潜る（控えめ・低頻度）。頭を下げて沈み→雲にveilされながら浮き上がる弧。
+        if (d.diveA > 0) { d.diveA += dt / 9; if (d.diveA >= 1) { d.diveA = 0; d.diveT = t + 50 + R() * 40 } }
+        else if (t >= d.diveT) d.diveA = 0.0001
+        const _dive = d.diveA > 0 ? Math.sin(d.diveA * Math.PI) * 24 : 0 // 沈んで戻る弧
+        d.o.position.y = d.baseY + Math.sin(t * 0.18) * 2.4 - _dive // 雲海を上下にたゆたう＋潜り
+        d.o.rotation.z = Math.sin(t * 0.18) * 0.04 + (d.diveA > 0 ? -Math.cos(d.diveA * Math.PI) * 0.2 : 0) // 横揺れ＋潜降で頭下げ/浮上で頭上げ
         if (d.calf) d.calf.position.y = -4 + Math.sin(t * 0.18 + 0.9) * 1.1 // 子鯨は親より少し遅れて上下にたゆたう
-        if (d.spout) { // 時々ふっと潮を吹く（白い柱が立ちのぼって消える）
-          if (d.spoutA > 0) { d.spoutA += dt / 1.5; if (d.spoutA >= 1) { d.spoutA = 0; d.spout.material.opacity = 0 } else { const e = Math.sin(d.spoutA * Math.PI); d.spout.material.opacity = e * 0.7; d.spout.scale.set(4 + e * 3, 7 + e * 10, 1) } }
-          else if (t >= d.spoutT) { d.spoutT = t + 6 + R() * 7; d.spoutA = 0.001 } // 6〜13秒ごと（実時計）
+        if (d.spout) { // 時々ふっと潮を吹く（立ちのぼって細く伸び、漂い散って消える）
+          if (d.spoutA > 0) { d.spoutA += dt / 1.8
+            if (d.spoutA >= 1) { d.spoutA = 0; d.spout.material.opacity = 0 }
+            else { const e = Math.sin(d.spoutA * Math.PI), rise = d.spoutA * d.spoutA; d.spout.material.opacity = e * 0.62; d.spout.position.set(13, 7.5 + rise * 4, 0); d.spout.scale.set(3.4 + d.spoutA * 3.2, 6 + d.spoutA * 12, 1) } } // 後半ほど上へ立ちのぼり細く高く伸びて散る
+          else if (t >= d.spoutT && d.diveA === 0) { d.spoutT = t + 6 + R() * 7; d.spoutA = 0.001 } // 6〜13秒ごと（潜行中は吹かない）
         }
       } else if (d.kind === 'flock') { // 渡りの群れ：ゆっくり+Xへ渡り、端で戻る。羽ばたき＋たゆたい
         d.o.position.x += 3.0 * dt; if (d.o.position.x > 360) d.o.position.x = -360
