@@ -7,21 +7,13 @@ import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
 import { createTilt } from './ui/tilt.js'
-import { mountSplat, unmountSplat, applySplatTilt, resetSplatTilt } from './engine/splatViewer.js'
-import {
-  mountTown3d,
-  unmountTown3d,
-  applyTown3dLook,
-  resetTown3dLook,
-  setTown3dWindowOpen,
-  setTown3dLean,
-  setTown3dFly,
-  setTown3dLand,
-  setTown3dHint,
-  isTown3dFlyable,
-  setTown3dSettings,
-  triggerTown3dFlash,
-} from './engine/town3dViewer.js'
+// 立体の街エンジン(town3dViewer)とスプラットビューア(splatViewer)はどちらも重い（8千行超の造形コードや Three.js を含む）。
+// 窓辺(2D)の起動時には読み込まず、その情景に入る瞬間だけ動的importで取り寄せる＝最初の表示を軽くする（評価エンジニア・初期チャンク削減）。
+// メイン描画は素のWebGL（renderer.js）なので、これらは3D/スプラット情景に入るまで一切ダウンロードされない。
+let _t3d = null // 読み込み済みの town3dViewer モジュール（未読み込みなら null）
+let _splat = null // 読み込み済みの splatViewer モジュール（未読み込みなら null）
+const loadTown3d = async () => (_t3d ||= await import('./engine/town3dViewer.js'))
+const loadSplat = async () => (_splat ||= await import('./engine/splatViewer.js'))
 
 const BASE = import.meta.env.BASE_URL || '/'
 
@@ -76,7 +68,7 @@ function start() {
   // 遠雷の音に合わせて空をほのかに光らせる（シェーダー情景＝renderer／立体の街＝town3d 両方に効かせる）
   const audio = createAudio({
     onCue: (def) => {
-      if (def.cue === 'thunder') { renderer.triggerFlash(0.6); if (town3dMode) triggerTown3dFlash(0.6) } // 遠雷はひかえめに
+      if (def.cue === 'thunder') { renderer.triggerFlash(0.6); if (town3dMode) _t3d?.triggerTown3dFlash(0.6) } // 遠雷はひかえめに
     },
   })
   let splatMode = false
@@ -84,11 +76,11 @@ function start() {
   // 端末の傾き: スプラット情景は3Dの見回し、それ以外はシェーダーの視差に振り分ける
   const tilt = createTilt({
     onTilt: (nx, ny) => {
-      if (splatMode) applySplatTilt(nx, ny)
+      if (splatMode) _splat?.applySplatTilt(nx, ny)
       else renderer.applyTilt(nx, ny)
     },
     onDisable: () => {
-      if (splatMode) resetSplatTilt()
+      if (splatMode) _splat?.resetSplatTilt()
       else renderer.clearTilt()
     },
   })
@@ -135,19 +127,19 @@ function start() {
       splatMode = true
       canvas.style.display = 'none'
       renderer.pause(); if (renderer.freeFBO) renderer.freeFBO() // 別エンジン描画中はメインのGPUメモリを解放（コンテキスト枯渇の緩和）
-      if (town3dMode) { town3dMode = false; await unmountTown3d() }
+      if (town3dMode) { town3dMode = false; if (_t3d) await _t3d.unmountTown3d() }
       try {
         // 読み込み中の下地は情景の空色に（黒からの唐突な切替を避ける）
         const bg = (next.palette && next.palette.early && next.palette.early.skyMid) || null
-        await mountSplat(document.body, BASE + next.splatUrl, next.splatMode || 'orbit', bg)
+        await (await loadSplat()).mountSplat(document.body, BASE + next.splatUrl, next.splatMode || 'orbit', bg)
         // 読み込み中に新しい情景へ切替わっていたら、出来上がったスプラットを片付けて譲る
         if (gen !== sceneGen) {
-          await unmountSplat()
+          if (_splat) await _splat.unmountSplat()
           return
         }
       } catch (e) {
         console.error('スプラット読み込み失敗→通常情景へ:', e)
-        await unmountSplat()
+        if (_splat) await _splat.unmountSplat()
         if (gen !== sceneGen) return
         splatMode = false
         canvas.style.display = ''
@@ -159,9 +151,9 @@ function start() {
       town3dMode = true
       canvas.style.display = 'none'
       renderer.pause(); if (renderer.freeFBO) renderer.freeFBO() // 立体の街の描画中はメインのGPUメモリを解放（コンテキスト枯渇の緩和・評価エンジニア）
-      if (splatMode) { splatMode = false; await unmountSplat() }
+      if (splatMode) { splatMode = false; if (_splat) await _splat.unmountSplat() }
       try {
-        await mountTown3d(document.body, {
+        await (await loadTown3d()).mountTown3d(document.body, {
           palette: (next.palette && next.palette.early) || null,
           season: (next.axes && next.axes.season) || 'summer',
           weather: next.town3dWeather || null, // 'snow' | 'petals' | 'leaves'（降るもの）
@@ -192,10 +184,10 @@ function start() {
           onDayPhase: (v) => { if (!sleepFading) audio.setDayPhase(v) }, // 日の傾きで外の音もそっとやわらぐ＝絵だけでなく音も時刻に連れ添う（評価エモ最優先）
           onContextRestore: () => { applyScene(next, false) }, // WebGLコンテキスト喪失（実機のバックグラウンド復帰/メモリ逼迫）から復帰したら、同じ情景を組み直して黒画面固定を防ぐ（評価 技術-致命3）
         })
-        if (gen !== sceneGen) { await unmountTown3d(); return }
+        if (gen !== sceneGen) { if (_t3d) await _t3d.unmountTown3d(); return }
       } catch (e) {
         console.error('3Dの街 表示失敗→通常情景へ:', e)
-        await unmountTown3d()
+        if (_t3d) await _t3d.unmountTown3d()
         if (gen !== sceneGen) return
         town3dMode = false
         canvas.style.display = ''
@@ -205,14 +197,14 @@ function start() {
     } else {
       if (splatMode) {
         splatMode = false
-        await unmountSplat()
+        if (_splat) await _splat.unmountSplat()
         if (gen !== sceneGen) return
         canvas.style.display = ''
         renderer.resume()
       }
       if (town3dMode) {
         town3dMode = false
-        await unmountTown3d()
+        if (_t3d) await _t3d.unmountTown3d()
         if (gen !== sceneGen) return
         canvas.style.display = ''
         renderer.resume()
@@ -327,7 +319,7 @@ function start() {
       renderer.setSettings(getState().settings)
       // 3Dの街モードでは明るさ・描き込みをtown3dへ反映（シェーダーは一時停止中なので renderer.setSettings は効かない）
       if (town3dMode && (patch.brightness !== undefined || patch.quality !== undefined || patch.timeStay !== undefined)) {
-        setTown3dSettings({ brightness: patch.brightness, quality: patch.quality, timeStay: patch.timeStay })
+        _t3d?.setTown3dSettings({ brightness: patch.brightness, quality: patch.quality, timeStay: patch.timeStay })
       }
       if (patch.tilt !== undefined) {
         if (patch.tilt) {
@@ -352,28 +344,28 @@ function start() {
       audio.setVolume(v)
     },
     onToggleWindow(open) {
-      if (town3dMode) setTown3dWindowOpen(open) // 3Dの街は窓ガラスがすべって開く
+      if (town3dMode) _t3d?.setTown3dWindowOpen(open) // 3Dの街は窓ガラスがすべって開く
       else renderer.setWindowOpen(open)
       audio.setWindowOpen(open) // 窓をあけると外音が澄む（ガラス越しのこもり→外気＝視覚＋聴覚で「あいた」を伝える）
     },
     onToggleLean(lean) {
-      if (town3dMode) setTown3dLean(lean) // 3Dの街はカメラが枠を越えて前へ
+      if (town3dMode) _t3d?.setTown3dLean(lean) // 3Dの街はカメラが枠を越えて前へ
       else renderer.setLeanOut(lean)
       if (lean) audio.setWindowOpen(true) // 乗り出すと窓は開く＝外音もさらに澄む
     },
     onToggleFly(fly) {
-      if (town3dMode) setTown3dFly(fly) // 立体の街は空へ飛び立ち、滑空して見渡す
+      if (town3dMode) _t3d?.setTown3dFly(fly) // 立体の街は空へ飛び立ち、滑空して見渡す
       if (fly) audio.setWindowOpen(true) // 空にいる＝外気の音
     },
     onToggleLand(land) {
-      if (town3dMode) setTown3dLand(land) // 空から飛び降りて着地し一人称で歩く／また飛び立つ
+      if (town3dMode) _t3d?.setTown3dLand(land) // 空から飛び降りて着地し一人称で歩く／また飛び立つ
       audio.setWindowOpen(true) // 地上も外気の中
     },
     isFlyable() {
-      return town3dMode && isTown3dFlyable() // 「空へ／おりる」を出してよい情景か（立体の街のとき）
+      return town3dMode && !!_t3d && _t3d.isTown3dFlyable() // 「空へ／おりる」を出してよい情景か（立体の街のとき）
     },
     onShowHint() {
-      if (town3dMode) setTown3dHint() // モードピルをタップ＝消えた操作ヒントをもう一度出す（迷った時に・評価UX-U1）
+      if (town3dMode) _t3d?.setTown3dHint() // モードピルをタップ＝消えた操作ヒントをもう一度出す（迷った時に・評価UX-U1）
     },
   })
 
@@ -383,10 +375,10 @@ function start() {
     window.__audio = audio // 検証用: 見回し連動の音場(getLookPan)など
     window.__applyScene = (id) => applyScene(resolveScene(id), false)
     window.__sceneIds = SCENES.filter((s) => s.public !== false && s.status === 'ready').map((s) => s.id)
-    window.__town3dWindow = (b) => setTown3dWindowOpen(b) // 検証用: 3Dの街の窓をあける/しめる
-    window.__town3dLean = (b) => setTown3dLean(b) // 検証用: 3Dの街で身を乗り出す/もどる
-    window.__town3dFlyToggle = (b) => setTown3dFly(b) // 検証用: 3Dの街で空へ飛び立つ/もどる
-    window.__town3dLandToggle = (b) => setTown3dLand(b) // 検証用: 着地して歩く/また飛び立つ
+    window.__town3dWindow = (b) => _t3d?.setTown3dWindowOpen(b) // 検証用: 3Dの街の窓をあける/しめる
+    window.__town3dLean = (b) => _t3d?.setTown3dLean(b) // 検証用: 3Dの街で身を乗り出す/もどる
+    window.__town3dFlyToggle = (b) => _t3d?.setTown3dFly(b) // 検証用: 3Dの街で空へ飛び立つ/もどる
+    window.__town3dLandToggle = (b) => _t3d?.setTown3dLand(b) // 検証用: 着地して歩く/また飛び立つ
     window.__sleepNow = () => startSleepFade() // 検証用: おやすみの暗転を即時に起こす
     window.__lookDemo = () => maybeLookDemo() // 検証用: 初回の見回しデモを起こす（flagは呼び元で消す）
     window.__sleepState = () => ({ fading: sleepFading, on: sleepOverlay.classList.contains('sleep-overlay--on') })
