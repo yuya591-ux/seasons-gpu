@@ -5597,6 +5597,16 @@ export async function mountTown3d(parent, opts = {}) {
       g.userData = { ph: R() * 6.28, sway: 0.6 + R() * 0.5, rise: 0.5 + R() * 0.6, baseX: cx, baseZ: cz, glow: glowSprite, glowBase: glowSprite ? glowSprite.material.opacity : 0 }
       scene.add(g); skyDrifters.push({ o: g, kind: 'lantern' })
     }
+    // 灯りの粒（蛍火のような暖かな光の粒が群島の上をふわりと漂い明滅する＝夜の郷愁）。夜のみ・加算で滲む。
+    if (isNight) {
+      const moteG = new THREE.Group()
+      for (let i = 0; i < (LIGHT ? 12 : 22); i++) {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: 0xffc878, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }))
+        const mx = -30 + (R() - 0.5) * 160, mz = -330 + (R() - 0.5) * 160, my = SEA_Y + 12 + R() * 22
+        sp.position.set(mx, my, mz); sp.scale.setScalar(0.8 + R() * 0.6); sp.userData = { x0: mx, z0: mz, y0: my, ph: R() * 6.28 }; moteG.add(sp)
+      }
+      scene.add(moteG); skyDrifters.push({ o: moteG, kind: 'motes' })
+    }
 
     // ブロッケンの虹輪＝晴れた日に雲海の上を飛ぶと、自分の影を囲む円い虹が雲に映る（実在の現象＝静かな幻想）。
     // 自分の真下（反太陽点に近い）に淡い分光の輪を置き、frameで追従＋高度/昼でフェード。
@@ -8851,6 +8861,12 @@ export async function mountTown3d(parent, opts = {}) {
           lf2.position.z = u.z0 + Math.cos(t * 0.5 + u.ph) * 1.0
           lf2.rotation.x += dt * 1.2; lf2.rotation.z += dt * 0.8
           if (lf2.position.y < 1.7) lf2.position.y = 14.2 } // GY(1.2)+0.5で接地→GY+13で上から湧き直す（GYはbuildスコープ＝frameからは見えないため島ローカルの定数で）
+      } else if (d.kind === 'motes') { // 灯りの粒（蛍火）：ふわりと漂い、明滅する
+        for (const sp of d.o.children) { const u = sp.userData
+          sp.position.x = u.x0 + Math.sin(t * 0.3 + u.ph) * 4
+          sp.position.z = u.z0 + Math.cos(t * 0.24 + u.ph) * 4
+          sp.position.y = u.y0 + Math.sin(t * 0.2 + u.ph * 1.7) * 2.5
+          sp.material.opacity = (0.45 + 0.5 * Math.sin(t * 1.3 + u.ph)) * 0.6 } // 明滅
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
