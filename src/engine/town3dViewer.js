@@ -191,6 +191,7 @@ export function setTown3dFly(on) {
     active.mode = 'window'
     active.flyTarget = 0
     active.moveX = 0; active.moveY = 0
+    active.justReturned = true // 帰還の儀式「ただいま」: 窓辺に戻りきった所で鈴＋猫が顔を上げる（frameで発火）
   }
 }
 
@@ -8472,6 +8473,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 室内は不透明（街を遮蔽してfill節約・カクつき対策）。乗り出すとカメラが窓の開口を抜けて前へ出る＝室内は背後へ退く。
     // lean>0.16で非表示＝カメラがベランダの手すり/窓枠へ達する前に室内ごと消す（貫通して見えるのを防ぐ）。空/地上でも非表示。
     winRoom.visible = flyAmt < 0.6 && lean < 0.16
+    // 帰還の儀式「ただいま」: 旅から窓辺へ戻りきった瞬間、澄んだ鈴がひとつ満ち、眠っていた猫が顔を上げてこちらを見る＝
+    // 出発点でしかなかった窓が「帰る家」になる（エモ最重要: 帰る場所が無く旅が一周しない）。直前の季節/時刻はドリフトが継続＝引き継がれる。
+    if (active.justReturned && flyAmt < 0.18) { active.justReturned = false; onChime()
+      if (winCat) { winCat.react = 'lookback'; winCat.reactDur = 2.8; winCat.reactT = 2.8; winCat.wakeHold = Math.max(winCat.wakeHold || 0, 3.2); winCat.alert = 1; winCat.lastReact = -1 } } // 猫が「おかえり」と顔を上げる
     if (winRoom.visible && winSashR) winSashR.position.x = winSashX0 + wo * (winSashX1 - winSashX0) // 窓をあけると右の障子が左へすべって開く
     if (winRoom.visible && winRefl) winRefl.mat.opacity = winRefl.base * (1 - wo) // 窓をあけると硝子の映り込みは消える（外気が澄む）
     if (winRoom.visible && winRainGlass) { winRainGlass.tex.offset.y = (winRainGlass.tex.offset.y + dt * 0.045) % 1; winRainGlass.mat.opacity = 0.62 * (1 - wo) } // 雨粒がガラスを下へ流れる／窓をあけると消える
