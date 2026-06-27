@@ -5614,6 +5614,17 @@ export async function mountTown3d(parent, opts = {}) {
     const seaMerged = BufferGeometryUtils.mergeGeometries(seaGeos, false); seaGeos.forEach((g) => g.dispose())
     if (seaMerged) cloudSeaG.add(new THREE.Mesh(seaMerged, seaMat))
     scene.add(cloudSeaG); cloudSea = cloudSeaG
+    // 天上界の光芒（天使の梯子）＝雲海に常時そっと差し込む光の柱。下界の街には無い神々しさ＝差別化③。
+    // skyDrifters['godshaft']で高度フェード（cloudReveal）＆カメラ追従。控えめ（ギラつかせない）・加算ビルボード7枚＝軽量。
+    { const gsGrp = new THREE.Group(), gsMats = []
+      const gsCv = document.createElement('canvas'); gsCv.width = 32; gsCv.height = 96; const gsx = gsCv.getContext('2d')
+      for (let y = 0; y < 96; y++) { const top = 1 - y / 96, hg = gsx.createLinearGradient(0, y, 32, y); hg.addColorStop(0, 'rgba(255,240,206,0)'); hg.addColorStop(0.5, `rgba(255,240,206,${(0.3 + 0.42 * top).toFixed(3)})`); hg.addColorStop(1, 'rgba(255,240,206,0)'); gsx.fillStyle = hg; gsx.fillRect(0, y, 32, 1) }
+      const gsTex = new THREE.CanvasTexture(gsCv)
+      const NGS = LIGHT ? 4 : 7
+      for (let i = 0; i < NGS; i++) { const m = new THREE.MeshBasicMaterial({ map: gsTex, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); gsMats.push(m)
+        const beam = new THREE.Mesh(new THREE.PlaneGeometry(11 + R() * 7, 130), m); beam.position.set(-30 + (i - (NGS - 1) / 2) * 15 + (R() - 0.5) * 8, SEA_Y + 48, -315 + (R() - 0.5) * 50); beam.rotation.z = (i - (NGS - 1) / 2) * 0.035; gsGrp.add(beam) } // 群島(中心-30,-320)の上に立つ光の柱
+      scene.add(gsGrp); skyDrifters.push({ o: gsGrp, kind: 'godshaft', mats: gsMats })
+    }
     // 高層の巻雲ヴェール＝雲海のはるか上をゆっくり流れる薄い筋雲。雲海(下層)と巻雲(上層)の二層で空に奥行きを出す。
     { const ciCv = document.createElement('canvas'); ciCv.width = ciCv.height = 256
       const cictx = ciCv.getContext('2d'); cictx.clearRect(0, 0, 256, 256)
@@ -9075,6 +9086,11 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.rotation.y = -ang - Math.PI / 2; d.o.rotation.z = 0.28 // 進行方向へ向き、旋回へ傾ける
         const flap = Math.sin(t * 2.0 + d.ph) * 0.5
         for (const w of d.wings) w.wp.rotation.x = -w.sd * (0.12 + flap) // ゆるやかな羽ばたき（主に滑空）
+      } else if (d.kind === 'godshaft') { // 天上界の光芒：雲海に常時そっと差し込む光の柱。cloudRevealで滲み出し・カメラへ向ける（薄板が正面＝光芒に見える）
+        const op = cloudReveal * 0.28 // 控えめ（白飛び/ギラつき回避）
+        for (const m of d.mats) m.opacity = op
+        const cp = camera.position
+        for (const beam of d.o.children) { beam.getWorldPosition(TMP_DIR); beam.rotation.y = Math.atan2(cp.x - TMP_DIR.x, cp.z - TMP_DIR.z) }
       } else if (d.kind === 'well') { // 天の井戸：下界の灯が揺らめいて瞬く＋ときおり水面に波紋が広がる（雫の余韻）
         d.mat.uniforms.uT.value = t; d.mat.uniforms.uOp.value = cloudReveal // 灯の明滅（瞬き）。雲海の滲み出しに同期して現れる
         const rg = d.ring; d.ringT -= dt
