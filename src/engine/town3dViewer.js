@@ -5437,17 +5437,36 @@ export async function mountTown3d(parent, opts = {}) {
         const mergeAdd = (geos, mat) => { if (!geos.length) return; const ni = geos.map((x) => x.toNonIndexed()); geos.forEach((x) => x.dispose()); const m = BufferGeometryUtils.mergeGeometries(ni, false); if (m) g.add(new THREE.Mesh(m, mat)); ni.forEach((x) => x.dispose()) }
         mergeAdd(sGeo, stoneMat); mergeAdd(mGeo, mossMat); mergeAdd(bGeo, bibMat)
       } else if (n.kind === 'well') { // 天の井戸＝覗くと下界の街の灯がかすかに映る暗い水面。天と地をつなぐ縦の没入（独自意匠）
-        const stoneMat = tn(isNight ? 0x55524c : 0x8b867b), woodM = tn(isNight ? 0x4a3a2c : 0x6e5640)
+        const stoneMat = tn(isNight ? 0x55524c : 0x8b867b), woodM = tn(isNight ? 0x4a3a2c : 0x6e5640), glowW = isNight || dk > 0.2
         const curbOut = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 1.7, 16), stoneMat); curbOut.position.y = GY + 0.85; g.add(curbOut) // 石枠
         const curbIn = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.72, 1.8, 16, 1, true), tn(isNight ? 0x14181c : 0x2a2e34)); curbIn.position.y = GY + 0.9; g.add(curbIn) // 内側の暗がり（井戸の闇）
+        const shaftDeep = new THREE.Mesh(new THREE.CylinderGeometry(1.66, 1.3, 3.0, 16, 1, true), tn(isNight ? 0x0a0d10 : 0x171c24)); shaftDeep.position.y = GY - 0.6; g.add(shaftDeep) // 下へすぼまる井戸坑＝奥行き（覗くと深い闇）
         const wellW = new THREE.Mesh(new THREE.CircleGeometry(1.66, 20), new THREE.MeshBasicMaterial({ color: isNight ? 0x0c1014 : 0x18202c, fog: false })); wellW.rotation.x = -Math.PI / 2; wellW.position.y = GY + 0.5; g.add(wellW) // 下界が覗く暗い水鏡
-        const lightGeos = []; for (let i = 0; i < 16; i++) { const a = R() * 6.28, rr = R() * 1.4, d = new THREE.SphereGeometry(0.05 + R() * 0.04, 5, 4); d.translate(Math.cos(a) * rr, GY + 0.53, Math.sin(a) * rr); lightGeos.push(d) }
-        if (lightGeos.length && BufferGeometryUtils.mergeGeometries) { const lm = BufferGeometryUtils.mergeGeometries(lightGeos, false); lightGeos.forEach((x) => x.dispose()); if (lm) g.add(new THREE.Mesh(lm, new THREE.MeshBasicMaterial({ color: 0xffcaa0, fog: false }))) } // はるか下界の街の灯（水面にかすかに映る暖かい点）
+        // はるか下界の街の灯＝水面で揺らめいて瞬く（静的な点でなく、ゆっくり明滅する生きた光。skyDrifters['well']でuTを進める）。1ドロー・加算。
+        const NL = LIGHT ? 14 : 22, lpos = new Float32Array(NL * 3), laph = new Float32Array(NL)
+        for (let i = 0; i < NL; i++) { const a = R() * 6.28, rr = R() * 1.42; lpos[i * 3] = Math.cos(a) * rr; lpos[i * 3 + 1] = GY + 0.54; lpos[i * 3 + 2] = Math.sin(a) * rr; laph[i] = R() * 6.28 }
+        const lgeo = new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lpos, 3)); lgeo.setAttribute('aph', new THREE.BufferAttribute(laph, 1))
+        const lmat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+          uniforms: { uT: { value: 0 }, uOp: { value: 0 } },
+          vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.25+0.75*(0.5+0.5*sin(uT*1.7+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=2.7*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
+          fragmentShader: 'varying float vtw; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(1.0,0.79,0.62, a*vtw*uOp); }' })
+        const lpts = new THREE.Points(lgeo, lmat); lpts.frustumCulled = false; g.add(lpts)
+        // 水底から立ちのぼるやわらかな光の柱（天と地をつなぐ気配。夕夜に暖かく・昼はごく淡く）。井戸坑の中に収め屋根を突き抜けない。
+        const colOp = isNight ? 0.23 : (dk > 0.15 ? 0.13 : 0.06)
+        const shaftCol = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.3, 3.3, 16, 1, true), new THREE.MeshBasicMaterial({ color: isNight ? 0xffd0a0 : 0xfff0d8, transparent: true, opacity: colOp, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); shaftCol.position.set(0, GY + 2.1, 0); g.add(shaftCol) // 柱頭(beam GY+4)へ向け立ちのぼる光＝天と地をつなぐ気配
+        // ときおり水面に広がる波紋（雫の余韻＝生命感。skyDrifters['well']でアニメ）。reveal上書きを避けるため__revBase既定でcloudRevealMatsから除外
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.28, 20), new THREE.MeshBasicMaterial({ color: isNight ? 0x9fb6c4 : 0xbcd0d8, transparent: true, opacity: 0, depthWrite: false, fog: false })); ring.rotation.x = -Math.PI / 2; ring.position.set(0, GY + 0.52, 0); ring.visible = false; ring.material.__revBase = 0; ring.userData = { life: 0 }; g.add(ring)
+        skyDrifters.push({ o: lpts, kind: 'well', mat: lmat, ring, ringT: 1.5 + R() * 2.5 })
         for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 4.2, 6), woodM); post.position.set(sx * 2.0, GY + 2.1, 0); g.add(post) } // 二本柱
         const beam = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.3, 0.3), woodM); beam.position.set(0, GY + 4.0, 0); g.add(beam)
         const pulley = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 10), woodM); pulley.rotation.z = Math.PI / 2; pulley.position.set(0, GY + 3.7, 0); g.add(pulley) // 滑車
+        const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.2, 5), tn(isNight ? 0x4a4038 : 0x6b5a44)); rope.position.set(0.36, GY + 2.0, 0); g.add(rope) // 滑車から井戸の闇へ垂れる縄（縦の没入を強める）
         const roof = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.4, 4), tn(isNight ? 0x4a4236 : 0x8a7a54)); roof.rotation.y = Math.PI / 4; roof.position.set(0, GY + 5.0, 0); g.add(roof) // 小屋根
         const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.34, 0.5, 8), woodM); bucket.position.set(2.45, GY + 1.5, 0); g.add(bucket) // 縁の釣瓶
+        const lantStone = tn(isNight ? 0x707280 : 0x9a948a), lbz = -3.4 // 傍らの石灯籠＝夕夜に灯る暖かな目印（他の島と統一）
+        const lbase = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 0.85, 6), lantStone); lbase.position.set(3.2, GY + 0.42, lbz); g.add(lbase)
+        const lfire = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(glowW ? 0xff9c4e : 0x000000), emissiveIntensity: glowW ? (isNight ? 1.0 : 0.4) : 0 })); lfire.position.set(3.2, GY + 1.25, lbz); g.add(lfire)
+        const lcap = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.55, 6), lantStone); lcap.position.set(3.2, GY + 1.9, lbz); g.add(lcap)
         for (let i = 0; i < 5; i++) { const a = R() * 6.28, rr = 3.5 + R() * 4; const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6 + R() * 0.5, 0), tn(isNight ? 0x33473a : 0x5f7a4c)); m.scale.y = 0.5; m.position.set(Math.cos(a) * rr, GY + 0.5, Math.sin(a) * rr); g.add(m) } // 苔のむら
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
@@ -8985,6 +9004,11 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.rotation.y = -ang - Math.PI / 2; d.o.rotation.z = 0.28 // 進行方向へ向き、旋回へ傾ける
         const flap = Math.sin(t * 2.0 + d.ph) * 0.5
         for (const w of d.wings) w.wp.rotation.x = -w.sd * (0.12 + flap) // ゆるやかな羽ばたき（主に滑空）
+      } else if (d.kind === 'well') { // 天の井戸：下界の灯が揺らめいて瞬く＋ときおり水面に波紋が広がる（雫の余韻）
+        d.mat.uniforms.uT.value = t; d.mat.uniforms.uOp.value = cloudReveal // 灯の明滅（瞬き）。雲海の滲み出しに同期して現れる
+        const rg = d.ring; d.ringT -= dt
+        if (d.ringT <= 0) { if (cloudReveal > 0.5) { rg.visible = true; rg.scale.setScalar(0.3); rg.material.opacity = 0.42; rg.userData.life = 0 } d.ringT = 2.6 + R() * 3.4 }
+        if (rg.visible) { rg.userData.life += dt; const f = rg.userData.life / 1.7; if (f >= 1) rg.visible = false; else { rg.scale.setScalar(0.3 + f * 1.35); rg.material.opacity = (1 - f) * 0.42 } }
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
