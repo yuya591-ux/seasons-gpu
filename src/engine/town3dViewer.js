@@ -5262,10 +5262,11 @@ export async function mountTown3d(parent, opts = {}) {
       { x: -84, z: -318, r: 17, topY: SEA_Y + 27, kind: 'ruin' },     // 緑に還る空の社跡（廃墟＋御神木＝静かな驚き。雲海の感情のクライマックス）
       { x: 58, z: -334, r: 15, topY: SEA_Y + 22, kind: 'paddy' },     // 空の棚田と水鏡（谷戸を空へ＝故郷の幹と直結。段々田が空/夕陽を映す）
       { x: -34, z: -366, r: 17, topY: SEA_Y + 20, kind: 'market' },   // 無人の灯籠市（売り手のいない夜店＋連なる提灯＝逢魔が時の郷愁）
+      { x: -100, z: -360, r: 16, topY: SEA_Y + 25, kind: 'colonnade' }, // 眠る石像の回廊（苔むした石柱の並木＋顔のない石の番人＝安心の守り手）
     ]
     const cwBridges = []
     const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6, ra: a.r - 1, rb: b.r - 1 }) }
-    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7) // 中心から各島へ／見晴らし台→社跡／茶屋→空の棚田／祠→灯籠市
+    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7); link(5, 8) // 中心から各島へ／見晴らし台→社跡→石像の回廊／茶屋→空の棚田／祠→灯籠市
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
       const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
@@ -5406,6 +5407,26 @@ export async function mountTown3d(parent, opts = {}) {
         for (const [pxx, pzz] of poles) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 5.4, 6), woodM); pl.position.set(pxx, GY + 2.7, pzz); g.add(pl) }
         const strand = (ax, az, bx, bz) => { const N = LIGHT ? 5 : 6; for (let i = 1; i < N; i++) { const t = i / N, lx = ax + (bx - ax) * t, lz = az + (bz - az) * t, ly = GY + 5.1 - Math.sin(Math.PI * t) * 1.3; const lan = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 7), lamp); lan.scale.y = 1.25; lan.position.set(lx, ly, lz); g.add(lan) } } // カテナリに連なる提灯
         strand(-7, 2.5, 0, -6.8); strand(0, -6.8, 7, 2.5); strand(7, 2.5, -7, 2.5) // 三辺に灯りの天蓋
+      } else if (n.kind === 'colonnade') { // 眠る石像の回廊＝苔むした石柱の並木道に顔のない石の番人が点々と座る（失われた文明の守り手・安心。IPセーフ＝野仏/磐座）。石/苔/前掛けを各1メッシュに統合
+        const stoneMat = tn(isNight ? 0x4e4e4a : 0x8b867b), mossMat = tn(isNight ? 0x33473a : 0x5f7a4c), bibMat = tn(isNight ? 0x7a2e26 : 0xbe3b2e)
+        const sGeo = [], mGeo = [], bGeo = []
+        const pathG = new THREE.BoxGeometry(4.4, 0.3, 20); pathG.translate(0, GY + 0.15, 0); sGeo.push(pathG) // 石畳の道
+        for (let i = 0; i < 6; i++) { const z = -8.5 + i * 3.4
+          for (const sx of [-1, 1]) { const broken = R() < 0.35, h = broken ? 1.6 + R() * 1.4 : 5.2; const col = new THREE.CylinderGeometry(0.45, 0.55, h, 8); if (broken) col.rotateZ(sx * R() * 0.22); col.translate(sx * 3.2, GY + h / 2, z); sGeo.push(col) } // 石柱（立つ/欠ける/傾く）
+          if (i % 2 === 0 && R() < 0.7) { const beam = new THREE.BoxGeometry(7.4, 0.5, 0.8); if (R() < 0.4) beam.rotateZ(0.1); beam.translate(0, GY + 5.2, z); sGeo.push(beam) } // 崩れかけた回廊の横梁
+        }
+        for (let i = 0; i < 5; i++) { const z = -7 + i * 3.6, sx = (i % 2 === 0 ? -1 : 1) * 2.6 // 顔のない石の番人（道の縁に座る・赤いよだれかけ・頭に苔）
+          const body = new THREE.CylinderGeometry(0.55, 0.8, 1.3, 8); body.translate(sx, GY + 0.65, z); sGeo.push(body)
+          const head = new THREE.SphereGeometry(0.5, 10, 8); head.translate(sx, GY + 1.55, z); sGeo.push(head)
+          const cap = new THREE.IcosahedronGeometry(0.42, 0); cap.scale(1, 0.5, 1); cap.translate(sx, GY + 1.86, z); mGeo.push(cap)
+          const bib = new THREE.CylinderGeometry(0.42, 0.6, 0.5, 8, 1, true); bib.translate(sx, GY + 1.1, z); bGeo.push(bib)
+        }
+        for (let i = 0; i < 6; i++) { const a = R() * 6.28, rr = 2 + R() * 6; const m = new THREE.IcosahedronGeometry(0.7 + R() * 0.6, 0); m.scale(1, 0.5, 1); m.translate(Math.cos(a) * rr, GY + 0.5, Math.sin(a) * rr - 2); mGeo.push(m) } // 苔のむら
+        { const body = new THREE.CylinderGeometry(1.0, 1.4, 2.4, 10); body.translate(0, GY + 1.2, -10.4); sGeo.push(body) // 端に佇む大きめの石仏（回廊の主）
+          const head = new THREE.SphereGeometry(0.85, 12, 10); head.translate(0, GY + 2.9, -10.4); sGeo.push(head)
+          const cap = new THREE.IcosahedronGeometry(0.7, 0); cap.scale(1, 0.5, 1); cap.translate(0, GY + 3.5, -10.4); mGeo.push(cap) }
+        const mergeAdd = (geos, mat) => { if (!geos.length) return; const ni = geos.map((x) => x.toNonIndexed()); geos.forEach((x) => x.dispose()); const m = BufferGeometryUtils.mergeGeometries(ni, false); if (m) g.add(new THREE.Mesh(m, mat)); ni.forEach((x) => x.dispose()) }
+        mergeAdd(sGeo, stoneMat); mergeAdd(mGeo, mossMat); mergeAdd(bGeo, bibMat)
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
         for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
