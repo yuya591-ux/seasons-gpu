@@ -132,13 +132,11 @@ function start() {
         // 読み込み中の下地は情景の空色に（黒からの唐突な切替を避ける）
         const bg = (next.palette && next.palette.early && next.palette.early.skyMid) || null
         await (await loadSplat()).mountSplat(document.body, BASE + next.splatUrl, next.splatMode || 'orbit', bg)
-        // 読み込み中に新しい情景へ切替わっていたら、出来上がったスプラットを片付けて譲る
-        if (gen !== sceneGen) {
-          if (_splat) await _splat.unmountSplat()
-          return
-        }
+        // 読み込み中に新しい情景へ切替わっていたら、何もせず譲る（後始末は新しい切替が行う＝ここで unmount すると新情景を壊す・連打レース対策）
+        if (gen !== sceneGen) return
       } catch (e) {
         console.error('スプラット読み込み失敗→通常情景へ:', e)
+        if (gen !== sceneGen) return // 既に次の切替が走っている＝そちらに任せる（古いエラーで新情景を壊さない）
         if (_splat) await _splat.unmountSplat()
         if (gen !== sceneGen) return
         splatMode = false
@@ -184,9 +182,10 @@ function start() {
           onDayPhase: (v) => { if (!sleepFading) audio.setDayPhase(v) }, // 日の傾きで外の音もそっとやわらぐ＝絵だけでなく音も時刻に連れ添う（評価エモ最優先）
           onContextRestore: () => { applyScene(next, false) }, // WebGLコンテキスト喪失（実機のバックグラウンド復帰/メモリ逼迫）から復帰したら、同じ情景を組み直して黒画面固定を防ぐ（評価 技術-致命3）
         })
-        if (gen !== sceneGen) { if (_t3d) await _t3d.unmountTown3d(); return }
+        if (gen !== sceneGen) return // 新しい切替が走っている＝そちらが active を管理する。ここで unmount すると新情景を壊す（連打レース対策）
       } catch (e) {
         console.error('3Dの街 表示失敗→通常情景へ:', e)
+        if (gen !== sceneGen) return // 既に次の切替が走っている＝そちらに任せる（古いエラーで新情景を壊さない）
         if (_t3d) await _t3d.unmountTown3d()
         if (gen !== sceneGen) return
         town3dMode = false
