@@ -15,8 +15,14 @@ function precacheManifest() {
         BASE + 'icon-192.png',
         BASE + 'icon-512.png',
       ]
+      // シェル＝メインの入口チャンク(index-*.js)＋全CSS のみ事前キャッシュ。
+      // three / town3dViewer / splatViewer / 後処理パス等の「遅延import」チャンクは事前キャッシュしない＝
+      // 初回訪問で重いJS(計1.4MB+)を前倒しダウンロードしない（④-cの動的importの意図を尊重・初回表示を軽く）。
+      // 3D/スプラット情景に入った時にSWの stale-while-revalidate が取得・キャッシュ＝以後はオフラインでも動く
+      // （未取得の状態で3Dをオフラインで開いた場合は main.js の try/catch が2D情景へ穏やかにフォールバック）。
       for (const f of Object.keys(bundle)) {
-        if (/\.(js|css)$/.test(f)) urls.push(BASE + f)
+        if (/\.css$/.test(f)) urls.push(BASE + f)
+        else if (/(^|\/)index-[\w-]+\.js$/.test(f)) urls.push(BASE + f) // 入口チャンクのみ（遅延チャンクは除外）
       }
       this.emitFile({ type: 'asset', fileName: 'precache-manifest.json', source: JSON.stringify(urls) })
     },

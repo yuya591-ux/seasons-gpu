@@ -2382,7 +2382,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (R() < 0.4) {
       const ax = x + (R() < 0.5 ? 2.3 : -2.3)
       const topG = new THREE.Vector3(x, gy + ph - 1.4, z), anc = new THREE.Vector3(ax, gy + 0.1, z + 0.3)
-      const guy = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, topG.distanceTo(anc), 4), wireMat)
+      const guy = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, topG.distanceTo(anc), 4), wireMat)
       guy.position.copy(topG).lerp(anc, 0.5); guy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), anc.clone().sub(topG).normalize()); town.add(guy)
     }
     // 引き込み線（電柱から家の軒へ＝細い斜めの線。一部の柱に。本物の街は電柱から各戸へ線が伸びる）
@@ -2390,7 +2390,7 @@ export async function mountTown3d(parent, opts = {}) {
       const sgn = R() < 0.5 ? 1 : -1
       const top2 = new THREE.Vector3(x + sgn * 0.9, gy + ph - 1.2, z)
       const eave = new THREE.Vector3(x + sgn * (5.0 + R() * 2.5), gy + 3.0 + R() * 1.6, z + (R() - 0.5) * 3)
-      const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, top2.distanceTo(eave), 4), wireMat)
+      const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, top2.distanceTo(eave), 4), wireMat)
       drop.position.copy(top2).lerp(eave, 0.5); drop.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), eave.clone().sub(top2).normalize()); town.add(drop)
     }
     // 電線を複数本に（碍子の両端＋下段の通信ケーブル＝日本の街の“電線の多さ”が本物感の決め手）
@@ -2403,7 +2403,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (prevAnchors) {
       for (let k = 0; k < anchors.length; k++) {
         const a = prevAnchors[k], bn = anchors[k]
-        const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, a.distanceTo(bn), 4), wireMat)
+        const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, a.distanceTo(bn), 4), wireMat)
         wire.position.copy(a).lerp(bn, 0.5)
         wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bn.clone().sub(a).normalize())
         town.add(wire)
@@ -2585,7 +2585,7 @@ export async function mountTown3d(parent, opts = {}) {
     const g = new THREE.Group()
     const r = 1.6 + R() * 1.4
     const ci = (R() * leafBaseMats.length) | 0
-    const det = scale > 1.4 ? 3 : 2 // 樹冠の分割を上げて輪郭を丸く＝低ポリの塊を脱す。木ごとに1メッシュ統合なので三角形増のみ・描画コール不変
+    const det = scale > 0.85 ? 3 : 2 // 樹冠の分割を上げて輪郭を丸く＝低ポリの塊を脱す。木ごとに1メッシュ統合なので三角形増のみ・描画コール不変（鮮明さ優先で中〜大の木をdet3へ広げ近景の面段差を緩和。極小の茂みのみdet2）
     // 樹形のばらつき＝同形のロリポップ畑を脱す。縦長(杉檜風)/横広(落葉樹の傘)/標準を振る。
     const form = R()
     const tall = form > 0.68, broad = form < 0.28
@@ -7543,7 +7543,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!restIdle && drawDt > 0.001 && drawDt < 0.4) {
       if (drawDt > 0.047) { adQLow++; adQOk = 0 } else if (drawDt < 0.038) { adQOk++; adQLow = 0 } else { if (adQLow) adQLow--; if (adQOk) adQOk-- }
       if (adQLow >= 16 && curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR - 0.12); applySize(); adQLow = 0; adQOk = 0 } // 重い→解像度を譲る
-      else if (adQOk >= 40 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.22); applySize(); adQOk = 0 } // 安定したら素早く鮮やかさを戻す（重い所を抜けたら数秒で回復＝荒いまま固定しない）
+      else if (adQOk >= 40 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.12); applySize(); adQOk = 0 } // 安定したら鮮やかさを戻す。戻り幅を下げ幅と同じ0.12に揃える＝以前の+0.22は下げの約2倍で解像度が脈打って見えた（カクつき評価）。重い所を抜ければ数段で回復しつつ脈動を抑える
     }
     const dt = Math.min(0.05, t - lastT); lastT = t
     // 時代エリアの距離カリング：群の「最も近い縁(中心距離−半径)」が霧(fog.far)の外に出たら非表示にする。
