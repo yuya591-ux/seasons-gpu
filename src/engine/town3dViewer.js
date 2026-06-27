@@ -5103,7 +5103,7 @@ export async function mountTown3d(parent, opts = {}) {
       puffGeos.push(cloudCol(pg, (up < 0.25 ? cloudBot : topMat).color.getHex())) // 色を頂点色で焼く（雲底=翳り/雲頂=地域色）
     }
     if (puffGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(puffGeos, false); if (m) g.add(new THREE.Mesh(m, cloudVC)); puffGeos.forEach((x) => x.dispose()) } // 群内のパフを1メッシュへ統合
-    g.position.set(cx, 54 + R() * 34, cz)
+    g.position.set(cx, 66 + R() * 34, cz) // 積雲の基準高度を上げる(旧54→66)＝巡航帯(y30-60)の上に浮かせ「雲が地面/稜線に近く空が低い」を解消（低空滑空・歩行の空の抜けが一段広がる）。66-100で雲海(88)前後・巻雲(98+)の下に層をなす
     scene.add(g); clouds.push(g)
   }
   // 巻雲（cirrus）＝高い空の薄い刷毛のような筋雲（晴天/夕。雨雪では出さない）。平たく細長く淡い＝空に高さと多様さ。
@@ -8282,9 +8282,9 @@ export async function mountTown3d(parent, opts = {}) {
       const cumHaze = Math.max(0, 1 - Math.sqrt(nearC) / 5.0)
       // 雲海・入道雲を突き抜けるときだけ白く包まれる手応え（高所限定＝街の一望は損なわない）。
       let seaCross = 0, towerHaze = 0
-      if (cloudSea) { const dY = Math.abs(active.flyPos.y - (SEA_Y + 14)); seaCross = Math.max(0, 1 - dY / 16) } // 雲塊の中ほど(SEA_Y+14)で最も白く包まれる
+      if (cloudSea) { const dY = Math.abs(active.flyPos.y - (SEA_Y + 2)); seaCross = Math.max(0, 1 - dY / 13) } // 雲海のデッキを突き抜ける高さ(SEA_Y+2≈90)で最も白く包まれ、島の高さ(≈108-110)では晴れる＝群島が白霞に呑まれず見えるように（旧: ピーク102で島の高さが真っ白だった）
       for (const tc of towerCenters) { const dh = Math.hypot(tc.x - active.flyPos.x, tc.z - active.flyPos.z); if (dh < 18 && active.flyPos.y > SEA_Y - 16 && active.flyPos.y < tc.yTop + 4) towerHaze = Math.max(towerHaze, 1 - dh / 18) }
-      const hazeOp = isWalk ? 0 : Math.min(0.6, Math.max(cumHaze * 0.14, seaCross * 0.5, towerHaze * 0.55)) * flyAmt
+      const hazeOp = isWalk ? 0 : Math.min(0.6, Math.max(cumHaze * 0.14, seaCross * 0.34, towerHaze * 0.55)) * flyAmt // 雲海の白包みを 0.5→0.34 へ控えめに＝突き抜けの手応えは残しつつ群島が見える（評価: 雲海が白に呑まれて見えない）
       if (Math.abs(hazeOp - cloudHazeCur) > 0.02) { cloudHazeCur = hazeOp; cloudHaze.style.opacity = hazeOp.toFixed(2) }
       // 雲海の出現＝高く昇るほど淡く現れ、突き抜けると街が雲の下に消える別世界（窓辺・巡航では opacity0 で開けた空）。
       if (cloudSea) {
