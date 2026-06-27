@@ -8165,6 +8165,15 @@ export async function mountTown3d(parent, opts = {}) {
         }
         backTgt = back
       }
+      // 構図ガード(地形): focus→後方カメラの線分が丘の尾根に潜ると、全画面が無地の地面ベタ面になる(カメラ埋没＝評価アートの最致命/全エリアで頻発)。
+      // 線分に沿って地形/海面の高さをサンプルし、線が地形より下に潜る手前まで back を詰める＝丘に埋もれず常に「一枚の絵」に閉じる。飛行/歩行とも。
+      { const N = 6, minB = isWalk ? 1.2 : 2.2
+        for (let i = 1; i <= N; i++) { const tt = i / N
+          const sx = fp.x - fwdX * backTgt * tt, sz = fp.z - fwdZ * backTgt * tt
+          const sy = fp.y - fwdY * backTgt * tt + upOff * tt // 線分上の高さ（upOffは終端で最大）
+          const gh = Math.max(heightAt(sx, sz), SEA.level) + (isWalk ? 1.0 : 1.4) // 地形＋余裕
+          if (sy < gh) { backTgt = Math.max(minB, backTgt * (i - 1) / N); break } }
+      }
       // 寄せ距離をなめらかに追従（瞬間スナップを排す＝寄せ/戻りで前後にカクつかない）
       if (!active.camReady || active.camBackCur === undefined) active.camBackCur = backTgt
       else active.camBackCur += (backTgt - active.camBackCur) * 0.1
