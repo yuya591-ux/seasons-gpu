@@ -3,6 +3,7 @@
 import { SCENES, DEFAULT_SCENE, pickNowScene } from './data/scenes/index.js'
 import { getState, setScene, updateSettings, recordVisit, addViewSeconds, recordEvent } from './state.js'
 import { createRenderer } from './engine/renderer.js'
+import { createEvents2d } from './engine/events2d.js'
 import { createAudio } from './audio/audio.js'
 import { buildUI } from './ui/ui.js'
 import { attachLookAround } from './ui/lookAround.js'
@@ -71,6 +72,13 @@ function start() {
       if (def.cue === 'thunder') { renderer.triggerFlash(0.6); if (town3dMode) _t3d?.triggerTown3dFlash(0.6) } // 遠雷はひかえめに
     },
   })
+  // シェーダー2D情景の静かな定期イベント（澄んだ夜＝流れ星／夏の宵＝蛍）。town3d/splatは各自の現象系を持つので除外。
+  const events2d = createEvents2d({
+    onStar: () => { if (!sleepFading) audio.playEvent('star') }, // 流れ星のきらめき音
+    isLive: () => !sleepFading && !document.hidden, // おやすみ中・非表示では出さない
+    reduceMotion: !!(mqReduce && mqReduce.matches),
+  })
+  if (location.search.includes('dev=1')) window.__events2d = events2d // dev: 流れ星の手動発火など
   let splatMode = false
   let town3dMode = false
   // 端末の傾き: スプラット情景は3Dの見回し、それ以外はシェーダーの視差に振り分ける
@@ -118,6 +126,8 @@ function start() {
     setScene(next.id)
     recordVisit(next.id) // 通い帳: この窓辺に座った記録
     audio.setScene(next)
+    events2d.setScene(next) // シェーダー2D情景の定期イベント（流れ星/蛍）。town3d/splatでは内部で無効化
+
     if (next.render !== 'town3d') audio.setMusicBed({ off: true }) // 3Dの街以外ではBGMの下地を静かに引く（3Dではエンジンのonsceneが鳴らす）
     // 情景を替えたら窓は閉じた状態から始める（ボタンと描画のズレを防ぐ）
     renderer.setWindowOpen(false)
@@ -164,6 +174,8 @@ function start() {
           onEvent: (kind) => {
             const k2 = kind === 'fireworksFinale' ? 'fireworks' : kind // 花火大会フィナーレも花火の音
             if (!sleepFading) audio.playEvent(k2) // 画面の現象に音を結ぶ（おやすみ中は鳴らさない）
+            // 無音だった「空のご褒美」（虹・オーロラ・天の川）に、やわらかな鈴をそっと添える＝静かな立ち会いの一拍。
+            if (!sleepFading && (kind === 'rainbowSolo' || kind === 'aurora' || kind === 'milkyway')) audio.chime()
             const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', fireworksFinale: 'fireworks', aurora: 'aurora', star: 'star' }[kind]
             if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録（もやは静かな日常なので記録しない）
           },
