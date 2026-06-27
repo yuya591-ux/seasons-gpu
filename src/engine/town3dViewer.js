@@ -8115,7 +8115,9 @@ export async function mountTown3d(parent, opts = {}) {
         let thermal = 0
         for (const th of THERMALS) { const d2 = (active.flyPos.x - th.x) ** 2 + (active.flyPos.z - th.z) ** 2; if (d2 < th.r * th.r) thermal = Math.max(thermal, 1 - Math.sqrt(d2) / th.r) }
         active.thermal = thermal
-        if (active.cruise && active.climb === 0) dvY += thermal * FLY.climbSpeed * 0.5 // 止空/手動昇降中は効かせない（眺めを邪魔しない）
+        // 低〜中空(y<54)でだけ・控えめ(0.5→0.2)に効かせる＝「押していないのに高度が上がり続ける」を防ぐ（実機FB: 戦国へ向かう航路で勝手に上昇）。
+        // soaringのふわっと感は低空で残しつつ、一定高度より上では効かない＝高度はユーザーの手に。止空/手動昇降中も効かせない。
+        if (active.cruise && active.climb === 0 && active.flyPos.y < 54) dvY += thermal * FLY.climbSpeed * 0.2
       }
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
       const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit // カメラの向き
