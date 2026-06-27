@@ -242,6 +242,10 @@ export function createRenderer(canvas) {
   let winPrevSec = 0 // 窓アニメ用の前フレーム時刻(秒)。経過時間でdtを取り、fpsに依らず一定速度に
   let basePanX = 2.6 // 情景ごとの基本可動域（lean-out で広げる）
 
+  // 最後にユーザー操作があった時刻(ms)。長く無操作なら描画頻度を落として発熱/電池を抑える（眺める主用途の省電力）。
+  // 解像度は落とさない＝静止画の鮮明さを守る（鮮明さ優先）。見回し/窓/傾き/情景切替で更新し、操作再開で即フルfpsへ。
+  let lastInputT = (typeof performance !== 'undefined' ? performance.now() : 0)
+  const markInput = () => { lastInputT = (typeof performance !== 'undefined' ? performance.now() : Date.now()) }
   // 見回し（uPan）。指の操作で目標値を動かし、毎フレームなめらかに追従させる。
   const panCur = { x: 0, y: 0 }
   const panTarget = { x: 0, y: 0 }
@@ -360,16 +364,23 @@ export function createRenderer(canvas) {
   function render(now) {
     // 次フレームを先に予約し、約30fpsに間引く（アンビエントに60fpsは不要＝GPU負荷と発熱を約半減）
     rafId = requestAnimationFrame(render)
-    if (now - lastRenderTime < 30) return // ~33fps上限（描画をスキップしてGPUを休ませる）
+    // 通常は~33fps上限。長く無操作で「眺めている」時は約20fpsへ間引いて発熱/電池を抑える（解像度は維持＝鮮明さ優先・
+    // シェーダ情景はゆっくりした動きなので20fpsでも体感は変わらない）。操作（見回し/窓/傾き/情景切替）で即33fpsへ復帰。
+    const idleStill = (now - lastInputT) > 4000
+    if (now - lastRenderTime < (idleStill ? 50 : 30)) return // 描画をスキップしてGPUを休ませる
+    if (flashLevel > 0.001) lastInputT = now // 遠雷の発光中はフル描画を保ちたいので idle にしない
     lastRenderTime = now
     if (canvas.clientWidth < 1 || canvas.clientHeight < 1) return // 非表示中(town3d/splat表示中など)はサイズ0描画を避ける（FBO不完全エラー回避・評価 技術-重要1）
-    // フレーム時間を測り、重い端末では描画解像度を自動調整（発熱を抑え滑らかさを保つ）
-    if (lastFrame > 0) {
+    // フレーム時間を測り、重い端末では描画解像度を自動調整（発熱を抑え滑らかさを保つ）。
+    // idle間引き中(意図的に~50ms間隔)は性能信号でないので計測も自動調整もしない＝idleで誤って解像度を落とさない（鮮明さ優先）。
+    if (lastFrame > 0 && !idleStill) {
       const dt = now - lastFrame
       if (dt > 0 && dt < 300) frameEMA = frameEMA * 0.9 + dt * 0.1
     }
     lastFrame = now
-    if (adaptCooldown > 0) {
+    if (idleStill) {
+      // 眺めている間は解像度の自動調整をしない（fpsだけ落とし、絵の鮮明さは保つ）
+    } else if (adaptCooldown > 0) {
       adaptCooldown--
     } else if (frameEMA > 42 && renderScale > 0.5) {
       // 24fps未満が続けば解像度を落として発熱/カクつきを抑える。とても重い端末(cornerRoom等)は大きめに落とし
@@ -561,17 +572,20 @@ export function createRenderer(canvas) {
     },
     // 指スワイプなどから見回しの目標値を動かす（相対）
     addPan(dx, dy) {
+      markInput()
       panTarget.x = clamp(panTarget.x + dx, PAN_LIMIT.x)
       panTarget.y = clamp(panTarget.y + dy, PAN_LIMIT.y)
     },
     getPan() { return { x: panTarget.x, y: panTarget.y } }, // 見回し目標の読み出し（検証/連携用）
     // 端末の傾きなどから見回しの目標値を直接決める（絶対）
     setPanTarget(x, y) {
+      markInput()
       panTarget.x = clamp(x, PAN_LIMIT.x)
       panTarget.y = clamp(y, PAN_LIMIT.y)
     },
     // 端末の傾き（nx,ny は -1..1）。パノラマでは視差（覗き込み）、それ以外は見回しに使う。
     applyTilt(nx, ny) {
+      markInput()
       nx = Math.max(-1, Math.min(1, nx))
       ny = Math.max(-1, Math.min(1, ny))
       if (shaderType === 'windowPano') {
@@ -597,6 +611,7 @@ export function createRenderer(canvas) {
       reduceMotion = !!b
     },
     setWindowOpen(b) {
+      markInput()
       windowOpenTarget = b ? 1 : 0
       if (!b) leanOutTarget = 0 // 閉じると乗り出しも戻す
     },
@@ -604,6 +619,7 @@ export function createRenderer(canvas) {
       return windowOpenTarget > 0.5
     },
     setLeanOut(b) {
+      markInput()
       leanOutTarget = b ? 1 : 0
       if (b) windowOpenTarget = 1 // 乗り出すには開いている前提
     },
@@ -611,6 +627,7 @@ export function createRenderer(canvas) {
       return leanOutTarget > 0.5
     },
     setScene(s) {
+      markInput() // 情景を切替えた直後はフルfpsで（導入の暗転明けを滑らかに）。無操作が続けば再びidleへ
       scene = s
       driftStart = (performance.now() - startTime) / 1000 // 情景ごとに時の移ろいを最初から進め直す
       if (timeStay) stayK = 0.45                           // 「とどまる」中の新情景はその情景の基準時刻で静止

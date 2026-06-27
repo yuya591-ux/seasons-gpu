@@ -290,7 +290,11 @@ export async function mountTown3d(parent, opts = {}) {
   // 描き込み品質（設定/自動品質）でtown3dも重さを調整＝低性能端末の発熱・カクつきを抑える（従来は品質設定を無視していた）。
   const QUAL = opts.quality || 'standard'
   const LIGHT = QUAL === 'light'
-  const PR_CAP = LIGHT ? 1.15 : QUAL === 'soft' ? 1.6 : 1.4 // 解像度(DPR)の上限。ピクセル塗り＝発熱は解像度の二乗で効くので、見た目をFXAAで保ちつつ上限を控えめに（発熱対策・2026-06）
+  // 解像度(DPR)の上限。方針=鮮明さ優先: 主力3Dの「額縁外(飛行/歩行)が窓辺より粗い」を解消するため、
+  // 旧 standard 1.4 を 1.6 へ引き上げ素のシェーダ情景(1.75)へ寄せる。発熱はピクセル塗りの二乗で効くが、
+  // 重い時は自動品質(curPR↓・下のadQ)が実測で天井から下げる安全網に任せる（先回りで眠くしない）。
+  // ※起動時(ここ)と setQuality(設定変更時)で上限が食い違うと「設定を触ると急に鮮明化」する＝両者を同値に統一。
+  const PR_CAP = LIGHT ? 1.2 : QUAL === 'soft' ? 2 : 1.6
   const PR_FLOOR = LIGHT ? 0.82 : 0.96 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）。高DPR端末で「荒すぎる」のを防ぐため一段引き上げ
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
@@ -300,7 +304,6 @@ export async function mountTown3d(parent, opts = {}) {
   let bloomWanted = false // この情景でブルームを焚きたいか（夜/はっきりした夕）。light品質ではこれが真でも切る
   let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
   let lastDDT = 0 // 直近の描画間隔（検証用）
-  let idleLowApplied = false, idlePrevPR = 0 // 「眺めている時」の追加省電力: 静止＆無操作で解像度も一段下げる（発熱対策）。復帰時に元へ戻す
   let lastJsMs = 0 // 毎フレームのJS処理時間ms（検証用・CPU負荷）
   let bcFrame = 0 // フレーム数（初回の影焼き後にhome建物の霧カリングを始める）
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
@@ -6788,12 +6791,16 @@ export async function mountTown3d(parent, opts = {}) {
   applyStageFilter() // 起動時のユーザ明るさを即反映
   active.setBrightness = (b) => { userBright = b || 1; applyStageFilter() }
   active.setQuality = (q) => { // 描き込み変更で解像度＋灯りのブルームを即反映（影/密度は次の情景読み込みでフル反映）
-    const cap = q === 'light' ? 1.25 : q === 'soft' ? 2 : 1.6
+    const cap = q === 'light' ? 1.2 : q === 'soft' ? 2 : 1.6 // PR_CAP(起動時)と同値に統一（標準1.6=鮮明さ優先）
     qCap = cap; prFly = false; curQual = q
     curPR = Math.min(window.devicePixelRatio || 1, cap)
     if (bloomPass) bloomPass.enabled = bloomWanted && q !== 'light' // 軽やかでは後処理ブルームも切る＝解像度に加えGPU負荷を一段下げる（眺め時の発熱対策）
+    // 軽量端末では全画面の合成レイヤー(soft-light×3)を畳む＝iOSコンポジタの毎フレ合成負荷を下げる（DPRを下げても相殺されるのを防ぐ）。
+    // standard以上は水彩グレードを完全維持（鮮明さ優先）。紙目(paper=乗算1枚)だけは残し手触りを保つ。
+    stage.classList.toggle('town3d-stage--light', q === 'light')
     applySize() // pixelRatio＋size＋aspect をまとめて更新
   }
+  stage.classList.toggle('town3d-stage--light', QUAL === 'light') // 起動時の品質を即反映（軽量端末は軽い合成で始める）
   active.setStay = (v) => { drift.stay = !!v } // 「時間をとどめる」：日の傾きのドリフトを今の時刻で凍結／解除
 
   // ════════════════════════════════════════════════════════════════════════
@@ -7523,10 +7530,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 能動的に飛んで動く時（巡航・操舵・昇降・速い移動）は30fpsを保つので滑らかさは損なわない。
     const stillNow = Math.hypot(active.vel.x, active.vel.z) < 0.8 && (active.climb || 0) === 0
     const restIdle = stillNow && (performance.now() - (active.lastInputT || 0)) > 3500
-    // 「眺めている時」は解像度も一段下げる＝動かないので体感劣化ゼロで発熱を抑える（このアプリの主用途）。操作再開で即元へ。
-    if (restIdle && !idleLowApplied) { idlePrevPR = curPR; if (curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR * 0.8); applySize() } idleLowApplied = true }
-    else if (!restIdle && idleLowApplied) { if (idlePrevPR > 0 && Math.abs(idlePrevPR - curPR) > 0.001) { curPR = Math.min(qCap, idlePrevPR); applySize() } idleLowApplied = false }
-    if (t - lastDraw < (restIdle ? 0.06 : 0.032)) return // 眺めている時は約16fpsへ（動きはクロック基準で滑らか）／能動時は約30fps
+    // 「眺めている時」は描画頻度だけ約16fpsへ落とす＝発熱/電池を抑える（主用途＝長時間ぼーっと眺める）。
+    // 方針=鮮明さ優先: 解像度は落とさない（静止画こそ鮮明に見たい）。動きはクロック基準なので16fpsでも滑らか。操作再開で即30fps。
+    // ※以前は idle で解像度も×0.8 に落としていたが、眺める静止画がぼやけるため取りやめ（fps低下が発熱の主レバー＝それは維持）。
+    if (t - lastDraw < (restIdle ? 0.06 : 0.032)) return // 眺めている時は約16fps／能動時は約30fps
     const drawDt = lastDraw < 0 ? 0.033 : t - lastDraw // 実際の描画間隔（カク付き検知）
     lastDraw = t
     const _js0 = performance.now() // 毎フレームのJS処理時間を測る（検証用・CPU負荷）
