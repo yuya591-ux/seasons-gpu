@@ -5452,7 +5452,7 @@ export async function mountTown3d(parent, opts = {}) {
       }
       g.position.set(n.x, n.topY - GY, n.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(g); cloudObjs.push(g)
     }
-    cloudWalkInfo = { nodes: cwNodes.map((n) => ({ x: n.x, z: n.z, r: n.r - 2.5, topY: n.topY })), bridges: cwBridges, minY: SEA_Y - 6 }
+    cloudWalkInfo = { nodes: cwNodes.map((n) => ({ x: n.x, z: n.z, r: n.r - 2.5, topY: n.topY, kind: n.kind })), bridges: cwBridges, minY: SEA_Y - 6 }
     // 雲の温泉の湯けむり（ふわふわ立ちのぼる白い湯気）。skyDriftersで更新＝低空では自動的に止まる。
     { const on = cwNodes[4], steam = new THREE.Group()
       const stCv = document.createElement('canvas'); stCv.width = stCv.height = 48
@@ -8685,7 +8685,7 @@ export async function mountTown3d(parent, opts = {}) {
       if (Math.abs(fp.x - RIVER.x) < 40 && fp.z > -130 && fp.z < 46) rivD = Math.min(rivD, Math.abs(fp.x - RIVER.x)) // 現代homeの川(x=-52)
       { const dz = fp.z - SENGOKU.z; if (Math.abs(dz) < SENGOKU.r) rivD = Math.min(rivD, Math.abs((fp.x - SENGOKU.x) - senValley(dz))) } // 戦国の谷の川
       const rivLow = Math.max(0, Math.min(1, (30 - Math.max(0, fp.y - SEA.level)) / 24)) // 川・運河は低空/地上でだけ聞こえる
-      const riverAmt = Math.max(0, Math.min(1, (8 - rivD) / 8)) * rivLow * outAmt * (1 - seaAmt) // 川の近く（海の時は波を優先）
+      let riverAmt = Math.max(0, Math.min(1, (8 - rivD) / 8)) * rivLow * outAmt * (1 - seaAmt) // 川の近く（海の時は波を優先）。雲海の水の島でも上乗せするので let
       let crowdAmt = 0; for (const c of crowdCenters) { const d = Math.hypot(fp.x - c.x, fp.z - c.z); if (d < c.r) crowdAmt = Math.max(crowdAmt, 1 - d / c.r) } // 人だまりの近さ
       const grdLow = Math.max(0, Math.min(1, (28 - Math.max(0, fp.y - heightAt(fp.x, fp.z))) / 22)) // 地面からの高さ＝標高の高い時代エリア(江戸/大正の台地)でも降りればざわめきが満ちる
       crowdAmt *= grdLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
@@ -8709,6 +8709,15 @@ export async function mountTown3d(parent, opts = {}) {
         staAmt = Math.pow(Math.max(0, Math.min(1, (78 - d) / 78)), 1.8)
         if (aOut) staAmt *= Math.max(0, Math.min(1, (40 - Math.max(0, fp.y - SEA.level)) / 36)) // 高いほど静か（ホームの音は地上で）
         staPan = bearingPan(STATION.x, STATION.z) // 駅の方角へ定位
+      }
+      // 雲海の島の音の気配＝灯籠市は遠い祭りの余韻(囃子・控えめ)、水のある島(棚田/社跡/温泉/天の井戸)はせせらぎ/水音。近づくと満ちる（既存の音チャンネルを再利用）。
+      if ((active.flyP || 0) > 0.4 && fp.y > 52 && cloudWalkInfo) {
+        for (const n of cloudWalkInfo.nodes) {
+          const near = Math.max(0, 1 - Math.hypot(fp.x - n.x, fp.z - n.z) / 42)
+          if (near <= 0) continue
+          if (n.kind === 'market') { if (!rainActive) { festAmt = Math.max(festAmt, near * 0.5); festPan = bearingPan(n.x, n.z) } } // 無人の灯籠市＝遠い祭りの余韻
+          else if (n.kind === 'paddy' || n.kind === 'ruin' || n.kind === 'onsen' || n.kind === 'well') riverAmt = Math.max(riverAmt, near * 0.42) // 水のある島＝せせらぎ/水滴
+        }
       }
       onAmbience(seaAmt, riverAmt, crowdAmt, festAmt, staAmt, festPan, staPan) }
     // 夜の灯りの息づき（篝火/松明＝炎の揺らぎ・ガス灯＝穏やかな明滅）。二重サインで不規則に。
