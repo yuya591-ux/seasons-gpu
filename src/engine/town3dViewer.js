@@ -5219,9 +5219,12 @@ export async function mountTown3d(parent, opts = {}) {
         for (let i = 0; i < nc; i++) { const a = (i / nc) * 6.283 + R() * 0.6, rr = r * (0.82 + R() * 0.28), pf = new THREE.IcosahedronGeometry(r * (0.32 + R() * 0.18), 1); pf.scale(1.25, 0.5, 1.25); cM.makeTranslation(Math.cos(a) * rr, -r * (0.08 + R() * 0.22), Math.sin(a) * rr); pf.applyMatrix4(cM); collarGeos.push(pf) }
         const cm = BufferGeometryUtils.mergeGeometries ? BufferGeometryUtils.mergeGeometries(collarGeos, false) : null; collarGeos.forEach((g2) => g2.dispose()); if (cm) g.add(new THREE.Mesh(cm, collarMat)) }
       // 草の頂にぽつぽつ低木＝平らな草地を脱し雲の島に緑の生命感（少数・島は低空で一括カリング＝発熱安全）
-      const bushC = tn(isNight ? 0x2e4a36 : 0x4f7a4e), nb = 2 + ((r / 8) | 0)
-      for (let i = 0; i < nb; i++) { const a = R() * 6.28, rr = R() * r * 0.6, bs = 0.7 + R() * 0.7; const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(bs, 1), bushC); bush.scale.y = 0.68; bush.position.set(Math.cos(a) * rr, 1.2 + bs * 0.45, Math.sin(a) * rr); g.add(bush) }
-      if (!isNight) for (let i = 0; i < nb + 1; i++) { const a = R() * 6.28, rr = R() * r * 0.66; const fl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 5), tn([0xeef0ee, 0xf0d850, 0xe6a8cc][(R() * 3) | 0])); fl.position.set(Math.cos(a) * rr, 1.4, Math.sin(a) * rr); g.add(fl) } // 野花の彩り（昼）
+      const bushC = tn(isNight ? 0x2e4a36 : 0x4f7a4e), grassC = tn(isNight ? 0x32543a : 0x5f8a4e), nb = 3 + ((r / 7) | 0)
+      for (let i = 0; i < nb; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4), bs = 0.6 + R() * 0.9; const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(bs, 1), bushC); bush.scale.y = 0.6 + R() * 0.4; bush.position.set(Math.cos(a) * rr, 1.2 + bs * 0.4, Math.sin(a) * rr); g.add(bush) } // 大小の茂みを縁に寄せて（中央の構造物を避ける）
+      { const gg = [], ng = 5 + ((r / 4) | 0) // 草むら＝縁に沿った小さな草の束（1メッシュへ統合＝瑞々しさを足しても描画+1のみ）
+        for (let i = 0; i < ng; i++) { const a = R() * 6.28, rr = r * (0.55 + R() * 0.38), tg = new THREE.ConeGeometry(0.12, 0.5 + R() * 0.45, 4); tg.translate(Math.cos(a) * rr, 1.45, Math.sin(a) * rr); gg.push(tg) }
+        if (gg.length && BufferGeometryUtils.mergeGeometries) { const gm = BufferGeometryUtils.mergeGeometries(gg, false); gg.forEach((x) => x.dispose()); if (gm) g.add(new THREE.Mesh(gm, grassC)) } }
+      if (!isNight) for (let i = 0; i < nb + 2; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), tn([0xeef0ee, 0xf0d850, 0xe6a8cc, 0xf0b8d0][(R() * 4) | 0])); fl.position.set(Math.cos(a) * rr, 1.42, Math.sin(a) * rr); g.add(fl) } // 野花の彩り（昼・縁に） // 野花の彩り（昼）
       return g
     }
     const isles = []
