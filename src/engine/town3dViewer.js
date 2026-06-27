@@ -147,10 +147,6 @@ export function setTown3dCruise(on) {
   if (active) active.cruise = !!on
 }
 
-export function resetTown3dLook() {
-  if (active) { active.yawTarget = 0; active.pitchTarget = 0 }
-}
-
 // 窓をあける／しめる（ガラスが横にすべって外気が澄む）。
 export function setTown3dWindowOpen(open) {
   if (active) active.winOpenTarget = open ? 1 : 0
