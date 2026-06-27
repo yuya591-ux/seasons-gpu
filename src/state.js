@@ -18,6 +18,7 @@ function autoQuality() {
 
 const DEFAULTS = {
   sceneId: null, // null のときは DEFAULT_SCENE を使う
+  sceneAt: 0, // 最後に情景を選んだ時刻(ms)。近いうちに開き直したら「昨日(さっき)の続き」へ戻す＝連続性（古ければ今の時刻の情景へ）
   settings: {
     rain: 0.65, // 雨脚 0..1
     brightness: 1.0, // 画面の明るさ 0.7..1.3
@@ -73,6 +74,7 @@ export function getState() {
 
 export function setScene(id) {
   state.sceneId = id
+  state.sceneAt = Date.now() // 連続性の判定用＝最後に居た時刻
   persist()
 }
 

@@ -51,8 +51,12 @@ function resolveScene(id) {
 
 function start() {
   const state = getState()
-  // 起動時は「いま（今の季節・時刻）の窓辺」を開く＝開くたび今と地続きの再訪動機。
-  const scene = pickNowScene()
+  // 連続性「昨日(さっき)の続き」: 直近(3時間以内)に居た情景があればそこへ戻す＝閉じて開き直しても続きから。
+  // 久しぶり(=新しい日/セッション)なら「いま（今の季節・時刻）の窓辺」を開く＝今と地続きの再訪動機（pickNowSceneの日替わり巡回を保つ）。
+  const CONTINUE_MS = 3 * 3600 * 1000
+  const recent = state.sceneId && state.sceneAt && (Date.now() - state.sceneAt) < CONTINUE_MS
+  const lastScene = recent ? SCENES.find((s) => s.id === state.sceneId && s.status === 'ready' && s.public !== false) : null
+  const scene = lastScene || pickNowScene()
   const settings = state.settings
 
   // iPhone特有のズーム（連打＝ダブルタップ拡大／二本指のピンチ拡大）を堅牢に無効化。
