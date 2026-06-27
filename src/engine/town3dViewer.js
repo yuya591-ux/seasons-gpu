@@ -5224,7 +5224,12 @@ export async function mountTown3d(parent, opts = {}) {
       { const gg = [], ng = 5 + ((r / 4) | 0) // 草むら＝縁に沿った小さな草の束（1メッシュへ統合＝瑞々しさを足しても描画+1のみ）
         for (let i = 0; i < ng; i++) { const a = R() * 6.28, rr = r * (0.55 + R() * 0.38), tg = new THREE.ConeGeometry(0.12, 0.5 + R() * 0.45, 4); tg.translate(Math.cos(a) * rr, 1.45, Math.sin(a) * rr); gg.push(tg) }
         if (gg.length && BufferGeometryUtils.mergeGeometries) { const gm = BufferGeometryUtils.mergeGeometries(gg, false); gg.forEach((x) => x.dispose()); if (gm) g.add(new THREE.Mesh(gm, grassC)) } }
-      if (!isNight) for (let i = 0; i < nb + 2; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), tn([0xeef0ee, 0xf0d850, 0xe6a8cc, 0xf0b8d0][(R() * 4) | 0])); fl.position.set(Math.cos(a) * rr, 1.42, Math.sin(a) * rr); g.add(fl) } // 野花の彩り（昼・縁に） // 野花の彩り（昼）
+      if (!isNight) for (let i = 0; i < nb + 2; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), tn([0xeef0ee, 0xf0d850, 0xe6a8cc, 0xf0b8d0][(R() * 4) | 0])); fl.position.set(Math.cos(a) * rr, 1.42, Math.sin(a) * rr); g.add(fl) } // 野花の彩り（昼・縁に）
+      const treeC = tn(isNight ? 0x2c4632 : 0x4a7a48), barkC = tn(isNight ? 0x3a2e26 : 0x5a4634), ntr = r > 14 ? 2 : 1 // 小さな木を外縁(r*0.8以遠＝中央の構造物の外)に。縦の緑で群島のシルエットを豊かに
+      for (let i = 0; i < ntr; i++) { const a = R() * 6.28, rr = r * (0.8 + R() * 0.12), tx = Math.cos(a) * rr, tz = Math.sin(a) * rr, th = 2.4 + R() * 1.6
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.3, th, 6), barkC); trunk.position.set(tx, 1.2 + th / 2, tz); g.add(trunk)
+        const c1 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 + R() * 0.7, 1), treeC); c1.scale.y = 0.95; c1.position.set(tx, 1.2 + th + 0.7, tz); g.add(c1)
+        const c2 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.5, 1), treeC); c2.position.set(tx + (R() - 0.5) * 1.2, 1.2 + th + 0.1, tz + (R() - 0.5) * 1.2); g.add(c2) }
       return g
     }
     const isles = []
