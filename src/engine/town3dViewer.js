@@ -5669,6 +5669,24 @@ export async function mountTown3d(parent, opts = {}) {
       }
       scene.add(bflyG); skyDrifters.push({ o: bflyG, kind: 'butterfly' })
     }
+    // 鶴＝群島の上をゆっくり大きく旋回して滑空する白い鳥のつがい（白い体に黒い翼端・優美な生命の気配）。
+    { const cBody = tn(isNight ? 0xb8c0d0 : 0xf2f0ea), cDark = tn(isNight ? 0x5a6270 : 0x33373c)
+      const buildCrane = (k) => { const g2 = new THREE.Group()
+        const body = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 9), cBody); body.scale.set(2.4 * k, 0.95 * k, 1.0 * k); g2.add(body) // 胴(頭+x)
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.5 * k, 1.6 * k, 6), cBody); tail.rotation.z = Math.PI / 2; tail.position.set(-2.6 * k, 0.1 * k, 0); g2.add(tail)
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * k, 0.22 * k, 2.2 * k, 6), cBody); neck.position.set(2.2 * k, 0.7 * k, 0); neck.rotation.z = -0.7; g2.add(neck)
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.32 * k, 8, 7), cBody); head.position.set(3.1 * k, 1.3 * k, 0); g2.add(head)
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1 * k, 0.6 * k, 5), cDark); beak.rotation.z = -Math.PI / 2; beak.position.set(3.7 * k, 1.3 * k, 0); g2.add(beak)
+        const wings = []
+        for (const sd of [-1, 1]) { const wp = new THREE.Group(); wp.position.set(0, 0.2 * k, sd * 0.5 * k)
+          const w = new THREE.Mesh(new THREE.BoxGeometry(2.4 * k, 0.12 * k, 4.4 * k), cBody); w.position.set(0, 0, sd * 2.4 * k); wp.add(w)
+          const tip = new THREE.Mesh(new THREE.BoxGeometry(1.5 * k, 0.13 * k, 1.4 * k), cDark); tip.position.set(-0.2 * k, 0, sd * 4.5 * k); wp.add(tip) // 黒い翼端
+          g2.add(wp); wings.push({ wp, sd }) }
+        g2.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } })
+        return { g2, wings }
+      }
+      for (let i = 0; i < 2; i++) { const c = buildCrane(1.0 - i * 0.25); scene.add(c.g2); skyDrifters.push({ o: c.g2, kind: 'crane', wings: c.wings, cx: -30, cz: -320, rad: 120 + i * 18, ph: i * 1.3, hy: SEA_Y + 36 - i * 5 }) }
+    }
 
     // ブロッケンの虹輪＝晴れた日に雲海の上を飛ぶと、自分の影を囲む円い虹が雲に映る（実在の現象＝静かな幻想）。
     // 自分の真下（反太陽点に近い）に淡い分光の輪を置き、frameで追従＋高度/昼でフェード。
@@ -8949,6 +8967,12 @@ export async function mountTown3d(parent, opts = {}) {
           b.position.x = u.x0 + Math.sin(t * u.spd + u.ph) * 8
           b.position.z = u.z0 + Math.cos(t * u.spd * 0.8 + u.ph * 1.3) * 8
           b.position.y = u.y0 + Math.sin(t * 0.7 + u.ph) * 2.5 }
+      } else if (d.kind === 'crane') { // 鶴：群島の上をゆっくり旋回滑空、ゆるやかに羽ばたく
+        const ang = t * 0.05 + d.ph
+        d.o.position.set(d.cx + Math.cos(ang) * d.rad, d.hy + Math.sin(t * 0.2 + d.ph) * 2, d.cz + Math.sin(ang) * d.rad)
+        d.o.rotation.y = -ang - Math.PI / 2; d.o.rotation.z = 0.28 // 進行方向へ向き、旋回へ傾ける
+        const flap = Math.sin(t * 2.0 + d.ph) * 0.5
+        for (const w of d.wings) w.wp.rotation.x = -w.sd * (0.12 + flap) // ゆるやかな羽ばたき（主に滑空）
       } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
