@@ -469,6 +469,7 @@ export async function mountTown3d(parent, opts = {}) {
   const GOLD_TOP = skyTop0.clone().multiplyScalar(0.82), GOLD_HOR = skyHor0.clone().lerp(new THREE.Color(0xf2b878), 0.5), GOLD_FOG = baseFogCol.clone().lerp(new THREE.Color(0xe8c79a), 0.42), GOLD_SUN = SUN_COL_O.clone().lerp(new THREE.Color(0xffca96), 0.45)
   const DRIFT_SECS = 1080 // 約18分かけて夕方へ（ごくゆっくり＝眺めるうちにいつの間にか）
   let sunGlow = null // 昼/夕の空の太陽の光輪（彩雲リング付き）。カメラへ追従させて空に置く
+  let sunDisk = null // 太陽の本体（くっきりした円盤＝空の主役。Bloomで芯が発光。光輪の中心に重ね、夕は橙金に大きく）
   let firstStar = null // 一番星: 日の傾き(dd)が深まると空にひとつだけ薄く灯る＝18分の移ろいの「暮れきった一拍」（評価エモ）
   const sunDir = new THREE.Vector3()
   let starMat = null // 夜の星（per-starできらめく）。frameで uT を進める
@@ -513,6 +514,7 @@ export async function mountTown3d(parent, opts = {}) {
     sgr.addColorStop(0.76, 'rgba(255,184,172,0)'); sgx.fillStyle = sgr; sgx.fillRect(0, 0, 128, 128)
     sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(scv), transparent: true, opacity: weather === 'snow' ? 0.58 : 0.92, depthWrite: false, fog: false })) // 雪は窓ごしに白飛びしやすい＝光輪を弱め小さく（暖かいにじみは残す）
     { const sgS = weather === 'snow' ? 124 : 155; sunGlow.scale.set(sgS, sgS, 1); scene.add(sunGlow) }
+    // 太陽の本体（円盤）は duskAmt 定義後（L667付近）でまとめて作る＝TDZ回避。下の「太陽の本体」ブロック参照。
     // 一番星のスプライト（昼ドリフトが深まると上空にひとつ灯る）。夜情景では既存の星空があるので作らない。
     if (!isNight) { const stc = document.createElement('canvas'); stc.width = stc.height = 32; const stx = stc.getContext('2d'); const stg = stx.createRadialGradient(16, 16, 0.4, 16, 16, 10); stg.addColorStop(0, 'rgba(255,255,250,1)'); stg.addColorStop(0.3, 'rgba(232,240,255,0.45)'); stg.addColorStop(1, 'rgba(232,240,255,0)'); stx.fillStyle = stg; stx.fillRect(0, 0, 32, 32)
       firstStar = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(stc), transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); firstStar.scale.set(7, 7, 1); firstStar.visible = false; scene.add(firstStar) }
@@ -657,6 +659,17 @@ export async function mountTown3d(parent, opts = {}) {
   // 灯り度（空の明るさで決める。明るい昼=窓は灯らない／夕暮れ=ほのか／夜=煌々と）
   const skyBright = (skyTop.r + skyTop.g + skyTop.b) / 3
   const duskAmt = Math.min(1, Math.max(0, (0.56 - skyBright) * 2.4))
+  // 太陽の本体＝くっきりした円盤（空の主役）。加算で芯が明るく、Bloomで発光する。夕は橙金に大きく（地平に近い夕陽）。
+  // 光輪 sunGlow は上で作成済み。ここで夕の暖色・拡大を足し、本体の円盤を中心に重ねる（duskAmt 定義後＝TDZ回避）。
+  if (!isNight && sunGlow) {
+    sunGlow.scale.multiplyScalar(1 + duskAmt * 0.32); sunGlow.material.color = new THREE.Color(0xffffff).lerp(new THREE.Color(0xffc070), duskAmt * 0.7) // 夕は光輪が大きく暖色に
+    const dcv = document.createElement('canvas'); dcv.width = dcv.height = 64
+    const ddx = dcv.getContext('2d'); const ddg = ddx.createRadialGradient(32, 32, 0, 32, 32, 32)
+    ddg.addColorStop(0.0, 'rgba(255,253,245,1)'); ddg.addColorStop(0.55, 'rgba(255,248,230,0.97)'); ddg.addColorStop(0.74, 'rgba(255,233,193,0.82)'); ddg.addColorStop(0.93, 'rgba(255,214,150,0)'); ddx.fillStyle = ddg; ddx.fillRect(0, 0, 64, 64)
+    const diskCol = new THREE.Color(0xfffaf0).lerp(new THREE.Color(0xffaa55), duskAmt) // 夕は橙金へ
+    sunDisk = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(dcv), color: diskCol, transparent: true, opacity: weather === 'snow' ? 0.7 : 0.95, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }))
+    const dS = (weather === 'snow' ? 15 : 19) + duskAmt * 17; sunDisk.scale.set(dS, dS, 1); scene.add(sunDisk)
+  }
   const rng = (seed) => { let s = seed * 9301 + 49297; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280 } }
   const R = rng(7)
 
@@ -8484,6 +8497,7 @@ export async function mountTown3d(parent, opts = {}) {
     camera.position.set(camX, camY, camZ)
     if (skyDome) skyDome.position.set(camX, camY, camZ) // 空ドームをカメラへ追従＝拡大世界のどこへ飛んでも空が常に周囲を覆う（黒い虚空を防ぐ）
     if (sunGlow) sunGlow.position.set(camX + sunDir.x * 470, camY + sunDir.y * 470, camZ + sunDir.z * 470) // 太陽の光輪を太陽の向きの空に追従配置
+    if (sunDisk) sunDisk.position.set(camX + sunDir.x * 472, camY + sunDir.y * 472, camZ + sunDir.z * 472) // 太陽の本体（光輪の中心に重ねる）
     if (firstStar) { // 一番星: 日の傾きが0.8を越えると上空にひとつ薄く灯り、淡くまたたく＝「暮れきった一拍」
       const sd = drift.on ? Math.max(0, (drift.t / DRIFT_SECS - 0.8) / 0.2) : 0
       const op = sd * sd * 0.85 * (0.72 + 0.28 * Math.sin(t * 2.1))
@@ -8930,10 +8944,11 @@ export async function mountTown3d(parent, opts = {}) {
       // 遠い時代エリア(原点から640)ではドーム外＝黒い虚空＋星が透けて夜のように写る。撮影前に追従位置を合わせ実機と一致させる。
       const sdP = skyDome && skyDome.position.clone(); if (skyDome) skyDome.position.set(cx, cy, cz)
       const sgP = sunGlow && sunGlow.position.clone(); if (sunGlow) sunGlow.position.set(cx + sunDir.x * 470, cy + sunDir.y * 470, cz + sunDir.z * 470)
+      const sdkP = sunDisk && sunDisk.position.clone(); if (sunDisk) sunDisk.position.set(cx + sunDir.x * 472, cy + sunDir.y * 472, cz + sunDir.z * 472)
       const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, cam)
       const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT)
-      if (skyDome && sdP) skyDome.position.copy(sdP); if (sunGlow && sgP) sunGlow.position.copy(sgP) // 追従位置を元へ戻す
+      if (skyDome && sdP) skyDome.position.copy(sdP); if (sunGlow && sgP) sunGlow.position.copy(sgP); if (sunDisk && sdkP) sunDisk.position.copy(sdkP) // 追従位置を元へ戻す
       const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); const img = x.createImageData(W, H)
       for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); x.putImageData(img, 0, 0); rt.dispose()
       return c.toDataURL()
