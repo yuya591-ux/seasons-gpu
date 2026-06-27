@@ -5332,14 +5332,32 @@ export async function mountTown3d(parent, opts = {}) {
           grp.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); g.add(grp)
         }
         mkSitter(0); mkSitter(3) // 向かい合わぬ二辺に二人＝静かに雲を眺める
-      } else if (n.kind === 'teahouse') {
+      } else if (n.kind === 'teahouse') { // 峠の茶屋＝茅葺の小屋＋暖簾＋緋毛氈の縁台＋茶器＋軒の提灯（雲海を眺めて一服する郷愁）
+        const glowT = isNight || dk > 0.2, woodT = tn(isNight ? 0x5a4636 : 0x6e5640), redT = tn(isNight ? 0x7a2e28 : 0xb2402f)
         const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3.0, 5), tn(isNight ? 0x6a6052 : 0xd8cdb2)); body.position.set(0, GY + 1.5, -1); g.add(body)
         const roof = new THREE.Mesh(new THREE.ConeGeometry(5.4, 3.0, 4), tn(isNight ? 0x4a4236 : 0x8a7a54)); roof.rotation.y = Math.PI / 4; roof.position.set(0, GY + 4.3, -1); g.add(roof) // 茅葺の茶屋
-        const bench = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 1.2), tn(isNight ? 0x5a4636 : 0x6e5640)); bench.position.set(0, GY + 0.9, 3.4); g.add(bench)
-      } else if (n.kind === 'lookout') {
+        const noren = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.0, 0.08), redT); noren.position.set(0, GY + 2.4, 1.55); g.add(noren) // 入口の暖簾
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 1.2), woodT); bench.position.set(0, GY + 0.9, 3.4); g.add(bench) // 縁台
+        for (const lx of [-1.6, 1.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.8, 1.0), woodT); leg.position.set(lx, GY + 0.4, 3.4); g.add(leg) }
+        const felt = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.06, 1.3), redT); felt.position.set(0, GY + 1.13, 3.4); g.add(felt) // 緋毛氈
+        for (const [tx, kind] of [[-1.3, 0], [0.2, 1], [1.3, 0]]) { // 湯のみ／急須（誰かが置いていった一服）
+          if (kind === 0) { const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.18, 8), tn(isNight ? 0x9a9488 : 0xe8e0d2)); cup.position.set(tx, GY + 1.27, 3.4); g.add(cup) }
+          else { const pot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 7), tn(isNight ? 0x4a443c : 0x6a5e4e)); pot.scale.y = 0.8; pot.position.set(tx, GY + 1.33, 3.4); g.add(pot); const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.28, 5), tn(isNight ? 0x4a443c : 0x6a5e4e)); spout.rotation.z = 0.9; spout.position.set(tx + 0.26, GY + 1.36, 3.4); g.add(spout) } }
+        const lpz = 1.8, lant = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.66, 10), new THREE.MeshToonMaterial({ color: isNight ? 0xffcaa0 : 0xf0e0c0, gradientMap: grad, emissive: new THREE.Color(glowT ? 0xff8a3c : 0x000000), emissiveIntensity: glowT ? (isNight ? 1.1 : 0.5) : 0 })); lant.scale.y = 1.2; lant.position.set(2.2, GY + 3.0, lpz); g.add(lant) // 軒の提灯
+        const banner = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.6, 0.06), tn(isNight ? 0x8a8478 : 0xeae2d2)); banner.position.set(-3.4, GY + 2.3, 2.2); g.add(banner) // 「茶」の幟（白い布）
+        const bpole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.0, 5), woodT); bpole.position.set(-3.75, GY + 2.0, 2.2); g.add(bpole)
+      } else if (n.kind === 'lookout') { // 見晴らし台＝雲海へ張り出す欄干＋望遠鏡＋腰かけ＋木（「台」の実体を与え本物の展望地に）
         const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640)
-        const bench = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 1.3), woodMat); bench.position.set(0, GY + 0.9, 3); g.add(bench) // 縁の腰かけ
-        for (const lx of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.1), woodMat); leg.position.set(lx, GY + 0.45, 3); g.add(leg) }
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 1.3), woodMat); bench.position.set(0, GY + 0.9, 1.5); g.add(bench) // 縁の腰かけ（欄干の手前へ）
+        for (const lx of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.1), woodMat); leg.position.set(lx, GY + 0.45, 1.5); g.add(leg) }
+        const railZ = 7.4 // 雲海側へ張り出す欄干（手すり）
+        for (let i = -2; i <= 2; i++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 1.4, 6), woodMat); p.position.set(i * 2.0, GY + 0.7, railZ); g.add(p) }
+        const topRail = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 8.4, 6), woodMat); topRail.rotation.z = Math.PI / 2; topRail.position.set(0, GY + 1.35, railZ); g.add(topRail)
+        const midRail = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 8.4, 6), woodMat); midRail.rotation.z = Math.PI / 2; midRail.position.set(0, GY + 0.85, railZ); g.add(midRail)
+        const teleStand = tn(isNight ? 0x556070 : 0x7a8a9a) // 100円双眼鏡風の望遠鏡＝雲海へ向ける（郷愁）
+        const tpost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.5, 8), teleStand); tpost.position.set(2.6, GY + 0.75, 5.6); g.add(tpost)
+        const tbody = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, 1.4, 10), teleStand); tbody.rotation.x = Math.PI / 2 - 0.5; tbody.position.set(2.6, GY + 1.65, 5.7); g.add(tbody)
+        const teye = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.2, 8), tn(0x33363c)); teye.rotation.x = Math.PI / 2 - 0.5; teye.position.set(2.6, GY + 1.36, 5.18); g.add(teye)
         const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 6, 7), tn(0x5a4636)); tk.position.set(-5, GY + 3, -4); g.add(tk)
         const can = new THREE.Mesh(new THREE.IcosahedronGeometry(4.6, 2), tn(isNight ? 0x2e4a36 : 0x4f7a4e)); can.position.set(-5, GY + 7, -4); can.scale.y = 0.85; g.add(can)
       } else if (n.kind === 'shrine') { // 小さな祠＋鳥居
@@ -5396,6 +5414,12 @@ export async function mountTown3d(parent, opts = {}) {
         const arms = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 0.12), scWood); arms.position.set(0, scTop + 1.6, 0); g.add(arms)
         const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.12), tn(isNight ? 0x6a5550 : 0xb08858)); cloth.position.set(0, scTop + 1.45, 0); g.add(cloth)
         const hat = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.42, 9), tn(isNight ? 0x6a6450 : 0xc4b078)); hat.position.set(0, scTop + 2.2, 0); g.add(hat)
+        // あぜに咲く野花（畦道の郷愁）。各段の縁に沿って小さな花株を点々と（1メッシュ統合）。季節で色が移る。
+        const flG = []
+        for (let k = 0; k < tiers; k++) { const rr = baseR2 - k * step, yT = GY + k * tierH + tierH + 0.2, cnt = 6 - (k > 1 ? 2 : 0)
+          for (let i = 0; i < cnt; i++) { const a = i / cnt * 6.28 + k * 1.1 + 0.3, fr = rr - 0.25, fl = new THREE.SphereGeometry(0.14, 5, 4); fl.translate(Math.cos(a) * fr, yT, Math.sin(a) * fr); flG.push(fl)
+            const stem = new THREE.CylinderGeometry(0.025, 0.025, 0.3, 4); stem.translate(Math.cos(a) * fr, yT - 0.2, Math.sin(a) * fr); flG.push(stem) } }
+        if (flG.length && BufferGeometryUtils.mergeGeometries) { const fm = BufferGeometryUtils.mergeGeometries(flG, false); flG.forEach((x) => x.dispose()); if (fm) g.add(new THREE.Mesh(fm, tn(season === 'autumn' ? 0xc23b2e : (season === 'spring' ? 0xe6a6c4 : 0xe8e0d0)))) } // 秋=彼岸花の赤／春=れんげの桃／他=白い小花
       } else if (n.kind === 'market') { // 無人の灯籠市＝売り手のいない夜店が弧を描き、連なる提灯の暖かな天蓋が灯る（祭りの余韻・逢魔が時の郷愁）
         const glowOn = isNight || dk > 0.2
         const woodM = tn(isNight ? 0x4a3a2c : 0x6e5640), stallRoof = tn(isNight ? 0x6a2e2a : 0xb24a3e), stone = tn(isNight ? 0x55524c : 0x8b867b)
@@ -5416,6 +5440,14 @@ export async function mountTown3d(parent, opts = {}) {
         for (const [pxx, pzz] of poles) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 5.4, 6), woodM); pl.position.set(pxx, GY + 2.7, pzz); g.add(pl) }
         const strand = (ax, az, bx, bz) => { const N = LIGHT ? 5 : 6; for (let i = 1; i < N; i++) { const t = i / N, lx = ax + (bx - ax) * t, lz = az + (bz - az) * t, ly = GY + 5.1 - Math.sin(Math.PI * t) * 1.3; const lan = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 7), lamp); lan.scale.y = 1.25; lan.position.set(lx, ly, lz); g.add(lan) } } // カテナリに連なる提灯
         strand(-7, 2.5, 0, -6.8); strand(0, -6.8, 7, 2.5); strand(7, 2.5, -7, 2.5) // 三辺に灯りの天蓋
+        // 無人の夜店の郷愁＝柱に立てかけた閉じた番傘＋誰もいない床几（人の去った気配）
+        const wagasa = new THREE.Group()
+        const wshaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 6), tn(0x5a4636)); wshaft.position.y = 1.3; wagasa.add(wshaft)
+        const wpaper = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.5, 10), tn(isNight ? 0x8a3a30 : 0xc0503e)); wpaper.position.y = 1.95; wagasa.add(wpaper)
+        wagasa.position.set(-6.5, GY, 2.1); wagasa.rotation.z = 0.34; g.add(wagasa)
+        const shougi = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.7), woodM); shougi.position.set(2.6, GY + 0.5, 4.6); shougi.rotation.y = -0.3; g.add(shougi) // 床几（縁台）
+        for (const lx of [-0.8, 0.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.6), woodM); leg.position.set(2.6 + lx * Math.cos(0.3), GY + 0.25, 4.6 + lx * Math.sin(0.3)); g.add(leg) }
+        const cloth2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.04), stallRoof); cloth2.position.set(2.4, GY + 0.78, 4.5); cloth2.rotation.y = -0.3; g.add(cloth2) // 床几に掛けた緋毛氈
       } else if (n.kind === 'colonnade') { // 眠る石像の回廊＝苔むした石柱の並木道に顔のない石の番人が点々と座る（失われた文明の守り手・安心。IPセーフ＝野仏/磐座）。石/苔/前掛けを各1メッシュに統合
         const stoneMat = tn(isNight ? 0x4e4e4a : 0x8b867b), mossMat = tn(isNight ? 0x33473a : 0x5f7a4c), bibMat = tn(isNight ? 0x7a2e26 : 0xbe3b2e)
         const sGeo = [], mGeo = [], bGeo = []
