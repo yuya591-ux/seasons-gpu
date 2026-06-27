@@ -6686,14 +6686,18 @@ export async function mountTown3d(parent, opts = {}) {
     // 「建物/水を避ける」だけでなく「歩いて出られる開けた所」を選ぶ＝降りた途端に透明の壁で詰まらない。
     // さらに、屋台/門/群衆の際に降りると一人称の前方が近接物で塞がるため、十分に開けた地点を優先する
     // （前方視界の抜けを確保＝降り立った景色を気持ちよく）。16u以上開けた所を見つけたら即採用、無ければ最も開けた所。
-    let best = null, bestClear = -1
+    // フォールバックは「最も開けた所」でなく「開けて かつ 平らな所」を選ぶ＝急斜面の縁に降りて視界が地肌で
+    // 埋まり見下ろしになるのを避ける（特に谷戸＝谷底の平場へ寄せる。テレポートでなく現在地から外へ探す・実機FB）。
+    let best = null, bestScore = -1e9
     const consider = (nx, nz) => {
       if (spawnBad(nx, nz)) return false
-      const c = maxClearAt(nx, nz); if (c > bestClear) { bestClear = c; best = [nx, nz] } // 最も開けた所をフォールバックに保持（従来どおり）
-      // 急斜面の縁に降りると視界が斜面の地肌で埋まる（評価指摘の着地景色の悪化）。前後左右8u先の高低差が小さい平場を「良い着地点」とする。
+      const c = maxClearAt(nx, nz)
+      // 急斜面の縁に降りると視界が斜面の地肌で埋まる（着地景色の悪化）。前後左右8u先の高低差が小さい平場を「良い着地点」とする。
       const h0 = heightAt(nx, nz); let maxRise = 0
       for (const [ox, oz] of [[8, 0], [-8, 0], [0, 8], [0, -8]]) { const dh = Math.abs(heightAt(nx + ox, nz + oz) - h0); if (dh > maxRise) maxRise = dh }
-      return c >= 16 && maxRise < 6 // 抜けがあり かつ 平場（斜面の縁を避ける）＝即採用。無ければ最も開けた所へフォールバック
+      const score = Math.min(c, 24) - maxRise * 2.2 // フォールバック優先度: 開けて(上限24)かつ平らなほど高い＝斜面の縁でなく平場を選ぶ
+      if (score > bestScore) { bestScore = score; best = [nx, nz] }
+      return c >= 16 && maxRise < 4.5 // 抜けがあり かつ 平場（旧6→4.5に厳しく＝斜面を避け谷底/街路の平場へ寄せる）＝即採用
     }
     if (consider(x, z)) return [x, z]
     for (let r = 1.5; r <= 28; r += 1.5) { // 抜けのある所まで少し広く探す（斜面の縁など詰まった所からも開けた景色へ寄せる）
@@ -6702,7 +6706,7 @@ export async function mountTown3d(parent, opts = {}) {
         if (consider(nx, nz)) return [nx, nz]
       }
     }
-    return best || [x, z] // どこも狭ければ、せめて最も開けた所へ
+    return best || [x, z] // どこも条件を満たさなければ、開けて平らな度合いが最も高い所へ
   }
   // 着地時の向き：最も視界の抜ける方向を基本に、街並み(中心)の方へ顔を向ける＝壁/空き地/水面でなく
   // 景色の深い方（街路・ランドマーク）を望む。抜けの距離＋中心へ向く度合いの合算で選ぶ。
