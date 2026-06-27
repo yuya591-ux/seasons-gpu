@@ -5259,10 +5259,11 @@ export async function mountTown3d(parent, opts = {}) {
       { x: -62, z: -270, r: 12, topY: SEA_Y + 24, kind: 'lookout' },  // 見晴らし台
       { x: -2, z: -336, r: 11, topY: SEA_Y + 19, kind: 'shrine' },    // 小さな祠
       { x: 30, z: -256, r: 12, topY: SEA_Y + 21, kind: 'onsen' },     // 雲の温泉（露天＝湯けむり）
+      { x: -84, z: -318, r: 17, topY: SEA_Y + 27, kind: 'ruin' },     // 緑に還る空の社跡（廃墟＋御神木＝静かな驚き。雲海の感情のクライマックス）
     ]
     const cwBridges = []
     const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6, ra: a.r - 1, rb: b.r - 1 }) }
-    link(0, 1); link(0, 2); link(0, 3); link(0, 4) // 中心から各島へ吊り橋
+    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5) // 中心から各島へ吊り橋／見晴らし台から社跡へ渡る
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
       const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
@@ -5335,6 +5336,23 @@ export async function mountTown3d(parent, opts = {}) {
         const kasa = new THREE.Mesh(new THREE.BoxGeometry(tw + 2, 0.7, 1.2), trMat); kasa.position.set(0, GY + th + 0.3, 4); g.add(kasa)
         const hond = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 2.4), tn(isNight ? 0x5a4636 : 0x7a5d44)); hond.position.set(0, GY + 1.7, -2); g.add(hond)
         const hroof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 4), tn(isNight ? 0x3a3f4a : 0x49545f)); hroof.rotation.y = Math.PI / 4; hroof.position.set(0, GY + 3.6, -2); g.add(hroof)
+      } else if (n.kind === 'ruin') { // 緑に還る空の社跡＝苔むした石組みの円遺構＋倒れた鳥居の柱を、巨大な御神木が根で抱く。人はいない、風と水音だけ（IPセーフな独自意匠＝磐座/野仏/御神木）
+        const stone = tn(isNight ? 0x4e4e4a : 0x8b867b), moss = tn(isNight ? 0x33473a : 0x5f7a4c), bark = tn(isNight ? 0x3a2e26 : 0x5a4634), leaf = tn(isNight ? 0x2c4634 : 0x4f7a4a)
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(9, 9.6, 0.7, 16), stone); base.position.y = GY + 0.35; g.add(base) // 崩れた円形の石壇（下段）
+        const tier = new THREE.Mesh(new THREE.CylinderGeometry(6, 6.4, 0.6, 14), stone); tier.position.set(0.6, GY + 0.9, -0.4); g.add(tier) // 上段（少しずれて欠ける）
+        for (let i = 0; i < 5; i++) { const a = R() * 6.28, rr = 3 + R() * 5; const blk = new THREE.Mesh(new THREE.BoxGeometry(0.8 + R() * 1.2, 0.5 + R() * 0.5, 0.8 + R() * 1.2), R() < 0.4 ? moss : stone); blk.position.set(Math.cos(a) * rr, GY + 0.55, Math.sin(a) * rr); blk.rotation.set(R() * 0.3, R() * 6.28, R() * 0.3); g.add(blk) } // 割れた石畳・転がる石
+        const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 6, 8), stone); p1.position.set(-5, GY + 3, 5); p1.rotation.z = 0.08; g.add(p1) // 立ち残った石柱
+        const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 6.5, 8), stone); p2.position.set(5.5, GY + 1.0, 4.2); p2.rotation.z = -1.18; p2.rotation.y = 0.3; g.add(p2) // 倒れた石柱（廃墟）
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.9, 9.5, 9), bark); trunk.position.set(1, GY + 4.6, -2); g.add(trunk) // 御神木の幹
+        for (let i = 0; i < 4; i++) { const a = i / 4 * 6.28 + 0.4; const root = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.55, 4.6, 6), bark); root.position.set(1 + Math.cos(a) * 1.7, GY + 1.1, -2 + Math.sin(a) * 1.7); root.rotation.set(Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55); g.add(root) } // 根が石壇を抱く
+        const canopy = new THREE.Mesh(new THREE.IcosahedronGeometry(6.6, 2), leaf); canopy.position.set(1, GY + 11.2, -2); canopy.scale.set(1.12, 0.92, 1.12); g.add(canopy) // 大きな樹冠
+        const canopy2 = new THREE.Mesh(new THREE.IcosahedronGeometry(3.6, 1), leaf); canopy2.position.set(-3, GY + 9.6, 0.5); g.add(canopy2)
+        for (let i = 0; i < 5; i++) { const a = R() * 6.28, rr = R() * 7.5; const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8 + R() * 0.7, 0), moss); m.position.set(Math.cos(a) * rr, GY + 0.78, Math.sin(a) * rr); m.scale.y = 0.5; g.add(m) } // 苔のむら
+        for (const [gx2, gz2] of [[-6.5, -3], [4.5, 6.5]]) { // 顔のない丸い石の番人（野仏／道祖神＝安心の守り手）
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.95, 1.6, 8), stone); body.position.set(gx2, GY + 0.8, gz2); g.add(body)
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 8), stone); head.position.set(gx2, GY + 1.9, gz2); g.add(head)
+          const moc = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 0), moss); moc.position.set(gx2, GY + 2.28, gz2); moc.scale.y = 0.5; g.add(moc) } // 頭に苔
+        const pool = new THREE.Mesh(new THREE.CircleGeometry(1.9, 18), freshWater(new THREE.MeshToonMaterial({ color: isNight ? 0x33484a : 0x86a8a0, gradientMap: grad, fog: true }))); pool.rotation.x = -Math.PI / 2; pool.position.set(-1.4, GY + 0.46, 2.4); g.add(pool) // 根元から滴る水＝空を映す静かな水鏡
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
         for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
