@@ -5204,8 +5204,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // 夕焼けは雲海のいちばんの見せ場＝頂を茜金、谷を青紫の影に染める（duskで補間）。夜/雪は別色なので染めない。
     const dk = (SNOWY || isNight) ? 0 : duskAmt
-    const seaLowC = new THREE.Color(SNOWY ? 0xccd2dc : (isNight ? 0x636a83 : 0xa9b4c4)).lerp(new THREE.Color(0x8e7896), dk * 0.7).getHex() // 谷の翳り（雲の底＝粒の立体感のため深めの灰青／夕は青紫へ）
-    const seaHighC = new THREE.Color(SNOWY ? 0xe9edf2 : (isNight ? 0xb2b8cc : 0xeee7d6)).lerp(new THREE.Color(0xf0bf8c), dk * 0.72).getHex() // 陽の当たる頂（純白を避けた柔らかいクリーム＝白飛び防止／夕はほのか茜金へ）
+    const seaLowC = new THREE.Color(SNOWY ? 0xccd2dc : (isNight ? 0x6c6678 : 0xa9b4c4)).lerp(new THREE.Color(0x8e7896), dk * 0.7).getHex() // 谷の翳り（雲の底＝粒の立体感のため深めの灰青／夜は鋼青を脱し少し温かいすみれ灰／夕は青紫へ）
+    const seaHighC = new THREE.Color(SNOWY ? 0xe9edf2 : (isNight ? 0xbcb6c2 : 0xeee7d6)).lerp(new THREE.Color(0xf0bf8c), dk * 0.72).getHex() // 陽/月の当たる頂（純白を避けた柔らかいクリーム＝白飛び防止／夜は冷たすぎない月銀／夕はほのか茜金へ）
     // 群島（鳥居・五重塔・御神木・茅葺き）。それぞれ違うシルエットの発見。雲海をくぼませて据える。
     const isleGrass = isNight ? 0x3a5642 : 0x6f9a5c, isleRock = isNight ? 0x484540 : 0x7b6f60
     const tn = (col) => new THREE.MeshToonMaterial({ color: col, gradientMap: grad })
@@ -5368,18 +5368,22 @@ export async function mountTown3d(parent, opts = {}) {
     seaUni = { uTime: { value: 0 } }
     const seaSunDir = sun.position.clone().normalize()
     const seaSunCol = new THREE.Color(isNight ? 0x9fb0d8 : 0xfff2d8).lerp(new THREE.Color(0xffc070), dk)
+    // 雲海に灯る暖かい光のにじみ＝谷(暗部)ほど琥珀色が灯る「街明かりが雲を染める」郷愁。夜が最強＝帰ってきた心地、朝夕は金、昼は控えめ。
+    const seaWarm = new THREE.Color(isNight ? 0xffba7c : 0xffd49c)
+    const seaWarmAmt = isNight ? 0.26 : (0.05 + dk * 0.18)
     const applySeaShader = (mat) => {
       mat.onBeforeCompile = (sh) => {
         sh.uniforms.uTime = seaUni.uTime
         sh.uniforms.uSunDir = { value: seaSunDir }
         sh.uniforms.uSunCol = { value: seaSunCol }
         sh.uniforms.uSeaR = { value: seaR }
+        sh.uniforms.uWarm = { value: seaWarm }; sh.uniforms.uWarmAmt = { value: seaWarmAmt }
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', '#include <common>\nuniform float uTime; varying vec3 vSeaN; varying float vSeaC;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\n  float _wx = transformed.x, _wz = transformed.z;\n  float _p1 = _wx*0.020 + uTime*0.16, _p2 = _wz*0.024 - uTime*0.12, _p3 = (_wx+_wz)*0.012 + uTime*0.08;\n  transformed.y += sin(_p1)*cos(_p2)*3.0 + sin(_p3)*1.8;\n  float _dx = 0.020*cos(_p1)*cos(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  float _dz = -0.024*sin(_p1)*sin(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  vSeaN = normalize(vec3(-_dx, 1.0, -_dz));\n  vSeaC = length((modelMatrix * vec4(transformed,1.0)).xz);')
         sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uSeaR; varying vec3 vSeaN; varying float vSeaC;')
-          .replace('#include <dithering_fragment>', '  float _ndl = dot(normalize(vSeaN), uSunDir);\n  gl_FragColor.rgb *= (0.90 + smoothstep(-0.2, 0.7, _ndl) * 0.10);\n  gl_FragColor.rgb += uSunCol * pow(max(_ndl, 0.0), 10.0) * 0.05;\n  gl_FragColor.a *= 1.0 - smoothstep(uSeaR*0.80, uSeaR*0.998, vSeaC);\n#include <dithering_fragment>')
+          .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uSeaR; uniform vec3 uWarm; uniform float uWarmAmt; varying vec3 vSeaN; varying float vSeaC;')
+          .replace('#include <dithering_fragment>', '  float _ndl = dot(normalize(vSeaN), uSunDir);\n  gl_FragColor.rgb *= (0.90 + smoothstep(-0.2, 0.7, _ndl) * 0.10);\n  gl_FragColor.rgb += uSunCol * pow(max(_ndl, 0.0), 10.0) * 0.05;\n  float _lum = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, uWarm, uWarmAmt * (0.45 + 0.55 * (1.0 - clamp(_lum, 0.0, 1.0))));\n  gl_FragColor.a *= 1.0 - smoothstep(uSeaR*0.80, uSeaR*0.998, vSeaC);\n#include <dithering_fragment>')
       }
       mat.customProgramCacheKey = () => 'cloudsea'
       return mat
@@ -5509,15 +5513,17 @@ export async function mountTown3d(parent, opts = {}) {
     const dctx = dotCv.getContext('2d'), dgr = dctx.createRadialGradient(32, 32, 0, 32, 32, 32)
     dgr.addColorStop(0, 'rgba(255,232,194,0.95)'); dgr.addColorStop(1, 'rgba(255,232,194,0)'); dctx.fillStyle = dgr; dctx.fillRect(0, 0, 64, 64)
     const dotTex = new THREE.CanvasTexture(dotCv)
-    const lanternMat = new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xeadcc0, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0xe8c79a), emissiveIntensity: isNight ? 1.0 : 0.28 })
-    for (let i = 0; i < (LIGHT ? 7 : 13); i++) {
+    const lanternGlow = isNight || dk > 0.25 // 夜・夕は灯がともる（暖かい・懐かしい灯り）
+    const lanternMat = new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xeadcc0, gradientMap: grad, emissive: new THREE.Color(isNight ? 0xff9c4e : 0xe8c79a), emissiveIntensity: isNight ? 1.0 : (lanternGlow ? 0.5 : 0.28) })
+    for (let i = 0; i < (LIGHT ? 10 : 18); i++) { // 増量＝雲海に灯がいくつも漂う賑わい（きらびやか）。上空は街が隠れ描画予算に余裕。
       const g = new THREE.Group()
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.74, 1.9, 8), lanternMat); g.add(body)
       const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.95, 0.5, 8), lanternMat); cap.position.y = 1.2; g.add(cap)
-      if (isNight) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: 0xffba66, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: true })); gl.scale.set(3.4, 3.4, 1); gl.position.y = 0.3; g.add(gl) }
-      const cx = 20 + (R() - 0.5) * 150, cz = -320 + (R() - 0.5) * 130, by = SEA_Y + 8 + R() * 40 // ゆるくまとまった群れ（天灯の放たれた一群）
+      let glowSprite = null
+      if (lanternGlow) { glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: isNight ? 0xffba66 : 0xffc98a, transparent: true, opacity: isNight ? 0.82 : 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: true })); glowSprite.scale.set(3.6, 3.6, 1); glowSprite.position.y = 0.3; g.add(glowSprite) }
+      const cx = 20 + (R() - 0.5) * 180, cz = -310 + (R() - 0.5) * 170, by = SEA_Y + 6 + R() * 46 // ゆるくまとまった群れ（天灯の放たれた一群）。少し広く散らす
       g.position.set(cx, by, cz)
-      g.userData = { ph: R() * 6.28, sway: 0.6 + R() * 0.5, rise: 0.5 + R() * 0.6, baseX: cx, baseZ: cz }
+      g.userData = { ph: R() * 6.28, sway: 0.6 + R() * 0.5, rise: 0.5 + R() * 0.6, baseX: cx, baseZ: cz, glow: glowSprite, glowBase: glowSprite ? glowSprite.material.opacity : 0 }
       scene.add(g); skyDrifters.push({ o: g, kind: 'lantern' })
     }
 
@@ -8767,11 +8773,12 @@ export async function mountTown3d(parent, opts = {}) {
           sp.position.set(u.x0 + Math.sin(u.ph * 6.28 + u.x0) * 1.3, 0.4 + h, u.z0)
           sp.material.opacity = Math.sin(u.ph * Math.PI) * 0.4
           const sc = 2.6 + u.ph * 3.4; sp.scale.set(sc, sc * 1.15, 1) }
-      } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す
+      } else { // 灯籠：ゆっくり昇りつつ揺れ、上端で下から湧き直す。灯はゆるく瞬く（炎のゆらめき＝懐かしい灯り）
         const u = d.o.userData
         d.o.position.y += u.rise * dt; if (d.o.position.y > SEA_Y + 58) d.o.position.y = SEA_Y + 4
         d.o.position.x = u.baseX + Math.sin(t * 0.3 + u.ph) * u.sway
         d.o.position.z = u.baseZ + Math.cos(t * 0.24 + u.ph) * u.sway
+        if (u.glow) u.glow.material.opacity = u.glowBase * (0.72 + 0.28 * Math.sin(t * 1.6 + u.ph)) // ゆるい瞬き
       }
     }
     if (cloudHi !== lastCloudHi) { lastCloudHi = cloudHi; for (const o of cloudObjs) o.visible = cloudHi } // 低空では雲海の静的要素も一括で隠す（描画コール節約・見た目は霧で不変）
