@@ -5386,6 +5386,17 @@ export async function mountTown3d(parent, opts = {}) {
     const seaMerged = BufferGeometryUtils.mergeGeometries(seaGeos, false); seaGeos.forEach((g) => g.dispose())
     if (seaMerged) cloudSeaG.add(new THREE.Mesh(seaMerged, seaMat))
     scene.add(cloudSeaG); cloudSea = cloudSeaG
+    // 高層の巻雲ヴェール＝雲海のはるか上をゆっくり流れる薄い筋雲。雲海(下層)と巻雲(上層)の二層で空に奥行きを出す。
+    { const ciCv = document.createElement('canvas'); ciCv.width = ciCv.height = 256
+      const cictx = ciCv.getContext('2d'); cictx.clearRect(0, 0, 256, 256)
+      for (let i = 0; i < 22; i++) { const cx = R() * 256, cy = R() * 256, cw = 40 + R() * 150, ch = 2 + R() * 5, ca = 0.05 + R() * 0.11
+        const lg = cictx.createLinearGradient(cx, 0, cx + cw, 0); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,' + ca.toFixed(3) + ')'); lg.addColorStop(1, 'rgba(255,255,255,0)')
+        cictx.fillStyle = lg; cictx.fillRect(cx, cy, cw, ch) }
+      const ciTex = new THREE.CanvasTexture(ciCv); ciTex.wrapS = ciTex.wrapT = THREE.RepeatWrapping; ciTex.repeat.set(3, 3)
+      const cirrus = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100), new THREE.MeshBasicMaterial({ map: ciTex, color: new THREE.Color(isNight ? 0x8a93ad : 0xffffff).lerp(new THREE.Color(0xffce9c), dk * 0.5), transparent: true, opacity: 0, depthWrite: false, fog: false }))
+      cirrus.rotation.x = -Math.PI / 2; cirrus.position.set(0, SEA_Y + 38, -120)
+      scene.add(cirrus); skyDrifters.push({ o: cirrus, kind: 'cirrus', mat: cirrus.material })
+    }
     // 入道雲＝雲海から雄大に立ち上がる積乱雲（トゥーンで陽の当たる面/翳る面が出て、もくもくの塊が立体に）。
     // 上層=陽の当たる白(cloudMat)／下層=翳る雲底(cloudBot) の2メッシュに統合。最高高度を越えて聳える＝縫って飛ぶ道標。
     const towerTop = [], towerBot = []
@@ -8695,6 +8706,9 @@ export async function mountTown3d(parent, opts = {}) {
             else { const e = Math.sin(d.spoutA * Math.PI), rise = d.spoutA * d.spoutA; d.spout.material.opacity = e * 0.62; d.spout.position.set(13, 7.5 + rise * 4, 0); d.spout.scale.set(3.4 + d.spoutA * 3.2, 6 + d.spoutA * 12, 1) } } // 後半ほど上へ立ちのぼり細く高く伸びて散る
           else if (t >= d.spoutT && d.diveA === 0) { d.spoutT = t + 6 + R() * 7; d.spoutA = 0.001 } // 6〜13秒ごと（潜行中は吹かない）
         }
+      } else if (d.kind === 'cirrus') { // 高層の巻雲ヴェール：高度でフェードしつつ texture をゆっくり流す（雲海の上に層の奥行き）
+        d.mat.opacity = cloudReveal * 0.34
+        if (d.mat.map) d.mat.map.offset.x = (t * 0.004) % 1
       } else if (d.kind === 'flock') { // 渡りの群れ：ゆっくり+Xへ渡り、端で戻る。羽ばたき＋たゆたい
         d.o.position.x += 3.0 * dt; if (d.o.position.x > 360) d.o.position.x = -360
         d.o.position.y = d.o.userData.baseY + Math.sin(t * 0.22) * 1.6
