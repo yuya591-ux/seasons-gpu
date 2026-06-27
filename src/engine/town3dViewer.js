@@ -7364,6 +7364,20 @@ export async function mountTown3d(parent, opts = {}) {
     for (const ch of moved) grp.add(ch) // 群へ移す（位置は原点群なので不変）。merged済の地物(position原点)は対象外＝常時描画のまま（数個なので軽い）
     if (moved.length) eraCull.push({ grp, cx: ec.c.x, cz: ec.c.z, r: ec.r, vis: true })
   }
+  // ── 遠景ランドマークの誘い：時代エリアに地平で淡く灯る光の標(ビーコン)。飛行中に遠くから気配で誘い、近づくと消える。
+  //    矢印UIでなく光の柱で「あそこへ行ってみよう」を生む（プロデューサー: 到達導線が長すぎ城下町に一度も到達せず離脱）。
+  //    距離カリングされる時代の街とは別に scene へ置く＝街が霞で消えていても標だけは灯って渡りを誘う。──
+  const beacons = []
+  if (kind !== 'yato') {
+    const bc = document.createElement('canvas'); bc.width = 32; bc.height = 96; const bgx = bc.getContext('2d')
+    for (let y = 0; y < 96; y++) { const a = Math.pow(1 - y / 96, 1.4) * 0.9, grd = bgx.createLinearGradient(0, y, 32, y); grd.addColorStop(0, 'rgba(255,255,255,0)'); grd.addColorStop(0.5, `rgba(255,248,236,${a})`); grd.addColorStop(1, 'rgba(255,255,255,0)'); bgx.fillStyle = grd; bgx.fillRect(0, y, 32, 1) } // 下ほど濃く上へ淡い光柱
+    const beaconTex = new THREE.CanvasTexture(bc)
+    for (const [c, tint] of [[EDO, 0xffd8a0], [SENGOKU, 0xbcc8e0], [TAISHO, 0xf0c4a4]]) {
+      const gy = Math.max(heightAt(c.x, c.z), SEA.level)
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: beaconTex, color: tint, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }))
+      m.scale.set(11, 70, 1); m.position.set(c.x, gy + 32, c.z); m.renderOrder = -0.5; m.visible = false; scene.add(m); beacons.push({ m, x: c.x, z: c.z })
+    }
+  }
 
   // 高速時の速度感（風の手応え）。画面の縁がそっと締まり、視界が前へ吸い込まれる映画的なヴィネット。
   // 明るい水彩の空に“流れる白線”は埋もれて出ない／強いとゲーム臭くなるため、縁の締まりで速さを伝える。
@@ -7523,6 +7537,10 @@ export async function mountTown3d(parent, opts = {}) {
     // 固定330で切ると、大きな島(半径〜240)の中心が330でも近縁は90u＝霧の手前で鮮明なまま現れ「ポップ」した（評価エモ指摘）。
     // fog.far基準にすると、縁が霧で完全に溶けた所で切替＝見た目の瞬断が消え、近づくと霞からゆっくり立ち現れる（現代home建物と同じ方式）。
     for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz) - e.r; const ff = scene.fog.far; const want = d < (e.vis ? ff + 30 : ff); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
+    // 遠景ランドマークの誘い: 飛行中、遠いほど淡く灯り近づくと消える光の標＝渡りの目印（窓辺/着地では消す）。
+    if (beacons.length) { const fa = active.flyP || 0, fp = active.flyPos
+      for (const b of beacons) { const d = Math.hypot(fp.x - b.x, fp.z - b.z), op = fa * 0.36 * Math.max(0, Math.min(1, (d - 70) / 120))
+        b.m.visible = op > 0.012; if (b.m.visible) b.m.material.opacity = op * (0.82 + 0.18 * Math.sin(t * 0.7 + b.x * 0.01)) } } // 遠いほど灯り、近づく(70u以内)と消える＝着いたら役目を終える
     // いまの居場所をそっと伝える（飛行/歩行中の迷子防止）。窓辺は空文字＝表示を消す。変化時だけ通知。
     { let loc = ''
       if (active.mode !== 'window') {
