@@ -7419,10 +7419,14 @@ export async function mountTown3d(parent, opts = {}) {
     const rmat = new THREE.LineBasicMaterial({ color: 0xc8d6e4, transparent: true, opacity: 0.6, fog: true, depthWrite: false })
     const rseg = new THREE.LineSegments(rgeo, rmat); rseg.frustumCulled = false; scene.add(rseg)
     scene.fog.far *= 0.88 // 雨で奥がけむる
+    // 雲海より上に出ると雨がやむ＝雲の上は晴れ。雲の層(基準面SEA_Y=88・雲頂~110)を抜ける高度帯でやわらかく消える。
+    // 下界(y≦76)では満雨、雲を抜けた島の高さ(y≧108)で晴れ。窓辺/地上(非飛行)では常に降る。
+    function rainAlt(a) { if (!a.fly) return 1; const t = Math.max(0, Math.min(1, (SEA_Y + 20 - a.y) / 32)); return t * t * (3 - 2 * t) }
     addFx({
       update: (age, dt) => {
         for (let i = 0; i < N; i++) { head[i * 3 + 1] -= spd[i] * dt; head[i * 3] += 4 * dt; if (head[i * 3 + 1] < -14) { head[i * 3 + 1] = 80 + R() * 16; head[i * 3] = (R() - 0.5) * 150 } }
         const a = evAnchor(), ax = a.x, ay = a.fly ? a.y - 47 : 0, az = a.z // 飛行/歩行中は“自分”を中心に雨が追従
+        const ra = rainAlt(a); rmat.opacity = 0.6 * ra; rseg.visible = ra > 0.01 // 雲海の上＝雨脚を消す
         for (let i = 0; i < N; i++) { const h = i * 3, p = i * 6; pos[p] = head[h] + ax; pos[p + 1] = head[h + 1] + ay; pos[p + 2] = head[h + 2] + az; pos[p + 3] = head[h] + ax + 0.6; pos[p + 4] = head[h + 1] + ay - len; pos[p + 5] = head[h + 2] + az }
         rgeo.attributes.position.needsUpdate = true; return true
       },
@@ -7442,7 +7446,7 @@ export async function mountTown3d(parent, opts = {}) {
     })
     const wpts = new THREE.Points(wgeo, wmat); wpts.frustumCulled = false; scene.add(wpts)
     addFx({ update: (age) => { wmat.uniforms.uT.value = age
-      const a = evAnchor()
+      const a = evAnchor(); const ra = rainAlt(a); wmat.uniforms.uOp.value = 0.5 * ra; wpts.visible = ra > 0.01 // 雲海の上＝濡れた路面のきらめきも消す
       for (let i = 0; i < M; i++) { const wx = a.x + wloc[i * 2], wz = a.z + wloc[i * 2 + 1]; wpos[i * 3] = wx; wpos[i * 3 + 1] = heightAt(wx, wz) + 0.12; wpos[i * 3 + 2] = wz }
       wgeo.attributes.position.needsUpdate = true; return true
     }, cleanup: () => { scene.remove(wpts); wgeo.dispose(); wmat.dispose() } })
@@ -7450,9 +7454,9 @@ export async function mountTown3d(parent, opts = {}) {
     const RIP = 16, rips = []
     for (let i = 0; i < RIP; i++) { const rg = new THREE.RingGeometry(0.42, 0.5, 16); rg.rotateX(-Math.PI / 2); const rm = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: isNight ? 0xc8dcec : 0xd6e4ee, transparent: true, opacity: 0, depthWrite: false, fog: true })); rm.visible = false; rm.userData = { t: R() * 1.6, life: 0 }; scene.add(rm); rips.push(rm) }
     addFx({ update: (age, dt) => {
-      const a = evAnchor()
+      const a = evAnchor(); const ra = rainAlt(a) // 雲海の上＝波紋を生まない（既に広がり中の輪は寿命まで残す）
       for (const rm of rips) { const u = rm.userData; u.t -= dt
-        if (u.t <= 0) { const wx = a.x + (R() - 0.5) * 24, wz = a.z + (R() - 0.5) * 26; rm.position.set(wx, heightAt(wx, wz) + 0.06, wz); rm.scale.setScalar(0.25); rm.material.opacity = 0.5; rm.visible = true; u.t = 0.7 + R() * 1.3; u.life = 0 }
+        if (u.t <= 0) { if (ra > 0.35) { const wx = a.x + (R() - 0.5) * 24, wz = a.z + (R() - 0.5) * 26; rm.position.set(wx, heightAt(wx, wz) + 0.06, wz); rm.scale.setScalar(0.25); rm.material.opacity = 0.5 * ra; rm.visible = true; u.life = 0 } u.t = 0.7 + R() * 1.3 }
         if (rm.visible) { u.life += dt; const f = u.life / 0.7; if (f >= 1) rm.visible = false; else { rm.scale.setScalar(0.25 + f * 1.5); rm.material.opacity = (1 - f) * 0.5 } }
       }
       return true
