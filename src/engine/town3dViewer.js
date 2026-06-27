@@ -3897,7 +3897,8 @@ export async function mountTown3d(parent, opts = {}) {
         // ── 棚田（西の尾根の谷側斜面に、等高線に沿って段々に連なる水田）。段に高さをスナップして水平な田を連ね、
         //    谷側に石の畦(擁壁)を立てる＝バラけた板でなく「階段状に揃う棚田」。夏春は水鏡、秋は刈田、冬は雪。統合で軽量。 ──
         { const isWaterSeason = season === 'summer' || season === 'spring'
-          const padWaterMat = new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8ab0b4), fog: true }) // 水鏡（空を映す水田）
+          // freshWaterで空を映すフレネル反射を載せる＝不透明なベタ青の板("青三角")を脱し、homeの棚田と同じ空を映す水鏡に（評価アート①-c）。
+          const padWaterMat = freshWater(new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8ab0b4), fog: true })) // 水鏡（空を映す水田）
           const padGreenMat = toon(season === 'autumn' ? 0xbfa850 : season === 'winter' ? 0xdfe4e6 : 0x6f9450) // 青田/刈田/雪田
           const wallM = toon(season === 'winter' ? 0xc6c8c2 : 0x6f6552)
           const padWG = [], padGG = [], wallG = [], pM = new THREE.Matrix4()
