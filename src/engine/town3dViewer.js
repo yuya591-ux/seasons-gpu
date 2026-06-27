@@ -684,28 +684,39 @@ export async function mountTown3d(parent, opts = {}) {
   let critters = [] // 舞う蝶/蜻蛉（frameでふわふわ）＝街/季節ごとの生きもの
   let seaTex = null // 海面テクスチャ（さざ波をスクロールさせ動く水面に）
   let seaUniforms = null // 海面シェーダーの時間（うねり・きらめき）
+  // 水面の太陽きらめき（向き・色）。波の法線が太陽を眼へ反射する所だけ細かく輝く「きらめきの道」に使う。静的＝frame負荷ゼロ。
+  const glintDir = sun.position.clone().normalize()
+  const glintCol = new THREE.Color(isNight ? 0x5a6e92 : (weather === 'snow' ? 0xe8eef6 : 0xfff0d2)).lerp(new THREE.Color(0xffc888), (isNight || weather === 'snow') ? 0 : duskAmt) // 昼=暖白／夕=金／夜=淡い月明かり
   // 川・池・水路のきらめき（淡い真水の水面のゆらぎ＝歩いて水辺で映える。海より細かく穏やか）。共有uniformをframeで進める。
   const freshUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() }, uSky2: { value: skyTop.clone() } } // uSky=地平の色/uSky2=天頂の色。映り込みを縦グラデにする(地平=暖/天頂=空)＝単色の板を脱す。frameで日の傾きに追従
   const freshWater = (mat) => {
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = freshUniforms.uTime
       sh.uniforms.uSkyF = freshUniforms.uSky; sh.uniforms.uSky2F = freshUniforms.uSky2 // 共有＝frameで日の傾きに追従（静的な空グラデに動く反射＋時刻で水も染まる）
+      sh.uniforms.uGlintDir = { value: glintDir }; sh.uniforms.uGlintCol = { value: glintCol } // 太陽きらめきの道（静的）
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPosF;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPosF = (modelMatrix * vec4(transformed, 1.0)).xyz;')
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSkyF;\nuniform vec3 uSky2F;\nvarying vec3 vWPosF;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSkyF;\nuniform vec3 uSky2F;\nuniform vec3 uGlintDir;\nuniform vec3 uGlintCol;\nvarying vec3 vWPosF;')
         .replace('#include <map_fragment>', `#include <map_fragment>
           float phf = uTime;
           float rp = sin(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + sin(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.4 * sin((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.82, smoothstep(0.55, 1.5, -rp) * 0.30); // 谷はほのかに沈む（沈め過ぎない）
-          diffuseColor.rgb += vec3(1.0, 0.98, 0.9) * smoothstep(0.74, 1.4, rp) * 0.16; // 細かな陽のきらめき
+          diffuseColor.rgb += vec3(1.0, 0.98, 0.9) * smoothstep(0.74, 1.4, rp) * 0.08; // 細かな陽のきらめき（控えめ＝下の鏡面きらめきと二重にしない）
           // 空の映り込み（フレネル）＝視線が浅い水面ほど空を映す。さざ波で映りの境を揺らす（ベタ塗りの板を脱す）。
           vec3 vDirF = normalize(cameraPosition - vWPosF);
           float grazeF = 1.0 - clamp(vDirF.y + rp * 0.05, 0.0, 1.0);
           float fresF = pow(grazeF, 4.0);
           vec3 reflF = mix(uSky2F, uSkyF, grazeF); // 視線が浅い(遠い水面)ほど地平の暖色、見下ろすほど天頂の空色＝縦グラデの映り込み
           diffuseColor.rgb = mix(diffuseColor.rgb, reflF, fresF * 0.34);
+          // 太陽へ向かう鏡面のきらめき＝波の法線が太陽を眼へ反射する所だけ細かくちらつく「きらめきの道」（小さな高輝度点＝Bloomが映え白飛びしない）。
+          float dRxF = 0.85 * cos(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + 0.5 * cos((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
+          float dRzF = 0.7 * cos(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.5 * cos((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
+          vec3 nWF = normalize(vec3(-dRxF * 0.14, 1.0, -dRzF * 0.14));
+          float specF = pow(max(dot(nWF, normalize(vDirF + uGlintDir)), 0.0), 80.0);
+          float twF = 0.5 + 0.5 * sin(vWPosF.x * 5.3 + vWPosF.z * 4.7 + phf * 5.5);
+          diffuseColor.rgb += uGlintCol * specF * twF;
         `)
     }
     mat.customProgramCacheKey = () => 'freshWater'
@@ -3245,11 +3256,12 @@ export async function mountTown3d(parent, opts = {}) {
         sh.uniforms.uTime = seaUniforms.uTime
         sh.uniforms.uSky = seaUniforms.uSky
         sh.uniforms.uSky2 = seaUniforms.uSky2
+        sh.uniforms.uGlintDir = { value: glintDir }; sh.uniforms.uGlintCol = { value: glintCol } // 太陽きらめきの道（静的）
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
         sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSky;\nuniform vec3 uSky2;\nvarying vec3 vWPos;')
+          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSky;\nuniform vec3 uSky2;\nuniform vec3 uGlintDir;\nuniform vec3 uGlintCol;\nvarying vec3 vWPos;')
           .replace('#include <map_fragment>', `#include <map_fragment>
             float ph = uTime;
             // 大きなうねり＋斜めのさざ波（複数周波の和＝規則的すぎない水面）
@@ -3271,11 +3283,13 @@ export async function mountTown3d(parent, opts = {}) {
             // 縦グラデ＝近く（見下ろし）は天頂の色、遠く（浅い視線）は地平の色。塗りの板でなく空を映す水面。
             vec3 refl = mix(uSky2, uSky, graze);
             diffuseColor.rgb = mix(diffuseColor.rgb, refl, fres * 0.5);
-            // 水平線まわりのきらめき（カメラから遠い帯でちらちら＝夕日の道のような輝き）
-            float dC = distance(vWPos.xz, cameraPosition.xz);
-            float band = smoothstep(170.0, 360.0, dC) * (1.0 - smoothstep(470.0, 650.0, dC));
-            float gl = 0.5 + 0.5 * sin(vWPos.x * 0.55 + vWPos.z * 0.28 + ph * 4.2);
-            diffuseColor.rgb += vec3(1.0, 0.96, 0.85) * band * pow(gl, 4.0) * 0.4;
+            // 太陽へ向かう、きらめきの道＝波の法線が太陽を眼へ反射する筋だけ細かく輝く（夕日の道）。小さな高輝度点＝Bloomが映え白飛びしない。
+            float dSx = 0.045 * cos(vWPos.x * 0.045 + ph * 0.7) * 0.5 + 0.085 * cos((vWPos.x + vWPos.z) * 0.085 + ph * 1.1);
+            float dSz = 0.035 * cos(vWPos.z * 0.035 - ph * 0.5) * 0.5 + 0.085 * cos((vWPos.x + vWPos.z) * 0.085 + ph * 1.1) + 0.16 * 0.4 * cos(vWPos.z * 0.16 - ph * 1.7);
+            vec3 nW = normalize(vec3(-dSx * 3.0, 1.0, -dSz * 3.0));
+            float specS = pow(max(dot(nW, normalize(vDir + uGlintDir)), 0.0), 60.0);
+            float twS = 0.5 + 0.5 * sin(vWPos.x * 0.5 + vWPos.z * 0.42 + ph * 5.0);
+            diffuseColor.rgb += uGlintCol * specS * twS;
           `)
       }
       const seaMesh = new THREE.Mesh(seaGeo, seaMat)
