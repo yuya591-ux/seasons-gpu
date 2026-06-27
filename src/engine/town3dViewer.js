@@ -1154,6 +1154,7 @@ export async function mountTown3d(parent, opts = {}) {
   // 足元に薄い影の円を敷いて接地させる＝浮き感を消す（評価アート「接地影は最強のコスパ」）。多数を1メッシュへ統合＝描画コール+1。
   const csCv = document.createElement('canvas'); csCv.width = csCv.height = 64; const csx = csCv.getContext('2d'); const csGr = csx.createRadialGradient(32, 32, 1, 32, 32, 32); csGr.addColorStop(0, 'rgba(0,0,0,0.85)'); csGr.addColorStop(0.55, 'rgba(0,0,0,0.4)'); csGr.addColorStop(1, 'rgba(0,0,0,0)'); csx.fillStyle = csGr; csx.fillRect(0, 0, 64, 64); const contactShadowTex = new THREE.CanvasTexture(csCv)
   const contactShadowMat = new THREE.MeshBasicMaterial({ map: contactShadowTex, transparent: true, opacity: 0.5, depthWrite: false, fog: true, color: 0x000000 })
+  const crowdShadowGeo = new THREE.PlaneGeometry(1.5, 1.5) // 群衆(mkCrowdPerson)の足元影＝メッシュの子に付けて移動/回転に追従（円なので回転不問）
   const addContactShadows = (specs) => { // specs: [[x, groundY, z, radius], ...] を1メッシュへ
     if (!specs.length || !BufferGeometryUtils.mergeGeometries) return
     const geos = []
@@ -1203,6 +1204,9 @@ export async function mountTown3d(parent, opts = {}) {
     if (!BufferGeometryUtils.mergeGeometries) return
     const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
     const mesh = new THREE.Mesh(m, crowdMat); mesh.position.set(px, py, pz); mesh.rotation.y = R() * 6.28; mesh.scale.setScalar(sc); mesh.castShadow = true; town.add(mesh)
+    // 接地影: 静的影は原点±60しか焼かない＝時代エリア(遠い)の群衆は影が無く宙に浮く。足元に柔らかい影の円を「メッシュの子」で付け、
+    // 移動(cityWalkers)にも追従させる(円なので回転は不問)。原点近く(home)は実影があるので付けない＝二重で濃くならない・描画コールも増やさない。
+    if (Math.hypot(px, pz) > 58) { const csh = new THREE.Mesh(crowdShadowGeo, contactShadowMat); csh.rotation.x = -Math.PI / 2; csh.position.y = 0.05; csh.renderOrder = 3; mesh.add(csh) }
     return mesh // 動く旅人(cityWalkers)等が参照して動かせるよう返す
   }
   const makeFestival = (fx, fz, sc = 1) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）
