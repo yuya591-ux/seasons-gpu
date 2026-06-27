@@ -442,7 +442,9 @@ export function createAudio(opts) {
   const festState = { amt: 0 }
   function startFestival() {
     if (!ctx || festNode || !ctx.createBufferSource) return
-    const fg = ctx.createGain(); fg.gain.value = 0; fg.connect(master)                    // 祭り全体の音量（近さで満ち引き＝離れたら無音）
+    const fg = ctx.createGain(); fg.gain.value = 0                    // 祭り全体の音量（近さで満ち引き＝離れたら無音）
+    const fPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null // 空間音: 会場の方角へ定位＝飛びながら横を抜けると囃子が左右へ流れる（評価サウンド: 音源の定位）
+    if (fPan) fg.connect(fPan).connect(master); else fg.connect(master)
     const bright = ctx.createBiquadFilter(); bright.type = 'lowpass'; bright.frequency.value = 650; bright.Q.value = 0.5; bright.connect(fg) // 笛/鉦の明るさ（遠=こもる→近=澄む）
     // ざわめき（祭りの人声・常時）
     const len = Math.floor(6 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0) // 2秒→6秒で周期感を消す（評価サウンド）
@@ -452,7 +454,7 @@ export function createAudio(opts) {
     const mbp = ctx.createBiquadFilter(); mbp.type = 'bandpass'; mbp.frequency.value = 700; mbp.Q.value = 0.7
     const mg = ctx.createGain(); mg.gain.value = 0.5; msrc.connect(mhp).connect(mbp).connect(mg).connect(fg)
     try { msrc.start() } catch { /* 無視 */ }
-    festNode = { fg, bright, nextNote: ctx.currentTime + 0.12, step: 0, sched: null }
+    festNode = { fg, bright, pan: fPan, nextNote: ctx.currentTime + 0.12, step: 0, sched: null }
     // 太鼓の一打（中域の thump＋クリック。低音はスマホで歪むので高め）
     const taiko = (tt, hi) => {
       const o = ctx.createOscillator(); o.type = 'sine'; const g = ctx.createGain(); const f0 = hi ? 300 : 190
@@ -494,11 +496,12 @@ export function createAudio(opts) {
     schedule()
   }
   // 祭りの近さ(0..1)で囃子を満ち引きさせる。離れたら 0（無音）。近づくほど高域が澄む。
-  function setFestival(amt) {
+  function setFestival(amt, pan) {
     if (!festNode) return
     const t = now(), a = Math.max(0, Math.min(1, amt || 0))
     festNode.fg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.2, t, 0.8) // 実機FBで音量を下げる（0.5→0.3→0.2＝もっと控えめに）
     festNode.bright.frequency.setTargetAtTime(560 + a * a * 3600, t, 0.8)   // 遠=太鼓だけがこもって届く／近=笛・鉦が際立つ
+    if (festNode.pan && pan != null) festNode.pan.pan.setTargetAtTime(Math.max(-0.9, Math.min(0.9, pan)), t, 0.25) // 会場の方角へ定位（振り向くと反対へ流れる）
     festState.amt = a
   }
   //  駅の音（発車ベル＋電車の通過音）。setStation(近さ0..1)が満ち引きさせ、遠いとこもり近づくと澄む。
@@ -507,11 +510,13 @@ export function createAudio(opts) {
   const staState = { amt: 0 }
   function startStation() {
     if (!ctx || staNode || !ctx.createBufferSource) return
-    const sg = ctx.createGain(); sg.gain.value = 0; sg.connect(master)
+    const sg = ctx.createGain(); sg.gain.value = 0
+    const sPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null // 空間音: 駅の方角へ定位
+    if (sPan) sg.connect(sPan).connect(master); else sg.connect(master)
     const bright = ctx.createBiquadFilter(); bright.type = 'lowpass'; bright.frequency.value = 700; bright.Q.value = 0.5; bright.connect(sg) // ベルの明るさ（遠=こもる→近=澄む）
     const len = Math.floor(6 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0) // 2秒→6秒で周期感を消す（評価サウンド）
     let mb = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; mb = 0.9 * mb + w * 0.1; dd[i] = (mb * 0.8 + w * 0.2) * 0.4 }
-    staNode = { sg, bright, timer: null }
+    staNode = { sg, bright, pan: sPan, timer: null }
     // 発車ベルは「チン」が不快との実機FBで廃止（合成のベル関数ごと削除＝死蔵コードを残さない）。駅は遠い電車の通過音だけ。
     const trainPass = (tt) => {  // 電車の通過音（中域のゴーッ＋レールのカタンカタン。寄せて返す）
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true
@@ -534,18 +539,19 @@ export function createAudio(opts) {
     tick()
   }
   // 駅の近さ(0..1)で発車ベル・電車の音を満ち引きさせる。離れたら 0（無音）。近づくほど澄む。
-  function setStation(amt) {
+  function setStation(amt, pan) {
     if (!staNode) return
     const t = now(), a = Math.max(0, Math.min(1, amt || 0))
     staNode.sg.gain.setTargetAtTime(a <= 0.01 ? 0 : a * 0.5, t, 0.7)
     staNode.bright.frequency.setTargetAtTime(640 + a * a * 3200, t, 0.7)  // 遠=こもったベル／近=澄んだベル
+    if (staNode.pan && pan != null) staNode.pan.pan.setTargetAtTime(Math.max(-0.9, Math.min(0.9, pan)), t, 0.25) // 駅の方角へ定位
     staState.amt = a
   }
   // 夏の風鈴の「チリン」は実機FBで不快につき廃止（合成関数ごと削除＝死蔵コードを残さない）。風鈴の見た目は3D側に残す。
   // 海の近さ・川の近さ・人混みの近さ・夏祭り・駅(各0..1)で環境音を満ち引きさせる。完全に離れたら 0（無音＝ノイズ漏れ無し）。
-  function setAmbience(sea, river, crowd, fest, sta) {
-    setFestival(fest)  // 夏祭りの囃子（場所への近さで満ち引き）
-    setStation(sta)    // 駅の音（発車ベル＋電車の通過音）
+  function setAmbience(sea, river, crowd, fest, sta, festPan, staPan) {
+    setFestival(fest, festPan)  // 夏祭りの囃子（場所への近さで満ち引き＋会場の方角へ定位）
+    setStation(sta, staPan)     // 駅の音（発車ベル＋電車の通過音＋駅の方角へ定位）
     if (!waterNode) return
     const t = now()
     const s = Math.max(0, Math.min(1, sea || 0)), r = Math.max(0, Math.min(1, river || 0)), cw = Math.max(0, Math.min(1, crowd || 0))

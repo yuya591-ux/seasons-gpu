@@ -8435,22 +8435,28 @@ export async function mountTown3d(parent, opts = {}) {
       let crowdAmt = 0; for (const c of crowdCenters) { const d = Math.hypot(fp.x - c.x, fp.z - c.z); if (d < c.r) crowdAmt = Math.max(crowdAmt, 1 - d / c.r) } // 人だまりの近さ
       const grdLow = Math.max(0, Math.min(1, (28 - Math.max(0, fp.y - heightAt(fp.x, fp.z))) / 22)) // 地面からの高さ＝標高の高い時代エリア(江戸/大正の台地)でも降りればざわめきが満ちる
       crowdAmt *= grdLow * outAmt // 人混みは低空/地上で（賑わいの中に居る時）
+      // 空間音(③-c): 音源の方角を、飛行の進行向き(flyYaw)を基準にした左右パン(-1..1)へ。飛びながら横を抜けると音が左右へ流れ、
+      //  振り向く(flyYaw変化)と反対へ回る＝「その世界に居る」。基準向き＝飛行はflyYaw／窓辺は見回しyaw。
+      const aOut = (active.flyP || 0) > 0.2, baseYaw = aOut ? (active.flyYaw || 0) : (active.yaw || 0)
+      const bearingPan = (sx, sz) => { const rel = Math.atan2(sx - fp.x, -(sz - fp.z)) - baseYaw; return Math.sin(rel) } // 右=+
       // 夏祭りの囃子＝遠くでほんのり聞こえ、近づくほど大きくなる（音で会場を探す）。窓辺でも遠くの祭りが届く。
-      let festAmt = 0
+      let festAmt = 0, festPan = 0
       if (festivalSpots.length) {
-        const out = (active.flyP || 0) > 0.2, lx2 = out ? fp.x : eye.x, lz2 = out ? fp.z : eye.z, FEST_AUDIBLE = 175
-        for (const fs of festivalSpots) { const d = Math.hypot(lx2 - fs.x, lz2 - fs.z); festAmt = Math.max(festAmt, Math.pow(Math.max(0, Math.min(1, (FEST_AUDIBLE - d) / FEST_AUDIBLE)), 1.7)) }
-        if (out) festAmt *= Math.max(0, Math.min(1, (60 - Math.max(0, fp.y - SEA.level)) / 50)) // 飛行は高いほど静か（窓辺は等倍）
+        const lx2 = aOut ? fp.x : eye.x, lz2 = aOut ? fp.z : eye.z, FEST_AUDIBLE = 175; let nd = 1e9, nfs = null
+        for (const fs of festivalSpots) { const d = Math.hypot(lx2 - fs.x, lz2 - fs.z); festAmt = Math.max(festAmt, Math.pow(Math.max(0, Math.min(1, (FEST_AUDIBLE - d) / FEST_AUDIBLE)), 1.7)); if (d < nd) { nd = d; nfs = fs } }
+        if (aOut) festAmt *= Math.max(0, Math.min(1, (60 - Math.max(0, fp.y - SEA.level)) / 50)) // 飛行は高いほど静か（窓辺は等倍）
+        if (nfs) festPan = bearingPan(nfs.x, nfs.z) // 最寄りの会場の方角へ定位
       }
       if (rainActive) festAmt = 0 // 通り雨の間は祭りの囃子をしぼる（雨が降ったら祭りは中断＝現実忠実・実機FB）
       // 駅の音＝駅に近づくと発車ベル・電車の通過音が満ちる（歩行/低空で）。谷戸には駅が無い。
-      let staAmt = 0
+      let staAmt = 0, staPan = 0
       if (kind !== 'yato') {
-        const out = (active.flyP || 0) > 0.2, lx2 = out ? fp.x : eye.x, lz2 = out ? fp.z : eye.z, d = Math.hypot(lx2 - STATION.x, lz2 - STATION.z)
+        const lx2 = aOut ? fp.x : eye.x, lz2 = aOut ? fp.z : eye.z, d = Math.hypot(lx2 - STATION.x, lz2 - STATION.z)
         staAmt = Math.pow(Math.max(0, Math.min(1, (78 - d) / 78)), 1.8)
-        if (out) staAmt *= Math.max(0, Math.min(1, (40 - Math.max(0, fp.y - SEA.level)) / 36)) // 高いほど静か（ホームの音は地上で）
+        if (aOut) staAmt *= Math.max(0, Math.min(1, (40 - Math.max(0, fp.y - SEA.level)) / 36)) // 高いほど静か（ホームの音は地上で）
+        staPan = bearingPan(STATION.x, STATION.z) // 駅の方角へ定位
       }
-      onAmbience(seaAmt, riverAmt, crowdAmt, festAmt, staAmt) }
+      onAmbience(seaAmt, riverAmt, crowdAmt, festAmt, staAmt, festPan, staPan) }
     // 夜の灯りの息づき（篝火/松明＝炎の揺らぎ・ガス灯＝穏やかな明滅）。二重サインで不規則に。
     for (const g of nightGlows) g.m.opacity = Math.max(0, g.base * (1 + g.amp * (Math.sin(t * g.sp + g.ph) * 0.6 + Math.sin(t * g.sp * 1.73 + g.ph * 1.3) * 0.4)))
     // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
