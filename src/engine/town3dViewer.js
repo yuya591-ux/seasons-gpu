@@ -5272,10 +5272,11 @@ export async function mountTown3d(parent, opts = {}) {
       { x: -34, z: -366, r: 17, topY: SEA_Y + 20, kind: 'market' },   // 無人の灯籠市（売り手のいない夜店＋連なる提灯＝逢魔が時の郷愁）
       { x: -100, z: -360, r: 16, topY: SEA_Y + 25, kind: 'colonnade' }, // 眠る石像の回廊（苔むした石柱の並木＋顔のない石の番人＝安心の守り手）
       { x: 90, z: -340, r: 13, topY: SEA_Y + 19, kind: 'well' },      // 天の井戸（覗くと下界の街の灯がかすかに見える＝天と地をつなぐ縦の没入）
+      { x: 120, z: -312, r: 14, topY: SEA_Y + 18, kind: 'station' },  // 空の無人駅（一本の線路が雲へ消える終着駅＝旅情と郷愁の白眉。長い橋の先・東の縁）
     ]
     const cwBridges = []
     const link = (i, j) => { const a = cwNodes[i], b = cwNodes[j]; cwBridges.push({ ax: a.x, az: a.z, ay: a.topY, bx: b.x, bz: b.z, by: b.topY, halfW: 2.4, sag: 2.6, ra: a.r - 1, rb: b.r - 1 }) }
-    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7); link(5, 8); link(6, 9) // 中心から各島へ／見晴らし台→社跡→回廊／茶屋→棚田→天の井戸／祠→灯籠市
+    link(0, 1); link(0, 2); link(0, 3); link(0, 4); link(2, 5); link(1, 6); link(3, 7); link(5, 8); link(6, 9); link(9, 10) // 中心から各島へ／見晴らし台→社跡→回廊／茶屋→棚田→天の井戸→空の無人駅（東の終着）／祠→灯籠市
     const makeBridge = (br) => { // 板＋垂れる手すりロープ＋門柱の吊り橋
       const g = new THREE.Group(), dx = br.bx - br.ax, dz = br.bz - br.az, len = Math.hypot(dx, dz), px = -dz / len, pz = dx / len
       const plankMat = tn(isNight ? 0x5a4636 : 0x7a5d44), ropeMat = tn(isNight ? 0x47403a : 0x6b5a44)
@@ -5500,6 +5501,33 @@ export async function mountTown3d(parent, opts = {}) {
         const lfire = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), new THREE.MeshToonMaterial({ color: isNight ? 0xffd49a : 0xcfc8ba, gradientMap: grad, emissive: new THREE.Color(glowW ? 0xff9c4e : 0x000000), emissiveIntensity: glowW ? (isNight ? 1.0 : 0.4) : 0 })); lfire.position.set(3.2, GY + 1.25, lbz); g.add(lfire)
         const lcap = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.55, 6), lantStone); lcap.position.set(3.2, GY + 1.9, lbz); g.add(lcap)
         for (let i = 0; i < 5; i++) { const a = R() * 6.28, rr = 3.5 + R() * 4; const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6 + R() * 0.5, 0), tn(isNight ? 0x33473a : 0x5f7a4c)); m.scale.y = 0.5; m.position.set(Math.cos(a) * rr, GY + 0.5, Math.sin(a) * rr); g.add(m) } // 苔のむら
+      } else if (n.kind === 'station') { // 空の無人駅＝一本の線路が雲へ消える終着駅。プラットフォーム＋上屋＋ベンチ＋駅名標＋時計＋裸電球（旅情と郷愁の白眉）
+        const glowS = isNight || dk > 0.2, concM = tn(isNight ? 0x585c62 : 0x9a958c), woodM = tn(isNight ? 0x5a4636 : 0x6e5640), steelM = tn(isNight ? 0x44484e : 0x7a7e84), sleepM = tn(isNight ? 0x342b24 : 0x55473a)
+        // プラットフォーム（内側-x。線路は+x側＝島の縁へ走り雲へ消える）
+        const plat = new THREE.Mesh(new THREE.BoxGeometry(5, 0.6, 12), concM); plat.position.set(-2.5, GY + 0.3, 0); g.add(plat)
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 12), tn(isNight ? 0x8a8460 : 0xd8c878)); edge.position.set(0.05, GY + 0.63, 0); g.add(edge) // 縁の警告帯（黄）
+        // 線路＝二本のレール＋枕木。プラットフォーム前(x=1)から島の縁の外(x=17)へ伸び、雲へ消える（終着の余韻）
+        const railGeos = [], slGeos = []
+        for (const s of [-0.72, 0.72]) { const r = new THREE.BoxGeometry(16, 0.1, 0.12); r.translate(9, GY + 0.12, s); railGeos.push(r) }
+        for (let i = 0; i < 11; i++) { const sx = 1.6 + i * 1.45; const sl = new THREE.BoxGeometry(0.5, 0.12, 2.1); sl.translate(sx, GY + 0.04, 0); slGeos.push(sl) }
+        if (BufferGeometryUtils.mergeGeometries) { const rm = BufferGeometryUtils.mergeGeometries(railGeos, false); if (rm) g.add(new THREE.Mesh(rm, steelM)); railGeos.forEach((x) => x.dispose()); const sm = BufferGeometryUtils.mergeGeometries(slGeos, false); if (sm) g.add(new THREE.Mesh(sm, sleepM)); slGeos.forEach((x) => x.dispose()) }
+        // 上屋（プラットフォームの屋根。四本柱＋深い軒の片流れ）
+        for (const [px, pz] of [[-4.2, -3.5], [-4.2, 3.5], [-0.9, -3.5], [-0.9, 3.5]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 3.0, 6), woodM); post.position.set(px, GY + 2.0, pz); g.add(post) }
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.18, 8.4), tn(isNight ? 0x4a4034 : 0x7a6448)); roof.position.set(-2.5, GY + 3.5, 0); roof.rotation.z = -0.06; g.add(roof)
+        // ベンチ（線路を向いて待つ＝旅情）
+        const bseat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.35, 3.0), woodM); bseat.position.set(-3.4, GY + 1.05, 0); g.add(bseat)
+        const bback = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.7, 3.0), woodM); bback.position.set(-3.8, GY + 1.4, 0); g.add(bback)
+        for (const lz of [-1.3, 1.3]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.85, 0.16), woodM); leg.position.set(-3.4, GY + 0.62, lz); g.add(leg) }
+        // 駅名標（無地のパネル＝特定の駅を模さない。支柱＋枠＋淡い板）
+        for (const sz of [-5, 5]) { const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.2, 6), steelM); sp.position.set(-1.0, GY + 1.5, sz); g.add(sp)
+          const board = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.62, 2.4), tn(isNight ? 0x8a9aa2 : 0xeef2f4)); board.position.set(-1.0, GY + 2.4, sz); g.add(board)
+          const band = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 2.4), tn(isNight ? 0x3a5a72 : 0x4f8ab0)); band.position.set(-1.0, GY + 2.15, sz); g.add(band) } // 駅名標の下の青帯（雰囲気だけ）
+        // 古い丸時計（柱＋白い文字盤＋針）
+        const cpole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.4, 6), steelM); cpole.position.set(-4.6, GY + 1.7, 0); g.add(cpole)
+        const cface = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 16), tn(isNight ? 0xb8bcc0 : 0xf4f2ec)); cface.rotation.x = Math.PI / 2; cface.position.set(-4.6, GY + 3.5, 0.12); g.add(cface)
+        for (const [len, ang, th] of [[0.36, 1.2, 0.05], [0.5, -0.6, 0.035]]) { const hand = new THREE.Mesh(new THREE.BoxGeometry(len, th, 0.04), tn(0x2a2e34)); hand.position.set(-4.6 + Math.cos(ang) * len / 2, GY + 3.5 + Math.sin(ang) * len / 2, 0.2); hand.rotation.z = ang; g.add(hand) } // 短針/長針
+        // 裸電球（プラットフォームの灯り。夕夜に灯る）
+        const lbulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 7), new THREE.MeshToonMaterial({ color: isNight ? 0xffe6b0 : 0xf0e8d8, gradientMap: grad, emissive: new THREE.Color(glowS ? 0xffaa50 : 0x000000), emissiveIntensity: glowS ? (isNight ? 1.2 : 0.5) : 0 })); lbulb.position.set(-1.6, GY + 3.3, -3.5); g.add(lbulb)
       } else { // onsen（雲の温泉＝岩で囲った露天の湯舟。湯けむりが立つ。湯けむりはskyDriftersで別途）
         const rockMat = tn(isNight ? 0x4a4640 : 0x6f655a), poolR = 5.5
         for (let a = 0; a < 11; a++) { const ang = a / 11 * Math.PI * 2; const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.6, 0), rockMat); rk.position.set(Math.cos(ang) * poolR, GY + 0.35, Math.sin(ang) * poolR); rk.scale.y = 0.7; g.add(rk) } // 湯舟の縁の岩
