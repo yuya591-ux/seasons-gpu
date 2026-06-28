@@ -1225,15 +1225,16 @@ export async function mountTown3d(parent, opts = {}) {
     // 胴は「胸(上衣)＋腰(下衣)」の二段＝くびれた腰と二色の服で、のっぺりした円柱(=瓶/こけし)を脱す（評価アート①-d）。統合メッシュなので描画コール不変。
     bake(new THREE.CylinderGeometry(0.2, 0.165, 0.34, 9).toNonIndexed(), bodyCol, 1.0) // 胸（肩0.2を張り→腰0.165へ細る上衣）
     bake(new THREE.CylinderGeometry(0.165, 0.2, 0.34, 9).toNonIndexed(), legHex, 0.69) // 腰（くびれ0.165→腰0.2へ広がる下衣＝袴/スカートの裾）
+    { const sh = new THREE.SphereGeometry(0.205, 9, 6).toNonIndexed(); sh.scale(1.0, 0.4, 0.62); bake(sh, bodyCol, 1.16) } // 肩（横に張る稜線＝円柱の天面でなく「肩のある人型」。瓶/こけしを明確に脱す）
     bake(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed(), skinHex, 1.21) // 首
     const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); bake(hd, skinHex, 1.33) // 小さめの頭＝頭身を伸ばす
     bake(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed(), hairHex, 1.35, 0, -0.012) // 髪（後頭部）
     for (const s of [-1, 1]) bake(new THREE.SphereGeometry(0.022, 5, 4).toNonIndexed(), hairHex, 1.35, s * 0.05, 0.118) // 目（歩いて寄ると「顔のある人」と分かる。統合メッシュに焼くので描画コール不変＝中距離LODの代わり）
     const aM = new THREE.Matrix4() // 腕（肩から下へ・少し外へ）＋手先＝人型の手応え。同じ統合メッシュに焼くので描画コール不変
     for (const s of [-1, 1]) {
-      const arm = new THREE.CylinderGeometry(0.032, 0.04, 0.5, 5).toNonIndexed(); aM.makeRotationZ(s * 0.14).setPosition(s * 0.215, 0.82, 0.02); arm.applyMatrix4(aM)
+      const arm = new THREE.CylinderGeometry(0.03, 0.038, 0.56, 5).toNonIndexed(); aM.makeRotationZ(s * 0.07).setPosition(s * 0.205, 0.84, 0.02); arm.applyMatrix4(aM) // 体側へ自然に下ろす（張り出しを減らす）＋少し長く
       const c = new THREE.Color(bodyCol), a = new Float32Array(arm.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } arm.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(arm)
-      bake(new THREE.SphereGeometry(0.045, 6, 5).toNonIndexed(), skinHex, 0.575, s * 0.245, 0.03) // 手先
+      bake(new THREE.SphereGeometry(0.043, 6, 5).toNonIndexed(), skinHex, 0.55, s * 0.225, 0.03) // 手先
     }
     if (!BufferGeometryUtils.mergeGeometries) return
     const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
@@ -5987,6 +5988,7 @@ export async function mountTown3d(parent, opts = {}) {
     const bgeos = []
     const bbake = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); bgeos.push(geo) }
     bbake(new THREE.CylinderGeometry(0.2, 0.135, 0.6, 10).toNonIndexed().translate(0, 1.04, 0), topHex) // 胴（肩→腰のテーパー）
+    { const sh = new THREE.SphereGeometry(0.21, 10, 6).toNonIndexed(); sh.scale(1.0, 0.4, 0.6); sh.translate(0, 1.3, 0); bbake(sh, topHex) } // 肩（横に張る稜線＝円柱の天面でなく肩のある人型）
     bbake(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 7).toNonIndexed().translate(0, 1.37, 0), skinHex) // 首
     const hg = new THREE.SphereGeometry(0.17, 10, 9).toNonIndexed(); hg.scale(0.94, 1.06, 0.96); hg.translate(0, 1.55, 0); bbake(hg, skinHex) // 頭（小さめ＝約7頭身）
     bbake(new THREE.SphereGeometry(0.183, 10, 9, 0, Math.PI * 2, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.58, -0.012), hairHex) // 髪（上＋後ろ・顔は出す）

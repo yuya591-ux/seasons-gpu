@@ -1,0 +1,22 @@
+// 人物造形の接写。祭りの演者(folkBody)を上空へピンして背景なしで大きく撮る＝人間らしさの点検。
+import { chromium } from 'playwright'
+const port = process.env.PORT || '5121'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 480, height: 640 }, deviceScaleFactor: 2 })
+page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
+await page.goto(`http://localhost:${port}/seasons/?dev=1&fest=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(() => {})
+await page.waitForTimeout(700)
+await page.addStyleTag({ content: '.ui,[class*="toast"],[class*="hint"],[class*="cruise"]{display:none !important}' })
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d')); await page.waitForTimeout(2800)
+await page.evaluate(() => { window.__town3dFly(true) }); await page.waitForTimeout(400)
+await page.evaluate(() => { window.__town3dCruise && window.__town3dCruise(false) }); await page.waitForTimeout(200)
+const ok = await page.evaluate(() => { if (!window.__town3dFolkPin) return 'no pin'; window.__town3dFolkPin(0, 0, 0, Math.PI, 120); return 'pinned' })
+console.log('pin', ok)
+await page.evaluate(() => window.__town3dFlyPose(0, 121.0, 6.5, 0, -0.02)); await page.waitForTimeout(1400)
+await page.mouse.move(240, 320); await page.mouse.move(242, 322); await page.waitForTimeout(250)
+await page.screenshot({ path: 'scripts/_shots/folkpin-front.png' })
+await page.evaluate(() => window.__town3dFlyPose(4.5, 121.0, 5.0, 0.7, -0.02)); await page.waitForTimeout(1200)
+await page.screenshot({ path: 'scripts/_shots/folkpin-3q.png' })
+console.log('done')
+await browser.close()
