@@ -6771,6 +6771,19 @@ export async function mountTown3d(parent, opts = {}) {
       box(0.16, 0.04, 0.02, mx, my + 0.22, mz + 0.07, redCol)                  // 首輪
       cyl(0.045, 0.045, 0.02, mx, my + 0.15, mz + 0.08, brass, 10)             // 小判
     }
+    // ── ちゃぶ台（昭和の茶の間の主役）＝低い円卓＋急須＋湯呑み＋みかんの鉢。左手前の床（猫の定位置=右と分けて据える）。陽だまりに置く。──
+    { const tx = -0.72, tz = 2.25, ty = FY, topM = mk(C(0x8a6a44, 0x4a3826)), kyusu = mk(C(0x5e5446, 0x33342c)), mikan = mk(C(0xf0962e, 0x8a5018))
+      cyl(0.5, 0.5, 0.05, tx, ty + 0.34, tz, topM, 22)                                    // 円い天板
+      cyl(0.42, 0.46, 0.02, tx, ty + 0.305, tz, woodDk, 20)                               // 天板裏の見切り
+      for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) cyl(0.03, 0.04, 0.32, tx + lx * 0.34, ty + 0.16, tz + lz * 0.34, woodDk, 6) // 折りたたみ脚
+      cyl(0.1, 0.115, 0.12, tx - 0.13, ty + 0.42, tz - 0.02, kyusu, 14)                   // 急須の胴
+      { const lid = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 6, 0, 6.283, 0, 1.5), kyusu); lid.position.set(tx - 0.13, ty + 0.485, tz - 0.02); grad(lid); lid.renderOrder = 2; winRoom.add(lid) } // 蓋
+      const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.032, 0.13, 6), kyusu); sp.position.set(tx - 0.25, ty + 0.46, tz - 0.02); sp.rotation.z = 0.7; grad(sp); sp.renderOrder = 2; winRoom.add(sp) // 注ぎ口
+      const hd = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.014, 6, 10, 3.4), kyusu); hd.position.set(tx - 0.005, ty + 0.46, tz - 0.02); hd.rotation.y = Math.PI / 2; grad(hd); hd.renderOrder = 2; winRoom.add(hd) // 取っ手
+      for (const [cx, cz] of [[0.16, -0.16], [0.18, 0.14]]) { cyl(0.05, 0.04, 0.06, tx + cx, ty + 0.4, tz + cz, ceramMat, 12); cyl(0.044, 0.044, 0.006, tx + cx, ty + 0.43, tz + cz, mk(C(0x6a8a52, 0x33422a)), 12) } // 湯呑み2客＋お茶の面
+      cyl(0.13, 0.09, 0.055, tx + 0.05, ty + 0.4, tz + 0.2, ceramMat, 16)                 // みかんの浅い鉢
+      for (const [mx, mz, my] of [[-0.04, 0, 0], [0.05, 0.02, 0], [0, 0.06, 0.03], [0.02, -0.04, 0.04]]) { const mm = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), mikan); mm.position.set(tx + 0.05 + mx, ty + 0.45 + my, tz + 0.2 + mz); mm.scale.y = 0.92; grad(mm); mm.renderOrder = 2; winRoom.add(mm) } // みかん
+    }
     { const px = 1.9, pz = 0.9 // 観葉植物（窓辺の床）
       cyl(0.19, 0.14, 0.34, px, FY + 0.17, pz, potMat, 14)                     // 鉢
       for (const [dx, dy, dz, s] of [[0, 0.42, 0, 0.24], [-0.13, 0.34, 0.06, 0.18], [0.12, 0.36, -0.05, 0.19], [0.02, 0.54, -0.02, 0.16]]) { const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), leaf); lf.position.set(px + dx, FY + 0.34 + dy, pz + dz); grad(lf); lf.renderOrder = 2; winRoom.add(lf) } // 葉群
