@@ -6899,10 +6899,12 @@ export async function mountTown3d(parent, opts = {}) {
         { f: 0xeae2d2, d: 0xc88a4c, l: 0x3c3631, w: 0xf2ece0, n: true },  // 三毛（白地に茶と黒のブチ）
       ]
       const coat = COATS[(Math.random() * COATS.length) | 0], dk = (h) => new THREE.Color(h).multiplyScalar(0.7).getHex() // 読み込みごとに違う毛色（Math.randomで毎回変える＝シード固定のRと別に）
-      const fur = M(isNight ? dk(coat.f) : coat.f)   // 地色
-      const furD = M(isNight ? dk(coat.d) : coat.d)  // 縞・陰
-      const furL = M(isNight ? dk(coat.l) : coat.l)  // 背の明るみ
-      const white = M(isNight ? dk(coat.w) : coat.w) // 胸・口先・足先
+      // 毛の主要部は陰影付き(MeshToon)で「ふわっとした量感」を出す＝平塗りの塊感を脱す。目/ひげ/鼻は鮮明さのためMeshBasic(M)のまま。
+      const Mt = (h) => { const m = new THREE.MeshToonMaterial({ color: tint(h), gradientMap: grad, fog: false }); winRoomMats.push(m); return m }
+      const fur = Mt(isNight ? dk(coat.f) : coat.f)   // 地色（陰影付き）
+      const furD = Mt(isNight ? dk(coat.d) : coat.d)  // 縞・陰
+      const furL = Mt(isNight ? dk(coat.l) : coat.l)  // 背の明るみ
+      const white = Mt(isNight ? dk(coat.w) : coat.w) // 胸・口先・足先
       const pink = M(isNight ? 0x7e615d : 0xd69a90)  // 鼻・耳の内
       const dark = M(isNight ? 0x231e19 : 0x3b332b)  // 閉じた目・口
       const whisk = M(isNight ? 0x9a9384 : 0xeee7d6) // ひげ
@@ -6934,12 +6936,12 @@ export async function mountTown3d(parent, opts = {}) {
       // 閉じた目（やさしい弧＝うとうと。眠っている間）
       const eyesClosed = []; for (const s of [-1, 1]) eyesClosed.push(hAdd(new THREE.TorusGeometry(0.03, 0.006, 6, 14, Math.PI), dark, s * 0.052, 0.016, 0.112, 0, 0, Math.PI))
       // 開いた目（目を覚ます/撫でられるとこちらを見る。初期は隠す）。黒目＋緑の虹彩＋縦瞳孔＋キャッチライト。
-      const iris = M(isNight ? 0x70794a : 0xa0ae66)
-      const eyesOpen = []; for (const s of [-1, 1]) { const eg = new THREE.Group(); eg.position.set(s * 0.052, 0.02, 0.108); eg.visible = false; headG.add(eg)
-        const ball = new THREE.Mesh(SP(0.025, 12, 10), dark); ball.scale.set(0.95, 1.3, 0.6); ball.renderOrder = 3; eg.add(ball)
-        const ir = new THREE.Mesh(SP(0.017, 10, 8), iris); ir.position.z = 0.012; ir.scale.set(0.92, 1.12, 0.6); ir.renderOrder = 3; eg.add(ir)
-        const pup = new THREE.Mesh(CY(0.0032, 0.028, 5), dark); pup.position.z = 0.02; pup.renderOrder = 3; eg.add(pup)
-        const cl = new THREE.Mesh(SP(0.006, 8, 6), white); cl.position.set(s * 0.008, 0.014, 0.026); cl.renderOrder = 3; eg.add(cl)
+      const iris = M(isNight ? 0x70794a : 0xa0ae66), eyeShine = M(0xfdfdf6) // 虹彩＋キャッチライト(鮮明な白=MeshBasic)
+      const eyesOpen = []; for (const s of [-1, 1]) { const eg = new THREE.Group(); eg.position.set(s * 0.056, 0.022, 0.107); eg.visible = false; headG.add(eg)
+        const ball = new THREE.Mesh(SP(0.03, 14, 11), dark); ball.scale.set(1.0, 1.16, 0.62); ball.renderOrder = 3; eg.add(ball)           // 黒目（少し大きく丸く＝可愛い）
+        const ir = new THREE.Mesh(SP(0.022, 12, 9), iris); ir.position.z = 0.013; ir.scale.set(0.96, 1.06, 0.6); ir.renderOrder = 3; eg.add(ir) // 緑の虹彩（大きめ）
+        const pup = new THREE.Mesh(CY(0.0036, 0.03, 6), dark); pup.position.z = 0.024; pup.renderOrder = 3; eg.add(pup)                   // 縦の瞳孔
+        const cl = new THREE.Mesh(SP(0.008, 8, 6), eyeShine); cl.position.set(s * 0.009, 0.018, 0.03); cl.renderOrder = 3; eg.add(cl)    // キャッチライト（うるっと）
         eyesOpen.push(eg) }
       const hit = new THREE.Mesh(SP(0.42, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.22, 0.06); cat.add(hit) // 撫でる判定の当たり（不可視・大きめ）
       // 耳（外＝毛色／内＝ピンク。先を少し外へ）
