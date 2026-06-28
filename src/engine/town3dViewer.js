@@ -1144,13 +1144,18 @@ export async function mountTown3d(parent, opts = {}) {
   const mkDragonfly = (cx, cy, cz, bodyCol = 0x46665a) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(bodyCol)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
   // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーン。frameで尾を振り・首を傾げ・たまに数歩あるく（佇む人形にしない）。
   const quads = []
+  const animalEyeMat = toon(0x14100c) // 動物の黒目（共有・描画コール節約のため1材を使い回す）
   const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 3, 6), toon(col)); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
+    const tcol = toon(col), isHorse = sc >= 0.9 // 馬は鼻面と耳が長い
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 4, 9), tcol); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
     const headG = new THREE.Group(); headG.position.set(0.58 * sc, 0.96 * sc, 0); g.add(headG) // 首振りの支点
-    headG.add(new THREE.Mesh(new THREE.SphereGeometry(0.25 * sc, 7, 6), toon(col)))
+    headG.add(new THREE.Mesh(new THREE.SphereGeometry(0.25 * sc, 9, 8), tcol)) // 頭
+    { const muz = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * sc, 0.145 * sc, (isHorse ? 0.34 : 0.22) * sc, 7), tcol); muz.rotation.z = Math.PI / 2; muz.position.set((isHorse ? 0.27 : 0.21) * sc, (isHorse ? -0.04 : -0.07) * sc, 0); headG.add(muz) } // 鼻面（前へ突き出す＝犬猫馬らしい横顔）
+    for (const es of [-1, 1]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08 * sc, (isHorse ? 0.22 : 0.17) * sc, 5), tcol); ear.position.set(-0.03 * sc, 0.25 * sc, es * 0.13 * sc); ear.rotation.x = es * -0.18; headG.add(ear) // 耳×2（立ち耳）
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.036 * sc, 6, 5), animalEyeMat); eye.position.set(0.18 * sc, 0.06 * sc, es * 0.11 * sc); headG.add(eye) } // 黒目×2＝近くで生気
     const legs = []
-    for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const legG = new THREE.Group(); legG.position.set(lx * sc, 0.7 * sc, lz * sc); g.add(legG); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.7 * sc, 5), toon(col)); leg.position.y = -0.35 * sc; legG.add(leg); legs.push(legG) } // 脚は股支点で振る
-    const tailG = new THREE.Group(); tailG.position.set(-0.55 * sc, 0.8 * sc, 0); g.add(tailG); const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), toon(col)); tail.position.y = -0.25 * sc; tail.rotation.z = 0.7; tailG.add(tail)
+    for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const legG = new THREE.Group(); legG.position.set(lx * sc, 0.7 * sc, lz * sc); g.add(legG); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.06 * sc, 0.7 * sc, 6), tcol); leg.position.y = -0.35 * sc; legG.add(leg); const paw = new THREE.Mesh(new THREE.SphereGeometry(0.075 * sc, 6, 5), tcol); paw.scale.set(1, 0.7, 1.25); paw.position.y = -0.7 * sc; legG.add(paw); legs.push(legG) } // 脚は股支点で振る＋足先（前へ伸びる肉球で接地感）
+    const tailG = new THREE.Group(); tailG.position.set(-0.55 * sc, 0.8 * sc, 0); g.add(tailG); const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), tcol); tail.position.y = -0.25 * sc; tail.rotation.z = 0.7; tailG.add(tail)
     g.userData = { headG, tailG, legs, sc, hx: x, hz: z, face: ry, ph: Math.random() * 6.28, moving: false, tx: x, tz: z, moveT: 2 + Math.random() * 6, speed: 0.5 + Math.random() * 0.4 }
     town.add(g); quads.push(g); return g }
   // 屋台/床店（市の賑わい＝着地の散歩で出会う活気）。柱＋差し掛け屋根＋商品台＋籠＋色とりどりの品＋暖簾。
@@ -9403,6 +9408,22 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dQuadFront = (i = 0, dist = 4) => { const q = quads[i]; if (!q) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); const u = q.userData; u.moving = false; u.moveT = 1e9; u.hx = t.x; u.hz = t.z; q.position.set(t.x, heightAt(t.x, t.z), t.z) } // 検証用: 犬猫をカメラ正面の地面へ（造形確認）
     window.__town3dQuadPin = (i, x, z, y, face = 0) => { const q = quads[i]; if (!q) return; const u = q.userData; u.moving = false; u.moveT = 1e9; u.hx = x; u.hz = z; q.position.set(x, y !== undefined ? y : heightAt(x, z), z); q.rotation.y = face } // 検証用: 犬猫を座標(任意y)に固定（shotAtで接写）
     window.__town3dQuadCount = () => quads.length
+    window.__town3dQuadDbg = (i) => { const q = quads[i]; if (!q) return null; return { x: q.position.x, y: q.position.y, z: q.position.z, vis: q.visible, sc: q.userData.sc } } // 検証用: 犬猫の現在位置/可視/スケール
+    window.__town3dQuadShot = (col = 0x8a7a5a, sc = 0.7, yaw = 2.0) => { // 検証用: 犬猫馬を原点に1頭だけ作り、隔離シーンで正確に接写（造形の確認）
+      const g = mkQuad(0, 0, 0, yaw, col, sc); town.remove(g); const qi = quads.indexOf(g); if (qi >= 0) quads.splice(qi, 1)
+      const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
+      const dl = new THREE.DirectionalLight(0xffffff, 0.9); dl.position.set(0.4, 1, 1.2); s.add(dl)
+      const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.3); dl2.position.set(-0.7, 0.4, 0.6); s.add(dl2); s.add(g)
+      const W = 520, H = 460, cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 30), r = 2.5 * sc
+      cam.position.set(r, 0.85 * sc, r); cam.lookAt(0, 0.5 * sc, 0)
+      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
+      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
+      const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
+      s.remove(g); g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() }); rt.dispose(); return cv.toDataURL()
+    }
     window.__town3dResClip = () => { // 検証用: 建物コライダーに食い込んでいる住民/peepの数（実機FB「住民が建物に食い込む」の定量化）
       let resIn = 0, peepIn = 0; const bad = []
       for (const r of residents) if (blockedAt(r.position.x, r.position.z)) { resIn++; bad.push({ t: 'res', x: +r.position.x.toFixed(1), z: +r.position.z.toFixed(1) }) }
