@@ -7935,6 +7935,15 @@ export async function mountTown3d(parent, opts = {}) {
     active.cruise = !active.cruise
     reflectCruise()
   })
+  // ── 低く流す（自転車のように坂を低速で滑空）。地形に沿って低高度を保ち、巡航をゆるめる＝坂の街を低く流れる第四の眺め（評価UX/F1）。──
+  const lowBtn = document.createElement('button'); lowBtn.type = 'button'; lowBtn.className = 'town3d-low'
+  lowBtn.textContent = '低く流す'; lowBtn.setAttribute('aria-label', '低く流す（自転車のように坂を滑空）')
+  lowBtn.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:6;display:none;padding:9px 17px;min-height:44px;border:none;border-radius:21px;background:rgba(28,30,38,.5);color:rgba(255,255,255,.9);font-size:13px;letter-spacing:.05em;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.22);cursor:pointer'
+  stage.appendChild(lowBtn)
+  const reflectLow = () => { const on = !!(active && active.lowCruise); lowBtn.style.background = on ? 'rgba(150,196,120,.62)' : 'rgba(28,30,38,.5)'; lowBtn.textContent = on ? '空へ戻す' : '低く流す' }
+  lowBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation() })
+  lowBtn.addEventListener('click', (e) => { e.stopPropagation(); if (!active) return; active.lowCruise = !active.lowCruise; if (active.lowCruise) active.cruise = true; reflectLow(); reflectCruise(); active.lastInputT = performance.now(); active.cinema = 0 })
+  let lowShown = false
 
   // ── 操作トレイ（左下＝左親指の一角に飛行の補助操作を集約。バラけたボタンを一塊に） ──
   const pad = document.createElement('div'); pad.className = 'town3d-pad'; stage.appendChild(pad)
@@ -8639,10 +8648,10 @@ export async function mountTown3d(parent, opts = {}) {
         active.lookYawOff = 0
         cpit = Math.cos(active.flyPitch); spit = Math.sin(active.flyPitch)
         camYaw = active.flyYaw
-        const cruiseS = (active.cruise ? FLY.cruiseSpeed * active.speedMul * (active.arrivalSlow || 1) : 0) + cineSpeed // 速さは speedMul で可変＋目的地で自動減速＋シネマの周回
+        const cruiseS = ((active.cruise ? FLY.cruiseSpeed * active.speedMul * (active.arrivalSlow || 1) : 0) + cineSpeed) * (active.lowCruise ? 0.55 : 1) // 速さは speedMul で可変＋目的地で自動減速＋シネマの周回。低空滑空はゆるめる
         // 進むのは水平方向だけ＝見下ろし/見上げの角度に関係なく一定速度で前進（見下ろしても降下しない）。
         dvX = Math.sin(active.flyYaw) * cruiseS
-        dvY = (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。カメラの見る角度(flyPitch)は保持され移動には影響しない＝好きな角度で街を見下ろし続けられる
+        dvY = active.lowCruise ? 0 : (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。低空滑空中は地形追従に任せ昇降は効かせない（「空へ戻す」で解除）
         dvZ = -Math.cos(active.flyYaw) * cruiseS
         // 上昇気流＝暖かい場所・雲の塔の上は、巡航しながら通るとふわっと持ち上がる（押さなくても少し昇るソアリング）。
         let thermal = 0
@@ -8650,7 +8659,7 @@ export async function mountTown3d(parent, opts = {}) {
         active.thermal = thermal
         // 低〜中空(y<54)でだけ・控えめ(0.5→0.2)に効かせる＝「押していないのに高度が上がり続ける」を防ぐ（実機FB: 戦国へ向かう航路で勝手に上昇）。
         // soaringのふわっと感は低空で残しつつ、一定高度より上では効かない＝高度はユーザーの手に。止空/手動昇降中も効かせない。
-        if (active.cruise && active.climb === 0 && active.flyPos.y < 54) dvY += thermal * FLY.climbSpeed * 0.2
+        if (active.cruise && active.climb === 0 && active.flyPos.y < 54 && !active.lowCruise) dvY += thermal * FLY.climbSpeed * 0.2
       }
       const yawV = (active.flyYaw - prevYaw) / Math.max(dt, 0.001) // 旋回角速度（バンクの素）
       const fwdX = Math.sin(camYaw) * cpit, fwdY = spit, fwdZ = -Math.cos(camYaw) * cpit // カメラの向き
@@ -8711,7 +8720,8 @@ export async function mountTown3d(parent, opts = {}) {
         active.flyPos.x += active.vel.x * dt; active.flyPos.y += active.vel.y * dt; active.flyPos.z += active.vel.z * dt
         active.flyPos.x = Math.max(-b.x, Math.min(b.xMax || b.x, active.flyPos.x))
         active.flyPos.z = Math.max(b.zMin, Math.min(b.zMax, active.flyPos.z))
-        const floor = heightAt(active.flyPos.x, active.flyPos.z) + b.yFloor
+        const terr = heightAt(active.flyPos.x, active.flyPos.z), floor = terr + b.yFloor
+        if (active.lowCruise) { const gh = terr + 5.5; active.flyPos.y += (gh - active.flyPos.y) * Math.min(1, dt * 1.8) } // 自転車=地形に沿って低く滑空（坂を下る目線）
         active.flyPos.y = Math.max(floor, Math.min(b.yMax, active.flyPos.y))
         const fp = active.flyPos; if (!(fp.x === fp.x && fp.y === fp.y && fp.z === fp.z && Math.abs(fp.x) < 1e5 && Math.abs(fp.y) < 1e5 && Math.abs(fp.z) < 1e5)) { fp.set(0, 36, 50); active.vel.set(0, 0, 0); active.camReady = false } // 安全網: 位置が異常値(NaN/Inf)になったら安全な空へ戻す（遷移時の固まり防止）
       }
@@ -8944,6 +8954,7 @@ export async function mountTown3d(parent, opts = {}) {
     // とまる/すすむ ボタンは飛行のときだけ出す（歩行・窓辺では隠す）。出すときに現在の状態でラベルを合わせる。
     const showCruise = active.mode === 'fly' && active.flyP > 0.4
     if (showCruise !== cruiseShown) { cruiseShown = showCruise; cruiseBtn.classList.toggle('cruise--on', showCruise); if (showCruise) reflectCruise() }
+    if (showCruise !== lowShown) { lowShown = showCruise; lowBtn.style.display = showCruise ? 'block' : 'none'; if (showCruise) reflectLow(); else if (active.lowCruise) { active.lowCruise = false; reflectLow() } } // 低く流すボタンは飛行のときだけ。飛行を抜けたら解除
     const showJump = active.mode === 'walk' && active.flyP > 0.5 // ジャンプボタンは歩行のときだけ出す
     if (showJump !== jumpShown) { jumpShown = showJump; jumpBtn.classList.toggle('jump--show', showJump) }
     // スティック常駐: 歩行で触れていない間も既定位置に淡く出す（触れたらそこへ移る）。ドラッグ中(stickId)は触れた点の表示を優先。
@@ -9439,6 +9450,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
+    window.__town3dLowCruise = (b) => { if (active) { active.lowCruise = !!b; if (b) active.cruise = true } } // 検証用: 低空滑空(自転車)モード
     window.__town3dZoom = (v) => { if (active) { active.zoomTarget = Math.max(0.4, Math.min(3.0, v || 1)); active.zoom = active.zoomTarget } } // 検証用: ズーム(0.4寄り〜3.0引き)
     window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
