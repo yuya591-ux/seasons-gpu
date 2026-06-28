@@ -6921,7 +6921,12 @@ export async function mountTown3d(parent, opts = {}) {
       const body = add(SP(0.22, 20, 16), fur, 0, 0.15, -0.04, 0, 0, 0, 1.5, 0.78, 1.22)        // 胴
       add(SP(0.18), fur, -0.2, 0.17, -0.06, 0, 0, 0, 1.0, 0.95, 1.0)                            // お尻のふくらみ
       add(SP(0.19), white, 0.08, 0.085, 0.16, 0, 0, 0, 1.2, 0.5, 0.9)                           // 胸〜お腹の白
-      const paws = []; for (const px of [-0.08, 0.08]) { const pw = add(SP(0.05), white, 0.12, 0.045, 0.3, 0, 0, 0, 1.3, 0.8, 1.5); pw.position.set(0.16 + px * 0.55, 0.05, 0.27); pw.userData.y0 = 0.05; pw.userData.z0 = 0.27; paws.push(pw) } // 前足（白い足先・ふみふみ/バットで動く）
+      const paws = []; for (const px of [-0.08, 0.08]) { const pw = add(SP(0.05), white, 0.12, 0.045, 0.3, 0, 0, 0, 1.3, 0.8, 1.5); pw.position.set(0.16 + px * 0.55, 0.05, 0.27); pw.userData.y0 = 0.05; pw.userData.z0 = 0.27; paws.push(pw) } // 前足の足先（白い肉球。ふみふみ/バットで動く）
+      // 前足の脚（肩→足先を結ぶテーパ脚）。丸い足先だけが伸びて見える違和感を解消＝脚全体が一緒に伸びる。足先の動きに毎フレーム追従。
+      const legUp = new THREE.Vector3(0, 1, 0), legD = new THREE.Vector3()
+      const legs = paws.map((pw) => { const lg = add(new THREE.CylinderGeometry(0.03, 0.046, 1, 7), fur); lg.userData.sh = new THREE.Vector3(pw.position.x, 0.135, 0.08); return lg }) // 肩の付け根（胸の前）
+      const aimLegs = () => { for (let i = 0; i < legs.length; i++) { const lg = legs[i], sh = lg.userData.sh; legD.copy(paws[i].position).sub(sh); const L = Math.max(0.06, legD.length()); lg.position.copy(sh).addScaledVector(legD, 0.5); lg.scale.set(1, L, 1); lg.quaternion.setFromUnitVectors(legUp, legD.normalize()) } } // 肩→足先を結ぶ
+      aimLegs()
       // 背の薄墨の縞（タビー）。胴に沿って弧を伏せ、脇腹まで垂らす。密に・少し太く＝毛柄を明瞭に（solid色ではfurD≒地色で自然に目立たない＝正しい）
       for (const sx2 of [-0.2, -0.12, -0.04, 0.04, 0.12, 0.2]) add(new THREE.TorusGeometry(0.16, 0.02, 6, 16, Math.PI * 0.72), furD, sx2, 0.18, -0.03, 0, 0, Math.PI, 1.12, 1, 1.9)
       add(SP(0.2), furL, 0, 0.27, -0.04, 0, 0, 0, 1.3, 0.4, 1.0) // 背の明るみ
@@ -6963,7 +6968,7 @@ export async function mountTown3d(parent, opts = {}) {
       const toyShadow = floorShadow(toyHome.x, toyHome.z, 0.16, 0.5)
       winRoom.add(toyG)
       const toyHit = new THREE.Mesh(SP(0.16, 6, 5), new THREE.MeshBasicMaterial({ visible: false })); toyHit.position.copy(toyG.position); winRoom.add(toyHit)
-      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, eyesClosed, eyesOpen, hit, catShadow, paws, toyG, toyHit, toyShadow, toyHome, toyVX: 0, toyVZ: 0, toyBob: 0, y0: 0.78, headX0: -0.46, headY0: 0.33, baseY: FY + 0.02, homeX: 0.5, homeZ: 1.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1, alert: 0, alertTarget: 0, petAmt: 0, petActive: 0, wakeT: 26 + R() * 40, wakeHold: 0, purr: 0, relocT: 38 + R() * 50, relocP: 1, x0: 0.5, z0: 1.62, rot0: 0.38, x1: 0.5, z1: 1.62, rot1: 0.38, react: null, reactT: 0, reactDur: 1, lastReact: -1, playful: 0, lookX: 0, lookXTarget: 0, blinkT: 3 + R() * 4, blink: 0, voice: 0.82 + Math.random() * 0.42, knead: 0, kneadT: 0 }
+      winRoom.add(cat); winCat = { g: cat, body, tail, ears, ears0, headG, eyesClosed, eyesOpen, hit, catShadow, paws, legs, aimLegs, toyG, toyHit, toyShadow, toyHome, toyVX: 0, toyVZ: 0, toyBob: 0, y0: 0.78, headX0: -0.46, headY0: 0.33, baseY: FY + 0.02, homeX: 0.5, homeZ: 1.62, tailT: 3 + R() * 5, flickT: 0, earT: 5 + R() * 6, earK: 0, settleT: 22 + R() * 30, settleP: 1, headT: 16 + R() * 24, headP: 1, alert: 0, alertTarget: 0, petAmt: 0, petActive: 0, wakeT: 26 + R() * 40, wakeHold: 0, purr: 0, relocT: 38 + R() * 50, relocP: 1, x0: 0.5, z0: 1.62, rot0: 0.38, x1: 0.5, z1: 1.62, rot1: 0.38, react: null, reactT: 0, reactDur: 1, lastReact: -1, playful: 0, lookX: 0, lookXTarget: 0, blinkT: 3 + R() * 4, blink: 0, voice: 0.82 + Math.random() * 0.42, knead: 0, kneadT: 0 }
     }
     winRoom.position.set(0, eye.y - 1.5, eye.z - dWall)
     scene.add(winRoom)
@@ -9028,6 +9033,7 @@ export async function mountTown3d(parent, opts = {}) {
         }
         if (c.reactT <= 0) { c.react = null; c.g.rotation.z = 0; c.ears[0].rotation.x = c.ears0[0]; c.ears[1].rotation.x = c.ears0[1]; c.headG.rotation.z = 0; if (c.paws) for (const pw of c.paws) { pw.position.y = pw.userData.y0; pw.position.z = pw.userData.z0 } } // 反応終わり＝姿勢を戻す
       }
+      if (c.aimLegs) c.aimLegs() // 前足の脚を足先に追従（伸ばすと脚全体が伸びる＝丸い足先だけが浮く違和感を解消）
       // ── 毛糸玉のおもちゃの動き（バットされると転がり、減速し、止まると定位置へそっと戻る） ──
       if (c.toyG) { const tg = c.toyG
         tg.position.x += c.toyVX * dt; tg.position.z += c.toyVZ * dt
