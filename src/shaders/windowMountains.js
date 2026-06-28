@@ -82,8 +82,8 @@ const FRAGMENT_BODY = /* glsl */ `
       float cloudSh = smoothstep(0.42, 0.74, fbm(vec2(x * 0.55 + uTime * 0.02, 4.0))); // 大きな雲影
       mc *= 1.0 - cloudSh * 0.15 * tex;                                                 // 朝の斜面をゆっくり渡る
     }
-    // 朝陽の当たる稜線のリムライト
-    mc += uSunGlow * smoothstep(r - 0.015, r, p.y) * lit * 0.35;
+    // 朝陽の当たる稜線のリムライト（朝の山あいの主役＝少し強めて稜線を金色に光らせる）
+    mc += uSunGlow * smoothstep(r - 0.02, r, p.y) * lit * 0.5;
     col = mix(col, mc, inside);
     // 谷にたまる朝霧（近い層のみ。遠い層はfbmを省く）
     if (tex > 0.01) {
@@ -117,6 +117,9 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 cloudC = mix(mix(uSkyMid, vec3(0.74, 0.79, 0.86), 0.5), vec3(1.0, 0.95, 0.86), warmSide); // 影側=淡青灰, 陽側=暖クリーム
     cloudC = mix(cloudC, uSunGlow, warmSide * 0.4);
     col = mix(col, cloudC, cloudM * 0.5);
+    // 朝陽側の地平がほんのり燃える（霞に溶ける朝の温度差＝平らな空に奥行きと朝の情感）
+    float glowH = smoothstep(0.58, 0.34, vp.y) * smoothstep(0.14, 0.40, vp.y);
+    col = mix(col, mix(uHorizon, uSunGlow, 0.55), glowH * smoothstep(0.7, -0.6, ax) * 0.42);
     // 朝陽（世界に固定。首を振ると視界の中を移動する）。円盤＋薄明光線
     vec2 sunC = vec2(-0.25 - yaw * 0.6, 0.72);
     float sunDist = distance(vec2(ax, vp.y), sunC);
@@ -131,7 +134,7 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // 奥→手前（遠いほど空色に霞む）。回転はほぼ一律。lit=リム強, tex=森テクスチャ
     col = ridge(col, vp, ax + yaw * 0.22, 1.0, 0.60, 1.2, 0.16, mix(uSkyMid, uHorizon, 0.5), mistAmt, 0.10, 0.0);
-    col = ridge(col, vp, ax + yaw * 0.40, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.55), mistAmt * 0.8, 0.18, 0.25);
+    col = ridge(col, vp, ax + yaw * 0.40, 9.0, 0.52, 1.8, 0.20, mix(uDropTint, uSkyMid, 0.64), mistAmt * 0.85, 0.18, 0.25);
 
     // 雲海（谷を埋める朝霧の海。上面が起伏してゆっくり流れ、朝陽で縁が染まる。近い山が突き出る）
     float seaY = 0.47;
