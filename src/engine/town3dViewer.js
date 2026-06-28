@@ -6783,6 +6783,10 @@ export async function mountTown3d(parent, opts = {}) {
       for (const [cx, cz] of [[0.16, -0.16], [0.18, 0.14]]) { cyl(0.05, 0.04, 0.06, tx + cx, ty + 0.4, tz + cz, ceramMat, 12); cyl(0.044, 0.044, 0.006, tx + cx, ty + 0.43, tz + cz, mk(C(0x6a8a52, 0x33422a)), 12) } // 湯呑み2客＋お茶の面
       cyl(0.13, 0.09, 0.055, tx + 0.05, ty + 0.4, tz + 0.2, ceramMat, 16)                 // みかんの浅い鉢
       for (const [mx, mz, my] of [[-0.04, 0, 0], [0.05, 0.02, 0], [0, 0.06, 0.03], [0.02, -0.04, 0.04]]) { const mm = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), mikan); mm.position.set(tx + 0.05 + mx, ty + 0.45 + my, tz + 0.2 + mz); mm.scale.y = 0.92; grad(mm); mm.renderOrder = 2; winRoom.add(mm) } // みかん
+      // 座布団（ちゃぶ台の脇＝さっきまで誰かが座ってお茶を飲んでいた気配）。ふっくら二段。
+      const zabu = mk(C(0x9a5a4e, 0x4e2e28)), zx = tx - 0.18, zz = tz + 0.62
+      const z1 = box(0.48, 0.07, 0.48, zx, ty + 0.04, zz, zabu); z1.rotation.y = 0.3
+      const z2 = box(0.4, 0.05, 0.4, zx, ty + 0.095, zz, zabu); z2.rotation.y = 0.3
     }
     { const px = 1.9, pz = 0.9 // 観葉植物（窓辺の床）
       cyl(0.19, 0.14, 0.34, px, FY + 0.17, pz, potMat, 14)                     // 鉢
