@@ -5734,25 +5734,24 @@ export async function mountTown3d(parent, opts = {}) {
       g.userData = { ph: R() * 6.28, sway: 0.6 + R() * 0.5, rise: 0.5 + R() * 0.6, baseX: cx, baseZ: cz, glow: glowSprite, glowBase: glowSprite ? glowSprite.material.opacity : 0 }
       scene.add(g); skyDrifters.push({ o: g, kind: 'lantern' })
     }
-    // 灯りの粒（蛍火のような暖かな光の粒が群島の上をふわりと漂い明滅する＝夜の郷愁）。夜のみ・加算で滲む。
-    if (isNight) {
-      const moteG = new THREE.Group()
+    // 天上界に漂う光の粒。夜＝蛍火のような暖色／昼夕＝magic hourの光に舞う淡い金の塵。群島の上をふわりと漂い明滅する（加算で滲む・昼夜とも）。
+    { const moteG = new THREE.Group(), moteCol = isNight ? 0xffc878 : 0xf2e2b8
       for (let i = 0; i < (LIGHT ? 12 : 22); i++) {
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: 0xffc878, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }))
-        const mx = -30 + (R() - 0.5) * 160, mz = -330 + (R() - 0.5) * 160, my = SEA_Y + 12 + R() * 22
-        sp.position.set(mx, my, mz); sp.scale.setScalar(0.8 + R() * 0.6); sp.userData = { x0: mx, z0: mz, y0: my, ph: R() * 6.28 }; moteG.add(sp)
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: moteCol, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }))
+        const mx = -30 + (R() - 0.5) * 170, mz = -330 + (R() - 0.5) * 170, my = SEA_Y + 12 + R() * 30
+        sp.position.set(mx, my, mz); sp.scale.setScalar(0.7 + R() * 0.6); sp.userData = { x0: mx, z0: mz, y0: my, ph: R() * 6.28 }; moteG.add(sp)
       }
-      scene.add(moteG); skyDrifters.push({ o: moteG, kind: 'motes' })
+      scene.add(moteG); skyDrifters.push({ o: moteG, kind: 'motes', peak: isNight ? 0.6 : 0.34 }) // 昼は控えめ（白飛び回避）
     }
     // 島々の間を流れる霧のヴェール＝群島を夢想的につなぐ薄もや（ゆっくり横切り端で戻る・昼夜とも）。
     { const wispCv = document.createElement('canvas'); wispCv.width = wispCv.height = 64
       const wctx = wispCv.getContext('2d'), wgr = wctx.createRadialGradient(32, 32, 0, 32, 32, 32)
       wgr.addColorStop(0, 'rgba(255,255,255,0.5)'); wgr.addColorStop(1, 'rgba(255,255,255,0)'); wctx.fillStyle = wgr; wctx.fillRect(0, 0, 64, 64)
       const wispTex = new THREE.CanvasTexture(wispCv), mistG = new THREE.Group()
-      for (let i = 0; i < (LIGHT ? 4 : 7); i++) {
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: wispTex, color: isNight ? 0xb8c0d0 : 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: true }))
-        const mx = -40 + (R() - 0.5) * 220, mz = -330 + (R() - 0.5) * 180, my = SEA_Y + 14 + R() * 16, sc = 24 + R() * 22
-        sp.position.set(mx, my, mz); sp.scale.set(sc, sc * 0.55, 1); sp.userData = { spd: 1.4 + R() * 1.6, y0: my, ph: R() * 6.28 }; mistG.add(sp)
+      for (let i = 0; i < (LIGHT ? 6 : 11); i++) {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: wispTex, color: isNight ? 0xb8c0d0 : (dk > 0.2 ? 0xf6dcbe : 0xffffff), transparent: true, opacity: 0, depthWrite: false, fog: true })) // 夕は霧も金桃に染まる
+        const mx = -40 + (R() - 0.5) * 230, mz = -330 + (R() - 0.5) * 190, my = SEA_Y + 8 + R() * 26, sc = 28 + R() * 28 // 高さ方向にも層を広げ、島々の腰から谷まで霧が漂う
+        sp.position.set(mx, my, mz); sp.scale.set(sc, sc * (0.5 + R() * 0.2), 1); sp.userData = { spd: 1.2 + R() * 1.6, y0: my, ph: R() * 6.28 }; mistG.add(sp)
       }
       scene.add(mistG); skyDrifters.push({ o: mistG, kind: 'mistveil' })
     }
@@ -9063,12 +9062,13 @@ export async function mountTown3d(parent, opts = {}) {
           lf2.position.z = u.z0 + Math.cos(t * 0.5 + u.ph) * 1.0
           lf2.rotation.x += dt * 1.2; lf2.rotation.z += dt * 0.8
           if (lf2.position.y < 1.7) lf2.position.y = 14.2 } // GY(1.2)+0.5で接地→GY+13で上から湧き直す（GYはbuildスコープ＝frameからは見えないため島ローカルの定数で）
-      } else if (d.kind === 'motes') { // 灯りの粒（蛍火）：ふわりと漂い、明滅する
+      } else if (d.kind === 'motes') { // 天上界の光の粒：ふわりと漂い、明滅する。昼は控えめ(peak)・cloudRevealで滲み出す
+        const mPeak = (d.peak || 0.6) * cloudReveal
         for (const sp of d.o.children) { const u = sp.userData
           sp.position.x = u.x0 + Math.sin(t * 0.3 + u.ph) * 4
           sp.position.z = u.z0 + Math.cos(t * 0.24 + u.ph) * 4
-          sp.position.y = u.y0 + Math.sin(t * 0.2 + u.ph * 1.7) * 2.5
-          sp.material.opacity = (0.45 + 0.5 * Math.sin(t * 1.3 + u.ph)) * 0.6 } // 明滅
+          sp.position.y = u.y0 + Math.sin(t * 0.2 + u.ph * 1.7) * 2.5 // ふわりたゆたう
+          sp.material.opacity = (0.45 + 0.5 * Math.sin(t * 1.3 + u.ph)) * mPeak } // 明滅
       } else if (d.kind === 'mistveil') { // 島々の間を流れる霧のヴェール：ゆっくり横切り端で戻る・淡く漂う
         for (const sp of d.o.children) { const u = sp.userData
           sp.position.x += u.spd * dt; if (sp.position.x > 240) sp.position.x = -240
