@@ -8916,7 +8916,7 @@ export async function mountTown3d(parent, opts = {}) {
       c.wakeT -= dt
       if (c.wakeT < 0 && c.wakeHold <= 0 && c.petActive < 1) { c.wakeT = 32 + R() * 52; c.wakeHold = 2.5 + R() * 3.5
         // 目を覚ますと、ひとりでに毛づくろい/あくび/伸び等をする（タップしなくても生きている・自発の仕草・鳴かない）
-        if ((c.reactT || 0) <= 0) { const calm = ['groom', 'groom', 'yawn', 'stretch', 'earFlick']; c.react = calm[(Math.random() * calm.length) | 0]; c.reactDur = c.react === 'groom' ? 3.4 : (c.react === 'stretch' ? 2.4 : 1.9); c.reactT = c.reactDur; c.wakeHold = Math.max(c.wakeHold, c.reactDur); c.lastReact = -1 }
+        if ((c.reactT || 0) <= 0) { const calm = ['groom', 'groom', 'yawn', 'stretch', 'earFlick', 'gaze', 'gaze']; c.react = calm[(Math.random() * calm.length) | 0]; c.reactDur = c.react === 'gaze' ? 5.0 : c.react === 'groom' ? 3.4 : (c.react === 'stretch' ? 2.4 : 1.9); c.reactT = c.reactDur; if (c.react === 'gaze') c.gazeYaw = Math.PI; c.wakeHold = Math.max(c.wakeHold, c.reactDur); c.lastReact = -1 }
       } // たまにふと目を覚まし、自発的に仕草をする
       if (c.wakeHold > 0) c.wakeHold -= dt
       // たまに起き上がって伸びをし、日だまりの別の場所へ移って丸くなる（猫の現実的な“移動”）
@@ -9004,6 +9004,14 @@ export async function mountTown3d(parent, opts = {}) {
             c.headG.rotation.x = c.headX0 + c.alert * 0.34 + g2 * (0.24 + lk * 0.06)  // 顔を前足へ下げ、小刻みに舐める
             c.headG.rotation.z = Math.sin(p * Math.PI * 4.5) * 0.14 * g2               // 顔を傾けて舐める
             c.tail.rotation.y = Math.sin(t * 1.2) * 0.1; break } // 毛づくろい（顔を洗う・前足を舐める）
+          case 'gaze': { // 窓の外（街・空・鳥）をじっと眺める＝窓辺の猫の情緒。窓の方へ向き直り頭を上げ、ゆっくり首を振って外を見る。
+            if (c.gazeYaw !== undefined) { let dy = c.gazeYaw - c.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.g.rotation.y += dy * Math.min(1, dt * 3.5) } // 窓の方へゆっくり向き直る
+            const hold = Math.min(1, p / 0.2) * Math.min(1, (1 - p) / 0.16) // 立ち上がりと終いをなめらかに
+            c.headG.rotation.x = c.headX0 + c.alert * 0.34 + hold * 0.52       // 頭を上げて外を見上げる（窓の外へ）
+            c.headG.rotation.y = Math.sin(t * 0.5) * 0.2 * hold                // ゆっくり首を振って外を見回す（鳥や雲を目で追う）
+            c.tail.rotation.y = Math.sin(t * 0.5) * 0.12                        // ゆったり尻尾
+            if (c.ears) { c.ears[0].rotation.x = c.ears0[0] + Math.sin(t * 0.8) * 0.05 * hold; c.ears[1].rotation.x = c.ears0[1] + Math.sin(t * 0.8 + 1) * 0.05 * hold } // 耳が外の音へ
+            break }
           case 'batToy': { // ボールの方へ向き直ってから前足を伸ばして打つ（向いてる方向だけに伸びる違和感を解消）
             if (c.batYaw !== undefined) { let dy = c.batYaw - c.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.g.rotation.y += dy * Math.min(1, dt * 9) } // ボールへ向き直る（最短回り）
             const bt = Math.sin(Math.max(0, Math.min(1, (p - 0.32) / 0.5)) * Math.PI) // 向き直ってから打つ（前半は向き直り）
@@ -9299,7 +9307,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
     window.__town3dResFace = (i, ya) => { if (residents[i]) { const u = residents[i].userData; residents[i].rotation.y = ya; u.face = ya; u.moving = false; u.pauseT = 999; for (const a of u.arms) a.rotation.x = 0; for (const l of u.legs) l.rotation.x = 0 } } // 検証用: 住人を止めて向きを固定（顔の確認）
     window.__town3dCatReloc = () => { if (winCat) { winCat.relocT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.petActive = 0 } } // 検証用: 猫の移動を今すぐ起こす
-    window.__town3dCatReact = (n) => { if (winCat) { winCat.react = n || 'roll'; winCat.reactDur = 2.4; winCat.reactT = 2.4; winCat.wakeHold = 2.5; winCat.alert = 1; winCat.lastReact = -1 } } // 検証用: 猫の反応を手動発火
+    window.__town3dCatReact = (n) => { if (winCat) { winCat.react = n || 'roll'; winCat.reactDur = n === 'gaze' ? 5.0 : 2.4; winCat.reactT = winCat.reactDur; winCat.wakeHold = winCat.reactDur; winCat.alert = 1; if (n === 'gaze') winCat.gazeYaw = Math.PI; winCat.lastReact = -1 } } // 検証用: 猫の反応を手動発火
     window.__town3dCatBat = () => { batTheToy() } // 検証用: 毛糸玉をバット（転がす）
     window.__town3dJump = () => { triggerJump() } // 検証用: ジャンプ発火
     window.__town3dJumpState = () => active ? { mode: active.mode, jumpY: +(active.jumpY || 0).toFixed(2), jumpVel: +(active.jumpVel || 0).toFixed(2), y: +active.flyPos.y.toFixed(2), btnShown: jumpBtn.classList.contains('jump--show') } : null
