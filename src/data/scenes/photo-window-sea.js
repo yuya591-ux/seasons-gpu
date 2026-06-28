@@ -7,6 +7,7 @@ export default {
   label: '実写の窓、夕暮れの海辺',
   desc: '窓の外は、実写の夕の海辺。金色に光る水平線、瓦屋根の港町。波とカモメ。',
   status: 'ready',
+  public: false, // ギャラリーから引退（実機FB: 実写の窓は商品レベルに届かず＝3Dの街に集中）。コードは保持・devでは表示可。
   render: 'photoWindow',
   intensityLabel: '明るさ',
 

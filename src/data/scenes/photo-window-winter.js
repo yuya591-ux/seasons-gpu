@@ -8,6 +8,7 @@ export default {
   label: '実写の窓、雪の里',
   desc: '窓の外は、実写の雪降る山里。瓦に積もる雪、霞む白い丘。しんと静かな風の音。',
   status: 'ready',
+  public: false, // ギャラリーから引退（実機FB: 実写の窓は商品レベルに届かず＝3Dの街に集中）。コードは保持・devでは表示可。
   render: 'photoWindow',
   intensityLabel: '明るさ',
 

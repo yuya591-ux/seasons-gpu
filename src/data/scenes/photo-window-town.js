@@ -8,6 +8,7 @@ export default {
   label: '実写の窓、夏の坂の町',
   desc: '窓の外は、実写の昭和の住宅地。瓦屋根と電線、夏の緑、遠い里山。蝉時雨の午後。',
   status: 'ready',
+  public: false, // ギャラリーから引退（実機FB: 実写の窓は商品レベルに届かず＝3Dの街に集中）。コードは保持・devでは表示可。
   render: 'photoWindow', // 実写の窓シェーダー（写真を主役に・src/shaders/photoWindow.js）
   intensityLabel: '明るさ',
 
