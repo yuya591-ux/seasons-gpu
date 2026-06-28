@@ -1159,6 +1159,7 @@ export async function mountTown3d(parent, opts = {}) {
     const legs = []
     for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const legG = new THREE.Group(); legG.position.set(lx * sc, 0.7 * sc, lz * sc); g.add(legG); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.06 * sc, 0.7 * sc, 6), tcol); leg.position.y = -0.35 * sc; legG.add(leg); const paw = new THREE.Mesh(new THREE.SphereGeometry(0.075 * sc, 6, 5), tcol); paw.scale.set(1, 0.7, 1.25); paw.position.y = -0.7 * sc; legG.add(paw); legs.push(legG) } // 脚は股支点で振る＋足先（前へ伸びる肉球で接地感）
     const tailG = new THREE.Group(); tailG.position.set(-0.55 * sc, 0.8 * sc, 0); g.add(tailG); const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), tcol); tail.position.y = -0.25 * sc; tail.rotation.z = 0.7; tailG.add(tail)
+    const sh = new THREE.Mesh(dynShadowGeo, contactShadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.04; sh.scale.set(1.3 * sc, 2.0 * sc, 1); sh.renderOrder = 1; g.add(sh) // 足元の接地影（俯瞰で浮かない）
     g.userData = { headG, tailG, legs, sc, hx: x, hz: z, face: ry, ph: Math.random() * 6.28, moving: false, tx: x, tz: z, moveT: 2 + Math.random() * 6, speed: 0.5 + Math.random() * 0.4 }
     town.add(g); quads.push(g); return g }
   // 屋台/床店（市の賑わい＝着地の散歩で出会う活気）。柱＋差し掛け屋根＋商品台＋籠＋色とりどりの品＋暖簾。
@@ -1197,6 +1198,7 @@ export async function mountTown3d(parent, opts = {}) {
     const wg = []
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 10); w.rotateZ(Math.PI / 2); w.translate(sx * 0.82, 0.3, sz * (len / 2 - 0.72)); wg.push(w) } // 4輪
     const wm = BufferGeometryUtils.mergeGeometries ? (BufferGeometryUtils.mergeGeometries(wg, false) || wg[0]) : wg[0]; g.add(new THREE.Mesh(wm, carWheelMat)) // 4輪を1メッシュへ
+    const sh = new THREE.Mesh(dynShadowGeo, contactShadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.04; sh.scale.set(2.0, len + 0.5, 1); sh.renderOrder = 1; g.add(sh) // 足元の接地影（俯瞰で浮かない）
     return g
   }
   // 灯りの地明かり（提灯/ガス灯の足元の暖かい光だまり）。夕夜に道を照らす＝降り立った夜の情緒。
@@ -1207,6 +1209,7 @@ export async function mountTown3d(parent, opts = {}) {
   const csCv = document.createElement('canvas'); csCv.width = csCv.height = 64; const csx = csCv.getContext('2d'); const csGr = csx.createRadialGradient(32, 32, 1, 32, 32, 32); csGr.addColorStop(0, 'rgba(0,0,0,0.85)'); csGr.addColorStop(0.55, 'rgba(0,0,0,0.4)'); csGr.addColorStop(1, 'rgba(0,0,0,0)'); csx.fillStyle = csGr; csx.fillRect(0, 0, 64, 64); const contactShadowTex = new THREE.CanvasTexture(csCv)
   const contactShadowMat = new THREE.MeshBasicMaterial({ map: contactShadowTex, transparent: true, opacity: 0.5, depthWrite: false, fog: true, color: 0x000000 })
   const crowdShadowGeo = new THREE.PlaneGeometry(1.5, 1.5) // 群衆(mkCrowdPerson)の足元影＝メッシュの子に付けて移動/回転に追従（円なので回転不問）
+  const dynShadowGeo = new THREE.PlaneGeometry(1, 1) // 動く物(車/犬猫)の足元影＝子に付け各自scaleで足形に（共有ジオメトリ・接地影は最強のコスパ。アート監督E1）
   const addContactShadows = (specs) => { // specs: [[x, groundY, z, radius], ...] を1メッシュへ
     if (!specs.length || !BufferGeometryUtils.mergeGeometries) return
     const geos = []
@@ -1308,7 +1311,7 @@ export async function mountTown3d(parent, opts = {}) {
       const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(fx - dx2, fz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
       const yukM = toon(yukataCols[i % yukataCols.length]); folkBody(d, yukM, skinMat, hairMat) // 浴衣の踊り手（首・小頭・髪で人らしく）
       const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.5, 6), yukM); arm.position.set(0.19, 1.06, 0.08); arm.rotation.z = -0.9; d.add(arm) // 上げた片腕（踊り）
-      festDancers.push({ d, arm, ph: i * 0.5, y0: dgy })
+      festDancers.push({ d, arm, ph: i * 0.5, y0: dgy, cx: fx, cz: fz, rad: 5.8 * sc, ang: a }) // 輪の中心/半径/角度＝frameで少しずつ周回
     }
     colliders.push({ x: fx, z: fz, r: 2.6 }); spawnAvoid.push({ x: fx, z: fz, r: 7 })
     festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: この祭りに近づくと囃子が満ちる
@@ -8015,7 +8018,13 @@ export async function mountTown3d(parent, opts = {}) {
   // homeの建物本体は位置・回転・スケール不変（可視/不可視の切替のみ）＝安全に凍結できる。動く物(車/人/木/鳥/舟)や
   // 住人を含む時代エリア群は対象外。配置確定後にここで一度だけワールド行列を焼き、以後は再計算をスキップさせる。
   let frozenStatic = 0
-  for (const b of homeBldgs) { b.updateMatrixWorld(true); b.traverse((o) => { o.matrixAutoUpdate = false; frozenStatic++ }) }
+  const _bbox = new THREE.Box3(), _bsz = new THREE.Vector3(), _bctr = new THREE.Vector3(), bldgShadowSpecs = []
+  for (const b of homeBldgs) {
+    b.updateMatrixWorld(true); b.traverse((o) => { o.matrixAutoUpdate = false; frozenStatic++ })
+    // 静的焼き影(原点±60)の外＝飛行で俯瞰した時に地面から浮く建物に、足元の接地影デカールを敷く（アート監督 致命1）。
+    if (Math.hypot(b.position.x, b.position.z) > 58) { _bbox.setFromObject(b); _bbox.getSize(_bsz); _bbox.getCenter(_bctr); const r = Math.max(_bsz.x, _bsz.z) * 0.42; if (r > 0.6 && r < 14) bldgShadowSpecs.push([_bctr.x, heightAt(_bctr.x, _bctr.z), _bctr.z, r]) }
+  }
+  if (bldgShadowSpecs.length) addContactShadows(bldgShadowSpecs) // 遠景建物の足元影を1メッシュへ統合＝描画コール+1で浮きを一掃
   window.__town3dFrozen = () => frozenStatic // 検証用: 凍結した静的ノード数
 
   function frame() {
@@ -8227,7 +8236,9 @@ export async function mountTown3d(parent, opts = {}) {
     if (carousel) carousel.rotation.y += dt * 0.3 // メリーゴーラウンドがゆっくり回る
     if (teacups) { teacups.rotation.y += dt * 0.5; for (const cup of teacups.children) cup.rotation.y -= dt * 1.1 } // 台が回り、各カップは逆に回る
     for (const sp of steamPuffs) { const cy = (t * 0.5 + sp.ph) % 2.4, p = cy / 2.4; sp.mesh.position.y = sp.base + p * 1.7; sp.mesh.position.x = 0.4 + Math.sin(t * 1.3 + sp.ph) * 0.18; sp.mesh.material.opacity = 0.32 * Math.sin(p * Math.PI); sp.mesh.scale.setScalar(0.55 + p * 0.8) } // 屋台の湯気が立ちのぼる
-    for (const d of festDancers) { const s = Math.sin(t * 1.5 + d.ph); d.arm.rotation.z = -0.3 - s * 0.55; d.d.position.y = d.y0 + Math.abs(s) * 0.07 } // 盆踊り: 腕を上げ下げし、体が弾む
+    for (const d of festDancers) { const s = Math.sin(t * 1.5 + d.ph) // 盆踊り: 腕を上げ下げし、体が弾む
+      if (d.cx !== undefined) { d.ang += dt * 0.12; const x = d.cx + Math.cos(d.ang) * d.rad, z = d.cz + Math.sin(d.ang) * d.rad; d.d.position.x = x; d.d.position.z = z; d.d.rotation.y = Math.atan2(d.cx - x, d.cz - z) } // 輪になって少しずつ回る（中心を向いて周回）
+      d.arm.rotation.z = -0.3 - s * 0.55; d.d.position.y = d.y0 + Math.abs(s) * 0.07 }
     // 犬猫馬: 尾を振り・首を傾げ・たまに数歩あるく（佇む人形にしない）。近いものだけ更新＝遠い時代の動物は止める。
     for (const q of quads) { const u = q.userData
       const qdx = q.position.x - active.flyPos.x, qdz = q.position.z - active.flyPos.z; if (qdx * qdx + qdz * qdz > 14000) continue
@@ -9189,7 +9200,7 @@ export async function mountTown3d(parent, opts = {}) {
           if (d.spoutA > 0) { d.spoutA += dt / 1.8
             if (d.spoutA >= 1) { d.spoutA = 0; d.spout.material.opacity = 0 }
             else { const e = Math.sin(d.spoutA * Math.PI), rise = d.spoutA * d.spoutA; d.spout.material.opacity = e * 0.62; d.spout.position.set(13, 7.5 + rise * 4, 0); d.spout.scale.set(3.4 + d.spoutA * 3.2, 6 + d.spoutA * 12, 1) } } // 後半ほど上へ立ちのぼり細く高く伸びて散る
-          else if (t >= d.spoutT && d.diveA === 0) { d.spoutT = t + 6 + R() * 7; d.spoutA = 0.001 } // 6〜13秒ごと（潜行中は吹かない）
+          else if (t >= d.spoutT && d.diveA === 0) { d.spoutT = t + 13 + R() * 9; d.spoutA = 0.001 } // 13〜22秒ごと（潜行中は吹かない。希少にして神々しさを上げる・アート監督B9）
         }
       } else if (d.kind === 'ferry') { // 空の渡し舟：雲海の上をゆっくり巡り、舟人が棹をさす。進行方向へ舳先を向ける。
         d.ph += dt * 0.02
