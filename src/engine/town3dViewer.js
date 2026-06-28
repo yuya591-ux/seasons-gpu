@@ -1537,6 +1537,9 @@ export async function mountTown3d(parent, opts = {}) {
   // 陸屋根の屋上に雑多な設備を載せる（1棟＝1メッシュに統合して描画数を抑える）。
   function addRoofClutter(g, w, d, h) {
     const cg = [] // 屋上設備を1メッシュへ統合（色は頂点色で焼く）＝1棟あたり多数→1の描画コール
+    // パラペット（陸屋根の立ち上がり縁）＝天面に縁取りの段差を付け「のっぺりした箱の天面」を脱す。統合メッシュに焼くので描画コール不変（アート監督C1）。
+    const pw = 0.18, pph = 0.46
+    for (const [ox, oz, sw, sd] of [[0, d * 0.5, w + pw, pw], [0, -d * 0.5, w + pw, pw], [w * 0.5, 0, pw, d + pw], [-w * 0.5, 0, pw, d + pw]]) bakeColGeo(cg, new THREE.BoxGeometry(sw, pph, sd), 0x827e78, ox, h + 0.14, oz)
     bakeColGeo(cg, new THREE.BoxGeometry(w * 0.3, 1.6, d * 0.3), 0x8a8478, (R() - 0.5) * w * 0.4, h + 0.8, (R() - 0.5) * d * 0.4) // 塔屋（階段室）
     bakeColGeo(cg, new THREE.CylinderGeometry(d * 0.15, d * 0.15, 1.3, 8), 0x6e6a64, w * 0.28, h + 0.9, -d * 0.2) // 水タンク
     const nAc = 1 + ((R() * 2) | 0) // 室外機 1〜2
@@ -1665,7 +1668,8 @@ export async function mountTown3d(parent, opts = {}) {
         if (futGeos.length) { const m = BufferGeometryUtils.mergeGeometries(futGeos, false); if (m) { const fm = toon(0xffffff); fm.vertexColors = true; g.add(new THREE.Mesh(m, fm)) } futGeos.forEach((x) => x.dispose()) }
       }
     } else { // mid: 陸屋根＋屋上設備（塔屋・水タンク・室外機・アンテナ）
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(0x9a9488)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
+      const capCol = [0x9a9488, 0x8e8a82, 0xa39a8c, 0x86827c, 0x938c80][(R() * 5) | 0] // 屋上の色に幅＝一様な灰の陸屋根が連なる「箱の海」を脱す
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 1.03, 0.4, d * 1.03), toon(capCol)); cap.position.y = h + 0.2; cap.castShadow = true; g.add(cap)
       addRoofClutter(g, w, d, h + 0.4)
     }
     // 1階を店舗に（時々・中層/集合住宅）＝混在用途のにぎわい。庇＋店先のくすんだ色帯
@@ -4969,9 +4973,11 @@ export async function mountTown3d(parent, opts = {}) {
       const g = new THREE.Group(); g.position.set(c[0], gy + 0.18, c[1]); g.rotation.y = R() * 6.28
       addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.6, 4), toon(0x3a3a3a)), 0, 0.3, 0) // 脚
       const body = addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), heronMat), 0, 0.72, 0); body.scale.set(1, 0.8, 1.7)
-      const neck = addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.5, 5), heronMat), 0, 1.0, 0.08); neck.rotation.x = 0.35
-      addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), heronMat), 0, 1.22, 0.18) // 頭
-      const beak = addAt(g, new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 4), toon(0xd8b048)), 0, 1.22, 0.34); beak.rotation.x = Math.PI * 0.5
+      const neck1 = addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.052, 0.28, 5), heronMat), 0, 0.94, 0.06); neck1.rotation.x = 0.7 // 首の付け根（前下へ）＝S字の下カーブ
+      const neck2 = addAt(g, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.34, 5), heronMat), 0, 1.14, 0.18); neck2.rotation.x = -0.2 // 立ち上がる上首＝S字
+      addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), heronMat), 0, 1.32, 0.2) // 頭
+      const beak = addAt(g, new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.2, 5), toon(0xd8b048)), 0, 1.32, 0.37); beak.rotation.x = Math.PI * 0.5 // 黄の長い嘴
+      for (const s of [-1, 1]) { const wg = addAt(g, new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 5), heronMat), s * 0.085, 0.74, -0.04); wg.scale.set(0.45, 0.66, 1.5) } // 畳んだ翼＝白い玉でなく鳥の輪郭
       town.add(g)
     }
     // ── 谷戸の暮らしの彩り（柿の木・竹林・棚田を舞う蝶/赤とんぼ）＝故郷の谷戸の季節感と生命感 ──
