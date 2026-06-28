@@ -179,7 +179,9 @@ export function setTown3dFly(on) {
     }
     active.vel.set(0, 0, 0); active.moveX = 0; active.moveY = 0; active.bankCur = 0; active.turnSmooth = 0
     active.onCloud = false // 雲上のくつろぎ場所から飛び立ったら以後は通常の空
-    active.cruise = true // スキームA: 飛び立ったら自動巡航から
+    // 初めての飛び立ちだけ「とまる」(浮かんだまま)で始める＝初見がいきなり街へ突進せず、まず眺めてから動ける（UX監督A2）。以後は従来の自動巡航。
+    let firstFly = false; try { firstFly = !localStorage.getItem('seasons_flew_once'); if (firstFly) localStorage.setItem('seasons_flew_once', '1') } catch (_) { /* localStorage不可でも従来動作 */ }
+    active.cruise = !firstFly
     active.mode = 'fly'
     active.flyTarget = 1
     if (!active.flyHintDone) { active.flyHintDone = true; active.pendingHint = 'fly' } // 初めて空へ飛ぶ時だけ操舵ヒントをそっと出す
@@ -297,7 +299,8 @@ export async function mountTown3d(parent, opts = {}) {
   const PR_CAP = LIGHT ? 1.2 : QUAL === 'soft' ? 2 : 1.6
   const PR_FLOOR = LIGHT ? 0.82 : 0.96 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）。高DPR端末で「荒すぎる」のを防ぐため一段引き上げ
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
-  const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false })
+  // アンビエント用途＝省電力GPUを選ばせ発熱/電池を抑える（perf監督C6）。眺める時間が長いので high-performance より low-power が適切。
+  const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false, powerPreference: 'low-power' })
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
   let curQual = QUAL // 現在の描き込み（setQualityで変わる）。'light'では灯りのブルームも切る＝解像度に加え後処理も軽くする
@@ -7251,7 +7254,7 @@ export async function mountTown3d(parent, opts = {}) {
   const HINT_CSS = 'font:600 13px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,.95);text-shadow:0 1px 5px rgba(0,0,0,.55);text-align:center'
   const HINT_WALK = `<div style="position:absolute;left:8%;bottom:22%;${HINT_CSS}">◉<br><span style="font-weight:500">左で歩く</span></div>` +
     `<div style="position:absolute;right:8%;bottom:22%;${HINT_CSS}">⟲<br><span style="font-weight:500">右で見まわす</span></div>`
-  const HINT_FLY = `<div style="position:absolute;left:0;right:0;bottom:21%;${HINT_CSS};text-align:center">指でドラッグして空をすすむ<br><span style="font-weight:500">「すすむ／とまる」で巡航・自動で前へ</span></div>`
+  const HINT_FLY = `<div style="position:absolute;left:0;right:0;bottom:21%;${HINT_CSS};text-align:center">指でドラッグして空をすすむ<br><span style="font-weight:500">「すすむ／とまる」で巡航・自動で前へ</span><br><span style="font-weight:400;opacity:.8;font-size:.92em">高く昇れば雲海へ　海の向こうには、遠い季節の街が</span></div>`
   let ctrlHintT = 0
   const showCtrlHint = (kind) => { ctrlHint.innerHTML = kind === 'fly' ? HINT_FLY : HINT_WALK; ctrlHint.style.opacity = '1'; ctrlHintT = 5 } // 5秒後にそっと消える
   const hideCtrlHint = () => { if (ctrlHintT > 0) { ctrlHintT = 0; ctrlHint.style.opacity = '0' } } // 触れたら即消える
@@ -7906,7 +7909,7 @@ export async function mountTown3d(parent, opts = {}) {
   const reflectCruise = () => { cruiseBtn.classList.toggle('is-cruising', !!(active && active.cruise)) } // 巡航中=「すすむ」側を点灯／停止中=「とまる」側を点灯
   let cruiseShown = false
   // ジャンプボタン（歩行の右下）。ボタン／右側タップで跳ぶ。連打しても押すたびにフラッシュ＝押下判定が見える（実際の跳躍は接地時のみ＝二段ジャンプはしない）。
-  const jumpBtn = document.createElement('button'); jumpBtn.className = 'town3d-jump'; jumpBtn.type = 'button'; jumpBtn.setAttribute('aria-label', 'ジャンプ'); jumpBtn.textContent = 'JUMP'; stage.appendChild(jumpBtn)
+  const jumpBtn = document.createElement('button'); jumpBtn.className = 'town3d-jump'; jumpBtn.type = 'button'; jumpBtn.setAttribute('aria-label', 'ジャンプ'); jumpBtn.textContent = 'ジャンプ'; stage.appendChild(jumpBtn)
   let jumpShown = false, jumpFlashClr = null
   let stickRestShown = false // 歩行の常駐スティックを出しているか（変化時だけ class を書く）
   const flashJumpBtn = () => { jumpBtn.classList.remove('jump--press'); void jumpBtn.offsetWidth; jumpBtn.classList.add('jump--press'); if (jumpFlashClr) clearTimeout(jumpFlashClr); jumpFlashClr = setTimeout(() => jumpBtn.classList.remove('jump--press'), 180) } // 押すたびに再生（連打でも毎回光る）
@@ -7925,12 +7928,14 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 操作レベルのゲージ（iPhoneの音量表示のように、今どのくらいの位置かを縦バーで示す）。
   // ボタンを押すと現れ、少し経つと静かに消える。淡い帯＝心地よく眺められる「おすすめ範囲」。
   // band=[下端,上端]（0..1）。set(v)で塗りの高さを更新、show()で表示してから自動で消す。
-  const mkGauge = (wrap, band) => {
+  const mkGauge = (wrap, band, labels) => {
     const g = document.createElement('div'); g.className = 'town3d-gauge'
     const bd = document.createElement('div'); bd.className = 'town3d-gauge__band'
     bd.style.bottom = (band[0] * 100).toFixed(1) + '%'; bd.style.height = ((band[1] - band[0]) * 100).toFixed(1) + '%'
     const fill = document.createElement('div'); fill.className = 'town3d-gauge__fill'
     g.appendChild(bd); g.appendChild(fill); wrap.appendChild(g)
+    // 任意のラベル（高度ゲージの「地上/雲海」等＝今どこまで昇れば別世界かを可視化。UX監督B5）。インラインで自己完結（CSS変更不要）。
+    if (labels) { g.style.position = g.style.position || 'relative'; for (const lb of labels) { const el = document.createElement('div'); el.textContent = lb.t; el.style.cssText = 'position:absolute;right:128%;bottom:' + (lb.at * 100).toFixed(0) + '%;transform:translateY(50%);font-size:9px;line-height:1;color:rgba(255,255,255,.66);white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.55);pointer-events:none'; g.appendChild(el) } }
     let hideT = null, cur = -1
     return {
       set(v) { v = Math.max(0, Math.min(1, v)); if (Math.abs(v - cur) < 0.004) return; cur = v; fill.style.transform = 'scaleY(' + v.toFixed(3) + ')' },
@@ -7960,7 +7965,7 @@ export async function mountTown3d(parent, opts = {}) {
     const end = (e) => { if (e) e.stopPropagation(); stopZoomHold() }
     btn.addEventListener('pointerup', end)
     btn.addEventListener('pointercancel', end)
-    btn.addEventListener('pointerleave', end)
+    // pointerleaveは外す（実機FB系の不具合と同根: 指が僅かにボタン端からズレると連続ズームが止まる）。setPointerCapture＋window pointerupで確実に解除。
   }
   // ── 速度ボタン（速く／遅く＝飛行速度の調整。左下。タップで一段、長押しで連続。既定はゆっくり） ──
   const speedWrap = document.createElement('div'); speedWrap.className = 'town3d-speed'
@@ -7975,7 +7980,7 @@ export async function mountTown3d(parent, opts = {}) {
   for (const [btn, step] of [[spUp, 0.12], [spDn, -0.12]]) {
     btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { btn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } nudgeSpeed(step); stopSpeedHold(); speedHold = setInterval(() => nudgeSpeed(step * 0.5), 70) })
     const end = (e) => { if (e) e.stopPropagation(); stopSpeedHold() }
-    btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end); btn.addEventListener('pointerleave', end)
+    btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end) // pointerleaveは外す（指ズレで連続変更が止まる不具合の回避・zoomと同様）
   }
   // 視界を広げるモード（広角＋引き＝広い思案で操る）。トグル式。
   const wideWrap = document.createElement('div'); wideWrap.className = 'town3d-wide'
@@ -7988,7 +7993,7 @@ export async function mountTown3d(parent, opts = {}) {
   const climbUp = document.createElement('button'); climbUp.className = 'town3d-climb__btn'; climbUp.textContent = '↑'; climbUp.setAttribute('aria-label', '上昇')
   const climbDn = document.createElement('button'); climbDn.className = 'town3d-climb__btn'; climbDn.textContent = '↓'; climbDn.setAttribute('aria-label', '下降')
   climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); pad.appendChild(climbWrap)
-  const altGauge = mkGauge(climbWrap, [0.12, 0.65]) // ↑上昇で上がる＝今の高さ。おすすめ＝街を見渡せる低〜中空
+  const altGauge = mkGauge(climbWrap, [0.12, 0.65], [{ at: 0.05, t: '地上' }, { at: 0.97, t: '雲海' }]) // ↑上昇で上がる＝今の高さ。おすすめ＝街を見渡せる低〜中空。地上/雲海ラベルで「どこまで昇れば別世界か」を示す
   let climbShown = false
   for (const [cbtn, dir] of [[climbUp, 1], [climbDn, -1]]) {
     const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir; altGauge.show() }
@@ -8005,6 +8010,13 @@ export async function mountTown3d(parent, opts = {}) {
   const moreBtn = document.createElement('button'); moreBtn.className = 'town3d-more'; moreBtn.textContent = '⚙'; moreBtn.setAttribute('aria-label', '速さ・視界の操作を開く'); pad.appendChild(moreBtn)
   let padShown = false // 補助トレイの表示状態(=showSpeedと同期)。⚙自体の出し入れ用
   moreBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); pad.classList.toggle('pad--open'); moreBtn.classList.toggle('more--on', pad.classList.contains('pad--open')) })
+
+  // ── 静的な建物の毎フレーム行列再計算を止める（perf監督#243＝発熱の純損失を削る）。──
+  // homeの建物本体は位置・回転・スケール不変（可視/不可視の切替のみ）＝安全に凍結できる。動く物(車/人/木/鳥/舟)や
+  // 住人を含む時代エリア群は対象外。配置確定後にここで一度だけワールド行列を焼き、以後は再計算をスキップさせる。
+  let frozenStatic = 0
+  for (const b of homeBldgs) { b.updateMatrixWorld(true); b.traverse((o) => { o.matrixAutoUpdate = false; frozenStatic++ }) }
+  window.__town3dFrozen = () => frozenStatic // 検証用: 凍結した静的ノード数
 
   function frame() {
     if (!active) return

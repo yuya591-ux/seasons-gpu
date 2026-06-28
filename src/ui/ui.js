@@ -84,12 +84,14 @@ export function buildUI(opts) {
   // 見回せる情景（窓辺シリーズ）だけでヒントを出す
   const LOOKABLE = ['cornerRoom', 'windowTown', 'windowMountains', 'windowSea', 'windowPano', 'town3d', 'photoWindow']
   // 初回のみ: 「見回せる」ことをそっと伝える（localStorageで2回目以降は出さない）
-  function maybeShowLookHint() {
+  function maybeShowLookHint(force) {
     if (!LOOKABLE.includes(currentScene.render)) return // 見回せない情景では出さない
-    try {
-      if (localStorage.getItem('seasons_look_hint')) return
-    } catch {
-      /* localStorage不可でも続行 */
+    if (!force) { // force=タップで「もう一度みる」＝一度きりの制限を無視して再表示（UX監督D1: 窓辺のヒントが二度と出ない問題の解消）
+      try {
+        if (localStorage.getItem('seasons_look_hint')) return
+      } catch {
+        /* localStorage不可でも続行 */
+      }
     }
     const hint = h('div', 'lookhint')
     // 操作に加え、目玉の「時間の移ろい」を静かに予告＝ぼーっと眺める人が変化に気づく前に閉じないように（評価エモ）。
@@ -103,10 +105,12 @@ export function buildUI(opts) {
     const timer = setTimeout(dismiss, 4600)
     // パネルを開く等で触れたら、ヒントはそっと消す（ギャラリーに被らない＝評価UX）。
     window.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss() }, { once: true, passive: true })
-    try {
-      localStorage.setItem('seasons_look_hint', '1')
-    } catch {
-      /* 無視 */
+    if (!force) {
+      try {
+        localStorage.setItem('seasons_look_hint', '1')
+      } catch {
+        /* 無視 */
+      }
     }
   }
 
@@ -164,7 +168,7 @@ export function buildUI(opts) {
   topbar.insertBefore(backBtn, sceneBtn)
   const modePill = h('button', 'modepill', '') // いまの居場所（空/地上＋エリア名）をそっと表示。タップで操作ヒントを再表示
   modePill.setAttribute('aria-label', '操作のヒントをもう一度みる')
-  modePill.addEventListener('click', () => { if (aloft && onShowHint) onShowHint(); poke() }) // 迷ったら押すと案内が戻る
+  modePill.addEventListener('click', () => { if (aloft) { if (onShowHint) onShowHint() } else { maybeShowLookHint(true) } poke() }) // 迷ったら押すと案内が戻る（窓辺=見回し/窓あけ、空・地上=操舵ヒント）
   root.appendChild(modePill)
   // 段階表示（●○○○）: 立体の街の旅「窓をあける→乗り出す→空へ→地上」のどこまで来たかを点で示す＝stageBtnが何段あるか分かる（評価UX）。
   const stageDots = h('div', 'stagedots')
