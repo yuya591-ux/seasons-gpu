@@ -4559,15 +4559,28 @@ export async function mountTown3d(parent, opts = {}) {
       }
       // 海鳥（かもめ。湾の上をゆるく旋回し、はばたく）
       gulls = []
-      for (let i = 0; i < 6; i++) {
+      // かもめ脱ローポリ＝頭/くちばし/尾を足し、平らな箱の翼を「内羽(白・水平)＋外羽(灰・上へ折る)」の2節でMシルエットに。
+      // 胴/頭/尾は白1メッシュに統合・材は共有＝描画コール節約。翼はgroupで羽ばたく。
+      const gullWhite = toon(0xf4f2ec), gullGray = toon(0xb6bcc6), gullBeak = toon(0xe0a23a)
+      const gullBuild = () => {
         const g = new THREE.Group()
-        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body)
-        const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wingL.position.z = 0.85; g.add(wingL)
-        const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wingR.position.z = -0.85; g.add(wingR)
-        g.userData = { cx: 88 + R() * 16, cz: -42 + (R() - 0.5) * 56, rad: 6 + R() * 10, y: SEA.level + 9 + R() * 11, sp: (R() < 0.5 ? 1 : -1) * (0.18 + R() * 0.16), ph: R() * 6.28 }
-        scene.add(g); gulls.push(g)
+        const bGeo = new THREE.CapsuleGeometry(0.12, 0.52, 3, 6); bGeo.rotateZ(Math.PI / 2)       // 胴（長軸=x）
+        const hGeo = new THREE.SphereGeometry(0.12, 7, 6); hGeo.translate(0.36, 0.03, 0)           // 頭（前=+x）
+        const tGeo = new THREE.BoxGeometry(0.22, 0.04, 0.32); tGeo.translate(-0.36, 0, 0)          // 尾（後=-x）
+        let body = bGeo
+        if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries([bGeo.toNonIndexed(), hGeo.toNonIndexed(), tGeo.toNonIndexed()], false); if (m) body = m }
+        g.add(new THREE.Mesh(body, gullWhite))
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 5), gullBeak); beak.rotation.z = -Math.PI / 2; beak.position.set(0.5, 0.02, 0); g.add(beak) // くちばし
+        const wings = []
+        for (const s of [1, -1]) { const wing = new THREE.Group()
+          wing.add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.66), gullWhite)).position.z = s * 0.42         // 内羽（水平）
+          const outer = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, 0.72), gullGray); outer.position.set(0, 0.05, s * 1.02); outer.rotation.x = -s * 0.5; wing.add(outer) // 外羽（上へ折る＝かもめのM）
+          g.add(wing); wings.push(wing) }
+        g.userData = { wings }
+        return g
       }
-      const mkGull = (cx, cz) => { const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 3, 5), toon(0xf2f0ea)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [1, -1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.5), toon(0xe8e4dc)); wing.position.z = s * 0.85; g.add(wing) } g.userData = { cx, cz, rad: 7 + R() * 12, y: SEA.level + 12 + R() * 16, sp: (R() < 0.5 ? 1 : -1) * (0.16 + R() * 0.14), ph: R() * 6.28 }; scene.add(g); gulls.push(g) }
+      for (let i = 0; i < 6; i++) { const g = gullBuild(); Object.assign(g.userData, { cx: 88 + R() * 16, cz: -42 + (R() - 0.5) * 56, rad: 6 + R() * 10, y: SEA.level + 9 + R() * 11, sp: (R() < 0.5 ? 1 : -1) * (0.18 + R() * 0.16), ph: R() * 6.28 }); scene.add(g); gulls.push(g) }
+      const mkGull = (cx, cz) => { const g = gullBuild(); Object.assign(g.userData, { cx, cz, rad: 7 + R() * 12, y: SEA.level + 12 + R() * 16, sp: (R() < 0.5 ? 1 : -1) * (0.16 + R() * 0.14), ph: R() * 6.28 }); scene.add(g); gulls.push(g) }
       for (let i = 0; i < 7; i++) mkGull(160 + R() * 360, -44 + (R() - 0.5) * 50) // 東(江戸)への長い渡りの海鳥
       for (let i = 0; i < 6; i++) mkGull(140 + (R() - 0.5) * 50, -180 - R() * 360) // 北(戦国)への渡りの海鳥
       for (let i = 0; i < 5; i++) mkGull(-260 - R() * 320, -30 + (R() - 0.5) * 50) // 西(大正)への渡りの海鳥
@@ -5677,10 +5690,13 @@ export async function mountTown3d(parent, opts = {}) {
       const gsCv = document.createElement('canvas'); gsCv.width = 32; gsCv.height = 96; const gsx = gsCv.getContext('2d')
       for (let y = 0; y < 96; y++) { const top = 1 - y / 96, hg = gsx.createLinearGradient(0, y, 32, y); hg.addColorStop(0, 'rgba(255,240,206,0)'); hg.addColorStop(0.5, `rgba(255,240,206,${(0.3 + 0.42 * top).toFixed(3)})`); hg.addColorStop(1, 'rgba(255,240,206,0)'); gsx.fillStyle = hg; gsx.fillRect(0, y, 32, 1) }
       const gsTex = new THREE.CanvasTexture(gsCv)
-      const NGS = LIGHT ? 4 : 7
-      for (let i = 0; i < NGS; i++) { const m = new THREE.MeshBasicMaterial({ map: gsTex, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); gsMats.push(m)
-        const beam = new THREE.Mesh(new THREE.PlaneGeometry(11 + R() * 7, 130), m); beam.position.set(-30 + (i - (NGS - 1) / 2) * 15 + (R() - 0.5) * 8, SEA_Y + 48, -315 + (R() - 0.5) * 50); beam.rotation.z = (i - (NGS - 1) / 2) * 0.035; gsGrp.add(beam) } // 群島(中心-30,-320)の上に立つ光の柱
-      scene.add(gsGrp); skyDrifters.push({ o: gsGrp, kind: 'godshaft', mats: gsMats })
+      // 夜は暖色クリームの白い棒が菫色の夜空に加算で浮いてチープに見える(実機FB)→月光の淡い青紫へ寄せ・本数を減らし・幅広くばらけさせ重ねて柔らかい光芒に・不透明度を下げる。
+      const NGS = LIGHT ? 4 : (isNight ? 5 : 7)
+      const gsTint = isNight ? 0x8b97bc : 0xffffff // 夜=月光の淡い青紫／昼夕=暖色クリームのまま
+      for (let i = 0; i < NGS; i++) { const m = new THREE.MeshBasicMaterial({ map: gsTex, color: gsTint, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); gsMats.push(m)
+        const wd = (isNight ? 17 : 11) + R() * (isNight ? 15 : 7) // 夜は幅広く・ばらつかせ＝重なって柔らかい光芒に（棒の列に見せない）
+        const beam = new THREE.Mesh(new THREE.PlaneGeometry(wd, 130), m); beam.position.set(-30 + (i - (NGS - 1) / 2) * (isNight ? 22 : 15) + (R() - 0.5) * 12, SEA_Y + 48, -315 + (R() - 0.5) * 50); beam.rotation.z = (i - (NGS - 1) / 2) * 0.05 + (R() - 0.5) * 0.06; gsGrp.add(beam) } // 群島(中心-30,-320)の上に立つ光の柱
+      scene.add(gsGrp); skyDrifters.push({ o: gsGrp, kind: 'godshaft', mats: gsMats, opF: isNight ? 0.15 : 0.28 })
     }
     // 高層の巻雲ヴェール＝雲海のはるか上をゆっくり流れる薄い筋雲。雲海(下層)と巻雲(上層)の二層で空に奥行きを出す。
     { const ciCv = document.createElement('canvas'); ciCv.width = ciCv.height = 256
@@ -8201,7 +8217,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (seaUniforms) seaUniforms.uTime.value = t // 海面のうねり・きらめきの位相
     freshUniforms.uTime.value = t // 川・池のきらめきの位相
     if (lightBeam) lightBeam.rotation.y = t * 0.5 // 灯台の光芒が回る
-    for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; g.children[1].rotation.x = fl; g.children[2].rotation.x = -fl } // 海鳥が旋回しはばたく
+    for (const g of gulls) { const u = g.userData, a = t * u.sp + u.ph; g.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(a * 2) * 0.7, u.cz + Math.sin(a) * u.rad); g.rotation.y = -a - (u.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const fl = Math.sin(t * 7 + u.ph) * 0.5; if (u.wings) { u.wings[0].rotation.x = fl; u.wings[1].rotation.x = -fl } } // 海鳥が旋回しはばたく（翼=内羽+折れ外羽の2節groupを羽ばたかせる）
     for (const c of critters) {
       const dxc = c.cx - active.flyPos.x, dyc = c.cy - active.flyPos.y, dzc = c.cz - active.flyPos.z // 近い時だけ＝目線で舞い、俯瞰では消す（白い羽が点に見えるのを防ぐ・軽量）
       if (dxc * dxc + dyc * dyc + dzc * dzc > 2025) { if (c.g.visible) c.g.visible = false; continue }
@@ -9219,7 +9235,7 @@ export async function mountTown3d(parent, opts = {}) {
         const flap = Math.sin(t * 2.0 + d.ph) * 0.5
         for (const w of d.wings) w.wp.rotation.x = -w.sd * (0.12 + flap) // ゆるやかな羽ばたき（主に滑空）
       } else if (d.kind === 'godshaft') { // 天上界の光芒：雲海に常時そっと差し込む光の柱。cloudRevealで滲み出し・カメラへ向ける（薄板が正面＝光芒に見える）
-        const op = cloudReveal * 0.28 // 控えめ（白飛び/ギラつき回避）
+        const op = cloudReveal * (d.opF || 0.28) // 控えめ（白飛び/ギラつき回避）。夜は更に低く（月光の淡い光芒）
         for (const m of d.mats) m.opacity = op
         const cp = camera.position
         for (const beam of d.o.children) { beam.getWorldPosition(TMP_DIR); beam.rotation.y = Math.atan2(cp.x - TMP_DIR.x, cp.z - TMP_DIR.z) }
