@@ -2383,6 +2383,7 @@ export async function mountTown3d(parent, opts = {}) {
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x2a2a30, fog: true }) // 電線（共有・軽量）
   // スズメ（夕暮れの電線に集まる小鳥）の共有部材＝体・尾・頭。近い数スパンに数羽だけ＝郷愁の決め手。
   const sparrowMat = toon(0x554a3c), sparrowBody = new THREE.SphereGeometry(0.1, 6, 5), sparrowTail = new THREE.BoxGeometry(0.045, 0.03, 0.17)
+  const sparrowBeakMat = toon(0x3a3026), sparrowBeak = new THREE.ConeGeometry(0.02, 0.07, 4) // くちばし（球の塊→小鳥らしく）
   let prevAnchors = null
   for (let i = 0; i < 12; i++) {
     const z = 6 - i * 7
@@ -2456,6 +2457,7 @@ export async function mountTown3d(parent, opts = {}) {
           const body = new THREE.Mesh(sparrowBody, sparrowMat); body.scale.set(1, 1.05, 1.35); bird.add(body)
           const head = new THREE.Mesh(sparrowBody, sparrowMat); head.scale.setScalar(0.6); head.position.set(0, 0.08, 0.12); bird.add(head)
           const tail = new THREE.Mesh(sparrowTail, sparrowMat); tail.position.set(0, 0.03, -0.16); tail.rotation.x = 0.55; bird.add(tail)
+          const beak = new THREE.Mesh(sparrowBeak, sparrowBeakMat); beak.rotation.x = Math.PI / 2; beak.position.set(0, 0.075, 0.19); bird.add(beak) // くちばし
           bird.position.set(p.x, p.y + 0.12, p.z); bird.rotation.y = (row ? -0.3 : 0) + (R() - 0.5) * 1.4 // ほぼ同じ向き＋少しばらす
           town.add(bird)
           sparrows.push({ g: bird, py: p.y + 0.12, ry: bird.rotation.y, tail, ph: R() * 6.28, hop: 0, hopT: 3 + R() * 10 }) // フレームでぴょこっと跳ねさせる
@@ -5891,8 +5893,12 @@ export async function mountTown3d(parent, opts = {}) {
     // 鳥の渡り：V字の群れが雲海の上をゆっくり渡る。追いつくと並んで飛べる。
     { const flock = new THREE.Group(), bm = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3346 : 0x4a4a52, fog: true }), wings = []
       for (let i = 0; i < (LIGHT ? 7 : 11); i++) { const bird = new THREE.Group()
-        for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.08, 0.55), bm); w.position.x = s * 0.9; w.userData.side = s; bird.add(w); wings.push(w) }
-        bird.add(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 1.3), bm)) // 胴
+        // 翼＝内羽＋翼端を後ろへ折る外羽の2節group（平らな十字でなく、はばたく鳥のしなった翼）。羽ばたきはgroupをz回転（既存frameのwings/side）。
+        for (const s of [-1, 1]) { const wing = new THREE.Group(); wing.userData.side = s
+          const inner = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 0.52), bm); inner.position.x = s * 0.5; wing.add(inner)
+          const outer = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.06, 0.36), bm); outer.position.set(s * 1.28, 0, -0.16); outer.rotation.y = s * 0.42; wing.add(outer) // 翼端を後ろへ折る（swept）
+          bird.add(wing); wings.push(wing) }
+        const bodyGeo = new THREE.ConeGeometry(0.17, 1.5, 5); bodyGeo.rotateX(-Math.PI / 2); bird.add(new THREE.Mesh(bodyGeo, bm)) // 胴（前が尖る紡錘＝箱を脱す）
         const row = Math.ceil(i / 2), sd = i % 2 === 0 ? 1 : -1
         bird.position.set(sd * row * 2.8, (R() - 0.5) * 0.7, row * 2.3); flock.add(bird) } // V字（先頭から後ろへ広がる）
       flock.userData = { wings, baseY: SEA_Y + 32 }; flock.position.set(-320, SEA_Y + 32, -250); flock.rotation.y = -Math.PI / 2 // +Xへ渡る
