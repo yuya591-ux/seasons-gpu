@@ -1184,6 +1184,18 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i < 1 + (R() < 0.5 ? 1 : 0); i++) { const br = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.48, 10), wood); br.position.set(0.5 + i * 0.4, 0.24, 0.42); br.castShadow = true; g.add(br); for (const by of [0.11, -0.11]) { const bd = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.014, 4, 10), band); bd.rotation.x = Math.PI / 2; bd.position.set(0.5 + i * 0.4, 0.24 + by, 0.42); g.add(bd) } } // 樽
     town.add(g); return g
   }
+  // 車（面取り車体＋濃色キャビン＋4輪を1メッシュに統合）。街路/駐車場で再利用＝脱ローポリ(箱に車輪が付き「車」と分かる)しつつ描画コールは車体+窓+輪の3。
+  // cy=接地面の高さ（内部で車体を持ち上げ、車輪の下端がcyに来る）。len=全長（軽トラ/セダンで可変）。
+  const carGlassMat = toon(0x2a2e34), carWheelMat = toon(0x17171b)
+  const mkCar = (cx, cy, cz, ry, col, len = 3.4) => {
+    const g = new THREE.Group(); g.position.set(cx, cy, cz); g.rotation.y = ry
+    const body = new THREE.Mesh(new RoundedBoxGeometry(1.7, 0.96, len, 2, 0.26), toon(col)); body.position.y = 0.62; body.castShadow = true; g.add(body) // 車体（車輪の上に乗る）
+    const cab = new THREE.Mesh(new RoundedBoxGeometry(1.46, 0.62, len * 0.5, 2, 0.2), carGlassMat); cab.position.set(0, 1.28, -0.08); g.add(cab) // 濃色のキャビン（窓）
+    const wg = []
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 10); w.rotateZ(Math.PI / 2); w.translate(sx * 0.82, 0.3, sz * (len / 2 - 0.72)); wg.push(w) } // 4輪
+    const wm = BufferGeometryUtils.mergeGeometries ? (BufferGeometryUtils.mergeGeometries(wg, false) || wg[0]) : wg[0]; g.add(new THREE.Mesh(wm, carWheelMat)) // 4輪を1メッシュへ
+    return g
+  }
   // 灯りの地明かり（提灯/ガス灯の足元の暖かい光だまり）。夕夜に道を照らす＝降り立った夜の情緒。
   const poolCv = document.createElement('canvas'); poolCv.width = poolCv.height = 64; const pcx = poolCv.getContext('2d'); const pgr = pcx.createRadialGradient(32, 32, 1, 32, 32, 32); pgr.addColorStop(0, 'rgba(255,200,130,0.9)'); pgr.addColorStop(0.55, 'rgba(255,180,100,0.32)'); pgr.addColorStop(1, 'rgba(255,170,90,0)'); pcx.fillStyle = pgr; pcx.fillRect(0, 0, 64, 64); const poolTex = new THREE.CanvasTexture(poolCv)
   const lightPool = (x, gy, z, r, op) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 16), new THREE.MeshBasicMaterial({ map: poolTex, color: 0xffba66, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: true })); m.rotation.x = -Math.PI / 2; m.position.set(x, gy + 0.06, z); town.add(m); return m }
@@ -2194,10 +2206,8 @@ export async function mountTown3d(parent, opts = {}) {
       const cx = side * (3.3 + R() * 0.9)
       const cz = -12 - R() * 54
       const cy = heightAt(cx, cz)
-      const car = new THREE.Mesh(new RoundedBoxGeometry(1.7, 1.0, 3.4, 2, 0.26), toon(carCols[(R() * carCols.length) | 0])) // 面取りで丸みのある車体
-      car.position.set(cx, cy + 0.55, cz); car.rotation.y = side > 0 ? 0.05 : -0.05; car.castShadow = true; town.add(car)
-      const cab = new THREE.Mesh(new RoundedBoxGeometry(1.5, 0.7, 1.7, 2, 0.2), toon(0x2a2e34))
-      cab.position.set(cx, cy + 1.25, cz - 0.1); town.add(cab)
+      town.add(mkCar(cx, cy, cz, side > 0 ? 0.05 : -0.05, carCols[(R() * carCols.length) | 0])) // 車体＋窓＋4輪
+
     }
   }
 
@@ -2274,7 +2284,7 @@ export async function mountTown3d(parent, opts = {}) {
     for (let i = 0; i <= 6; i++) { const lg = new THREE.BoxGeometry(0.16, 0.04, 3.6); lg.translate(-9 + i * 3, 0.32, 12.6); lineGeos.push(lg) }
     if (BufferGeometryUtils.mergeGeometries) { const lm = BufferGeometryUtils.mergeGeometries(lineGeos, false); if (lm) g.add(new THREE.Mesh(lm, toon(0xe6e2d8))); lineGeos.forEach((q) => q.dispose()) } // 駐車枠の白線（統合）
     const pcols = [0xb0564a, 0xe8e2d4, 0x3a5a7a, 0x9a9488, 0x4a6a4a]
-    for (let i = 0; i < (LIGHT ? 7 : 11); i++) { const car = new THREE.Mesh(new RoundedBoxGeometry(1.7, 1.0, 3.2, 2, 0.24), toon(pcols[i % pcols.length])); car.position.set(-9 + (i % 6) * 3, 0.8, 12.6 + ((i / 6) | 0) * 4.6); car.castShadow = true; g.add(car) }
+    for (let i = 0; i < (LIGHT ? 7 : 11); i++) { g.add(mkCar(-9 + (i % 6) * 3, 0.3, 12.6 + ((i / 6) | 0) * 4.6, 0, pcols[i % pcols.length], 3.2)) } // 車体＋窓＋4輪
     { const corral = new THREE.Group(); corral.position.set(8.5, 0, 19.5); g.add(corral) // カート置き場（屋根＋支柱＋カートの列）
       const croof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 4), trimMat); croof.position.y = 2.2; corral.add(croof)
       for (const cx2 of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 6), trimMat); post.position.set(cx2, 1.1, 0); corral.add(post) }
@@ -9416,6 +9426,20 @@ export async function mountTown3d(parent, opts = {}) {
       const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.3); dl2.position.set(-0.7, 0.4, 0.6); s.add(dl2); s.add(g)
       const W = 520, H = 460, cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 30), r = 2.5 * sc
       cam.position.set(r, 0.85 * sc, r); cam.lookAt(0, 0.5 * sc, 0)
+      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
+      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
+      const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
+      s.remove(g); g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() }); rt.dispose(); return cv.toDataURL()
+    }
+    window.__town3dCarShot = (col = 0x3a5a7a) => { // 検証用: 駐車車両(mkCar)を隔離シーンで接写（車輪/窓の確認）
+      const g = mkCar(0, 0, 0, 0.5, col)
+      const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
+      const dl = new THREE.DirectionalLight(0xffffff, 0.9); dl.position.set(0.4, 1, 1.2); s.add(dl); s.add(g)
+      const W = 560, H = 420, cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 30)
+      cam.position.set(3.6, 1.8, 3.6); cam.lookAt(0, 0.7, 0)
       const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
       renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
