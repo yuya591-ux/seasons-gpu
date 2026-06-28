@@ -8914,7 +8914,10 @@ export async function mountTown3d(parent, opts = {}) {
     if (winRoom.visible && winCat) { const c = winCat // 猫: 眠る・たまに目を覚ます・撫でられると喜ぶ＝生きている気配
       // 覚醒度 alert（0=眠り/1=ぱっちり）。撫でている間=1、たまに自発的に目を覚ます。
       c.wakeT -= dt
-      if (c.wakeT < 0 && c.wakeHold <= 0 && c.petActive < 1) { c.wakeT = 32 + R() * 52; c.wakeHold = 2.5 + R() * 3.5 } // たまにふと目を覚ます
+      if (c.wakeT < 0 && c.wakeHold <= 0 && c.petActive < 1) { c.wakeT = 32 + R() * 52; c.wakeHold = 2.5 + R() * 3.5
+        // 目を覚ますと、ひとりでに毛づくろい/あくび/伸び等をする（タップしなくても生きている・自発の仕草・鳴かない）
+        if ((c.reactT || 0) <= 0) { const calm = ['groom', 'groom', 'yawn', 'stretch', 'earFlick']; c.react = calm[(Math.random() * calm.length) | 0]; c.reactDur = c.react === 'groom' ? 3.4 : (c.react === 'stretch' ? 2.4 : 1.9); c.reactT = c.reactDur; c.wakeHold = Math.max(c.wakeHold, c.reactDur); c.lastReact = -1 }
+      } // たまにふと目を覚まし、自発的に仕草をする
       if (c.wakeHold > 0) c.wakeHold -= dt
       // たまに起き上がって伸びをし、日だまりの別の場所へ移って丸くなる（猫の現実的な“移動”）
       c.relocT -= dt
@@ -8984,7 +8987,17 @@ export async function mountTown3d(parent, opts = {}) {
           case 'shake': { c.headG.rotation.y = c.lookX * c.alert + Math.sin(p * Math.PI * 8) * 0.34 * env; break } // ぶるっと頭を振る
           case 'yawn': { const yb = Math.sin(Math.min(1, p / 0.5) * Math.PI); c.headG.rotation.x = c.headX0 + c.alert * 0.34 - yb * 0.32; c.body.scale.y = c.y0 * (1 + yb * 0.08); break } // あくび
           case 'knead': { if (c.paws) for (let i = 0; i < c.paws.length; i++) { const pw = c.paws[i]; pw.position.y = pw.userData.y0 + Math.max(0, Math.sin(t * 6.5 + i * Math.PI)) * 0.055 * env } c.body.scale.y = c.y0 * (1 + Math.sin(t * 6.5) * 0.02 * env); c.purr = Math.max(c.purr, 0.5 * env); break } // ふみふみ（前足こねこね＋ご機嫌）
-          case 'batToy': { const bt = Math.sin(Math.min(1, p / 0.4) * Math.PI); if (c.paws && c.paws[0]) { c.paws[0].position.z = c.paws[0].userData.z0 + bt * 0.14; c.paws[0].position.y = c.paws[0].userData.y0 + bt * 0.05 } c.headG.rotation.x = c.headX0 + c.alert * 0.34 + bt * 0.16; c.body.scale.x = 1.5 * (1 + bt * 0.12); break } // おもちゃをバット（前足を伸ばす）
+          case 'groom': { const g2 = Math.sin(Math.min(1, p / 0.35) * Math.PI), lk = 0.5 + 0.5 * Math.sin(p * Math.PI * 9) // 立ち上がり＋舐めるリズム
+            if (c.paws && c.paws[0]) { c.paws[0].position.y = c.paws[0].userData.y0 + g2 * (0.16 + lk * 0.03); c.paws[0].position.z = c.paws[0].userData.z0 - g2 * 0.05 } // 前足を顔へ持ち上げる
+            c.headG.rotation.x = c.headX0 + c.alert * 0.34 + g2 * (0.24 + lk * 0.06)  // 顔を前足へ下げ、小刻みに舐める
+            c.headG.rotation.z = Math.sin(p * Math.PI * 4.5) * 0.14 * g2               // 顔を傾けて舐める
+            c.tail.rotation.y = Math.sin(t * 1.2) * 0.1; break } // 毛づくろい（顔を洗う・前足を舐める）
+          case 'batToy': { // ボールの方へ向き直ってから前足を伸ばして打つ（向いてる方向だけに伸びる違和感を解消）
+            if (c.batYaw !== undefined) { let dy = c.batYaw - c.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.g.rotation.y += dy * Math.min(1, dt * 9) } // ボールへ向き直る（最短回り）
+            const bt = Math.sin(Math.max(0, Math.min(1, (p - 0.32) / 0.5)) * Math.PI) // 向き直ってから打つ（前半は向き直り）
+            if (c.paws && c.paws[0]) { c.paws[0].position.z = c.paws[0].userData.z0 + bt * 0.24; c.paws[0].position.y = c.paws[0].userData.y0 + bt * 0.1 } // 前足をぐっとボールへ伸ばす
+            if (c.paws && c.paws[1]) c.paws[1].position.z = c.paws[1].userData.z0 + bt * 0.09 // もう片足も少し
+            c.headG.rotation.x = c.headX0 + c.alert * 0.34 + bt * 0.22; c.body.scale.x = 1.5 * (1 + bt * 0.16); c.g.position.y = c.baseY + bt * 0.02; break } // 打つ瞬間に前のめり
           default: { c.headG.rotation.x = c.headX0 + c.alert * 0.34 + Math.sin(p * Math.PI) * 0.08; break } // lookback: じっと見つめる
         }
         if (c.reactT <= 0) { c.react = null; c.g.rotation.z = 0; c.ears[0].rotation.x = c.ears0[0]; c.ears[1].rotation.x = c.ears0[1]; c.headG.rotation.z = 0; if (c.paws) for (const pw of c.paws) { pw.position.y = pw.userData.y0; pw.position.z = pw.userData.z0 } } // 反応終わり＝姿勢を戻す
@@ -9343,11 +9356,17 @@ export async function mountTown3d(parent, opts = {}) {
     petRay.setFromCamera(petNDC, camera)
     return petRay.intersectObject(winCat.toyHit).length > 0
   }
-  const batTheToy = () => { const c = winCat; if (!c) return // おもちゃをタップ＝猫がバットして毛糸玉が転がる
-    const ang = Math.random() * 6.28, sp = 1.3 + Math.random() * 1.0; c.toyVX = Math.cos(ang) * sp; c.toyVZ = Math.sin(ang) * sp; c.toyBob = 0.14
-    c.react = 'batToy'; c.reactDur = 1.1; c.reactT = 1.1; c.wakeHold = Math.max(c.wakeHold, 1.6); c.playful = Math.min(1, c.playful + 0.32); c.lastReact = -1
+  const batTheToy = () => { const c = winCat; if (!c) return // おもちゃをタップ＝猫がボールの方へ向き直り前足でバットして毛糸玉が転がる
+    // ボールの位置へ体を向ける（向いた方向＝ボール方向になり、前足が自然にボールへ届く）。離れた所なら近くへ寄ってから打つ。
+    const dx = c.toyG.position.x - c.g.position.x, dz = c.toyG.position.z - c.g.position.z, d = Math.hypot(dx, dz) || 0.001
+    c.batYaw = Math.atan2(dx, dz) // facing +z 基準＝この角でボールを正面に捉える
+    // 毛糸玉は猫から離れる向きへ転がす（ランダムでなく一打の方向性）。少しだけ角度をブレさせる。
+    const ux = dx / d, uz = dz / d, spread = (Math.random() - 0.5) * 0.7, cs = Math.cos(spread), sn = Math.sin(spread), sp = 1.3 + Math.random() * 1.0
+    c.toyVX = (ux * cs - uz * sn) * sp; c.toyVZ = (ux * sn + uz * cs) * sp; c.toyBob = 0.14
+    c.react = 'batToy'; c.reactDur = 1.4; c.reactT = 1.4; c.wakeHold = Math.max(c.wakeHold, 2.0); c.playful = Math.min(1, c.playful + 0.34); c.lastReact = -1
     if (Math.random() < 0.7) onMeow(c.voice * (1.0 + Math.random() * 0.1), 'short')
   }
+  if (/[?&]dev=1/.test(location.search)) window.__town3dBatToyAt = (wx, wz) => { if (!winCat) return null; winCat.toyG.position.set(wx, winCat.toyG.position.y, wz); winCat.toyHit.position.copy(winCat.toyG.position); batTheToy(); return { catX: +winCat.g.position.x.toFixed(2), catZ: +winCat.g.position.z.toFixed(2), batYaw: +winCat.batYaw.toFixed(2) } } // 検証用: 毛糸玉を指定位置へ置いて打撃を起こす
   // 窓辺の猫の「遊べる反応」。タップ/触れるたびに違う仕草を返す＝撫でるだけでなく構って遊べる。
   const CAT_REACTIONS = [
     { n: 'lookback', dur: 2.4 }, // 起きてこちらをじっと見つめる
@@ -9359,6 +9378,7 @@ export async function mountTown3d(parent, opts = {}) {
     { n: 'shake', dur: 1.2 },    // ぶるっと頭を振る
     { n: 'yawn', dur: 2.0 },     // ふわぁとあくび
     { n: 'knead', dur: 3.2 },    // ふみふみ（前足でこねこね＝ご機嫌の極み）
+    { n: 'groom', dur: 3.4 },    // 毛づくろい（前足を舐めて顔を洗う＝猫の白眉）
   ]
   const triggerCatReaction = (nx) => { const c = winCat; if (!c) return
     c.playful = Math.min(1, c.playful + 0.34) // 構うほどご機嫌＝活発に
