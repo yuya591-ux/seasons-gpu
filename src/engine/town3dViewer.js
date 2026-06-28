@@ -1244,7 +1244,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (Math.hypot(px, pz) > 58) { const csh = new THREE.Mesh(crowdShadowGeo, contactShadowMat); csh.rotation.x = -Math.PI / 2; csh.position.y = 0.05; csh.renderOrder = 3; mesh.add(csh) }
     return mesh // 動く旅人(cityWalkers)等が参照して動かせるよう返す
   }
-  const makeFestival = (fx, fz, sc = 1) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）
+  const makeFestival = (fx, fz, sc = 1, compact = false) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）。compact=狭い広場用に屋台を省き広場内に収める
     const fgy = heightAt(fx, fz), woodMat = toon(0x9a7048), redMat = toon(0xc0392b)
     const yag = new THREE.Group(); yag.position.set(fx, fgy, fz); town.add(yag) // やぐら（二段の木の櫓＋紅白幕＋太鼓＋宝形屋根）
     for (const lx of [-1.8, 1.8]) for (const lz of [-1.8, 1.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 4.6, 0.25), woodMat); leg.position.set(lx, 2.3, lz); leg.castShadow = true; yag.add(leg) }
@@ -1266,7 +1266,8 @@ export async function mountTown3d(parent, opts = {}) {
       const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, woodMat)); poleGeos.forEach((g) => g.dispose())
       for (let c = 0; c < 3; c++) { if (lanGeos[c].length) { const lm = BufferGeometryUtils.mergeGeometries(lanGeos[c], false); if (lm) town.add(new THREE.Mesh(lm, lit ? new THREE.MeshBasicMaterial({ color: lantLit[c], fog: true }) : lantCols[c])); lanGeos[c].forEach((g) => g.dispose()) } } // 夜は提灯が灯る
     }
-    // 屋台×4（暖簾の品書き。夜は灯る）
+    // 屋台×4（暖簾の品書き。夜は灯る）。compact会場(狭い広場)は屋台を省き広場内に収める＝密集地/大通りへはみ出さない
+    if (!compact) {
     const stallWords = ['たこやき', 'わたあめ', 'かきごおり', 'やきとり'], stallPos = [[-9, 4], [9, 2], [-4, 11], [6, 10]]
     for (let s = 0; s < 4; s++) {
       const sx = fx + stallPos[s][0] * sc, sz = fz + stallPos[s][1] * sc, sgy = heightAt(sx, sz), g = new THREE.Group(); g.position.set(sx, sgy, sz); town.add(g)
@@ -1278,6 +1279,7 @@ export async function mountTown3d(parent, opts = {}) {
       const stallLan = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), lit ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : redMat); stallLan.scale.y = 1.2; stallLan.position.set(-1.2, 1.8, 0.7); g.add(stallLan)
       if ((s === 0 || s === 3) && !LIGHT) for (let p = 0; p < 3; p++) { const puff = new THREE.Mesh(new THREE.SphereGeometry(0.32, 7, 6), new THREE.MeshBasicMaterial({ color: 0xf2f0ea, transparent: true, opacity: 0, depthWrite: false, fog: true })); puff.position.set(0.4, 1.4, 0.1); g.add(puff); steamPuffs.push({ mesh: puff, base: 1.4, ph: p * 0.8 + R() * 0.6 }) }
       colliders.push({ x: sx, z: sz, r: 1.6 })
+    }
     }
     // 盆踊りの輪（やぐらを囲む人。中心を向き、frameで腕を上げ下げ・体を揺らす）
     const skinMat = toon(0xf0c49c), hairMat = toon(0x2a2420), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], nD = LIGHT ? 8 : 12
@@ -3171,8 +3173,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
 
     // ── ホームの目の前の広場／街への入口の広場の盆踊り。夏の夕夜・日替わりでどちらか一方が祭りに（近すぎるので両方同時はなし）。──
-    if (festOn(3)) makeFestival(PLAZA_HOME.x, PLAZA_HOME.z, 0.6)        // 窓のすぐ前で盆踊り（目の前の広場）id=3
-    else if (festOn(4)) makeFestival(PLAZA_GATE.x, PLAZA_GATE.z, 0.55) // 街の入口の広場で盆踊り id=4
+    if (festOn(3)) makeFestival(PLAZA_HOME.x, PLAZA_HOME.z, 0.6, true) // 窓のすぐ前で盆踊り（compact＝屋台を出さず広場内に収め密集地へはみ出さない）id=3
+    // id=4(入口の広場PLAZA_GATEの祭り)は撤去＝中央通り(x=0軸)の真上で「大通りの真ん中の祭り会場」になっていた（実機FB）。会場は公園/校庭/やまゆり/窓前の専用用地に限定
 
     // ── 遊園地（観覧車のまわり）。ゲート・回転木馬・旗・柵・ベンチ＝明るい賑わいの目的地。──
     {
