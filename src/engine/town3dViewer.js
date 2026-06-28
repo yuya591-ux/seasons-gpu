@@ -5956,12 +5956,14 @@ export async function mountTown3d(parent, opts = {}) {
       const wing = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), birdMat)
       wing.position.x = s * 0.6; b.add(wing); wing.userData.side = s
     }
+    b.add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.95, 5).rotateX(-Math.PI / 2), birdMat)) // 紡錘の胴＝浮かぶ羽でなく鳥の輪郭
     b.userData = { cx: (R() - 0.5) * 40, cz: -40 - R() * 40, rad: 18 + R() * 16, yy: 30 + R() * 14, sp: 0.12 + R() * 0.08, ph: R() * 6.28 }
     scene.add(b); birds.push(b)
   }
   // 飛行中、ふと一羽が並んで飛ぶ（つかの間の道連れ）。たまに現れ、少し伴走して離れていく。
   const comp = new THREE.Group()
   for (const s of [-1, 1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.44), birdMat); wing.position.x = s * 0.64; comp.add(wing); wing.userData.side = s }
+  comp.add(new THREE.Mesh(new THREE.ConeGeometry(0.13, 1.0, 5).rotateX(-Math.PI / 2), birdMat)) // 紡錘の胴
   comp.visible = false; scene.add(comp)
   let compActive = false, compT = 0, compCool = 6, compSide = 1
   const compPhase = R() * 6.28
