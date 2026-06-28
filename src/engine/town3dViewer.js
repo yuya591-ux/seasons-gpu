@@ -6918,8 +6918,8 @@ export async function mountTown3d(parent, opts = {}) {
       add(SP(0.18), fur, -0.2, 0.17, -0.06, 0, 0, 0, 1.0, 0.95, 1.0)                            // お尻のふくらみ
       add(SP(0.19), white, 0.08, 0.085, 0.16, 0, 0, 0, 1.2, 0.5, 0.9)                           // 胸〜お腹の白
       const paws = []; for (const px of [-0.08, 0.08]) { const pw = add(SP(0.05), white, 0.12, 0.045, 0.3, 0, 0, 0, 1.3, 0.8, 1.5); pw.position.set(0.16 + px * 0.55, 0.05, 0.27); pw.userData.y0 = 0.05; pw.userData.z0 = 0.27; paws.push(pw) } // 前足（白い足先・ふみふみ/バットで動く）
-      // 背の薄墨の縞（茶トラ）。胴に沿って弧を伏せる。
-      for (const sx2 of [-0.16, -0.06, 0.04, 0.14]) add(new THREE.TorusGeometry(0.16, 0.016, 6, 14, Math.PI * 0.62), furD, sx2, 0.18, -0.02, 0, 0, Math.PI, 1.1, 1, 1.5)
+      // 背の薄墨の縞（タビー）。胴に沿って弧を伏せ、脇腹まで垂らす。密に・少し太く＝毛柄を明瞭に（solid色ではfurD≒地色で自然に目立たない＝正しい）
+      for (const sx2 of [-0.2, -0.12, -0.04, 0.04, 0.12, 0.2]) add(new THREE.TorusGeometry(0.16, 0.02, 6, 16, Math.PI * 0.72), furD, sx2, 0.18, -0.03, 0, 0, Math.PI, 1.12, 1, 1.9)
       add(SP(0.2), furL, 0, 0.27, -0.04, 0, 0, 0, 1.3, 0.4, 1.0) // 背の明るみ
       // 尻尾（胴の手前へ巻き、先が淡い）
       const tail = add(new THREE.TorusGeometry(0.15, 0.038, 8, 20, Math.PI * 1.3), fur, 0.04, 0.08, 0.2, Math.PI / 2, 0, 0.4)
