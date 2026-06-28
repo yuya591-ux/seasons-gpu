@@ -1239,6 +1239,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // 群衆の一人＝人らしい体（裾広がりの胴＋首＋小頭＋髪）を頂点色で1メッシュに焼く。こけし人形(円柱＋球)を脱しつつ描画コールは1（市の人々で多用するので軽量化も兼ねる）。
   const crowdMat = toon(0xffffff); crowdMat.vertexColors = true
+  const crowdAnim = [] // 静的な群衆(mkCrowdPerson)＝近くに立つと「蝋人形」に見える。frameで近くの者だけ微かに揺らす（蠢く）。cityWalkerは除外
   const mkCrowdPerson = (px, py, pz, bodyCol, sc = 0.7) => {
     const skinHex = 0xe6c6a4, hairHex = 0x2a1f18, geos = []
     const legHex = new THREE.Color(bodyCol).multiplyScalar(0.62).getHex() // 下衣（袴/ズボン）＝胴より一段暗い二色で「服を着た人」と分かる
@@ -1265,6 +1266,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 接地影: 静的影は原点±60しか焼かない＝時代エリア(遠い)の群衆は影が無く宙に浮く。足元に柔らかい影の円を「メッシュの子」で付け、
     // 移動(cityWalkers)にも追従させる(円なので回転は不問)。原点近く(home)は実影があるので付けない＝二重で濃くならない・描画コールも増やさない。
     if (Math.hypot(px, pz) > 58) { const csh = new THREE.Mesh(crowdShadowGeo, contactShadowMat); csh.rotation.x = -Math.PI / 2; csh.position.y = 0.05; csh.renderOrder = 3; mesh.add(csh) }
+    mesh.userData.cph = R() * 6.28; mesh.userData.cy0 = py; mesh.userData.crot = mesh.rotation.y; crowdAnim.push(mesh) // 近接の微揺れ用（cityWalkerになった個体はwalkerフラグで除外）
     return mesh // 動く旅人(cityWalkers)等が参照して動かせるよう返す
   }
   const makeFestival = (fx, fz, sc = 1, compact = false) => { // sc=会場の広さに合わせた縮尺（狭い校庭は小さめ）。compact=狭い広場用に屋台を省き広場内に収める
@@ -8025,6 +8027,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (Math.hypot(b.position.x, b.position.z) > 58) { _bbox.setFromObject(b); _bbox.getSize(_bsz); _bbox.getCenter(_bctr); const r = Math.max(_bsz.x, _bsz.z) * 0.42; if (r > 0.6 && r < 14) bldgShadowSpecs.push([_bctr.x, heightAt(_bctr.x, _bctr.z), _bctr.z, r]) }
   }
   if (bldgShadowSpecs.length) addContactShadows(bldgShadowSpecs) // 遠景建物の足元影を1メッシュへ統合＝描画コール+1で浮きを一掃
+  for (const w of cityWalkers) if (w.g) w.g.userData.walker = true // 動く旅人は近接微揺れの対象外（自前で動くため）
   window.__town3dFrozen = () => frozenStatic // 検証用: 凍結した静的ノード数
 
   function frame() {
@@ -8183,6 +8186,10 @@ export async function mountTown3d(parent, opts = {}) {
     }
     // 港町の少女（一枚絵の立ち絵）は常にカメラの方を向く
     for (const sp of standees) sp.rotation.y = Math.atan2(camera.position.x - sp.position.x, camera.position.z - sp.position.z)
+    // 静的な群衆の近接微揺れ（市の人だかり等が「蝋人形」に見えないよう、近くの者だけそっと向きを変え重心を移す。アート監督致命3）。
+    for (const m of crowdAnim) { const u = m.userData; if (u.walker) continue
+      const cdx = m.position.x - active.flyPos.x, cdz = m.position.z - active.flyPos.z; if (cdx * cdx + cdz * cdz > 2700) continue // 近く(約52u)だけ＝負荷を抑える
+      m.rotation.y = u.crot + Math.sin(t * 0.4 + u.cph) * 0.22; m.position.y = u.cy0 + Math.abs(Math.sin(t * 1.3 + u.cph)) * 0.03 }
     // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
     const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
     const wakeSpd = wakeOn ? Math.min(1, Math.hypot(active.vel.x, active.vel.z) / FLY.speed) : 0
