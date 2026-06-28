@@ -8926,6 +8926,17 @@ export async function mountTown3d(parent, opts = {}) {
         const ang = Math.random() * 6.28, d = 0.55 + Math.random() * 0.75
         c.x1 = Math.max(-0.35, Math.min(1.35, c.x0 + Math.cos(ang) * d)); c.z1 = Math.max(1.05, Math.min(2.35, c.z0 + Math.sin(ang) * d))
         c.rot1 = Math.atan2(c.x1 - c.x0, c.z1 - c.z0) }
+      // じゃれ追い: ご機嫌な時、止まった毛糸玉へ自分から歩み寄り、着いたら打つ（relocの歩行を流用・飽きる(playful減衰)まで繰り返す）。
+      if (c.chaseT === undefined) c.chaseT = 4 + R() * 4
+      c.chaseT -= dt
+      if (c.relocP >= 1 && c.petActive < 1 && !c.chaseToy && c.chaseT < 0 && c.playful > 0.35) {
+        const toyRest = Math.hypot(c.toyVX, c.toyVZ) < 0.2, dToy = Math.hypot(c.toyG.position.x - c.g.position.x, c.toyG.position.z - c.g.position.z)
+        if (toyRest && dToy > 0.55 && dToy < 2.4) { c.chaseT = 4 + R() * 5; c.relocP = 0; c.chaseToy = true
+          c.x0 = c.g.position.x; c.z0 = c.g.position.z; c.rot0 = c.g.rotation.y; c.g.rotation.z = 0
+          const ddx = c.toyG.position.x - c.x0, ddz = c.toyG.position.z - c.z0, dd = Math.hypot(ddx, ddz) || 1
+          c.x1 = Math.max(-0.35, Math.min(1.35, c.x0 + ddx / dd * (dd - 0.4))); c.z1 = Math.max(1.05, Math.min(2.35, c.z0 + ddz / dd * (dd - 0.4))); c.rot1 = Math.atan2(c.x1 - c.x0, c.z1 - c.z0)
+        } else c.chaseT = 4 + R() * 4 // 条件外なら近いうちに再判定
+      }
       const reloc = c.relocP < 1
       c.alertTarget = (c.petActive >= 1 || c.wakeHold > 0 || reloc) ? 1 : 0
       c.alert += (c.alertTarget - c.alert) * Math.min(1, dt * 3.2)
@@ -8969,8 +8980,9 @@ export async function mountTown3d(parent, opts = {}) {
         c.body.scale.z = 1.22 * (1 - st * 0.12)
         if (c.catShadow) { c.catShadow.position.x = c.g.position.x; c.catShadow.position.z = c.g.position.z }
       } else { c.body.scale.x = 1.5; c.body.scale.z = 1.22; if (Math.abs(c.g.position.y - c.baseY) > 0.0005) c.g.position.y = c.baseY }
+      if (c.chaseToy && c.relocP >= 1) { c.chaseToy = false; batTheToy() } // じゃれ追い: 玉に歩み寄って着いたら打つ（向き直り＋リーチ＋玉を転がす）
       // ── 遊べる反応（タップ/触れるたびに違う仕草）＋ご機嫌の減衰＋まばたき＋頭が手を追う ──
-      c.playful = Math.max(0, c.playful - dt * 0.09) // ご機嫌はゆっくり冷める
+      c.playful = Math.max(0, c.playful - dt * 0.065) // ご機嫌はゆっくり冷める（じゃれ追いが続くよう緩やかに）
       c.lookXTarget *= (1 - Math.min(1, dt * 0.6)) // 見ている方向は徐々に正面へ戻る
       c.lookX += (c.lookXTarget - c.lookX) * Math.min(1, dt * 5)
       if (c.alert > 0.2 && !reloc) c.headG.rotation.y = c.lookX * c.alert // 起きている時こちら(触れた方)を見る
@@ -9366,7 +9378,9 @@ export async function mountTown3d(parent, opts = {}) {
     c.react = 'batToy'; c.reactDur = 1.4; c.reactT = 1.4; c.wakeHold = Math.max(c.wakeHold, 2.0); c.playful = Math.min(1, c.playful + 0.34); c.lastReact = -1
     if (Math.random() < 0.7) onMeow(c.voice * (1.0 + Math.random() * 0.1), 'short')
   }
-  if (/[?&]dev=1/.test(location.search)) window.__town3dBatToyAt = (wx, wz) => { if (!winCat) return null; winCat.toyG.position.set(wx, winCat.toyG.position.y, wz); winCat.toyHit.position.copy(winCat.toyG.position); batTheToy(); return { catX: +winCat.g.position.x.toFixed(2), catZ: +winCat.g.position.z.toFixed(2), batYaw: +winCat.batYaw.toFixed(2) } } // 検証用: 毛糸玉を指定位置へ置いて打撃を起こす
+  if (/[?&]dev=1/.test(location.search)) { window.__town3dBatToyAt = (wx, wz) => { if (!winCat) return null; winCat.toyG.position.set(wx, winCat.toyG.position.y, wz); winCat.toyHit.position.copy(winCat.toyG.position); batTheToy(); return { catX: +winCat.g.position.x.toFixed(2), catZ: +winCat.g.position.z.toFixed(2), batYaw: +winCat.batYaw.toFixed(2) } } // 検証用: 毛糸玉を指定位置へ置いて打撃を起こす
+    window.__town3dCatChase = (wx, wz) => { if (!winCat) return null; if (wx !== undefined) { winCat.toyG.position.set(wx, winCat.toyG.position.y, wz); winCat.toyHit.position.copy(winCat.toyG.position) } winCat.toyVX = 0; winCat.toyVZ = 0; winCat.playful = 1; winCat.chaseT = -1; winCat.relocP = 1; winCat.chaseToy = false; return { catX: +winCat.g.position.x.toFixed(2), catZ: +winCat.g.position.z.toFixed(2), toyX: +winCat.toyG.position.x.toFixed(2), toyZ: +winCat.toyG.position.z.toFixed(2) } } // 検証用: 玉を置いて即じゃれ追いを起こす
+    window.__town3dCatState2 = () => winCat ? { catX: +winCat.g.position.x.toFixed(2), catZ: +winCat.g.position.z.toFixed(2), chaseToy: !!winCat.chaseToy, relocP: +winCat.relocP.toFixed(2), react: winCat.react || '', toyX: +winCat.toyG.position.x.toFixed(2), toyZ: +winCat.toyG.position.z.toFixed(2) } : null }
   // 窓辺の猫の「遊べる反応」。タップ/触れるたびに違う仕草を返す＝撫でるだけでなく構って遊べる。
   const CAT_REACTIONS = [
     { n: 'lookback', dur: 2.4 }, // 起きてこちらをじっと見つめる
