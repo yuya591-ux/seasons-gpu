@@ -551,6 +551,10 @@ export async function mountTown3d(parent, opts = {}) {
   // 雪の積もり: 上を向いた面（屋根・地面・樹冠の上面）だけ白を被せる＝「雪が乗っている」表現。
   // 壁など縦面(normal.y≈0)は白くならない。weather==='snow' の全トゥーン材に共有適用。
   const SNOW = weather === 'snow'
+  // 雪冠の色＝昼夕は陽を受けた明るい白／夜は夜空を映した暗い青灰（固定の明るい白だと遠景の雪屋根が
+  // 暗い夜空に白く光りブルームで白飛びする＝雪夜だけ眩しい不具合の真因）。混ぜ量も夜は控えめに。
+  const SNOW_RGB = isNight ? '0.42, 0.46, 0.58' : '0.88, 0.90, 0.95'
+  const SNOW_MIX = isNight ? 0.56 : 0.7
   const snowify = (m) => {
     if (!SNOW) return m
     m.onBeforeCompile = (sh) => {
@@ -559,9 +563,9 @@ export async function mountTown3d(parent, opts = {}) {
         .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vWNSnow = mat3(modelMatrix) * objectNormal;')
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWNSnow;')
-        .replace('#include <dithering_fragment>', '  float snowK = smoothstep(0.34, 0.74, normalize(vWNSnow).y);\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.88, 0.90, 0.95), snowK * 0.7);\n#include <dithering_fragment>')
+        .replace('#include <dithering_fragment>', `  float snowK = smoothstep(0.34, 0.74, normalize(vWNSnow).y);\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${SNOW_RGB}), snowK * ${SNOW_MIX});\n#include <dithering_fragment>`)
     }
-    m.customProgramCacheKey = () => 'snowcap'
+    m.customProgramCacheKey = () => isNight ? 'snowcap-n' : 'snowcap'
     return m
   }
   const toon = (hex) => snowify(new THREE.MeshToonMaterial({ color: hex, gradientMap: grad }))
