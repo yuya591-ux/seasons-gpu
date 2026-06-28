@@ -5300,6 +5300,21 @@ export async function mountTown3d(parent, opts = {}) {
       g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); return g
     }
     for (const br of cwBridges) { const bg = makeBridge(br); scene.add(bg); cloudObjs.push(bg) }
+    // 雲上のひと（浴衣姿の素朴な人影）。賑わいを少しだけ＝無人の静けさは保ちつつ人の気配を点々と灯す。tn材で陰影付き。
+    const folkSkin = tn(isNight ? 0xae9686 : 0xe6c2a2), folkHair = tn(isNight ? 0x2a2622 : 0x352e28), folkObi = tn(isNight ? 0x6a5a3a : 0xb89a5a)
+    const addFolk = (g, x, y, z, ry, robeHue, seated) => {
+      const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = ry
+      const robe = tn(robeHue), hipH = seated ? 0.34 : 0.6, topH = 0.5
+      const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.19, seated ? 0.24 : 0.3, hipH, 8), robe); lower.position.y = hipH / 2; grp.add(lower) // 裾
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.21, topH, 8), robe); upper.position.y = hipH + topH / 2; grp.add(upper) // 上体
+      const obi = new THREE.Mesh(new THREE.CylinderGeometry(0.215, 0.215, 0.1, 8), folkObi); obi.position.y = hipH + 0.03; grp.add(obi) // 帯
+      for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, topH * 0.92, 5), robe); arm.position.set(s * 0.2, hipH + topH * 0.46, 0.02); arm.rotation.z = s * 0.16; grp.add(arm) } // 腕（袖）＝瓶感を脱す
+      if (seated) { const lap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.46), robe); lap.position.set(0, hipH - 0.04, 0.2); grp.add(lap) } // 膝（前へ）
+      const neck = hipH + topH
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), folkSkin); head.position.y = neck + 0.11; grp.add(head)
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.155, 10, 8), folkHair); hair.scale.set(1, 0.74, 1); hair.position.set(0, neck + 0.16, -0.02); grp.add(hair)
+      g.add(grp); return grp
+    }
     for (const n of cwNodes) { // 各島を建てる
       const g = makeFloatIsle(n.r)
       if (n.kind === 'pavilion') {
@@ -5355,6 +5370,8 @@ export async function mountTown3d(parent, opts = {}) {
         const lpz = 1.8, lant = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.66, 10), new THREE.MeshToonMaterial({ color: isNight ? 0xffcaa0 : 0xf0e0c0, gradientMap: grad, emissive: new THREE.Color(glowT ? 0xff8a3c : 0x000000), emissiveIntensity: glowT ? (isNight ? 1.1 : 0.5) : 0 })); lant.scale.y = 1.2; lant.position.set(2.2, GY + 3.0, lpz); g.add(lant) // 軒の提灯
         const banner = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.6, 0.06), tn(isNight ? 0x8a8478 : 0xeae2d2)); banner.position.set(-3.4, GY + 2.3, 2.2); g.add(banner) // 「茶」の幟（白い布）
         const bpole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.0, 5), woodT); bpole.position.set(-3.75, GY + 2.0, 2.2); g.add(bpole)
+        addFolk(g, -1.7, GY + 1.13, 3.25, 0.12, isNight ? 0x33485e : 0x4a6b80, true)  // 縁台で一服しながら雲海を眺める（藍の浴衣）
+        addFolk(g, 1.7, GY + 1.13, 3.25, -0.12, isNight ? 0x5e3a44 : 0x9a5a4a, true)   // もう一人（茜の浴衣）
       } else if (n.kind === 'lookout') { // 見晴らし台＝雲海へ張り出す欄干＋望遠鏡＋腰かけ＋木（「台」の実体を与え本物の展望地に）
         const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640)
         const bench = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 1.3), woodMat); bench.position.set(0, GY + 0.9, 1.5); g.add(bench) // 縁の腰かけ（欄干の手前へ）
@@ -5457,6 +5474,11 @@ export async function mountTown3d(parent, opts = {}) {
         const shougi = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.7), woodM); shougi.position.set(2.6, GY + 0.5, 4.6); shougi.rotation.y = -0.3; g.add(shougi) // 床几（縁台）
         for (const lx of [-0.8, 0.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.6), woodM); leg.position.set(2.6 + lx * Math.cos(0.3), GY + 0.25, 4.6 + lx * Math.sin(0.3)); g.add(leg) }
         const cloth2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.04), stallRoof); cloth2.position.set(2.4, GY + 0.78, 4.5); cloth2.rotation.y = -0.3; g.add(cloth2) // 床几に掛けた緋毛氈
+        // ひと気を少しだけ（賑わい）＝そぞろ歩く人・店番・床几で休む人。無人の郷愁は保ちつつ祭りの温度を足す。
+        addFolk(g, 7.2, GY, 0, -Math.PI / 2, isNight ? 0x4a3a2c : 0x7a5a3e, false)       // 中央の夜店の店番（広場を向く）
+        addFolk(g, 1.4, GY + 0.62, 4.4, 2.5, isNight ? 0x33485e : 0x4a6b80, true)         // 床几で休む人（提灯を見上げる・藍の浴衣）
+        addFolk(g, -1.6, GY, 1.2, 0.8, isNight ? 0x4a4030 : 0x8a6a44, false)              // 広場をそぞろ歩く人
+        addFolk(g, 2.0, GY, -2.2, -1.9, isNight ? 0x5e3a44 : 0x9a5a4a, false)             // 灯りを見て回る人（茜の浴衣）
       } else if (n.kind === 'colonnade') { // 眠る石像の回廊＝苔むした石柱の並木道に顔のない石の番人が点々と座る（失われた文明の守り手・安心。IPセーフ＝野仏/磐座）。石/苔/前掛けを各1メッシュに統合
         const stoneMat = tn(isNight ? 0x4e4e4a : 0x8b867b), mossMat = tn(isNight ? 0x33473a : 0x5f7a4c), bibMat = tn(isNight ? 0x7a2e26 : 0xbe3b2e)
         const sGeo = [], mGeo = [], bGeo = []
