@@ -5570,6 +5570,17 @@ export async function mountTown3d(parent, opts = {}) {
       g.position.set(n.x, n.topY - GY, n.z); g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false } }); scene.add(g); cloudObjs.push(g)
     }
     cloudWalkInfo = { nodes: cwNodes.map((n) => ({ x: n.x, z: n.z, r: n.r - 2.5, topY: n.topY, kind: n.kind })), bridges: cwBridges, minY: SEA_Y - 6 }
+    // 空の渡し舟＝雲海の上を棹さす舟人が一艘でゆっくり巡る（眺めて整う中心の絵・郷愁）。skyDriftersで低空では自動的に隠れる。
+    { const boat = new THREE.Group()
+      const woodF = tn(isNight ? 0x4a3a2a : 0x6e553a), woodF2 = tn(isNight ? 0x5a4632 : 0x866a46)
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.5, 4.0), woodF); hull.position.y = 0.25; boat.add(hull) // 舟底
+      for (const sz of [-1, 1]) { const end = new THREE.Mesh(new THREE.ConeGeometry(0.66, 1.3, 4), woodF); end.rotation.set(sz * Math.PI / 2, Math.PI / 4, 0); end.scale.set(1, 1, 0.45); end.position.set(0, 0.28, sz * 2.3); boat.add(end) } // 舳先と艫（尖り）
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(1.46, 0.12, 4.2), woodF2); rim.position.y = 0.5; boat.add(rim) // 舷
+      addFolk(boat, 0, 0.5, -0.7, 0, isNight ? 0x46402f : 0x6e5a3c, false) // 舟人（棹をさして立つ）
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 4.6, 5), woodF2); pole.position.set(0.52, 1.5, -0.2); pole.rotation.x = -0.5; boat.add(pole) // 棹
+      boat.position.set(56, SEA_Y + 0.4, -315); boat.scale.setScalar(1.85)
+      scene.add(boat); skyDrifters.push({ o: boat, kind: 'ferry', cx: -30, cz: -315, rad: 86, ph: 0, pole, seaY: SEA_Y })
+    }
     // 雲の温泉の湯けむり（ふわふわ立ちのぼる白い湯気）。skyDriftersで更新＝低空では自動的に止まる。
     { const on = cwNodes[4], steam = new THREE.Group()
       const stCv = document.createElement('canvas'); stCv.width = stCv.height = 48
@@ -9110,6 +9121,14 @@ export async function mountTown3d(parent, opts = {}) {
             else { const e = Math.sin(d.spoutA * Math.PI), rise = d.spoutA * d.spoutA; d.spout.material.opacity = e * 0.62; d.spout.position.set(13, 7.5 + rise * 4, 0); d.spout.scale.set(3.4 + d.spoutA * 3.2, 6 + d.spoutA * 12, 1) } } // 後半ほど上へ立ちのぼり細く高く伸びて散る
           else if (t >= d.spoutT && d.diveA === 0) { d.spoutT = t + 6 + R() * 7; d.spoutA = 0.001 } // 6〜13秒ごと（潜行中は吹かない）
         }
+      } else if (d.kind === 'ferry') { // 空の渡し舟：雲海の上をゆっくり巡り、舟人が棹をさす。進行方向へ舳先を向ける。
+        d.ph += dt * 0.02
+        d.o.position.x = d.cx + Math.cos(d.ph) * d.rad
+        d.o.position.z = d.cz + Math.sin(d.ph) * d.rad
+        d.o.position.y = d.seaY + 0.3 + Math.sin(t * 0.5) * 0.22 // 雲海の上で静かにたゆたう
+        d.o.rotation.y = -d.ph                                    // 進行方向へ舳先（接線）
+        d.o.rotation.z = Math.sin(t * 0.5) * 0.03                 // 横揺れ
+        if (d.pole) d.pole.rotation.x = -0.5 + Math.sin(t * 0.55) * 0.22 // 棹をさす
       } else if (d.kind === 'cirrus') { // 高層の巻雲ヴェール：高度でフェードしつつ texture をゆっくり流す（雲海の上に層の奥行き）
         d.mat.opacity = cloudReveal * 0.34
         if (d.mat.map) d.mat.map.offset.x = (t * 0.004) % 1
