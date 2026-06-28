@@ -5581,6 +5581,23 @@ export async function mountTown3d(parent, opts = {}) {
       boat.position.set(56, SEA_Y + 0.4, -315); boat.scale.setScalar(1.85)
       scene.add(boat); skyDrifters.push({ o: boat, kind: 'ferry', cx: -30, cz: -315, rad: 86, ph: 0, pole, seaY: SEA_Y })
     }
+    // 灯籠流し＝灯籠市の手前の雲海の水面を、紙灯籠がいくつも静かに流れる（祭りの余韻・郷愁。夕夜に灯る）。skyDriftersで低空では隠れる。
+    { const glowL = isNight || dk > 0.2
+      const paperMat = new THREE.MeshToonMaterial({ color: isNight ? 0xffcaa0 : 0xf2e2c2, gradientMap: grad, emissive: new THREE.Color(glowL ? 0xff8a3c : 0x000000), emissiveIntensity: glowL ? (isNight ? 1.0 : 0.45) : 0, fog: true })
+      const floatMat = tn(isNight ? 0x3a2e26 : 0x5a4632)
+      const toroG = new THREE.Group(), N = LIGHT ? 8 : 13
+      for (let i = 0; i < N; i++) {
+        const lz = new THREE.Group()
+        lz.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), floatMat)).position.y = 0.06           // 木の台
+        const paper = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), paperMat); paper.position.y = 0.4; lz.add(paper) // 紙の火袋
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.46), floatMat); cap.position.y = 0.68; lz.add(cap)   // 蓋
+        const lx0 = (R() - 0.5) * 38, lz0 = (R() - 0.5) * 28; lz.position.set(lx0, 0, lz0)
+        lz.userData = { ph: R() * 6.28, bob: 0.5 + R() * 0.5, x0: lx0 }
+        toroG.add(lz)
+      }
+      toroG.position.set(-34, SEA_Y + 0.2, -346) // 灯籠市(-34,-366)の手前(南)の雲海に流す
+      scene.add(toroG); skyDrifters.push({ o: toroG, kind: 'toro', drift: 0 })
+    }
     // 雲の温泉の湯けむり（ふわふわ立ちのぼる白い湯気）。skyDriftersで更新＝低空では自動的に止まる。
     { const on = cwNodes[4], steam = new THREE.Group()
       const stCv = document.createElement('canvas'); stCv.width = stCv.height = 48
@@ -9129,6 +9146,14 @@ export async function mountTown3d(parent, opts = {}) {
         d.o.rotation.y = -d.ph                                    // 進行方向へ舳先（接線）
         d.o.rotation.z = Math.sin(t * 0.5) * 0.03                 // 横揺れ
         if (d.pole) d.pole.rotation.x = -0.5 + Math.sin(t * 0.55) * 0.22 // 棹をさす
+      } else if (d.kind === 'toro') { // 灯籠流し：雲海の水面をゆっくり流れ、各灯籠が静かに上下に揺れる（帯の中を回流＝端で反対側へ）
+        d.drift += dt * 0.7
+        for (const lz of d.o.children) {
+          let wx = lz.userData.x0 + d.drift; const B = 44; wx = ((wx + B) % (2 * B) + 2 * B) % (2 * B) - B // 帯[-44,44]に回流
+          lz.position.x = wx
+          lz.position.y = Math.sin(t * 0.6 + lz.userData.ph) * 0.12 * lz.userData.bob // 静かに上下
+          lz.rotation.y = Math.sin(t * 0.3 + lz.userData.ph) * 0.3                     // ゆらり
+        }
       } else if (d.kind === 'cirrus') { // 高層の巻雲ヴェール：高度でフェードしつつ texture をゆっくり流す（雲海の上に層の奥行き）
         d.mat.opacity = cloudReveal * 0.34
         if (d.mat.map) d.mat.map.offset.x = (t * 0.004) % 1
