@@ -352,20 +352,23 @@ export function buildUI(opts) {
     }
     function render() {
       bodyEl.replaceChildren()
-      const j = (getJournal && getJournal()) || { visits: {}, seconds: 0, events: {}, firstAt: null }
-      const visitIds = Object.keys(j.visits || {}).filter((id) => SCENES.some((s) => s.id === id))
+      const j = (getJournal && getJournal()) || { visits: {}, seen: {}, seconds: 0, events: {}, firstAt: null }
+      // 並びは「出会った順」だけ（回数や順位は出さない＝集める強迫を生まないため）。
+      const seenMap = (j.seen && Object.keys(j.seen).length) ? j.seen : (j.visits || {})
+      const seenIds = Object.keys(seenMap).filter((id) => SCENES.some((s) => s.id === id))
       const lead = h('p', 'journal__lead')
-      if (!j.firstAt || !visitIds.length) {
+      if (!j.firstAt || !seenIds.length) {
         lead.textContent = 'まだ記録がありません。窓辺に座ると、静かに溜まっていきます。'
       } else {
         const days = Math.max(1, Math.round((Date.now() - j.firstAt) / 86400000))
         lead.textContent = `はじめての窓辺から ${days}日。これまでに ${fmtDur(j.seconds)}、眺めました。`
       }
       bodyEl.appendChild(lead)
-      if (visitIds.length) {
-        visitIds.sort((a, b) => j.visits[b] - j.visits[a]) // 多く座った窓辺から
+      if (seenIds.length) {
+        const gi = (id) => SCENES.findIndex((s) => s.id === id)
+        seenIds.sort((a, b) => ((seenMap[a] || 0) - (seenMap[b] || 0)) || (gi(a) - gi(b))) // 出会った順（同時刻は情景の並び順）
         const grid = h('div', 'journal__grid')
-        for (const id of visitIds) {
+        for (const id of seenIds) {
           const sc = SCENES.find((s) => s.id === id)
           const cell = h('div', 'journal__cell')
           const sw = h('span', 'journal__thumb')
@@ -378,9 +381,9 @@ export function buildUI(opts) {
         bodyEl.appendChild(grid)
       }
       const ev = j.events || {}
-      const seen = [['rainbow', '虹'], ['star', '流れ星'], ['fireworks', '花火'], ['aurora', 'オーロラ']]
-        .filter(([k]) => ev[k] > 0).map(([k, n]) => `${n}に${ev[k]}度`)
-      if (seen.length) bodyEl.appendChild(h('p', 'journal__events', '立ち会った景色　' + seen.join('、')))
+      const seenEv = [['rainbow', '虹'], ['star', '流れ星'], ['fireworks', '花火'], ['aurora', 'オーロラ']]
+        .filter(([k]) => ev[k] > 0).map(([, label]) => label) // 回数は出さない＝立ち会えた景色の名だけを静かに
+      if (seenEv.length) bodyEl.appendChild(h('p', 'journal__events', '立ち会った景色　' + seenEv.join('、')))
     }
     return {
       el,
@@ -441,6 +444,11 @@ export function buildUI(opts) {
     const nowBtn = h('button', 'iconbtn nowbtn', 'いま')
     nowBtn.setAttribute('aria-label', '今の季節と時刻に合う窓辺')
     head.appendChild(nowBtn)
+    // 通い帳を独立入口へ（設定の奥4階層から、いちばん開かれる「情景」の隣へ昇格）。
+    const journalEntry = h('button', 'iconbtn nowbtn', '通い帳')
+    journalEntry.setAttribute('aria-label', 'これまでの窓辺の記録（通い帳）')
+    journalEntry.addEventListener('click', () => { el.classList.remove('panel--open'); panelJournal.open(); poke() })
+    head.appendChild(journalEntry)
     const close = h('button', 'iconbtn', '×')
     close.setAttribute('aria-label', '閉じる')
     head.appendChild(close)

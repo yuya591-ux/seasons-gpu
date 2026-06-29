@@ -36,29 +36,58 @@ const DEFAULTS = {
     muted: false,
     volume: 0.8, // 全体音量 0..1
   },
+  version: 2, // 保存スキーマの版。構造を増やしたら上げて migrate() で前方互換を保つ（情景メニュー破壊の前科への備え）
   // 通い帳: 訪れた窓辺・過ごした時間・立ち会ったまれな現象を静かに記録（達成やバッジではなく、気づいたら溜まっている記録）。
+  // 「回数」「順位」は意図して表に出さない＝集める強迫を生まないため。残すのは seen＝出会った順だけ。
   journal: {
-    visits: {}, // { sceneId: 訪れた回数 }
+    visits: {}, // { sceneId: 訪れた回数 }※互換のため残すが表示には使わない
+    seen: {}, // { sceneId: 初めて出会った時刻ms }＝通い帳は「出会った順」に静かに増える
     seconds: 0, // 累計の眺めた秒数
-    events: {}, // { rainbow|fireworks|star|aurora: 立ち会った回数 }
+    events: {}, // { rainbow|fireworks|star|aurora: 立ち会った回数 }※回数は表示しない（立ち会えた景色の名だけ）
     firstAt: null, // 初めて窓辺に座った日時
   },
+  // 世界の状態: 訪れた場所（時代エリア/雲海/祭り会場 等）を覚える器。
+  // 「水平線の灯り（未訪の地だけ淡く灯る誘い）」など、死蔵された世界への導線に使う。達成度・到達率は出さない。
+  worldState: {
+    discovered: {}, // { 場所id: 初めて辿り着いた時刻ms }
+    flags: {}, // 任意の小さな世界フラグ（季節の便りの既読など。今後の拡張用）
+  },
+}
+
+// 旧版の保存値を現行スキーマへ寄せる（前方互換）。構造変更時はここに一段ずつ足す。
+function migrate(parsed) {
+  // v1→v2: 通い帳に seen（出会った順）が無い旧利用者へ、既訪の窓辺を引き継ぐ（時刻不明は firstAt に寄せる）。
+  const j = parsed.journal
+  if (j && j.visits && !j.seen) {
+    const t = j.firstAt || Date.now()
+    j.seen = {}
+    for (const id of Object.keys(j.visits)) j.seen[id] = t
+  }
+  return parsed
 }
 
 function read() {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return structuredClone(DEFAULTS)
-    const parsed = JSON.parse(raw)
+    const parsed = migrate(JSON.parse(raw))
     return {
       ...structuredClone(DEFAULTS),
       ...parsed,
+      version: DEFAULTS.version, // 版は常に現行へ（migrate 済み）
       settings: { ...DEFAULTS.settings, ...(parsed.settings || {}) },
       journal: {
         ...DEFAULTS.journal,
         ...(parsed.journal || {}),
         visits: { ...(parsed.journal && parsed.journal.visits) },
+        seen: { ...(parsed.journal && parsed.journal.seen) },
         events: { ...(parsed.journal && parsed.journal.events) },
+      },
+      worldState: {
+        ...DEFAULTS.worldState,
+        ...(parsed.worldState || {}),
+        discovered: { ...(parsed.worldState && parsed.worldState.discovered) },
+        flags: { ...(parsed.worldState && parsed.worldState.flags) },
       },
     }
   } catch {
@@ -96,6 +125,7 @@ export function recordVisit(sceneId) {
   if (!sceneId) return
   const j = state.journal
   j.visits[sceneId] = (j.visits[sceneId] || 0) + 1
+  if (!j.seen[sceneId]) j.seen[sceneId] = Date.now() // 出会った順（通い帳の並びはこれだけで決める）
   if (!j.firstAt) j.firstAt = Date.now()
   persist()
 }
@@ -107,4 +137,17 @@ export function recordEvent(kind) {
   if (!kind) return
   state.journal.events[kind] = (state.journal.events[kind] || 0) + 1
   persist()
+}
+
+// ── 世界の状態（訪れた場所を覚える。未訪の地だけを灯す「水平線の標」に使う） ──
+export function markDiscovered(id) {
+  if (!id) return
+  const w = state.worldState
+  if (!w.discovered[id]) { w.discovered[id] = Date.now(); persist() } // 初めて辿り着いた時だけ記録（到達率や達成は出さない）
+}
+export function isDiscovered(id) {
+  return !!(state.worldState && state.worldState.discovered && state.worldState.discovered[id])
+}
+export function getWorldState() {
+  return state.worldState
 }
