@@ -7641,7 +7641,7 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 常時の雨（雨の角部屋＝3D化）。降る雨筋＋濡れた路面の反射を常時。weather==='rain'のみ。 ──
   if (weather === 'rain') {
-    const N = 760, len = 3.3 // 雨脚＝筋（風で少し斜め）。歩く雨でしっかり降らせる＝自機の周りに密に
+    const N = LIGHT ? 340 : 560, len = 3.3 // 雨脚＝筋（風で少し斜め）。端末性能に合わせ密度を落とす（実機FB: 雨が重い→画質崩壊の連鎖を断つ）。歩く雨の手応えは保つ
     const pos = new Float32Array(N * 2 * 3)
     const head = new Float32Array(N * 3); const spd = new Float32Array(N)
     for (let i = 0; i < N; i++) { head[i * 3] = (R() - 0.5) * 150; head[i * 3 + 1] = R() * 92; head[i * 3 + 2] = -100 + R() * 150; spd[i] = 34 * (0.7 + R() * 0.6) } // 範囲を絞って密度を上げる
@@ -7663,7 +7663,7 @@ export async function mountTown3d(parent, opts = {}) {
       cleanup: () => { scene.remove(rseg); rgeo.dispose(); rmat.dispose() },
     })
     // 濡れた路面のきらめき（街あかりを照り返す）。自機の足元の周りに広がり、歩く所が濡れて光る＝雨の路地。
-    const M = 170
+    const M = LIGHT ? 90 : 150
     const wloc = new Float32Array(M * 2) // ローカルのばらまき(x,z)＝自機を中心に追従
     const wpos = new Float32Array(M * 3); const waph = new Float32Array(M)
     for (let i = 0; i < M; i++) { wloc[i * 2] = (R() - 0.5) * 30; wloc[i * 2 + 1] = (R() - 0.5) * 34; wpos[i * 3 + 1] = 0.12; waph[i] = R() * 6.28 }
@@ -7675,10 +7675,16 @@ export async function mountTown3d(parent, opts = {}) {
       fragmentShader: 'varying float vtw; uniform vec3 uCol; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(uCol, a*vtw*uOp); }',
     })
     const wpts = new THREE.Points(wgeo, wmat); wpts.frustumCulled = false; scene.add(wpts)
+    let wLastX = 1e9, wLastZ = 1e9 // 直近に地形をサンプルした自機位置（停止中は再計算しない）
     addFx({ update: (age) => { wmat.uniforms.uT.value = age
       const a = evAnchor(); const ra = rainAlt(a); wmat.uniforms.uOp.value = 0.5 * ra; wpts.visible = ra > 0.01 // 雲海の上＝濡れた路面のきらめきも消す
-      for (let i = 0; i < M; i++) { const wx = a.x + wloc[i * 2], wz = a.z + wloc[i * 2 + 1]; wpos[i * 3] = wx; wpos[i * 3 + 1] = heightAt(wx, wz) + 0.12; wpos[i * 3 + 2] = wz }
-      wgeo.attributes.position.needsUpdate = true; return true
+      // 自機がほぼ動いていない（眺めている）間は heightAt(M回/フレーム)を省く＝雨の最大のCPU負荷を断つ。瞬きはシェーダ側のuTで続くので静止でもきらめく。
+      if (Math.abs(a.x - wLastX) + Math.abs(a.z - wLastZ) > 1.2) {
+        wLastX = a.x; wLastZ = a.z
+        for (let i = 0; i < M; i++) { const wx = a.x + wloc[i * 2], wz = a.z + wloc[i * 2 + 1]; wpos[i * 3] = wx; wpos[i * 3 + 1] = heightAt(wx, wz) + 0.12; wpos[i * 3 + 2] = wz }
+        wgeo.attributes.position.needsUpdate = true
+      }
+      return true
     }, cleanup: () => { scene.remove(wpts); wgeo.dispose(); wmat.dispose() } })
     // 雨の波紋（地面に当たって広がる輪＝歩く雨の足元の生命感）。自機の近くにぽつぽつ生まれ、広がって消える。
     const RIP = 16, rips = []
