@@ -5159,8 +5159,9 @@ export async function mountTown3d(parent, opts = {}) {
   const SNOWY = weather === 'snow'
   const mkCloud = (col) => SNOWY ? new THREE.MeshBasicMaterial({ color: col, fog: false }) : new THREE.MeshToonMaterial({ color: col, gradientMap: grad, fog: false })
   // 雲の色を時間帯に追従させる（昼=白／夕=暖色に染まる／夜=暗い月明かりの雲＝白い天井を脱す）。色は頂点色に焼くがシーンは時間帯ごとに別ビルドなのでビルド時にisNight/duskAmtで決めれば足りる。
-  const cloudTopHex = isNight ? 0x4a5168 : (SNOWY ? 0xf6f4f0 : new THREE.Color(0xfbfaf6).lerp(new THREE.Color(0xf3ca9c), duskAmt * 0.55).getHex()) // 夕は白→淡い夕焼け色
-  const cloudBotHex = isNight ? 0x363b50 : (SNOWY ? 0xe6e9ee : new THREE.Color(0xe9e4dc).lerp(new THREE.Color(0xd99a6a), duskAmt * 0.5).getHex())
+  // 夜は「月明かりに浮かぶ柔らかな雲」へ。以前(0x4a5168/0x363b50)は暗すぎ＋トゥーンの陰面が更に沈み、入道雲が真っ黒の不気味な塊に見えた（実機FB）。明度を上げ淡い青灰の月夜の雲に。
+  const cloudTopHex = isNight ? 0x7a82a0 : (SNOWY ? 0xf6f4f0 : new THREE.Color(0xfbfaf6).lerp(new THREE.Color(0xf3ca9c), duskAmt * 0.55).getHex()) // 夕は白→淡い夕焼け色／夜は月光の淡い青灰
+  const cloudBotHex = isNight ? 0x5e6580 : (SNOWY ? 0xe6e9ee : new THREE.Color(0xe9e4dc).lerp(new THREE.Color(0xd99a6a), duskAmt * 0.5).getHex())
   const cloudMat = mkCloud(cloudTopHex)        // 陽/月の当たる雲頂（夜は暗く沈める）
   const cloudBot = mkCloud(cloudBotHex)        // 影になる雲底（夜は更に暗い）
   const cloudVC = mkCloud(0xffffff); cloudVC.vertexColors = true // 雲のパフを群ごとに1メッシュへ統合（色は頂点色で焼く）＝描画コール削減
