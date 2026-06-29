@@ -6269,10 +6269,10 @@ export async function mountTown3d(parent, opts = {}) {
     const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.175, 1.37, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える。体から少し離す
       if (wide) loft([{ y: 0.02, rx: 0.08 }, { y: -0.18, rx: 0.09 }, { y: -0.36, rx: 0.07 }, { y: -0.47, rx: 0.05 }], sleeveMat, armG) // 着物の袖
       else { loft([{ y: 0.03, rx: 0.072, z: 0.004 }, { y: -0.17, rx: 0.066, z: 0.016 }, { y: -0.32, rx: 0.057, z: 0.05 }, { y: -0.47, rx: 0.049, z: 0.085 }], sleeveMat, armG, true); add(armG, SP(0.046, 12, 12), skin, 0, -0.51, 0.078, 0.66, 1.18, 0.42).rotation.z = s * 0.22 } // 細い腕は黒い輪郭で潰れるので輪郭なし。手は小さく平たく内へ傾けた手のひら状に（卵ミトン回避）
-      armG.rotation.z = s * 0.12; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 左右でわずかに角度差＝非対称（人形臭を消す）
+      armG.rotation.z = s * 0.15; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 腕を体から少し離す＝脇に余白（棒立ち感の緩和）。左右で角度差＝非対称
     // 脚＝腰→膝→足首の滑らかな一本のテーパー＋足。股関節で振れる。
     const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.078, 0.92, 0); g.add(legG)
-      loft([{ y: 0.05, rx: rad * 1.22 }, { y: -0.2, rx: rad }, { y: -0.4, rx: rad * 0.9, z: 0.012 }, { y: -0.6, rx: rad * 0.82, z: 0.02 }, { y: -0.8, rx: rad * 0.72, z: 0.02 }], legMat, legG); add(legG, SP(0.055), shoeM, 0, -0.84, 0.06, 1.45, 0.5, 1.95); legs.push(legG) } }
+      loft([{ y: 0.05, rx: rad * 1.4 }, { y: -0.2, rx: rad * 1.05 }, { y: -0.4, rx: rad * 0.85, z: 0.012 }, { y: -0.6, rx: rad * 0.68, z: 0.02 }, { y: -0.8, rx: rad * 0.58, z: 0.02 }], legMat, legG); add(legG, SP(0.05), shoeM, 0, -0.84, 0.05, 1.3, 0.5, 1.7); legs.push(legG) } } // むちっとした腿＋締まった足首＝幼い脚（デザイナー評価）。靴も小さめ
     // ── 体（衣装別。胴は一体のロフトで人体の一枚の形に）──
     if (outfit === 'kimono' || outfit === 'armor') {
       loft([{ y: 0.06, rx: 0.2, rz: 0.16 }, { y: 0.5, rx: 0.17, rz: 0.14 }, { y: 0.9, rx: 0.15, rz: 0.12 }, { y: 1.2, rx: 0.152, rz: 0.116 }, { y: 1.42, rx: 0.172, rz: 0.118 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 着物の身頃（裾広がりの一枚）
@@ -6306,10 +6306,10 @@ export async function mountTown3d(parent, opts = {}) {
       if (outfit === 'suit') add(g, BX(0.04, 0.3, 0.02), accentM, 0, 1.24, 0.1) // ネクタイ
       buildArms(topM, false)
     }
-    add(g, CY(0.05, 0.054, 0.16, 12), skin, 0, 1.45, 0) // 首（少し長く＝頭が肩にめり込まない）
+    add(g, CY(0.039, 0.044, 0.15, 12), skin, 0, 1.45, 0) // 首（小顔化に合わせ細く＝頭が肩にめり込まない）
     // ── 頭（小さめ＝約7頭身）＋顔（角のある輪郭：頭頂は丸く・こめかみ最大・顎へ細めて顎先を出す＝アニメの面） ──
     const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); headG.scale.setScalar(0.88); g.add(headG) // 頭(顔)全体を一回り小さく（実機FB「顔が大きい」）
-    loft([{ y: 0.10, rx: 0.053 }, { y: 0.065, rx: 0.09, rz: 0.086 }, { y: 0.018, rx: 0.10, rz: 0.094 }, { y: -0.03, rx: 0.097, rz: 0.091 }, { y: -0.068, rx: 0.079, rz: 0.075 }, { y: -0.10, rx: 0.048, rz: 0.05 }], skin, headG) // 丸く柔らかい卵形。輪郭を一回り小さく＋顎を短く＝目鼻に対して顔が大きすぎる(ミサワ)解消
+    loft([{ y: 0.082, rx: 0.052 }, { y: 0.05, rx: 0.088, rz: 0.084 }, { y: 0.012, rx: 0.099, rz: 0.093 }, { y: -0.032, rx: 0.097, rz: 0.091 }, { y: -0.068, rx: 0.079, rz: 0.075 }, { y: -0.10, rx: 0.048, rz: 0.05 }], skin, headG) // 丸く柔らかい卵形。頭頂を下げ「目より上」を詰める＋輪郭は小さめ＝top-heavy/ミサワ解消
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
     // 顔＝大きなアニメの目鼻を描いたテクスチャを頭前面の薄い円筒面（頭の丸みに沿う）へ貼る。小さな3Dパーツの寄せ集めをやめ、距離でも崩れず魅力的に（調査ベースの刷新）。
     const faceTex = makeFaceTex(cfg.iris, cfg.hair)
@@ -6318,18 +6318,18 @@ export async function mountTown3d(parent, opts = {}) {
     faceMesh.position.set(0, -0.012, 0); faceMesh.renderOrder = 2; headG.add(faceMesh)
     // ── 髪：さらさら・ふわっとした自然な毛。丸い地肌キャップ＋中央分けで左右へ流れる「平たい柔らかな房」を重ねる（毛先は丸く＝尖らせない／球のぼこぼこ・コーンのトゲを脱す）。──
     const hs = cfg.hairStyle
-    const hCap = (cz, sy, sx) => add(headG, SP(0.121, 22, 18), hairM, 0, 0.034, cz, sx || 1.05, sy, 1.0) // ふわっと膨らむ地肌
+    const hCap = (cz, sy, sx) => add(headG, SP(0.116, 22, 18), hairM, 0, 0.014, cz, sx || 1.03, sy, 1.0) // ふわっと膨らむ地肌（頭頂を下げ「目より上」を詰める）
     const fringe = (fz, drop) => { // 前髪＝左右2枚の平たい房を中央でわずかに分け、外下へ流す。毛先は丸い楕円＝さらさら
       for (const s of [-1, 1]) { const b = add(headG, SP(0.082, 16, 12), hairM, s * 0.02, 0.052, fz, 1.16, drop, 0.66); b.rotation.z = s * 0.44; b.rotation.x = -0.2 }
-      add(headG, SP(0.052, 14, 10), hairM, 0, 0.074, fz - 0.006, 1.0, drop * 1.05, 0.6) } // 分け目の中央のふくらみ
+      add(headG, SP(0.052, 14, 10), hairM, 0, 0.06, fz - 0.006, 1.0, drop, 0.6) } // 分け目の中央のふくらみ（やや下げる）
     const sideHair = (sy) => { for (const s of [-1, 1]) add(headG, SP(0.044, 14, 12), hairM, s * 0.104, -0.018, 0.012, 0.7, sy, 0.86) } // 頬に沿う柔らかい横髪（細長い楕円）
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
       add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代(時代物)
     else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) } // 笠の下
-    else if (hs === 'bob') { hCap(-0.026, 1.06); fringe(0.086, 0.62)
+    else if (hs === 'bob') { hCap(-0.026, 0.92); fringe(0.086, 0.62)
       for (const s of [-1, 1]) add(headG, SP(0.058, 14, 12), hairM, s * 0.1, -0.05, 0.0, 0.66, 2.05, 0.95) } // 頬を包む長い横髪（細長い楕円＝ボブ）
-    else if (hs === 'short') { hCap(-0.018, 0.98, 1.03); fringe(0.088, 0.5); sideHair(1.15) } // 短髪
-    else { hCap(-0.026, 1.06); fringe(0.086, 0.6); sideHair(1.7)
+    else if (hs === 'short') { hCap(-0.018, 0.86, 1.03); fringe(0.088, 0.5); sideHair(1.15) } // 短髪
+    else { hCap(-0.026, 0.92); fringe(0.086, 0.6); sideHair(1.7)
       if ((hs | 0) === 1) add(headG, SP(0.072, 14, 12), hairM, 0, -0.05, -0.085, 1.12, 1.3, 0.95) } // たまに後ろで結った膨らみ
     // ── 帽子（hat）。headG(縮小0.88)の子＝頭と一緒に縮み正しく載る（頭を小さくしても浮かない） ──
     if (cfg.hat === 'kasa') { add(headG, CY(0.035, 0.28, 0.13, 16), toon(cfg.hatCol || 0xc6a866), 0, 0.125, 0) }
@@ -6345,6 +6345,11 @@ export async function mountTown3d(parent, opts = {}) {
       const strap = add(g, BX(0.028, 0.52, 0.02), bm, 0, 1.18, 0.12); strap.rotation.z = 0.52 // たすき掛けの紐
       add(g, BX(0.17, 0.2, 0.08), bm, 0.2, 0.92, 0.07, 1, 1, 1).rotation.y = 0.1 } // 鞄本体（腰）
     addOutlines(0.009) // 体・手足・頭に黒い主線（セル画のライン）
+    // ── 等身の是正（デザイナー評価: 8.5頭身は伸びすぎ→約6頭身の幼く親しみやすい比率へ）。頭は据え置き、体だけをグループ化して縦に縮める。──
+    const body = new THREE.Group()
+    for (const ch of g.children.slice()) { if (ch !== headG) body.add(ch) } // 頭(headG)以外＝胴/手足/首/小物/輪郭をまとめて圧縮
+    g.add(body); body.scale.set(0.9, 0.7, 0.9); body.position.y = -0.05 // 縦を強めに詰め、幅も少し絞る。足を地面へ
+    headG.scale.setScalar(0.94); headG.position.y = 1.1 // 頭は据え置き気味。縮んだ首の上へ座らせる
     // 接地影（足元の柔らかな影＝人形の浮きを消して地に立たせる）
     const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.5, 0.72, 1); shadow.renderOrder = 1; g.add(shadow)
     g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
