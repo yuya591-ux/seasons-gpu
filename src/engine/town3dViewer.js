@@ -8093,8 +8093,14 @@ export async function mountTown3d(parent, opts = {}) {
     lastDDT = drawDt
     if (!restIdle && drawDt > 0.001 && drawDt < 0.4) {
       if (drawDt > 0.047) { adQLow++; adQOk = 0 } else if (drawDt < 0.038) { adQOk++; adQLow = 0 } else { if (adQLow) adQLow--; if (adQOk) adQOk-- }
-      if (adQLow >= 16 && curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR - 0.12); applySize(); adQLow = 0; adQOk = 0 } // 重い→解像度を譲る
-      else if (adQOk >= 40 && curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.12); applySize(); adQOk = 0 } // 安定したら鮮やかさを戻す。戻り幅を下げ幅と同じ0.12に揃える＝以前の+0.22は下げの約2倍で解像度が脈打って見えた（カクつき評価）。重い所を抜ければ数段で回復しつつ脈動を抑える
+      // 重い時はまず「重い後処理(ブルーム=複数回のぼかしパス)」を切る＝解像度(鮮明さ)を保ったまま大きく軽くする。次に解像度を譲る。
+      // これで「重くてカクつく→解像度だけ落ちてボヤける」連鎖を断つ（実機FB: 雨/雲海が重く画質も荒い）。iPhoneはstandardティアに張り付くため、実測fpsで自浄する。
+      if (adQLow >= 10 && bloomPass && bloomPass.enabled) { bloomPass.enabled = false; adQLow = 0; adQOk = 0 } // 段1: ブルームを落とす（最大の塗り負荷を削り鮮明さは保つ）
+      else if (adQLow >= 16 && curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR - 0.12); applySize(); adQLow = 0; adQOk = 0 } // 段2: 解像度を譲る
+      else if (adQOk >= 40) { // 安定が続けば逆順で戻す: まず解像度、次にブルーム
+        if (curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.12); applySize(); adQOk = 0 }
+        else if (bloomPass && bloomWanted && !bloomPass.enabled) { bloomPass.enabled = true; adQOk = 0 }
+      }
     }
     const dt = Math.min(0.05, t - lastT); lastT = t
     // 時代エリアの距離カリング：群の「最も近い縁(中心距離−半径)」が霧(fog.far)の外に出たら非表示にする。
