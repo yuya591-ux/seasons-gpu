@@ -18,7 +18,9 @@ console.log('hasFigShot =', await page.evaluate(() => typeof window.__town3dFigS
 const cfgs = {
   girl: '{"skin":16767164,"hair":2366488,"iris":4865068,"outfit":"blouse","top":15789794,"bottom":3029570,"hairStyle":"bob","prop":"bag","bagCol":9072214}',
   yukata: '{"skin":16177372,"hair":2762784,"iris":5921325,"outfit":"kimono","top":3828602,"accent":9070138,"hairStyle":"short"}',
-  modern: '{"skin":16177372,"hair":2762784,"iris":5921325,"outfit":"modern","top":3893052,"bottom":3092271,"hairStyle":1}'
+  modern: '{"skin":16177372,"hair":2762784,"iris":5921325,"outfit":"modern","top":3893052,"bottom":3092271,"hairStyle":1}',
+  edo: '{"skin":16177372,"hair":2762784,"iris":5921325,"outfit":"kimono","top":3818590,"accent":9070138,"hairStyle":"hat","hat":"kasa"}',
+  taisho: '{"skin":16177372,"hair":2762784,"iris":5921325,"outfit":"suit","top":3815362,"bottom":3815362,"hairStyle":"hat","hat":"fedora"}'
 }
 for (const [name, cfg] of Object.entries(cfgs)) {
   for (const [yaw, tag] of [[0,'front'],[0.6,'q'],[1.57,'side']]) {

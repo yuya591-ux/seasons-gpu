@@ -6225,19 +6225,19 @@ export async function mountTown3d(parent, opts = {}) {
     const S = 128, cv = document.createElement('canvas'); cv.width = S; cv.height = S; const x = cv.getContext('2d')
     const hex = (h) => '#' + (h >>> 0).toString(16).padStart(6, '0').slice(-6)
     const iris = hex(irisHex || 0x5a4632), hair = hex(hairHex || 0x2a2420), lash = '#2a221d'
-    const eye = (cx) => { // 優しい丸い瞳：小さめの焦げ茶の楕円＋大きなつや（見開いたまつ毛をやめ「睨み」を解消）
-      x.fillStyle = '#332b25'; x.beginPath(); x.ellipse(cx, 64, 10, 13, 0, 0, 7); x.fill() // 真っ黒でなく柔らかい焦げ茶
-      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 2.8, 59.5, 3.6, 4.4, 0, 0, 7); x.fill() // つやの大ハイライト
-      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 3, 67, 1.7, 0, 7); x.fill()
+    const eye = (cx) => { // 優しい丸い瞳：柔らかい焦げ茶の楕円＋大きなつや。顔に対して少し大きめ＝余白を詰めるが、見開かない丸い形で柔らかさは保つ
+      x.fillStyle = '#332b25'; x.beginPath(); x.ellipse(cx, 62, 12.5, 15.5, 0, 0, 7); x.fill()
+      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 3.4, 56, 4.4, 5.4, 0, 0, 7); x.fill() // つやの大ハイライト
+      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 3.6, 66, 2.1, 0, 7); x.fill()
     }
-    eye(48); eye(80)
-    x.strokeStyle = hair; x.globalAlpha = 0.45; x.lineWidth = 3.2; x.lineCap = 'round' // 眉＝うっすら短く（きつくしない）
-    x.beginPath(); x.moveTo(41, 46); x.quadraticCurveTo(48, 43, 55, 46); x.stroke()
-    x.beginPath(); x.moveTo(73, 46); x.quadraticCurveTo(80, 43, 87, 46); x.stroke()
+    eye(45); eye(83)
+    x.strokeStyle = hair; x.globalAlpha = 0.5; x.lineWidth = 3.6; x.lineCap = 'round' // 眉＝やや上に離して配置（縦に余白を散らす）
+    x.beginPath(); x.moveTo(36, 41); x.quadraticCurveTo(45, 37, 55, 41); x.stroke()
+    x.beginPath(); x.moveTo(73, 41); x.quadraticCurveTo(83, 37, 92, 41); x.stroke()
     x.globalAlpha = 1
-    x.fillStyle = 'rgba(150,110,95,0.3)'; x.beginPath(); x.arc(64, 80, 1.6, 0, 7); x.fill() // 鼻＝ごく小さな点（ほぼ無し）
-    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(58, 90); x.quadraticCurveTo(64, 94.5, 70, 90); x.stroke() // 小さな優しい微笑み
-    x.fillStyle = 'rgba(235,162,150,0.4)'; x.beginPath(); x.ellipse(31, 79, 9, 6, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(97, 79, 9, 6, 0, 0, 7); x.fill() // 頬の柔らかい赤み
+    x.fillStyle = 'rgba(150,110,95,0.32)'; x.beginPath(); x.arc(64, 82, 2.1, 0, 7); x.fill() // 鼻＝小さな点
+    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.8; x.lineCap = 'round'; x.beginPath(); x.moveTo(55, 95); x.quadraticCurveTo(64, 101, 73, 95); x.stroke() // 優しい微笑み（少し下げて余白を詰める）
+    x.fillStyle = 'rgba(235,162,150,0.42)'; x.beginPath(); x.ellipse(26, 80, 10, 6.5, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(102, 80, 10, 6.5, 0, 0, 7); x.fill() // 頬の柔らかい赤み
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; faceTexCache.set(key, tex); return tex
   }
   const makeResident = (cfg = {}) => {
@@ -6308,33 +6308,34 @@ export async function mountTown3d(parent, opts = {}) {
     }
     add(g, CY(0.05, 0.054, 0.16, 12), skin, 0, 1.45, 0) // 首（少し長く＝頭が肩にめり込まない）
     // ── 頭（小さめ＝約7頭身）＋顔（角のある輪郭：頭頂は丸く・こめかみ最大・顎へ細めて顎先を出す＝アニメの面） ──
-    const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); g.add(headG)
-    loft([{ y: 0.118, rx: 0.058 }, { y: 0.078, rx: 0.099, rz: 0.094 }, { y: 0.025, rx: 0.112, rz: 0.104 }, { y: -0.032, rx: 0.110, rz: 0.102 }, { y: -0.08, rx: 0.090, rz: 0.086 }, { y: -0.118, rx: 0.054, rz: 0.058 }], skin, headG) // 丸く柔らかい卵形（角を取りふっくらした頬・丸い顎先＝怖さの解消・癒しの丸いシェイプ）
+    const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); headG.scale.setScalar(0.88); g.add(headG) // 頭(顔)全体を一回り小さく（実機FB「顔が大きい」）
+    loft([{ y: 0.10, rx: 0.053 }, { y: 0.065, rx: 0.09, rz: 0.086 }, { y: 0.018, rx: 0.10, rz: 0.094 }, { y: -0.03, rx: 0.097, rz: 0.091 }, { y: -0.068, rx: 0.079, rz: 0.075 }, { y: -0.10, rx: 0.048, rz: 0.05 }], skin, headG) // 丸く柔らかい卵形。輪郭を一回り小さく＋顎を短く＝目鼻に対して顔が大きすぎる(ミサワ)解消
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
     // 顔＝大きなアニメの目鼻を描いたテクスチャを頭前面の薄い円筒面（頭の丸みに沿う）へ貼る。小さな3Dパーツの寄せ集めをやめ、距離でも崩れず魅力的に（調査ベースの刷新）。
     const faceTex = makeFaceTex(cfg.iris, cfg.hair)
-    const faceGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.17, 16, 1, true, -0.82, 1.64)
+    const faceGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.165, 16, 1, true, -0.86, 1.72)
     const faceMesh = new THREE.Mesh(faceGeo, new THREE.MeshToonMaterial({ map: faceTex, gradientMap: grad, transparent: true, alphaTest: 0.42, depthWrite: false, fog: true }))
-    faceMesh.position.set(0, -0.006, 0); faceMesh.renderOrder = 2; headG.add(faceMesh)
-    // ── 髪（hairStyle）。小さい頭に合わせた寸法 ──
+    faceMesh.position.set(0, -0.012, 0); faceMesh.renderOrder = 2; headG.add(faceMesh)
+    // ── 髪：さらさら・ふわっとした自然な毛。丸い地肌キャップ＋中央分けで左右へ流れる「平たい柔らかな房」を重ねる（毛先は丸く＝尖らせない／球のぼこぼこ・コーンのトゲを脱す）。──
     const hs = cfg.hairStyle
+    const hCap = (cz, sy, sx) => add(headG, SP(0.121, 22, 18), hairM, 0, 0.034, cz, sx || 1.05, sy, 1.0) // ふわっと膨らむ地肌
+    const fringe = (fz, drop) => { // 前髪＝左右2枚の平たい房を中央でわずかに分け、外下へ流す。毛先は丸い楕円＝さらさら
+      for (const s of [-1, 1]) { const b = add(headG, SP(0.082, 16, 12), hairM, s * 0.02, 0.052, fz, 1.16, drop, 0.66); b.rotation.z = s * 0.44; b.rotation.x = -0.2 }
+      add(headG, SP(0.052, 14, 10), hairM, 0, 0.074, fz - 0.006, 1.0, drop * 1.05, 0.6) } // 分け目の中央のふくらみ
+    const sideHair = (sy) => { for (const s of [-1, 1]) add(headG, SP(0.044, 14, 12), hairM, s * 0.104, -0.018, 0.012, 0.7, sy, 0.86) } // 頬に沿う柔らかい横髪（細長い楕円）
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
-      add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代
-    else if (hs === 'bob') { add(headG, SP(0.125, 18, 16), hairM, 0, 0.0, -0.05, 1.04, 1.05, 0.92) // 後方へ寄せ前面が顔に被らないように（顔を出す）。前髪は別途
-      for (const s of [-1, 1]) add(headG, SP(0.052, 12, 12), hairM, s * 0.112, -0.06, -0.01, 0.66, 1.5, 0.95) // 横の毛束（頬の外側＝顔に被せない）
-      for (const [hx, hz] of [[-0.06, 0.07], [0.0, 0.078], [0.06, 0.07]]) add(headG, SP(0.034, 12, 10), hairM, hx, 0.078, hz, 1, 0.7, 0.7) }
-    else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) }
-    else if (hs === 'short') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.03, -0.012, 1.04, 0.95, 1.04)
-      for (const [hx, hz] of [[-0.063, 0.083], [0.0, 0.095], [0.063, 0.083]]) add(headG, SP(0.029, 10, 8), hairM, hx, 0.075, hz, 1, 0.8, 0.8) }
-    else { add(headG, SP(0.117, 18, 16), hairM, 0, 0.018, -0.032, 1.03, 1.03, 1.0)
-      for (const [hx, hz] of [[-0.078, 0.074], [-0.037, 0.095], [0.0, 0.101], [0.037, 0.095], [0.078, 0.074]]) add(headG, SP(0.032, 12, 10), hairM, hx, 0.069, hz, 1, 0.9, 0.9)
-      if ((hs | 0) === 1) add(headG, SP(0.063, 14, 12), hairM, 0, -0.086, -0.094, 1.1, 1.0, 0.9)
-      else for (const s of [-1, 1]) add(headG, SP(0.045, 12, 12), hairM, s * 0.095, -0.043, -0.012, 0.7, 1.4, 0.9) }
-    // ── 帽子（hat）。小さい頭に合わせ高さ・寸法を更新 ──
-    if (cfg.hat === 'kasa') { add(g, CY(0.035, 0.28, 0.13, 16), toon(cfg.hatCol || 0xc6a866), 0, 1.72, 0) }
-    else if (cfg.hat === 'jingasa') { add(g, CY(0.045, 0.24, 0.08, 16), toon(cfg.hatCol || 0x4a3a2c), 0, 1.71, 0) }
-    else if (cfg.hat === 'fedora') { const hm = toon(cfg.hatCol || 0x3a322a); add(g, CY(0.155, 0.155, 0.018, 16), hm, 0, 1.685, 0); add(g, CY(0.095, 0.105, 0.11, 14), hm, 0, 1.745, 0) }
-    else if (cfg.hat === 'cap') { const hm = toon(cfg.hatCol || 0x2a2e38); add(g, SP(0.122, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hm, 0, 1.66, 0); add(g, BX(0.17, 0.022, 0.08), hm, 0, 1.645, 0.115) }
+      add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代(時代物)
+    else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) } // 笠の下
+    else if (hs === 'bob') { hCap(-0.026, 1.06); fringe(0.086, 0.62)
+      for (const s of [-1, 1]) add(headG, SP(0.058, 14, 12), hairM, s * 0.1, -0.05, 0.0, 0.66, 2.05, 0.95) } // 頬を包む長い横髪（細長い楕円＝ボブ）
+    else if (hs === 'short') { hCap(-0.018, 0.98, 1.03); fringe(0.088, 0.5); sideHair(1.15) } // 短髪
+    else { hCap(-0.026, 1.06); fringe(0.086, 0.6); sideHair(1.7)
+      if ((hs | 0) === 1) add(headG, SP(0.072, 14, 12), hairM, 0, -0.05, -0.085, 1.12, 1.3, 0.95) } // たまに後ろで結った膨らみ
+    // ── 帽子（hat）。headG(縮小0.88)の子＝頭と一緒に縮み正しく載る（頭を小さくしても浮かない） ──
+    if (cfg.hat === 'kasa') { add(headG, CY(0.035, 0.28, 0.13, 16), toon(cfg.hatCol || 0xc6a866), 0, 0.125, 0) }
+    else if (cfg.hat === 'jingasa') { add(headG, CY(0.045, 0.24, 0.08, 16), toon(cfg.hatCol || 0x4a3a2c), 0, 0.115, 0) }
+    else if (cfg.hat === 'fedora') { const hm = toon(cfg.hatCol || 0x3a322a); add(headG, CY(0.155, 0.155, 0.018, 16), hm, 0, 0.092, 0); add(headG, CY(0.095, 0.105, 0.11, 14), hm, 0, 0.155, 0) }
+    else if (cfg.hat === 'cap') { const hm = toon(cfg.hatCol || 0x2a2e38); add(headG, SP(0.122, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hm, 0, 0.066, 0); add(headG, BX(0.17, 0.022, 0.08), hm, 0, 0.046, 0.118) }
     // ── 小道具（prop） ──
     if (cfg.prop === 'swords') for (const [ln, yy] of [[0.56, 0.9], [0.4, 0.86]]) { const sw = add(g, CY(0.013, 0.013, ln, 6), toon(0x2a2620), -0.2, yy, -0.04); sw.rotation.z = 0.5; sw.rotation.x = -0.2 }
     else if (cfg.prop === 'spear') { add(g, CY(0.018, 0.018, 1.9, 6), toon(0x5a4632), 0.25, 0.92, -0.05); add(g, CY(0.0, 0.026, 0.15, 6), toon(0xb8bcc2), 0.25, 1.9, -0.05) }
