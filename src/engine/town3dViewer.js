@@ -6225,21 +6225,19 @@ export async function mountTown3d(parent, opts = {}) {
     const S = 128, cv = document.createElement('canvas'); cv.width = S; cv.height = S; const x = cv.getContext('2d')
     const hex = (h) => '#' + (h >>> 0).toString(16).padStart(6, '0').slice(-6)
     const iris = hex(irisHex || 0x5a4632), hair = hex(hairHex || 0x2a2420), lash = '#2a221d'
-    const eye = (cx) => { // アニメの大きな目：白目→虹彩→瞳→ハイライト→太い上まつ毛
-      x.fillStyle = '#fdfaf4'; x.beginPath(); x.ellipse(cx, 60, 18, 21, 0, 0, 7); x.fill()
-      x.fillStyle = iris; x.beginPath(); x.arc(cx, 63, 15, 0, 7); x.fill()
-      x.fillStyle = '#231b16'; x.beginPath(); x.arc(cx, 65, 7.6, 0, 7); x.fill()
-      x.fillStyle = '#ffffff'; x.beginPath(); x.arc(cx - 5, 56, 4.6, 0, 7); x.fill()
-      x.fillStyle = 'rgba(255,255,255,0.65)'; x.beginPath(); x.arc(cx + 4, 67, 2.3, 0, 7); x.fill()
-      x.strokeStyle = lash; x.lineWidth = 6; x.lineCap = 'round'; x.beginPath(); x.ellipse(cx, 60, 18, 21, 0, Math.PI * 1.04, Math.PI * 1.96); x.stroke()
+    const eye = (cx) => { // 優しい丸い瞳：小さめの焦げ茶の楕円＋大きなつや（見開いたまつ毛をやめ「睨み」を解消）
+      x.fillStyle = '#332b25'; x.beginPath(); x.ellipse(cx, 64, 10, 13, 0, 0, 7); x.fill() // 真っ黒でなく柔らかい焦げ茶
+      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 2.8, 59.5, 3.6, 4.4, 0, 0, 7); x.fill() // つやの大ハイライト
+      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 3, 67, 1.7, 0, 7); x.fill()
     }
-    eye(42); eye(86)
-    x.strokeStyle = hair; x.lineWidth = 4.6; x.lineCap = 'round' // 眉
-    x.beginPath(); x.moveTo(28, 34); x.quadraticCurveTo(42, 29, 56, 33); x.stroke()
-    x.beginPath(); x.moveTo(72, 33); x.quadraticCurveTo(86, 29, 100, 34); x.stroke()
-    x.strokeStyle = 'rgba(150,110,95,0.45)'; x.lineWidth = 3; x.beginPath(); x.moveTo(65, 80); x.lineTo(61, 85); x.stroke() // 鼻のごく小さな影
-    x.strokeStyle = '#b06a5a'; x.lineWidth = 4; x.lineCap = 'round'; x.beginPath(); x.moveTo(57, 99); x.quadraticCurveTo(64, 105, 71, 99); x.stroke() // 小さな微笑み
-    x.fillStyle = 'rgba(232,150,140,0.5)'; x.beginPath(); x.ellipse(22, 84, 11, 7, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(106, 84, 11, 7, 0, 0, 7); x.fill() // 頬の赤み
+    eye(48); eye(80)
+    x.strokeStyle = hair; x.globalAlpha = 0.45; x.lineWidth = 3.2; x.lineCap = 'round' // 眉＝うっすら短く（きつくしない）
+    x.beginPath(); x.moveTo(41, 46); x.quadraticCurveTo(48, 43, 55, 46); x.stroke()
+    x.beginPath(); x.moveTo(73, 46); x.quadraticCurveTo(80, 43, 87, 46); x.stroke()
+    x.globalAlpha = 1
+    x.fillStyle = 'rgba(150,110,95,0.3)'; x.beginPath(); x.arc(64, 80, 1.6, 0, 7); x.fill() // 鼻＝ごく小さな点（ほぼ無し）
+    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(58, 90); x.quadraticCurveTo(64, 94.5, 70, 90); x.stroke() // 小さな優しい微笑み
+    x.fillStyle = 'rgba(235,162,150,0.4)'; x.beginPath(); x.ellipse(31, 79, 9, 6, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(97, 79, 9, 6, 0, 0, 7); x.fill() // 頬の柔らかい赤み
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; faceTexCache.set(key, tex); return tex
   }
   const makeResident = (cfg = {}) => {
@@ -6311,13 +6309,13 @@ export async function mountTown3d(parent, opts = {}) {
     add(g, CY(0.05, 0.054, 0.16, 12), skin, 0, 1.45, 0) // 首（少し長く＝頭が肩にめり込まない）
     // ── 頭（小さめ＝約7頭身）＋顔（角のある輪郭：頭頂は丸く・こめかみ最大・顎へ細めて顎先を出す＝アニメの面） ──
     const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); g.add(headG)
-    loft([{ y: 0.1, rx: 0.038 }, { y: 0.06, rx: 0.093, rz: 0.088 }, { y: 0.0, rx: 0.104, rz: 0.095 }, { y: -0.05, rx: 0.093, rz: 0.087 }, { y: -0.097, rx: 0.063, rz: 0.073 }, { y: -0.13, rx: 0.028, rz: 0.046 }], skin, headG) // 角のある顔の輪郭
+    loft([{ y: 0.118, rx: 0.058 }, { y: 0.078, rx: 0.099, rz: 0.094 }, { y: 0.025, rx: 0.112, rz: 0.104 }, { y: -0.032, rx: 0.110, rz: 0.102 }, { y: -0.08, rx: 0.090, rz: 0.086 }, { y: -0.118, rx: 0.054, rz: 0.058 }], skin, headG) // 丸く柔らかい卵形（角を取りふっくらした頬・丸い顎先＝怖さの解消・癒しの丸いシェイプ）
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
     // 顔＝大きなアニメの目鼻を描いたテクスチャを頭前面の薄い円筒面（頭の丸みに沿う）へ貼る。小さな3Dパーツの寄せ集めをやめ、距離でも崩れず魅力的に（調査ベースの刷新）。
     const faceTex = makeFaceTex(cfg.iris, cfg.hair)
-    const faceGeo = new THREE.CylinderGeometry(0.104, 0.104, 0.17, 16, 1, true, -0.82, 1.64)
+    const faceGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.17, 16, 1, true, -0.82, 1.64)
     const faceMesh = new THREE.Mesh(faceGeo, new THREE.MeshToonMaterial({ map: faceTex, gradientMap: grad, transparent: true, alphaTest: 0.42, depthWrite: false, fog: true }))
-    faceMesh.position.set(0, -0.018, 0); faceMesh.renderOrder = 2; headG.add(faceMesh)
+    faceMesh.position.set(0, -0.006, 0); faceMesh.renderOrder = 2; headG.add(faceMesh)
     // ── 髪（hairStyle）。小さい頭に合わせた寸法 ──
     const hs = cfg.hairStyle
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
