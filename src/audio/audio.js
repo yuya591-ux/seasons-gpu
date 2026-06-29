@@ -694,12 +694,22 @@ export function createAudio(opts) {
     if (pan) { pan.pan.value = (Math.random() - 0.5); o.connect(g).connect(pan).connect(master) } else { o.connect(g).connect(master) }
     try { o.start(at); o.stop(at + 0.85) } catch { /* 無視 */ }
   }
+  function whistle(at) {
+    // 花火の打ち上げ「ヒュ〜ッ」＝細く上昇する笛。破裂の直前に鳴り、破裂で消える（サウンド監督D15）。
+    if (!ctx || !ctx.createOscillator) return
+    const o = ctx.createOscillator(); o.type = 'sine'
+    o.frequency.setValueAtTime(540, at); o.frequency.exponentialRampToValueAtTime(1480, at + 0.3)
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.017, at + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.33)
+    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+    if (pan) { pan.pan.value = (Math.random() - 0.5) * 0.7; o.connect(g).connect(pan).connect(master) } else o.connect(g).connect(master)
+    try { o.start(at); o.stop(at + 0.36) } catch { /* 無視 */ }
+  }
   function playEvent(kind) {
     if (!started || !ctx || muted) return
     const T = now() + 0.02
     if (kind === 'fireworks') {
       const shots = 2 + ((Math.random() * 3) | 0)
-      for (let i = 0; i < shots; i++) boom(T + 0.35 + i * (0.22 + Math.random() * 0.5), 0.5 + Math.random() * 0.34) // 光→一拍おいて遠い破裂＋連発
+      for (let i = 0; i < shots; i++) { const bt = T + 0.35 + i * (0.22 + Math.random() * 0.5); whistle(bt - 0.32); boom(bt, 0.5 + Math.random() * 0.34) } // 打ち上げの笛→光→一拍おいて遠い破裂＋連発
     } else if (kind === 'star') {
       shimmer(T)
     }
@@ -724,6 +734,10 @@ export function createAudio(opts) {
       // 根本対策として下地そのものを起動しない＝oscillatorを生成せずドローン源を消す。自然音(風・鳥・虫・波)だけにする。
       // （startMusicBed/setMusicBed は将来用に残すが呼ばない。bedNodesがnullのままなのでsetMusicBedは何もしない）
       if (currentScene) await playScene(currentScene, false)
+      // 起動の一声＝遠い風鈴のように澄んだ鈴を一つ。「丁寧に作られている」を最初の一拍で音にする第一印象（サウンド監督G26）。
+      if (!muted && ctx.createOscillator) { try { const t0 = now() + 0.4
+        for (const [mul, amp, dec] of [[1, 0.025, 2.6], [2.01, 0.009, 1.7]]) { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880 * mul; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(amp, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dec); o.connect(g).connect(master); o.start(t0); o.stop(t0 + dec + 0.1) }
+      } catch { /* 無音でも続行 */ } }
     },
     /** 画面の現象に音を結ぶ（花火の遠い破裂・流れ星のきらめき）。無音の現象は鳴らさない。 */
     playEvent,
