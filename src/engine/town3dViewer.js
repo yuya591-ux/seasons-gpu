@@ -6225,19 +6225,22 @@ export async function mountTown3d(parent, opts = {}) {
     const S = 128, cv = document.createElement('canvas'); cv.width = S; cv.height = S; const x = cv.getContext('2d')
     const hex = (h) => '#' + (h >>> 0).toString(16).padStart(6, '0').slice(-6)
     const iris = hex(irisHex || 0x5a4632), hair = hex(hairHex || 0x2a2420), lash = '#2a221d'
-    const eye = (cx) => { // 優しい丸い瞳：柔らかい焦げ茶の楕円＋大きなつや。顔に対して少し大きめ＝余白を詰めるが、見開かない丸い形で柔らかさは保つ
-      x.fillStyle = '#332b25'; x.beginPath(); x.ellipse(cx, 62, 12.5, 15.5, 0, 0, 7); x.fill()
-      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 3.4, 56, 4.4, 5.4, 0, 0, 7); x.fill() // つやの大ハイライト
-      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 3.6, 66, 2.1, 0, 7); x.fill()
+    const eye = (cx) => { // 優しい瞳：黒一色をやめ温かい焦げ茶＋虹彩＋瞳孔＋大きなつや。小さめ横長で「サングラス」を脱し生命感を出す
+      x.fillStyle = '#4a3a30'; x.beginPath(); x.ellipse(cx, 63, 9, 11.5, 0, 0, 7); x.fill() // 瞳の外形（焦げ茶）
+      x.fillStyle = iris; x.beginPath(); x.ellipse(cx, 64.5, 6, 8, 0, 0, 7); x.fill() // 虹彩（設定色）
+      x.fillStyle = '#241c17'; x.beginPath(); x.ellipse(cx, 65, 3, 4, 0, 0, 7); x.fill() // 瞳孔
+      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 2.6, 58.5, 3.4, 4.2, 0, 0, 7); x.fill() // 大きなつや＝生命感
+      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 2.8, 67, 1.5, 0, 7); x.fill()
+      x.strokeStyle = '#3a2c24'; x.globalAlpha = 0.5; x.lineWidth = 2.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(cx - 8, 56.5); x.quadraticCurveTo(cx, 53.5, cx + 8, 56.5); x.stroke(); x.globalAlpha = 1 // 薄い上まぶた（睨まない柔らかい弧）
     }
-    eye(45); eye(83)
-    x.strokeStyle = hair; x.globalAlpha = 0.5; x.lineWidth = 3.6; x.lineCap = 'round' // 眉＝やや上に離して配置（縦に余白を散らす）
-    x.beginPath(); x.moveTo(36, 41); x.quadraticCurveTo(45, 37, 55, 41); x.stroke()
-    x.beginPath(); x.moveTo(73, 41); x.quadraticCurveTo(83, 37, 92, 41); x.stroke()
+    eye(48); eye(80) // 左右間隔を詰める（離れすぎ＝サングラス感の解消）
+    x.strokeStyle = hair; x.globalAlpha = 0.42; x.lineWidth = 3; x.lineCap = 'round' // 眉＝細く短くうっすら
+    x.beginPath(); x.moveTo(41, 44); x.quadraticCurveTo(48, 40.5, 55, 44); x.stroke()
+    x.beginPath(); x.moveTo(73, 44); x.quadraticCurveTo(80, 40.5, 87, 44); x.stroke()
     x.globalAlpha = 1
     x.fillStyle = 'rgba(150,110,95,0.32)'; x.beginPath(); x.arc(64, 82, 2.1, 0, 7); x.fill() // 鼻＝小さな点
-    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.8; x.lineCap = 'round'; x.beginPath(); x.moveTo(55, 95); x.quadraticCurveTo(64, 101, 73, 95); x.stroke() // 優しい微笑み（少し下げて余白を詰める）
-    x.fillStyle = 'rgba(235,162,150,0.42)'; x.beginPath(); x.ellipse(26, 80, 10, 6.5, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(102, 80, 10, 6.5, 0, 0, 7); x.fill() // 頬の柔らかい赤み
+    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.6; x.lineCap = 'round'; x.beginPath(); x.moveTo(56, 95); x.quadraticCurveTo(64, 100, 72, 95); x.stroke() // 優しい微笑み
+    x.fillStyle = 'rgba(235,162,150,0.42)'; x.beginPath(); x.ellipse(34, 81, 9, 6, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(94, 81, 9, 6, 0, 0, 7); x.fill() // 頬の柔らかい赤み（目の下へ寄せる）
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; faceTexCache.set(key, tex); return tex
   }
   const makeResident = (cfg = {}) => {
@@ -6266,49 +6269,49 @@ export async function mountTown3d(parent, opts = {}) {
       const om = new THREE.Mesh(g2, RES_OUTLINE); om.position.copy(m.position); om.quaternion.copy(m.quaternion); om.scale.copy(m.scale); om.renderOrder = -1; m.parent.add(om) } }
     const arms = [], legs = []
     // 腕＝肩→肘→手首の滑らかな一本のテーパー（少し前へ＝自然）＋手。肩で振れる。
-    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.175, 1.37, 0); g.add(armG) // 肩端の少し下＝肩の出っぱりを抑える。体から少し離す
-      if (wide) loft([{ y: 0.02, rx: 0.08 }, { y: -0.18, rx: 0.09 }, { y: -0.36, rx: 0.07 }, { y: -0.47, rx: 0.05 }], sleeveMat, armG) // 着物の袖
-      else { loft([{ y: 0.03, rx: 0.072, z: 0.004 }, { y: -0.17, rx: 0.066, z: 0.016 }, { y: -0.32, rx: 0.057, z: 0.05 }, { y: -0.47, rx: 0.049, z: 0.085 }], sleeveMat, armG, true); add(armG, SP(0.046, 12, 12), skin, 0, -0.51, 0.078, 0.66, 1.18, 0.42).rotation.z = s * 0.22 } // 細い腕は黒い輪郭で潰れるので輪郭なし。手は小さく平たく内へ傾けた手のひら状に（卵ミトン回避）
-      armG.rotation.z = s * 0.15; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 腕を体から少し離す＝脇に余白（棒立ち感の緩和）。左右で角度差＝非対称
+    const buildArms = (sleeveMat, wide) => { const asym = (Math.random() - 0.5) * 0.12; for (const s of [-1, 1]) { const armG = new THREE.Group(); armG.position.set(s * 0.15, 1.37, 0); g.add(armG) // 肩幅縮小に合わせ腕の付け根を内へ
+      if (wide) loft([{ y: 0.02, rx: 0.072 }, { y: -0.18, rx: 0.08 }, { y: -0.36, rx: 0.062 }, { y: -0.47, rx: 0.045 }], sleeveMat, armG) // 着物の袖（少し細く）
+      else { loft([{ y: 0.03, rx: 0.06, z: 0.004 }, { y: -0.17, rx: 0.054, z: 0.016 }, { y: -0.32, rx: 0.047, z: 0.05 }, { y: -0.47, rx: 0.04, z: 0.085 }], sleeveMat, armG, true); add(armG, SP(0.04, 12, 12), skin, 0, -0.5, 0.078, 0.66, 1.1, 0.42).rotation.z = s * 0.22 } // 腕を細く＝華奢。手は小さく平たく（ソーセージ/ミトン回避）
+      armG.rotation.z = s * 0.09; armG.userData = { base: (s > 0 ? asym : -asym) }; arms.push(armG) } } // 腕を体に寄せる＝なで肩・華奢（肩の角を隠す）。左右で角度差＝非対称
     // 脚＝腰→膝→足首の滑らかな一本のテーパー＋足。股関節で振れる。
     const buildLegs = (legMat, rad) => { for (const s of [-1, 1]) { const legG = new THREE.Group(); legG.position.set(s * 0.078, 0.92, 0); g.add(legG)
       loft([{ y: 0.05, rx: rad * 1.4 }, { y: -0.2, rx: rad * 1.05 }, { y: -0.4, rx: rad * 0.85, z: 0.012 }, { y: -0.6, rx: rad * 0.68, z: 0.02 }, { y: -0.8, rx: rad * 0.58, z: 0.02 }], legMat, legG); add(legG, SP(0.05), shoeM, 0, -0.84, 0.05, 1.3, 0.5, 1.7); legs.push(legG) } } // むちっとした腿＋締まった足首＝幼い脚（デザイナー評価）。靴も小さめ
     // ── 体（衣装別。胴は一体のロフトで人体の一枚の形に）──
     if (outfit === 'kimono' || outfit === 'armor') {
-      loft([{ y: 0.06, rx: 0.2, rz: 0.16 }, { y: 0.5, rx: 0.17, rz: 0.14 }, { y: 0.9, rx: 0.15, rz: 0.12 }, { y: 1.2, rx: 0.152, rz: 0.116 }, { y: 1.42, rx: 0.172, rz: 0.118 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 着物の身頃（裾広がりの一枚）
-      add(g, CY(0.158, 0.152, 0.1, 18), accentM, 0, 0.9, 0) // 帯
+      loft([{ y: 0.06, rx: 0.188, rz: 0.152 }, { y: 0.5, rx: 0.158, rz: 0.13 }, { y: 0.9, rx: 0.14, rz: 0.112 }, { y: 1.2, rx: 0.14, rz: 0.108 }, { y: 1.42, rx: 0.155, rz: 0.11 }, { y: 1.47, rx: 0.082, rz: 0.07 }], topM, g) // 着物の身頃（肩をやや狭め全体を少し細く＝華奢）
+      add(g, CY(0.148, 0.142, 0.1, 18), accentM, 0, 0.9, 0) // 帯
       for (const s of [-1, 1]) add(g, BX(0.04, 0.4, 0.02), white, s * 0.038, 1.2, 0.12).rotation.z = -s * 0.3 // 襟
       for (const s of [-1, 1]) add(g, SP(0.057), shoeM, s * 0.06, 0.05, 0.05, 1.4, 0.5, 1.9) // 足
       buildArms(topM, true)
-      if (outfit === 'armor') { loft([{ y: 0.86, rx: 0.185, rz: 0.155 }, { y: 1.08, rx: 0.2, rz: 0.165 }, { y: 1.3, rx: 0.185, rz: 0.155 }], botM, g) // 胴丸（胸当て）
-        for (const s of [-1, 1]) add(g, SP(0.088, 12, 10), botM, s * 0.165, 1.4, 0, 1, 0.82, 0.9) } // 肩の防具
+      if (outfit === 'armor') { loft([{ y: 0.86, rx: 0.172, rz: 0.144 }, { y: 1.08, rx: 0.186, rz: 0.153 }, { y: 1.3, rx: 0.172, rz: 0.144 }], botM, g) // 胴丸（胸当て）
+        for (const s of [-1, 1]) add(g, SP(0.078, 12, 10), botM, s * 0.14, 1.4, 0, 1, 0.8, 0.88) } // 肩の防具（やや小さく）
     } else if (outfit === 'hakama') {
-      loft([{ y: 0.9, rx: 0.16, rz: 0.13 }, { y: 1.18, rx: 0.152, rz: 0.116 }, { y: 1.42, rx: 0.168, rz: 0.116 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 上衣
-      loft([{ y: 0.06, rx: 0.225, rz: 0.17 }, { y: 0.4, rx: 0.2, rz: 0.155 }, { y: 0.78, rx: 0.17, rz: 0.135 }, { y: 0.93, rx: 0.16, rz: 0.128 }], botM, g) // 袴（下が広い）
-      add(g, CY(0.165, 0.225, 0.09, 18), accentM, 0, 0.86, 0) // 帯
+      loft([{ y: 0.9, rx: 0.14, rz: 0.114 }, { y: 1.18, rx: 0.13, rz: 0.102 }, { y: 1.42, rx: 0.148, rz: 0.104 }, { y: 1.47, rx: 0.082, rz: 0.07 }], topM, g) // 上衣（肩をやや狭め細く）
+      loft([{ y: 0.06, rx: 0.205, rz: 0.156 }, { y: 0.4, rx: 0.182, rz: 0.142 }, { y: 0.78, rx: 0.155, rz: 0.124 }, { y: 0.93, rx: 0.145, rz: 0.117 }], botM, g) // 袴（下が広い・全体を少し細く）
+      add(g, CY(0.15, 0.205, 0.09, 18), accentM, 0, 0.86, 0) // 帯
       for (const s of [-1, 1]) add(g, SP(0.057), shoeM, s * 0.06, 0.05, 0.05, 1.4, 0.5, 1.9)
       buildArms(topM, true)
     } else if (outfit === 'dress') {
-      buildLegs(skin, 0.05) // 脚
-      loft([{ y: 0.1, rx: 0.235, rz: 0.18 }, { y: 0.5, rx: 0.155, rz: 0.125 }, { y: 0.86, rx: 0.125, rz: 0.1 }, { y: 1.1, rx: 0.12, rz: 0.095 }, { y: 1.3, rx: 0.138, rz: 0.1 }, { y: 1.42, rx: 0.155, rz: 0.105 }, { y: 1.47, rx: 0.08, rz: 0.07 }], topM, g) // ワンピース（裾広がり〜くびれ〜肩の一枚）
+      buildLegs(skin, 0.046) // 脚
+      loft([{ y: 0.1, rx: 0.22, rz: 0.17 }, { y: 0.5, rx: 0.142, rz: 0.115 }, { y: 0.86, rx: 0.112, rz: 0.09 }, { y: 1.1, rx: 0.108, rz: 0.086 }, { y: 1.3, rx: 0.126, rz: 0.092 }, { y: 1.42, rx: 0.14, rz: 0.098 }, { y: 1.47, rx: 0.078, rz: 0.068 }], topM, g) // ワンピース（裾広がり〜くびれ〜肩の一枚。全体を細く）
       add(g, CY(0.124, 0.124, 0.05, 16), accentM, 0, 1.0, 0) // ウエスト
       buildArms(topM, false)
     } else if (outfit === 'blouse') { // 添付の模倣: 白い半袖ブラウス＋濃色ハイウエストのワイドパンツ＋肩紐
-      buildLegs(botM, 0.084)
-      loft([{ y: 0.74, rx: 0.15, rz: 0.12 }, { y: 0.95, rx: 0.145, rz: 0.115 }, { y: 1.1, rx: 0.135, rz: 0.105 }], botM, g) // ハイウエストのパンツ
-      loft([{ y: 1.07, rx: 0.13, rz: 0.1 }, { y: 1.22, rx: 0.135, rz: 0.102 }, { y: 1.34, rx: 0.155, rz: 0.108 }, { y: 1.42, rx: 0.182, rz: 0.112 }, { y: 1.47, rx: 0.085, rz: 0.072 }], topM, g) // 白ブラウス（主役）
+      buildLegs(botM, 0.066)
+      loft([{ y: 0.74, rx: 0.12, rz: 0.098 }, { y: 0.95, rx: 0.116, rz: 0.094 }, { y: 1.1, rx: 0.112, rz: 0.09 }], botM, g) // ハイウエストのパンツ（細く）
+      loft([{ y: 1.07, rx: 0.112, rz: 0.09 }, { y: 1.22, rx: 0.114, rz: 0.092 }, { y: 1.34, rx: 0.132, rz: 0.1 }, { y: 1.42, rx: 0.15, rz: 0.104 }, { y: 1.47, rx: 0.082, rz: 0.07 }], topM, g) // 白ブラウス（肩を狭めウエストを絞る＝華奢）
       for (const s of [-1, 1]) add(g, BX(0.024, 0.32, 0.025), botM, s * 0.07, 1.26, 0.095).rotation.z = s * 0.03 // 肩紐
       buildArms(topM, false)
     } else { // modern / suit
-      buildLegs(botM, 0.07)
-      loft([{ y: 0.74, rx: 0.155, rz: 0.115 }, { y: 0.95, rx: 0.138, rz: 0.103 }, { y: 1.07, rx: 0.126, rz: 0.097 }], botM, g) // 腰〜パンツ
-      loft([{ y: 1.04, rx: 0.125, rz: 0.096 }, { y: 1.18, rx: 0.124, rz: 0.095 }, { y: 1.33, rx: 0.16, rz: 0.11 }, { y: 1.43, rx: 0.21, rz: 0.118 }, { y: 1.47, rx: 0.085, rz: 0.075 }], topM, g) // 胴（肩を広く＝撫で肩を解消・腰くびれの一枚）
+      buildLegs(botM, 0.058)
+      loft([{ y: 0.74, rx: 0.122, rz: 0.098 }, { y: 0.95, rx: 0.116, rz: 0.092 }, { y: 1.07, rx: 0.112, rz: 0.09 }], botM, g) // 腰〜パンツ（細く）
+      loft([{ y: 1.04, rx: 0.103, rz: 0.084 }, { y: 1.18, rx: 0.106, rz: 0.086 }, { y: 1.33, rx: 0.134, rz: 0.1 }, { y: 1.43, rx: 0.163, rz: 0.108 }, { y: 1.47, rx: 0.082, rz: 0.072 }], topM, g) // 胴（肩を0.21→0.163へ狭め・ウエストを絞りS字くびれ＝寸胴の樽を解消）
       if (outfit === 'suit') add(g, BX(0.04, 0.3, 0.02), accentM, 0, 1.24, 0.1) // ネクタイ
       buildArms(topM, false)
     }
-    add(g, CY(0.039, 0.044, 0.15, 12), skin, 0, 1.45, 0) // 首（小顔化に合わせ細く＝頭が肩にめり込まない）
+    add(g, CY(0.044, 0.05, 0.12, 12), skin, 0, 1.46, 0) // 首（頭が肩に乗る支え＝生首が浮く錯視を防ぎ顔を小さく見せる。短め・やや太め）
     // ── 頭（小さめ＝約7頭身）＋顔（角のある輪郭：頭頂は丸く・こめかみ最大・顎へ細めて顎先を出す＝アニメの面） ──
-    const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); headG.scale.setScalar(0.88); g.add(headG) // 頭(顔)全体を一回り小さく（実機FB「顔が大きい」）
+    const headG = new THREE.Group(); headG.position.set(0, 1.6, 0); headG.scale.setScalar(0.9); g.add(headG) // 頭(顔)全体を一回り小さく（実機FB「顔が大きい」）。最終のscale/yは末尾で確定
     loft([{ y: 0.082, rx: 0.052 }, { y: 0.05, rx: 0.088, rz: 0.084 }, { y: 0.012, rx: 0.099, rz: 0.093 }, { y: -0.032, rx: 0.097, rz: 0.091 }, { y: -0.068, rx: 0.079, rz: 0.075 }, { y: -0.10, rx: 0.048, rz: 0.05 }], skin, headG) // 丸く柔らかい卵形。頭頂を下げ「目より上」を詰める＋輪郭は小さめ＝top-heavy/ミサワ解消
     for (const s of [-1, 1]) add(headG, SP(0.02), skin, s * 0.1, -0.012, 0.0, 0.7, 1, 0.7) // 耳
     // 顔＝大きなアニメの目鼻を描いたテクスチャを頭前面の薄い円筒面（頭の丸みに沿う）へ貼る。小さな3Dパーツの寄せ集めをやめ、距離でも崩れず魅力的に（調査ベースの刷新）。
@@ -6318,16 +6321,16 @@ export async function mountTown3d(parent, opts = {}) {
     faceMesh.position.set(0, -0.012, 0); faceMesh.renderOrder = 2; headG.add(faceMesh)
     // ── 髪：さらさら・ふわっとした自然な毛。丸い地肌キャップ＋中央分けで左右へ流れる「平たい柔らかな房」を重ねる（毛先は丸く＝尖らせない／球のぼこぼこ・コーンのトゲを脱す）。──
     const hs = cfg.hairStyle
-    const hCap = (cz, sy, sx) => add(headG, SP(0.116, 22, 18), hairM, 0, 0.014, cz, sx || 1.03, sy, 1.0) // ふわっと膨らむ地肌（頭頂を下げ「目より上」を詰める）
-    const fringe = (fz, drop) => { // 前髪＝左右2枚の平たい房を中央でわずかに分け、外下へ流す。毛先は丸い楕円＝さらさら
-      for (const s of [-1, 1]) { const b = add(headG, SP(0.082, 16, 12), hairM, s * 0.02, 0.052, fz, 1.16, drop, 0.66); b.rotation.z = s * 0.44; b.rotation.x = -0.2 }
-      add(headG, SP(0.052, 14, 10), hairM, 0, 0.06, fz - 0.006, 1.0, drop, 0.6) } // 分け目の中央のふくらみ（やや下げる）
-    const sideHair = (sy) => { for (const s of [-1, 1]) add(headG, SP(0.044, 14, 12), hairM, s * 0.104, -0.018, 0.012, 0.7, sy, 0.86) } // 頬に沿う柔らかい横髪（細長い楕円）
+    const hCap = (cz, sy, sx) => add(headG, SP(0.104, 22, 18), hairM, 0, 0.014, cz, sx || 1.0, sy, 0.98) // ふわっと膨らむ地肌。顔の1.17倍→1.05倍に絞り「黒い兜で顔がデカく見える」を解消
+    const fringe = (fz, drop) => { // 前髪＝中央でしっかり割り、額を見せて左右へ斜めに流す（一枚板の兜＝目に被さりサングラス化、を解消）
+      for (const s of [-1, 1]) { const b = add(headG, SP(0.078, 16, 12), hairM, s * 0.05, 0.058, fz, 1.04, drop * 0.9, 0.62); b.rotation.z = s * 0.62; b.rotation.x = -0.16 } // 左右の房を離して斜め分け＝額の肌を出す
+      add(headG, SP(0.038, 12, 10), hairM, 0, 0.086, fz - 0.004, 0.86, drop * 0.55, 0.48) } // 分け目の小さな山（高い位置＝額を覆わない）
+    const sideHair = (sy) => { for (const s of [-1, 1]) add(headG, SP(0.04, 14, 12), hairM, s * 0.094, -0.018, 0.012, 0.66, sy, 0.82) } // 頬に沿う柔らかい横髪（張り出しを詰め顔まわりを小さく）
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
       add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代(時代物)
     else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) } // 笠の下
-    else if (hs === 'bob') { hCap(-0.026, 0.92); fringe(0.086, 0.62)
-      for (const s of [-1, 1]) add(headG, SP(0.058, 14, 12), hairM, s * 0.1, -0.05, 0.0, 0.66, 2.05, 0.95) } // 頬を包む長い横髪（細長い楕円＝ボブ）
+    else if (hs === 'bob') { hCap(-0.026, 0.9); fringe(0.086, 0.6)
+      for (const s of [-1, 1]) add(headG, SP(0.052, 14, 12), hairM, s * 0.088, -0.05, 0.0, 0.62, 2.0, 0.9) } // 頬を包む長い横髪（張り出しを詰め顔を小さく＝ボブ）
     else if (hs === 'short') { hCap(-0.018, 0.86, 1.03); fringe(0.088, 0.5); sideHair(1.15) } // 短髪
     else { hCap(-0.026, 0.92); fringe(0.086, 0.6); sideHair(1.7)
       if ((hs | 0) === 1) add(headG, SP(0.072, 14, 12), hairM, 0, -0.05, -0.085, 1.12, 1.3, 0.95) } // たまに後ろで結った膨らみ
@@ -6348,10 +6351,10 @@ export async function mountTown3d(parent, opts = {}) {
     // ── 等身の是正（デザイナー評価: 8.5頭身は伸びすぎ→約6頭身の幼く親しみやすい比率へ）。頭は据え置き、体だけをグループ化して縦に縮める。──
     const body = new THREE.Group()
     for (const ch of g.children.slice()) { if (ch !== headG) body.add(ch) } // 頭(headG)以外＝胴/手足/首/小物/輪郭をまとめて圧縮
-    g.add(body); body.scale.set(0.9, 0.7, 0.9); body.position.y = -0.05 // 縦を強めに詰め、幅も少し絞る。足を地面へ
-    headG.scale.setScalar(0.94); headG.position.y = 1.1 // 頭は据え置き気味。縮んだ首の上へ座らせる
+    g.add(body); body.scale.set(0.82, 0.72, 0.82); body.position.y = -0.06 // 横を強めに絞り「華奢」に（0.9→0.82）。縦は据え置き気味で背は低い幼児体型を保つ
+    headG.scale.setScalar(0.9); headG.position.y = 1.11 // 頭をやや小さく(0.94→0.9)。細くした首の上へ座らせる（生首が浮く感を消し顔を小さく見せる）
     // 接地影（足元の柔らかな影＝人形の浮きを消して地に立たせる）
-    const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.5, 0.72, 1); shadow.renderOrder = 1; g.add(shadow)
+    const shadow = new THREE.Mesh(resShadowGeo, resShadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, 0.03, 0.02); shadow.scale.set(0.42, 0.66, 1); shadow.renderOrder = 1; g.add(shadow)
     g.scale.setScalar((cfg.scale || 1) * (0.98 + R() * 0.12))
     g.userData = { arms, legs, headG }
     return g
@@ -6529,8 +6532,8 @@ export async function mountTown3d(parent, opts = {}) {
       const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(0.3, 1, 1.3); sc.add(dl)
       const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.25); dl2.position.set(-0.7, 0.4, 0.6); sc.add(dl2); sc.add(fig)
       const W = faceZoom ? 440 : 360, H = faceZoom ? 440 : 560
-      const cam = faceZoom ? new THREE.OrthographicCamera(-0.3, 0.3, 2.04, 1.44, 0.1, 12) : new THREE.OrthographicCamera(-0.62, 0.62, 0.95, -0.95, 0.1, 12)
-      if (faceZoom) { cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0) } else { cam.position.set(0, 0.9, 5); cam.lookAt(0, 0.9, 0) }
+      const cam = faceZoom ? new THREE.OrthographicCamera(-0.29, 0.29, 0.29, -0.29, 0.1, 12) : new THREE.OrthographicCamera(-0.62, 0.62, 0.95, -0.95, 0.1, 12)
+      if (faceZoom) { cam.position.set(0, 1.13, 5); cam.lookAt(0, 1.13, 0) } else { cam.position.set(0, 0.9, 5); cam.lookAt(0, 0.9, 0) }
       const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
       renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(sc, cam)
