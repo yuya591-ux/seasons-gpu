@@ -1,0 +1,16 @@
+import { chromium } from 'playwright'
+const PORT = process.env.PORT || 4896
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 780, height: 460 }, deviceScaleFactor: 2 })
+page.on('pageerror', (e) => console.log('PAGEERR', e.message))
+await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.locator('.gate').click().catch(()=>{})
+await page.waitForTimeout(800)
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2800)
+await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(700)
+await page.evaluate(() => { window.__town3dCruise(false); window.__town3dFlyPose(60, 96, -300, 0, -0.15) }); await page.waitForTimeout(1500)
+await page.addStyleTag({ content: '[class*="toast"],[class*="hint"],[class*="cruise"],[class*="gauge"],[class*="modepill"],[class*="town3d-low"],[class*="town3d-stick"]{display:none!important}' })
+await page.screenshot({ path: 'scripts/_shots/cloudcheck.png' })
+console.log('done')
+await browser.close()

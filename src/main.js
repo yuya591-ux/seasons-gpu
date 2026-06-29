@@ -45,7 +45,12 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     window.location.reload()
   })
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(BASE + 'sw.js', { scope: BASE }).catch(() => {})
+    navigator.serviceWorker.register(BASE + 'sw.js', { scope: BASE }).then((reg) => {
+      if (!reg) return
+      reg.update().catch(() => {}) // 起動ごとに更新確認＝新版を24時間待たずに拾う（実機の古いキャッシュからの脱出を速める）
+      // アプリに戻るたびにも更新確認（PWAは閉じずに長く滞在するため）。
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}) })
+    }).catch(() => {})
   })
 }
 

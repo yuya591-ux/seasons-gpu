@@ -2,8 +2,8 @@
 // 方針: 外部依存ゼロ・同一オリジンのみ。一度開けば、電波が無くても・将来サーバが消えても眺められる。
 // 戦略: ページ遷移=ネット優先(失敗時キャッシュ)／資産=stale-while-revalidate(即表示→裏で更新)。
 // 版を上げると activate で旧版キャッシュを全て掃除する＝古い情景レジストリ/チャンクの残留(メニュー破壊の元)を断つ。
-// デプロイで中身が変わる時は必ずこの版を上げること（v2→v3で実機の壊れたキャッシュを一掃）。
-const VERSION = 'seasons-v3'
+// デプロイで中身が変わる時は必ずこの版を上げること（v3→v4: ページ取得をHTTPキャッシュ非経由にして確実に最新の入口を出す）。
+const VERSION = 'seasons-v4'
 const ASSET_CACHE = `${VERSION}-assets`
 
 // install: シェル（index.html/JS/CSS/manifest/icon）を事前キャッシュ＝一度も情景を開かずオフラインでも起動。
@@ -48,7 +48,9 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       (async () => {
         try {
-          const fresh = await fetch(req)
+          // HTTPキャッシュを経由せず必ずネットに取りに行く＝GitHub Pages/ブラウザの古いindex.htmlを掴み続けて
+          // 「古いアプリで起動→新チャンクと混在→メニュー破壊」を防ぐ。失敗時のみキャッシュへフォールバック。
+          const fresh = await fetch(req, { cache: 'no-store' })
           const cache = await caches.open(ASSET_CACHE)
           cache.put(req, fresh.clone())
           return fresh

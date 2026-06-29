@@ -9346,9 +9346,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
     if (cloudHi !== lastCloudHi) { lastCloudHi = cloudHi; for (const o of cloudObjs) o.visible = cloudHi } // 低空では雲海の静的要素も一括で隠す（描画コール節約・見た目は霧で不変）
     // 雲海の世界（島・入道雲・吊り橋）を高度でゆっくりフェードして滲み出させる＝boolのポップを廃し、雲海(seaOp)と同期した上質な切り替わりに。
-    if (cloudHi) {
-      if (!cloudRevealMats) { cloudRevealMats = []; for (const o of cloudObjs) o.traverse((c) => { if (c.isMesh) { const mm = Array.isArray(c.material) ? c.material : [c.material]; for (const m of mm) { if (m && m.__revBase === undefined) { m.__revBase = (m.opacity == null ? 1 : m.opacity); m.transparent = true; cloudRevealMats.push(m) } } } }) }
-      for (const m of cloudRevealMats) m.opacity = m.__revBase * cloudReveal // y58で滲み始めy88で実体化（雲海seaOp y70→92に重なり、白い霞seaCrossが仕上げを覆う）
+    if (cloudHi && cloudRevealMats) {
+      for (const m of cloudRevealMats) m.opacity = m.__revBase * cloudReveal // y58で滲み始めy88で実体化（雲海seaOp y70→92に重なり、白い霞seaCrossが仕上げを覆う）。材の収集とtransparent切替はマウント時に済ませ済み（reveal時のリコンパイル大ヒッチを廃す）
     }
     // 雲海の奥深く（雲の層の上＝眼下の街は雲deckに隠れる高度）では街を丸ごと非表示＝「雲海＋街」の二重描画を解消し負荷を半減（雲海の重さ対策）。ヒステリシスでチラつき防止。
     const deepCloud = cloudHi && active.flyPos.y > (lastDeep ? SEA_Y + 2 : SEA_Y + 10)
@@ -9374,6 +9373,10 @@ export async function mountTown3d(parent, opts = {}) {
   // 初回フレームでの「可視マテリアルの一斉シェーダーコンパイル」(progs多数=数百msのヒッチ)を、
   // 描画を始める前にまとめて済ませる＝マウント直後の最初のframe()が固まらない（暗転の裏で温める）。
   // 対象は現在可視のマテリアルのみ（時代群は reveal 時に別途・本丸の段階生成は将来）。失敗しても従来どおり初回frameで遅延コンパイルされる。
+  // 雲海の材を「最初から透明」にして集めておく＝初めて雲海高度に達した瞬間の transparent 切替→全雲海材の一斉リコンパイル(数百ms)を無くす。
+  // この一斉リコンパイルが、上昇ボタンの長押しを iOS に pointercancel させ「雲海突入直前で1回解除」させていた実機FBの主因。直後の compile で透明版を温める。
+  // 低空では cloudObjs.visible=false なので、常時透明でも低空の描画コスト（オーバードロー）は増えない。
+  if (cloudObjs && cloudObjs.length) { cloudRevealMats = []; for (const o of cloudObjs) o.traverse((c) => { if (c.isMesh) { const mm = Array.isArray(c.material) ? c.material : [c.material]; for (const m of mm) { if (m && m.__revBase === undefined) { m.__revBase = (m.opacity == null ? 1 : m.opacity); m.transparent = true; m.opacity = 0; cloudRevealMats.push(m) } } } }) }
   try { renderer.compile(scene, camera) } catch { /* コンパイル先行に失敗しても描画は継続 */ }
   renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
   frame()
