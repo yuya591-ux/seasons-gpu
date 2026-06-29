@@ -1,18 +1,18 @@
-// 実写の窓(photoWindow)シーンを点検＝写真主役の窓辺の質感。
 import { chromium } from 'playwright'
-const port = process.env.PORT || '4801'
+const PORT = process.env.PORT || 4896
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
+const page = await browser.newPage({ viewport: { width: 760, height: 460 }, deviceScaleFactor: 2 })
 page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
-await page.waitForTimeout(700)
-for (const id of ['photo-window-town', 'photo-window-sea', 'photo-window-autumn']) {
-  await page.evaluate((s) => window.__applyScene(s), id)
-  await page.waitForTimeout(2400)
-  await page.addStyleTag({ content: '.ui{display:none !important}' }).catch(() => {})
-  await page.screenshot({ path: `scripts/_shots/${id}.png` })
-  console.log(id, 'done')
-}
+await page.waitForTimeout(800)
+await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2600)
+const hasPhotoBtn = await page.evaluate(() => !!Array.from(document.querySelectorAll('.iconbtn')).find(b => b.textContent === '写真'))
+await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.iconbtn')).find(x => x.textContent === '写真'); if (b) b.click() })
+await page.waitForTimeout(500)
+const idle = await page.evaluate(() => document.body.classList.contains('idle'))
+const topbarOpacity = await page.evaluate(() => { const t = document.querySelector('.topbar'); return t ? getComputedStyle(t).opacity : 'none' })
+console.log('photoBtn exists', hasPhotoBtn, '| idle after click', idle, '| topbar opacity', topbarOpacity)
+await page.screenshot({ path: 'scripts/_shots/photo_mode.png' })
 await browser.close()
-console.log('photo done')

@@ -154,9 +154,25 @@ export function buildUI(opts) {
   const topbar = h('div', 'topbar')
   const sceneBtn = h('button', 'iconbtn', '情景')
   const setBtn = h('button', 'iconbtn', '設定')
+  const photoBtn = h('button', 'iconbtn', '写真')
+  photoBtn.setAttribute('aria-label', 'この眺めをとどめる（UIを消す）')
   topbar.appendChild(sceneBtn)
   topbar.appendChild(setBtn)
+  topbar.appendChild(photoBtn)
   root.appendChild(topbar)
+  // 写真モード: UIを一瞬で消して「この眺めをとどめる」。端末のスクリーンショットで保存できる
+  // （canvasのtoDataURLだとCSSの水彩グレードが抜けて甘くなる＝端末撮影が最良。サウンド/プロデュース監督F4）。画面に触れると操作が戻る。
+  photoBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    clearTimeout(idleTimer); document.body.classList.add('idle')
+    const hint = h('div', 'lookhint')
+    hint.innerHTML = 'そのまま、画面を保存できます<br><span class="lookhint__sub">画面に触れると操作が戻ります</span>'
+    root.appendChild(hint)
+    requestAnimationFrame(() => hint.classList.add('lookhint--show'))
+    const fade = () => { hint.classList.remove('lookhint--show'); setTimeout(() => hint.remove(), 1200) }
+    const tmr = setTimeout(fade, 2800)
+    window.addEventListener('pointerdown', () => { clearTimeout(tmr); fade() }, { once: true, passive: true }) // 次に触れたら案内を消す（操作はpokeでidle解除＝UIが戻る）
+  })
 
   // ── 窓をあける/しめる＋身を乗り出す（窓辺の情景でだけ） ──
   const WINDOW_SCENES = ['cornerRoom', 'windowTown', 'shishigaya', 'windowSea', 'windowMountains', 'kitateraoRooftop', 'town3d', 'photoWindow']

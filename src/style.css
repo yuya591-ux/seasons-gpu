@@ -601,6 +601,13 @@ body.idle .town3d-climb.climb--on {
   opacity: 0;
   pointer-events: none;
 }
+/* 写真モード(idle)では低空ボタン/歩行スティックも一緒に消えてきれいな一枚に＝端末で保存しやすい。 */
+body.idle .town3d-low,
+body.idle .town3d-stick {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.town3d-low { transition: opacity 0.5s ease, background 0.25s ease; }
 /* 窓枠（最前景のアルミサッシ＋中央の縦横の桟＋窓台）。操作は透過。 */
 .town3d-frame {
   position: absolute;
