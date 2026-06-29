@@ -6223,7 +6223,7 @@ export async function mountTown3d(parent, opts = {}) {
     const g = new THREE.Group()
     const outfit = cfg.outfit || 'modern'
     const skin = toon(cfg.skin), hairM = toon(cfg.hair), topM = toon(cfg.top), botM = toon(cfg.bottom || cfg.top), shoeM = toon(cfg.shoe || 0x33302b)
-    skin.emissive = new THREE.Color(cfg.skin); skin.emissiveIntensity = 0.08 // 顔が影側でも暗く沈まないよう肌をわずかに自己発光（強いと霧/夕の中で煌々と浮くので控えめに）
+    skin.emissive = new THREE.Color(cfg.skin); skin.emissiveIntensity = 0.12 // 顔が影側でも暗く沈まないよう肌をわずかに自己発光（強いと霧/夕の中で煌々と浮くので控えめに）
     const white = toon(0xe6e0d4), dark = toon(0x2c2622), irisM = toon(cfg.iris || 0x5a4632), mouthM = toon(0xc08274), browM = toon(cfg.hair), blush = toon(0xe2a596) // 襟/白目は陰影付き(toon)＝MeshBasicの煌々とした白で霧の谷に浮かない
     const accentM = toon(cfg.accent || 0x8a6a3a) // 帯・襟・差し色
     const SP = (r, w, h) => new THREE.SphereGeometry(r, w || 16, h || 14), CY = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s || 16), BX = (w, h, d) => new THREE.BoxGeometry(w, h, d)
@@ -6231,9 +6231,11 @@ export async function mountTown3d(parent, opts = {}) {
     // ── 一体の連続メッシュ：断面リング(楕円)を滑らかにつなぐ＝球の寄せ集めでない「一枚の体・手足」。──
     const outlineList = [] // 黒い主線を付ける主要メッシュ（シルエット）
     const loft = (rings, mat, parent, noOutline) => { const N = 14, vp = [], idx = []
+      const flip = rings[rings.length - 1].y < rings[0].y // 【真因修正】リングがy降順だと面の巻きが逆＝法線が内向きになり、表面が裏面カリングされ黒い輪郭(裏面ハル)だけが残って「顔・袖・脚が真っ黒」に潰れていた。降順のときだけ面を反転し必ず外向きにする（y昇順の胴は従来通りで無改変＝無リスク）
       for (const r of rings) for (let j = 0; j < N; j++) { const a = (j / N) * Math.PI * 2; vp.push((r.x || 0) + Math.cos(a) * r.rx, r.y, (r.z || 0) + Math.sin(a) * (r.rz || r.rx)) }
-      for (let i = 0; i < rings.length - 1; i++) { const a0 = i * N, a1 = (i + 1) * N; for (let j = 0; j < N; j++) { const jn = (j + 1) % N; idx.push(a0 + j, a1 + j, a0 + jn, a0 + jn, a1 + j, a1 + jn) } } // 外向き
-      const cap = (r, dir, base) => { const c = vp.length / 3; vp.push(r.x || 0, r.y + dir * Math.max(r.rx, r.rz || r.rx) * 0.85, r.z || 0); for (let j = 0; j < N; j++) { const jn = (j + 1) % N; if (dir > 0) idx.push(base + j, base + jn, c); else idx.push(base + jn, base + j, c) } }
+      for (let i = 0; i < rings.length - 1; i++) { const a0 = i * N, a1 = (i + 1) * N; for (let j = 0; j < N; j++) { const jn = (j + 1) % N
+        if (flip) idx.push(a0 + j, a0 + jn, a1 + j, a0 + jn, a1 + jn, a1 + j); else idx.push(a0 + j, a1 + j, a0 + jn, a0 + jn, a1 + j, a1 + jn) } } // 外向き
+      const cap = (r, dir, base) => { const c = vp.length / 3; vp.push(r.x || 0, r.y + dir * Math.max(r.rx, r.rz || r.rx) * 0.85, r.z || 0); for (let j = 0; j < N; j++) { const jn = (j + 1) % N; const fwd = (dir > 0) !== flip; if (fwd) idx.push(base + j, base + jn, c); else idx.push(base + jn, base + j, c) } }
       cap(rings[0], -1, 0); cap(rings[rings.length - 1], 1, (rings.length - 1) * N)
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); if (!noOutline) outlineList.push(m); return m }
     // 黒い主線＝メッシュの裏面を法線方向に押し出した複製。関節がズレないよう各メッシュごとに作る。
@@ -6301,9 +6303,9 @@ export async function mountTown3d(parent, opts = {}) {
     const hs = cfg.hairStyle
     if (hs === 'topknot') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.012, -0.03, 1.02, 1.0, 1.0)
       add(headG, CY(0.026, 0.032, 0.07, 10), hairM, 0, 0.115, -0.012); add(headG, SP(0.04, 10, 8), skin, 0, 0.072, 0.08, 1.6, 0.5, 0.6) } // 髷＋月代
-    else if (hs === 'bob') { add(headG, SP(0.125, 18, 16), hairM, 0, 0.0, -0.012, 1.04, 1.05, 1.05)
-      for (const s of [-1, 1]) add(headG, SP(0.052, 12, 12), hairM, s * 0.108, -0.06, 0.014, 0.7, 1.5, 0.95)
-      for (const [hx, hz] of [[-0.054, 0.085], [0.0, 0.097], [0.054, 0.085]]) add(headG, SP(0.038, 12, 10), hairM, hx, 0.068, hz, 1, 0.8, 0.8) }
+    else if (hs === 'bob') { add(headG, SP(0.125, 18, 16), hairM, 0, 0.0, -0.05, 1.04, 1.05, 0.92) // 後方へ寄せ前面が顔に被らないように（顔を出す）。前髪は別途
+      for (const s of [-1, 1]) add(headG, SP(0.052, 12, 12), hairM, s * 0.112, -0.06, -0.01, 0.66, 1.5, 0.95) // 横の毛束（頬の外側＝顔に被せない）
+      for (const [hx, hz] of [[-0.06, 0.07], [0.0, 0.078], [0.06, 0.07]]) add(headG, SP(0.034, 12, 10), hairM, hx, 0.078, hz, 1, 0.7, 0.7) }
     else if (hs === 'hat') { add(headG, SP(0.111, 14, 12), hairM, 0, 0.0, -0.032, 1.0, 0.9, 1.0) }
     else if (hs === 'short') { add(headG, SP(0.113, 16, 14), hairM, 0, 0.03, -0.012, 1.04, 0.95, 1.04)
       for (const [hx, hz] of [[-0.063, 0.083], [0.0, 0.095], [0.063, 0.083]]) add(headG, SP(0.029, 10, 8), hairM, hx, 0.075, hz, 1, 0.8, 0.8) }
