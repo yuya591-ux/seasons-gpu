@@ -1227,6 +1227,11 @@ export async function mountTown3d(parent, opts = {}) {
   const festOn = (id) => season === 'summer' && weather !== 'rain' && weather !== 'snow' && (isNight || duskAmt > 0.2) && (FORCE_FEST || ((((festDay * 2654435761) ^ (id * 40503) ^ 0x5bd1e995) >>> 0) % 100) < 50) // 各会場50%で開催（夏の夕夜）。雨/雪は現実通り中止（実機FB）
   const festivalSpots = []  // 開催中の祭りの中心（音の距離計算用）＝遠くから囃子が聞こえ近づくと大きくなる
   const festDancers = []    // 盆踊りの踊り手（frameで腕を上げ下げ・体を揺らす）
+  // 祭り・雲海の人物を「住人(makeResident)」と同じ高品質（顔・手足・小物・輪郭）で作る。makeResidentは別ブロック(時代住人の生成所)で後方定義のため、ここでは配置データだけ溜め、そのブロック内で実体化する（評価FB「全エリアの全キャラを添付画像級の品質へ」）。
+  const folkSpecs = []
+  const FOLK_OBI = [0x8a6a3a, 0x7a3a32, 0x55603a, 0x3a4250, 0x9a7a44, 0x6a4a8a] // 浴衣の帯/差し色
+  // 雲海の島に立つ人＝高度フェード(cloudRevealMats)で滲み出させる。reveal=trueは材を複製して共有材(RES_OUTLINE/接地影)を汚さぬよう実体化時に処理。reveal=falseは渡し舟(skyDriftersで一括表示制御)用。
+  const queueCloudFolk = (parent, x, y, z, ry, top, scale = 0.82, reveal = true) => folkSpecs.push({ cloud: true, parent, x, y, z, ry, top, scale, reveal })
   // 祭りの立ち姿（浴衣の人影）。壺/こけしを避け、肩から裾へ広がる胴＋首＋小さめの頭＋髪＝人らしく（実機FB「ポットみたいなもの」の解消）。
   const folkBody = (parent, bodyMat, skinMat, hairMat) => {
     // 胴＋脚×2＋足先を1メッシュに統合（描画コールを増やさず脚を足す）。下半身を二本に分け人のシルエットを明確化（瓶/こけしを脱す）
@@ -1309,13 +1314,12 @@ export async function mountTown3d(parent, opts = {}) {
     }
     }
     // 盆踊りの輪（やぐらを囲む人。中心を向き、frameで腕を上げ下げ・体を揺らす）
-    const skinMat = toon(0xf0c49c), hairMat = toon(0x2a2420), yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], nD = LIGHT ? 8 : 12
+    const yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], nD = LIGHT ? 8 : 12
     for (let i = 0; i < nD; i++) {
       const a = i / 12 * 6.283, dx2 = fx + Math.cos(a) * 5.8 * sc, dz2 = fz + Math.sin(a) * 5.8 * sc, dgy = heightAt(dx2, dz2)
       const d = new THREE.Group(); d.position.set(dx2, dgy, dz2); d.rotation.y = Math.atan2(fx - dx2, fz - dz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d)
-      const yukM = toon(yukataCols[i % yukataCols.length]); folkBody(d, yukM, skinMat, hairMat) // 浴衣の踊り手（首・小頭・髪で人らしく）
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.5, 6), yukM); arm.position.set(0.19, 1.06, 0.08); arm.rotation.z = -0.9; d.add(arm) // 上げた片腕（踊り）
-      festDancers.push({ d, arm, ph: i * 0.5, y0: dgy, cx: fx, cz: fz, rad: 5.8 * sc, ang: a }) // 輪の中心/半径/角度＝frameで少しずつ周回
+      const yk = yukataCols[i % yukataCols.length], ph = i * 0.5, dcx = fx, dcz = fz, drad = 5.8 * sc, dang = a, dy = dgy
+      folkSpecs.push({ d, top: yk, ph, y0: dy, cx: dcx, cz: dcz, rad: drad, ang: dang, amp: 0.5 }) // 浴衣の踊り手（makeResident品質＝顔・手足・髪）。frameで両腕を上げ下げし輪になって周回
     }
     colliders.push({ x: fx, z: fz, r: 2.6 }); spawnAvoid.push({ x: fx, z: fz, r: 7 })
     festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: この祭りに近づくと囃子が満ちる
@@ -1332,11 +1336,10 @@ export async function mountTown3d(parent, opts = {}) {
     const btex = new THREE.CanvasTexture(bc); const banner = new THREE.Mesh(new THREE.BoxGeometry(6.6, 2.5, 0.12), lit ? new THREE.MeshBasicMaterial({ map: btex, fog: true }) : new THREE.MeshToonMaterial({ map: btex, gradientMap: grad, fog: true })); banner.position.set(fx, stY + 1.95, stz - 1.4); banner.castShadow = true; town.add(banner)
     for (const sx of [-3.5, 3.5]) { const g = new THREE.Group(); g.position.set(fx + sx, stY, stz - 0.2); town.add(g); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 3, 6), toon(0x4a4640)).translateY(1.5)); const sp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.4), toon(0x2a2724)); sp.position.y = 2.5; g.add(sp) } // 袖のスピーカー
     // ステージの演者×2（手を振る。frameで腕が動く）
-    const yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0], skinMat = toon(0xf0c49c), hairMat = toon(0x2a2420)
+    const yukataCols = [0x3a6a8a, 0xc0453a, 0x6a8a5a, 0xd0b090, 0x8a6aa0]
     for (let i = 0; i < 2; i++) { const px = fx + (i ? 1.4 : -1.4), pz = stz + 0.3, d = new THREE.Group(); d.position.set(px, stY + 0.6, pz); d.rotation.y = Math.PI; town.add(d) // 客席(+z)を向く
-      const yukM = toon(yukataCols[i]); folkBody(d, yukM, skinMat, hairMat)
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.5, 6), yukM); arm.position.set(0.19, 1.06, 0.08); arm.rotation.z = -0.9; d.add(arm)
-      festDancers.push({ d, arm, ph: i * 1.4, y0: stY + 0.6 }) }
+      const yk = yukataCols[i], ph = i * 1.4, dy = stY + 0.6
+      folkSpecs.push({ d, top: yk, ph, y0: dy, amp: 0.6 }) } // ステージの演者（makeResident品質。手を振る）
     // 提灯の列（広場を囲むポール間に渡す。色ごとに統合）
     const lanLit = [0xffd27a, 0xff8a6a, 0x8ac0e8], lanCols = [toon(0xe8a838), toon(0xc0392b), toon(0x3a8ac0)], lanGeos = [[], [], []], poleGeos = []
     const ring = [[-8, 4], [-8, -3], [8, -3], [8, 4], [0, 7]]
@@ -1356,9 +1359,10 @@ export async function mountTown3d(parent, opts = {}) {
       const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.32, 8), lit ? new THREE.MeshBasicMaterial({ color: 0xff9a4a, fog: true }) : toon(0xc0392b)); lan.position.set(-1.2, 1.7, 0.66); g.add(lan)
       colliders.push({ x: sx, z: sz, r: 1.5 }) }
     // 見物の人（ステージを向いて集まる）
-    for (let i = 0; i < (LIGHT ? 8 : 14); i++) { const ang = (R() - 0.5) * 2.2, rad = 2.6 + R() * 4.2, cx2 = fx + Math.sin(ang) * rad, cz2 = fz + 1.5 + Math.cos(ang) * rad * 0.6, cgy = heightAt(cx2, cz2)
+    for (let i = 0; i < (LIGHT ? 6 : 9); i++) { const ang = (R() - 0.5) * 2.2, rad = 2.6 + R() * 4.2, cx2 = fx + Math.sin(ang) * rad, cz2 = fz + 1.5 + Math.cos(ang) * rad * 0.6, cgy = heightAt(cx2, cz2)
       const d = new THREE.Group(); d.position.set(cx2, cgy, cz2); d.rotation.y = Math.atan2(fx - cx2, stz - cz2); d.scale.setScalar(0.9 + R() * 0.2); town.add(d) // ステージを向く
-      folkBody(d, toon(yukataCols[i % yukataCols.length]), skinMat, hairMat) } // 浴衣の見物客（首・小頭・髪で人らしく＝壺の解消）
+      const yk = yukataCols[i % yukataCols.length], ph = R() * 6.28, dy = cgy
+      folkSpecs.push({ d, top: yk, ph, y0: dy, amp: 0.16 }) } // 浴衣の見物客（makeResident品質。控えめに揺れて生気）
     colliders.push({ x: fx, z: stz, r: 3.6 }); spawnAvoid.push({ x: fx, z: fz, r: 8 })
     festivalSpots.push({ x: fx, z: fz, r: 13 }) // 音: サマフェスにも近づくと囃子が満ちる
   }
@@ -5422,8 +5426,8 @@ export async function mountTown3d(parent, opts = {}) {
         const lpz = 1.8, lant = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.66, 10), new THREE.MeshToonMaterial({ color: isNight ? 0xffcaa0 : 0xf0e0c0, gradientMap: grad, emissive: new THREE.Color(glowT ? 0xff8a3c : 0x000000), emissiveIntensity: glowT ? (isNight ? 1.1 : 0.5) : 0 })); lant.scale.y = 1.2; lant.position.set(2.2, GY + 3.0, lpz); g.add(lant) // 軒の提灯
         const banner = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.6, 0.06), tn(isNight ? 0x8a8478 : 0xeae2d2)); banner.position.set(-3.4, GY + 2.3, 2.2); g.add(banner) // 「茶」の幟（白い布）
         const bpole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.0, 5), woodT); bpole.position.set(-3.75, GY + 2.0, 2.2); g.add(bpole)
-        addFolk(g, -1.7, GY + 1.13, 3.25, 0.12, isNight ? 0x33485e : 0x4a6b80, true)  // 縁台で一服しながら雲海を眺める（藍の浴衣）
-        addFolk(g, 1.7, GY + 1.13, 3.25, -0.12, isNight ? 0x5e3a44 : 0x9a5a4a, true)   // もう一人（茜の浴衣）
+        queueCloudFolk(g, -2.0, GY, 4.0, 0.1, isNight ? 0x33485e : 0x4a6b80)  // 縁台のそばに立ち雲海を眺める（藍の浴衣）
+        queueCloudFolk(g, 2.0, GY, 4.0, -0.1, isNight ? 0x5e3a44 : 0x9a5a4a)   // もう一人（茜の浴衣）
       } else if (n.kind === 'lookout') { // 見晴らし台＝雲海へ張り出す欄干＋望遠鏡＋腰かけ＋木（「台」の実体を与え本物の展望地に）
         const woodMat = tn(isNight ? 0x5a4636 : 0x6e5640)
         const bench = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, 1.3), woodMat); bench.position.set(0, GY + 0.9, 1.5); g.add(bench) // 縁の腰かけ（欄干の手前へ）
@@ -5527,10 +5531,10 @@ export async function mountTown3d(parent, opts = {}) {
         for (const lx of [-0.8, 0.8]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.6), woodM); leg.position.set(2.6 + lx * Math.cos(0.3), GY + 0.25, 4.6 + lx * Math.sin(0.3)); g.add(leg) }
         const cloth2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.04), stallRoof); cloth2.position.set(2.4, GY + 0.78, 4.5); cloth2.rotation.y = -0.3; g.add(cloth2) // 床几に掛けた緋毛氈
         // ひと気を少しだけ（賑わい）＝そぞろ歩く人・店番・床几で休む人。無人の郷愁は保ちつつ祭りの温度を足す。
-        addFolk(g, 7.2, GY, 0, -Math.PI / 2, isNight ? 0x4a3a2c : 0x7a5a3e, false)       // 中央の夜店の店番（広場を向く）
-        addFolk(g, 1.4, GY + 0.62, 4.4, 2.5, isNight ? 0x33485e : 0x4a6b80, true)         // 床几で休む人（提灯を見上げる・藍の浴衣）
-        addFolk(g, -1.6, GY, 1.2, 0.8, isNight ? 0x4a4030 : 0x8a6a44, false)              // 広場をそぞろ歩く人
-        addFolk(g, 2.0, GY, -2.2, -1.9, isNight ? 0x5e3a44 : 0x9a5a4a, false)             // 灯りを見て回る人（茜の浴衣）
+        queueCloudFolk(g, 7.2, GY, 0, -Math.PI / 2, isNight ? 0x4a3a2c : 0x7a5a3e)       // 中央の夜店の店番（広場を向く）
+        queueCloudFolk(g, 1.4, GY, 5.0, 2.5, isNight ? 0x33485e : 0x4a6b80)              // 床几のそばで提灯を見上げる（藍の浴衣）
+        queueCloudFolk(g, -1.6, GY, 1.2, 0.8, isNight ? 0x4a4030 : 0x8a6a44)             // 広場をそぞろ歩く人
+        queueCloudFolk(g, 2.0, GY, -2.2, -1.9, isNight ? 0x5e3a44 : 0x9a5a4a)            // 灯りを見て回る人（茜の浴衣）
       } else if (n.kind === 'colonnade') { // 眠る石像の回廊＝苔むした石柱の並木道に顔のない石の番人が点々と座る（失われた文明の守り手・安心。IPセーフ＝野仏/磐座）。石/苔/前掛けを各1メッシュに統合
         const stoneMat = tn(isNight ? 0x4e4e4a : 0x8b867b), mossMat = tn(isNight ? 0x33473a : 0x5f7a4c), bibMat = tn(isNight ? 0x7a2e26 : 0xbe3b2e)
         const sGeo = [], mGeo = [], bGeo = []
@@ -5628,7 +5632,7 @@ export async function mountTown3d(parent, opts = {}) {
       const hull = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.5, 4.0), woodF); hull.position.y = 0.25; boat.add(hull) // 舟底
       for (const sz of [-1, 1]) { const end = new THREE.Mesh(new THREE.ConeGeometry(0.66, 1.3, 4), woodF); end.rotation.set(sz * Math.PI / 2, Math.PI / 4, 0); end.scale.set(1, 1, 0.45); end.position.set(0, 0.28, sz * 2.3); boat.add(end) } // 舳先と艫（尖り）
       const rim = new THREE.Mesh(new THREE.BoxGeometry(1.46, 0.12, 4.2), woodF2); rim.position.y = 0.5; boat.add(rim) // 舷
-      addFolk(boat, 0, 0.5, -0.7, 0, isNight ? 0x46402f : 0x6e5a3c, false) // 舟人（棹をさして立つ）
+      queueCloudFolk(boat, 0, 0.5, -0.7, 0, isNight ? 0x46402f : 0x6e5a3c, 0.72, false) // 舟人（棹をさして立つ／舟スケール1.85に合わせ小さめ・skyDriftersで表示制御するためreveal不要）
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 4.6, 5), woodF2); pole.position.set(0.52, 1.5, -0.2); pole.rotation.x = -0.5; boat.add(pole) // 棹
       boat.position.set(56, SEA_Y + 0.4, -315); boat.scale.setScalar(1.85)
       scene.add(boat); skyDrifters.push({ o: boat, kind: 'ferry', cx: -30, cz: -315, rad: 86, ph: 0, pole, seaY: SEA_Y })
@@ -6368,7 +6372,16 @@ export async function mountTown3d(parent, opts = {}) {
     return { outfit: 'kimono', skin, hair, iris, hairStyle: 'hat', hat: 'kasa', hatCol: 0xb8a060, top: pickC(SEN_DRAB), accent: pickC([0x5a4c3a, 0x4a4438]) } }) // 農夫
     // 港町の少女を home の要所にも数体（一枚絵の立ち絵＝常にこちらを向くビルボード）。
     for (const sp of [{ x: HARBOR.x - 4, z: HARBOR.z + 5 }, { x: 6, z: -26 }, { x: -42, z: -16 }, { x: HARBOR.x + 9, z: HARBOR.z - 3 }, { x: 30, z: -40 }, { x: -18, z: 24 }]) placeGirl(sp.x + (R() - 0.5) * 3, sp.z + (R() - 0.5) * 3, girlCfg())
-    // ── 地被（草株＋小石）を開けた地面に広く散らして「むき出しの土」を埋める＝滞在したくなる豊かさ（実機FB: 空き地が殺風景）。
+  // ── 祭り・雲海の人物を住人と同じ高品質(makeResident)で実体化（評価FB「全エリアの全キャラを添付画像級へ」）。浴衣＝着物の身頃で。makeResident/pickCが在るこのブロック内で folkSpecs を処理する。──
+  const FOLK_HAIR_STYLES = ['short', 'topknot', 'bob', 0, 1]
+  const buildFolk = (top, scale) => { const r = makeResident({ outfit: 'kimono', skin: pickC(RES_SKIN), hair: pickC(RES_HAIR), iris: pickC(RES_IRIS), top, accent: pickC(FOLK_OBI), hairStyle: pickC(FOLK_HAIR_STYLES), scale }); r.traverse((o) => { if (o.isMesh) o.castShadow = false }); return r } // 祭り/雲海は密集＝影焼きを切り接地影プレーンで足元を締める
+  for (const s of folkSpecs) {
+    if (s.cloud) { const r = buildFolk(s.top, s.scale); r.position.set(s.x, s.y, s.z); r.rotation.y = s.ry
+      r.traverse((o) => { if (o.isMesh) { o.receiveShadow = false; if (s.reveal) { if (Array.isArray(o.material)) o.material = o.material.map((m) => m.clone()); else if (o.material) o.material = o.material.clone() } } }) // 雲海の島はcloudRevealMatsで高度フェード＝共有材を汚さぬよう複製
+      s.parent.add(r) }
+    else { const r = buildFolk(s.top, 0.84); s.d.add(r); festDancers.push({ d: s.d, arms: r.userData.arms, ph: s.ph, y0: s.y0, cx: s.cx, cz: s.cz, rad: s.rad, ang: s.ang, amp: s.amp }) } // 祭り＝frameでfestDancersを動かす
+  }
+  // ── 地被（草株＋小石）を開けた地面に広く散らして「むき出しの土」を埋める＝滞在したくなる豊かさ（実機FB: 空き地が殺風景）。
     // 頂点色で1メッシュへ統合＝描画コール+1。R()依存の街生成の後に置くのでRNGずれ無し。建物/道/水際/木は避ける。LOWで半減。
     if (!SNOW) {
       const tuftGeos = []
@@ -8293,7 +8306,10 @@ export async function mountTown3d(parent, opts = {}) {
     for (const sp of steamPuffs) { const cy = (t * 0.5 + sp.ph) % 2.4, p = cy / 2.4; sp.mesh.position.y = sp.base + p * 1.7; sp.mesh.position.x = 0.4 + Math.sin(t * 1.3 + sp.ph) * 0.18; sp.mesh.material.opacity = 0.32 * Math.sin(p * Math.PI); sp.mesh.scale.setScalar(0.55 + p * 0.8) } // 屋台の湯気が立ちのぼる
     for (const d of festDancers) { const s = Math.sin(t * 1.5 + d.ph) // 盆踊り: 腕を上げ下げし、体が弾む
       if (d.cx !== undefined) { d.ang += dt * 0.12; const x = d.cx + Math.cos(d.ang) * d.rad, z = d.cz + Math.sin(d.ang) * d.rad; d.d.position.x = x; d.d.position.z = z; d.d.rotation.y = Math.atan2(d.cx - x, d.cz - z) } // 輪になって少しずつ回る（中心を向いて周回）
-      d.arm.rotation.z = -0.3 - s * 0.55; d.d.position.y = d.y0 + Math.abs(s) * 0.07 }
+      const up = (d.amp || 0.5) * (0.5 + s * 0.5) // 両腕を上げ下げ（makeResident＝肩で振れる二本の腕。ampで踊り手は大きく見物客は控えめに）
+      if (d.arms) { d.arms[1].rotation.z = 0.12 + up; d.arms[0].rotation.z = -(0.12 + up) }
+      else if (d.arm) d.arm.rotation.z = -0.3 - s * 0.55
+      d.d.position.y = d.y0 + Math.abs(s) * 0.07 * (d.amp ? Math.min(1, d.amp * 2) : 1) }
     // 犬猫馬: 尾を振り・首を傾げ・たまに数歩あるく（佇む人形にしない）。近いものだけ更新＝遠い時代の動物は止める。
     for (const q of quads) { const u = q.userData
       const qdx = q.position.x - active.flyPos.x, qdz = q.position.z - active.flyPos.z; if (qdx * qdx + qdz * qdz > 14000) continue
