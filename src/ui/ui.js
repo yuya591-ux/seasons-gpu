@@ -380,10 +380,20 @@ export function buildUI(opts) {
         }
         bodyEl.appendChild(grid)
       }
-      const ev = j.events || {}
-      const seenEv = [['rainbow', '虹'], ['star', '流れ星'], ['fireworks', '花火'], ['aurora', 'オーロラ']]
-        .filter(([k]) => ev[k] > 0).map(([, label]) => label) // 回数は出さない＝立ち会えた景色の名だけを静かに
-      if (seenEv.length) bodyEl.appendChild(h('p', 'journal__events', '立ち会った景色　' + seenEv.join('、')))
+      // 絵日記: 立ち会った景色を、その日の出来事として日付とともに静かに（達成でなく記録・最近のページだけ）。
+      const entries = Array.isArray(j.entries) ? j.entries : []
+      if (entries.length) {
+        const diary = h('div', 'journal__diary')
+        diary.appendChild(h('p', 'journal__diary-head', '絵日記'))
+        for (const e of entries.slice(-12)) diary.appendChild(h('p', 'journal__entry', e.text)) // 最近の数ページだけ（古いものは朧げに消えてよい）
+        bodyEl.appendChild(diary)
+      } else {
+        // 旧データの保険: entries が無くても、立ち会えた景色の名だけは静かに（回数は出さない）。
+        const ev = j.events || {}
+        const seenEv = [['rainbow', '虹'], ['star', '流れ星'], ['fireworks', '花火'], ['aurora', 'オーロラ']]
+          .filter(([k]) => ev[k] > 0).map(([, label]) => label)
+        if (seenEv.length) bodyEl.appendChild(h('p', 'journal__events', '立ち会った景色　' + seenEv.join('、')))
+      }
     }
     return {
       el,

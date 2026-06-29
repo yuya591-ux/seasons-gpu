@@ -1,7 +1,7 @@
 // 全体の結線。器（情景データ）＋レンダラ＋音＋UI をつなぐ。
 
 import { SCENES, DEFAULT_SCENE, pickNowScene } from './data/scenes/index.js'
-import { getState, setScene, updateSettings, recordVisit, addViewSeconds, recordEvent, markDiscovered, getWorldState } from './state.js'
+import { getState, setScene, updateSettings, recordVisit, addViewSeconds, recordEvent, addJournalEntry, markDiscovered, getWorldState } from './state.js'
 import { createRenderer } from './engine/renderer.js'
 import { createEvents2d } from './engine/events2d.js'
 import { createAudio } from './audio/audio.js'
@@ -193,7 +193,11 @@ function start() {
             // 無音だった「空のご褒美」（虹・オーロラ・天の川）に、やわらかな鈴をそっと添える＝静かな立ち会いの一拍。
             if (!sleepFading && (kind === 'rainbowSolo' || kind === 'aurora' || kind === 'milkyway')) audio.chime()
             const rare = { rainbowSolo: 'rainbow', rain: 'rainbow', fireworks: 'fireworks', fireworksFinale: 'fireworks', aurora: 'aurora', star: 'star' }[kind]
-            if (rare) recordEvent(rare) // 通い帳: まれな景色に立ち会った記録（もやは静かな日常なので記録しない）
+            if (rare && recordEvent(rare)) { // 通い帳: まれな景色に立ち会った記録。初めて立ち会った時だけ、絵日記にその日の一行を綴る（連打で埋めない）
+              const dt = new Date(), md = `${dt.getMonth() + 1}月${dt.getDate()}日`
+              const line = { rainbow: '虹がでた。', fireworks: '遠くで花火があがった。', aurora: '空に光のカーテンが揺れた。', star: '流れ星がながれた。' }[rare]
+              if (line) addJournalEntry(`${md}、${line}`)
+            }
           },
           onSpeed: (v) => { if (!sleepFading) audio.setFlyWind(v) }, // 飛行速度で風音を膨らませる
           onFoot: (surf) => { if (!sleepFading) audio.footstep(surf) }, // 散策の足音（素材別＝舗装/土・草/木）

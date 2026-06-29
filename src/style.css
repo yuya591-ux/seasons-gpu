@@ -1208,6 +1208,25 @@ body.pre-start .stagedots {
   letter-spacing: 0.06em;
   color: rgba(255, 235, 200, 0.7);
 }
+/* 絵日記: 立ち会った景色を、その日の出来事として静かに綴る一行（達成でなく記録） */
+.journal__diary {
+  margin: 1.2rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.journal__diary-head {
+  margin: 0 0 0.5rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.4);
+}
+.journal__entry {
+  margin: 0.35rem 0;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  color: rgba(255, 235, 205, 0.74);
+}
 /* この作品について（出典・ライセンス） */
 .credits {
   overflow-y: auto;

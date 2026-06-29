@@ -44,6 +44,7 @@ const DEFAULTS = {
     seen: {}, // { sceneId: 初めて出会った時刻ms }＝通い帳は「出会った順」に静かに増える
     seconds: 0, // 累計の眺めた秒数
     events: {}, // { rainbow|fireworks|star|aurora: 立ち会った回数 }※回数は表示しない（立ち会えた景色の名だけ）
+    entries: [], // 絵日記の短い一行 [{ at, text }]。立ち会った景色を、その日の出来事として日付とともに静かに（達成でなく記録・最新だけ残す）
     firstAt: null, // 初めて窓辺に座った日時
   },
   // 世界の状態: 訪れた場所（時代エリア/雲海/祭り会場 等）を覚える器。
@@ -62,6 +63,11 @@ function migrate(parsed) {
     const t = j.firstAt || Date.now()
     j.seen = {}
     for (const id of Object.keys(j.visits)) j.seen[id] = t
+  }
+  // v2: 絵日記 entries が無い旧利用者へ、これまでに立ち会った景色を日付なしの一行で引き継ぐ（古い記憶は朧げに）。
+  if (j && j.events && !j.entries) {
+    const phrase = { rainbow: '虹がでた。', star: '流れ星がながれた。', fireworks: '遠くで花火があがった。', aurora: '空に光のカーテンが揺れた。' }
+    j.entries = Object.keys(j.events).filter((k) => j.events[k] > 0 && phrase[k]).map((k) => ({ at: j.firstAt || Date.now(), text: phrase[k] }))
   }
   return parsed
 }
@@ -82,6 +88,7 @@ function read() {
         visits: { ...(parsed.journal && parsed.journal.visits) },
         seen: { ...(parsed.journal && parsed.journal.seen) },
         events: { ...(parsed.journal && parsed.journal.events) },
+        entries: [...((parsed.journal && parsed.journal.entries) || [])],
       },
       worldState: {
         ...DEFAULTS.worldState,
@@ -134,8 +141,18 @@ export function addViewSeconds(s) {
   persist()
 }
 export function recordEvent(kind) {
-  if (!kind) return
+  if (!kind) return false
+  const first = !(state.journal.events[kind] > 0) // この景色に立ち会うのが初めてか（絵日記には初回だけ静かに綴る＝連打で埋めない）
   state.journal.events[kind] = (state.journal.events[kind] || 0) + 1
+  persist()
+  return first
+}
+// 絵日記の一行を綴る（立ち会った景色を、その日の出来事として。最新40ページだけ静かに残す）。
+export function addJournalEntry(text) {
+  if (!text) return
+  const e = state.journal.entries
+  e.push({ at: Date.now(), text })
+  if (e.length > 40) e.splice(0, e.length - 40)
   persist()
 }
 
