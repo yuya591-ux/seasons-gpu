@@ -5360,8 +5360,10 @@ export async function mountTown3d(parent, opts = {}) {
       for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, topH * 0.92, 5), robe); arm.position.set(s * 0.2, hipH + topH * 0.46, 0.02); arm.rotation.z = s * 0.16; grp.add(arm) } // 腕（袖）＝瓶感を脱す
       if (seated) { const lap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.46), robe); lap.position.set(0, hipH - 0.04, 0.2); grp.add(lap) } // 膝（前へ）
       const neck = hipH + topH
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), folkSkin); head.position.y = neck + 0.11; grp.add(head)
-      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.155, 10, 8), folkHair); hair.scale.set(1, 0.74, 1); hair.position.set(0, neck + 0.16, -0.02); grp.add(hair)
+      { const sh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), robe); sh.scale.set(1.06, 0.4, 0.62); sh.position.y = neck - 0.04; grp.add(sh) } // 肩（横に張る稜線＝こけし/瓶を脱し「肩のある人」に）
+      grp.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.052, 0.09, 6), folkSkin).translateY(neck + 0.04)) // 首＝頭が肩にめり込まず人らしい間が出る
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.122, 10, 8), folkSkin); head.position.y = neck + 0.16; head.scale.set(0.95, 1.06, 0.96); grp.add(head) // 頭は小さめ＝頭身を伸ばす（こけしの大頭を脱す）
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), folkHair); hair.scale.set(1, 0.78, 1); hair.position.set(0, neck + 0.2, -0.015); grp.add(hair)
       g.add(grp); return grp
     }
     for (const n of cwNodes) { // 各島を建てる
