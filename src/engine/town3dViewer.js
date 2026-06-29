@@ -338,6 +338,8 @@ export async function mountTown3d(parent, opts = {}) {
   const onEvent = typeof opts.onEvent === 'function' ? opts.onEvent : () => {} // 定期イベント発火を外へ伝える（音の結線）
   const onSpeed = typeof opts.onSpeed === 'function' ? opts.onSpeed : () => {} // 飛行速度(0..1)を外へ伝える（風音の膨らみ）
   const onFoot = typeof opts.onFoot === 'function' ? opts.onFoot : () => {} // 歩行で一歩ごとに伝える（足音）
+  const onLand = typeof opts.onLand === 'function' ? opts.onLand : () => {} // 飛行/ジャンプから降り立つ瞬間（着地音）
+  const landSurf = () => weather === 'snow' ? 'snow' : kind === 'yato' ? 'grass' : 'hard' // 着地音の素材（足音と同方針の粗い判定）
   const onBirdFlush = typeof opts.onBirdFlush === 'function' ? opts.onBirdFlush : () => {} // 鳥が驚いて飛び立つ（羽音）
   const onAltitude = typeof opts.onAltitude === 'function' ? opts.onAltitude : () => {} // 飛行高度(0..1)を外へ伝える（高空で環境音をしぼる）
   const onScene = typeof opts.onScene === 'function' ? opts.onScene : () => {} // 場面（部屋/窓/飛行/歩行・速度・高度・地形・時代の近さ）を外へ伝える（BGMの下地）
@@ -8706,15 +8708,15 @@ export async function mountTown3d(parent, opts = {}) {
         if ((active.jumpY || 0) > 0 || active.jumpVel) {
           active.jumpVel = (active.jumpVel || 0) - FLY.gravity * dt
           active.jumpY = Math.max(0, (active.jumpY || 0) + active.jumpVel * dt)
-          if (active.jumpY <= 0 && active.jumpVel < 0) { active.jumpVel = 0; active.landDustT = 0.5; active.dipT = 0.28; landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true } // 着地＝砂ぼこり＋沈み込み
+          if (active.jumpY <= 0 && active.jumpVel < 0) { active.jumpVel = 0; active.landDustT = 0.5; active.dipT = 0.28; landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true; onLand(landSurf()) } // 着地＝砂ぼこり＋沈み込み＋着地音
         }
         const eyeY = groundY + FLY.eye + (active.jumpY || 0)
         const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
         if ((active.jumpY || 0) > 0.001) active.flyPos.y = eyeY // ジャンプ中は地面追従でなく直接（弾む手応え）
         else active.flyPos.y += (eyeY - active.flyPos.y) * ky // 接地はやわらかく・以降は面に沿う
-        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 降り立った瞬間＝砂ぼこり＋沈み込み
+        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 降り立った瞬間＝砂ぼこり＋沈み込み＋着地音
           active.landedFired = true; active.landDustT = 0.7; active.dipT = 0.42
-          landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true
+          landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true; onLand(landSurf())
         }
         // 足音: 歩いた距離を貯め、一歩ぶん進むごとに鳴らす（止まっている間は鳴らない）
         const hstep = Math.hypot(active.vel.x, active.vel.z) * dt

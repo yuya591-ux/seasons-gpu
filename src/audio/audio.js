@@ -863,6 +863,22 @@ export function createAudio(opts) {
       else src.connect(g).connect(master)
       try { src.start(t); src.stop(t + s.dec + 0.02) } catch { /* 無視 */ }
     },
+    /** 着地音（飛行/ジャンプから降り立つ一打＝足音より低く重い「ドスッ」＋土埃の擦れ）。surfで土/草/雪/舗装の質感。 */
+    land(surf) {
+      if (!ctx || muted) return
+      const t = now()
+      const sub = ctx.createOscillator(); sub.type = 'sine' // 腹に響く低い胴鳴り（短くピッチが落ちる）
+      sub.frequency.setValueAtTime(155, t); sub.frequency.exponentialRampToValueAtTime(72, t + 0.18)
+      const sg = ctx.createGain(); sg.gain.setValueAtTime(0.0001, t); sg.gain.linearRampToValueAtTime(0.07, t + 0.012); sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
+      sub.connect(sg).connect(master)
+      const len = Math.floor(0.16 * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0) // 土埃の擦れ（短い減衰ノイズ）
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2)
+      const src = ctx.createBufferSource(); src.buffer = buf
+      const lp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null
+      const g = ctx.createGain(); g.gain.setValueAtTime(surf === 'grass' || surf === 'snow' ? 0.05 : 0.062, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17)
+      if (lp) { lp.type = 'lowpass'; lp.frequency.value = surf === 'grass' ? 430 : surf === 'snow' ? 360 : 640; src.connect(lp).connect(g).connect(master) } else src.connect(g).connect(master)
+      try { sub.start(t); sub.stop(t + 0.24); src.start(t); src.stop(t + 0.18) } catch { /* 無視 */ }
+    },
     /** 街の環境音(虫/街音)をしぼる。v=しぼり量(0..1)。高空＋海上＋homeから離れた量を engine が合成して渡す。
      *  海に出ると虫の音がほぼ消える＝「海の上は風と鳥だけ」。風(生成)は別系統なので残る。 */
     setAltitudeDuck(v) {
