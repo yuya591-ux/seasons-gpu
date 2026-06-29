@@ -7794,6 +7794,17 @@ export async function mountTown3d(parent, opts = {}) {
     { next: 80 + R() * 90, min: 480, max: 1500, pool: ['rain', 'fireworks', 'fireworksFinale'] },                   // まれ（大当たり＝雨→虹／花火／花火大会）
     { next: 360 + R() * 360, min: 1800, max: 3600, pool: ['aurora'] },                                              // 超レア（30〜60分に一度の“特別な空”＝オーロラ。最初は6〜12分で一度）
   ]
+  // ── 今日の空模様（日替わりのシード）。その日だけ特定の現象が少し出やすい＝「今日は何か違う」再訪の動機。──
+  // 実カレンダーの日付ハッシュで決定（同じ日は同じ・日が変わると変わる。festDayと同方式）。眺める頻度や静けさの設計は変えず、抽選の重みだけ僅かに傾ける。
+  const SKY_MOODS = [
+    ['rainbowSolo', 'cloudShade'], // 虹の生まれやすい日
+    ['star', 'milkyway'],          // 星の多い夜
+    ['balloon', 'birds'],          // 空のにぎわい
+    ['godRays', 'mist'],           // 光と靄の日
+    ['drift', 'contrail'],         // 風と季節の日
+    ['aurora', 'star'],            // 特別な夜空
+  ]
+  const todayFavor = SKY_MOODS[(((festDay * 2654435761) ^ 0x9e3779b9) >>> 0) % SKY_MOODS.length]
   function scheduleFx(dt) {
     if (reduceMotion) return // 視差軽減では定期イベント（突発・大きな動き）を起こさない。ぼーっと眺める静けさは保つ
     // 深く眺めるほど（無操作が長いほど）発火間隔を伸ばす＝騒がしくせず静けさへ沈める（整う・評価エモ）。
@@ -7807,7 +7818,10 @@ export async function mountTown3d(parent, opts = {}) {
       b.next = b.min + R() * (b.max - b.min)
       if (b.quiet && R() < b.quiet) continue // 何も起きない“余白”をたまに挟む（アンビエントの締まり）
       const ok = b.pool.filter((k) => { const e = EV[k]; return e && (!e.ok || e.ok()) })
-      if (ok.length) { const k = ok[(R() * ok.length) | 0]; EV[k].run(); onEvent(k) } // 画面の現象と音を同時に
+      if (ok.length) {
+        const weighted = ok.slice(); for (const k of todayFavor) if (ok.includes(k)) weighted.push(k) // 今日の空模様＝その日だけ出やすい（重みを倍に）
+        const k = weighted[(R() * weighted.length) | 0]; EV[k].run(); onEvent(k)
+      } // 画面の現象と音を同時に
     }
   }
   // 検証用フック（dev）: 任意のイベントを即時に起こす
