@@ -33,6 +33,17 @@ if (!renderer) {
 // オフラインでも開ける（PWA）。本番のみ・対応ブラウザのみ。失敗は静かに無視。
 // 一度訪れれば、電波が無くても・将来サーバが消えても眺められる（「自分がいなくなっても動く」）。
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  // 新しい版のSWが有効化されて制御が切り替わったら、一度だけ静かに再読込する。
+  // これをしないと「古い版で起動したページ」に新しいSWが途中で割り込み、古い情景レジストリ(引退した実写の窓など)と
+  // 新しいチャンクが混在して情景メニューが壊れる（実機FB: 雨で遊んだ後に条件メニューが変わり実写しか選べない）。
+  // 初回登録(まだ誰も制御していない)では再読込しない＝更新時だけ一回。
+  const hadController = !!navigator.serviceWorker.controller
+  let swReloading = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || swReloading) return
+    swReloading = true
+    window.location.reload()
+  })
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(BASE + 'sw.js', { scope: BASE }).catch(() => {})
   })
