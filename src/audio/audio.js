@@ -151,12 +151,28 @@ export function createAudio(opts) {
   // 継ぎ目レスな無限ループ: 同じ素材を末尾と先頭で xf 秒だけ重ね、クロスフェードして繋ぐ。
   // swell=true のレイヤーは、ごくゆっくり音量が膨らみ・退き・時に静まる（虫の鳴き交わしの「間」＝
   // ずっと同じ壁の違和感を消し、静かになる瞬間をつくる）。layerGainは音場/高度しぼり用に残し、別段の swellGain で揺らす。
-  function startLoop(buffer, gainVal, pan, myGen, swell) {
+  // 日の傾き(dp 0..1)で虫の声をクロスフェード: 'out'=昼に満ち夕に退く(油蝉) / 'in'=夕に立ち上がる(ヒグラシ・鈴虫)。
+  // 情景ごとに sounds[].dayFade でオプトイン（無指定は常時＝従来通り）。各情景は固定の瞬間なので、昼→夕にドリフトする
+  // 立体の街でだけ実際に動く（夜シーン/2D窓は dp=0 のまま＝従来の音）。
+  const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x) }
+  function dayFadeMul(dayFade, dp) {
+    if (dayFade === 'out') return 1 - 0.95 * smooth01((dp - 0.18) / 0.44) // 昼に満ち、夕(dp~0.62)でほぼ退く
+    if (dayFade === 'in') return 0.06 + 0.94 * smooth01((dp - 0.30) / 0.62) // 夕へ向けて立ち上がる
+    return 1
+  }
+  // レイヤー音量を baseGain × 高度しぼり × 日の傾き で合成して反映（altitude と dayPhase が同じ layerGain を取り合わないよう一本化）。
+  function applyLayerGain(layer, ramp = 0.5) {
+    if (!layer || layer.stopped || !ctx) return
+    const tgt = Math.max(0.0001, (layer.baseGain || 0.4) * (1 - altDuckV * 0.985) * dayFadeMul(layer.dayFade, dayPhaseV))
+    try { layer.layerGain.gain.setTargetAtTime(tgt, now(), ramp) } catch { /* 無視 */ }
+  }
+  function startLoop(buffer, gainVal, pan, myGen, swell, dayFade) {
     const dur = buffer.duration
     const xf = Math.min(0.8, dur * 0.25)
     const layerGain = ctx.createGain()
     layerGain.gain.setValueAtTime(0.0001, now())
-    layerGain.gain.linearRampToValueAtTime(Math.max(0.0001, gainVal), now() + 1.4) // レイヤーのフェードイン
+    const initMul = (1 - altDuckV * 0.985) * dayFadeMul(dayFade, dayPhaseV) // 立ち上げ時点の高度・日の傾きを反映（夕に始めればヒグラシ寄りで入る）
+    layerGain.gain.linearRampToValueAtTime(Math.max(0.0001, gainVal * initMul), now() + 1.4) // レイヤーのフェードイン
     // swell の揺らぎ段（layerGain → swellGain → panner/master）。素のレイヤーは layerGain を直結。
     let tail = layerGain
     if (swell && ctx.createOscillator) {
@@ -177,7 +193,7 @@ export function createAudio(opts) {
     } else {
       tail.connect(master)
     }
-    const layer = { layerGain, stopped: false, panner, basePan: pan, baseGain: gainVal }
+    const layer = { layerGain, stopped: false, panner, basePan: pan, baseGain: gainVal, dayFade: dayFade || null }
     layers.push(layer)
 
     let nextStart = now() + 0.05
@@ -308,6 +324,7 @@ export function createAudio(opts) {
     gen++
     const myGen = gen
     stopAllNodes()
+    dayPhaseV = 0 // 新しい情景は「その瞬間」から始まる＝前の情景の夕暮れを持ち越さない（直後に onDayPhase で実態へ追従）
 
     const loops = (scene.sounds || []).filter((d) => d.loop !== false)
     let li = 0
@@ -326,7 +343,7 @@ export function createAudio(opts) {
         li++
         const lgain = def.gain != null ? def.gain : 1
         // 鈴虫(16kHz素材)は高域が8kHzで切れ、48kHzの虫(crickets)と並ぶと高域落差が目立つ→控えめにし虫を主役へ（評価サウンド）。
-        startLoop(buffer, /suzumushi/.test(def.src || '') ? lgain * 0.72 : lgain, pan, myGen, !!def.swell)
+        startLoop(buffer, /suzumushi/.test(def.src || '') ? lgain * 0.72 : lgain, pan, myGen, !!def.swell, def.dayFade)
       } else if (def.interval) {
         scheduleInterval(def, buffer, myGen)
       } else {
@@ -347,6 +364,7 @@ export function createAudio(opts) {
   let purrV = 0
   let flyWindV = 0 // 飛行速度に応じた風の強さ（setFlyWind）。細かな変化を無視する基準
   let altDuckV = 0 // 高度に応じた環境音のしぼり（setAltitudeDuck）。細かな変化を無視する基準
+  let dayPhaseV = 0 // 日の傾き(0=情景の始まり..1=夕へ移ろい)。虫の声の交代(油蝉↔ヒグラシ)を layerGain に合成する
   function startWind() {
     if (!ctx || windNode || !ctx.createBiquadFilter) return
     const len = Math.floor(6 * ctx.sampleRate) // 2秒→6秒: ループ周期を伸ばし、静かな場面で「白ノイズの2秒周期」が知覚されるのを防ぐ（評価サウンド）
@@ -886,17 +904,16 @@ export function createAudio(opts) {
       v = Math.max(0, Math.min(1, v || 0))
       if (Math.abs(v - altDuckV) < 0.03) return
       altDuckV = v
-      const t = now()
-      for (const l of layers) {
-        if (l.stopped) continue
-        try { l.layerGain.gain.setTargetAtTime(Math.max(0.0001, (l.baseGain || 0.4) * (1 - v * 0.985)), t, 0.5) } catch { /* 無視 */ } // 雲海の上・海上ではほぼ完全な無音まで（雨も虫も消え、風だけの開放感）
-      }
+      for (const l of layers) applyLayerGain(l) // 高度しぼり＋日の傾きを合成して反映（雲海の上・海上ではほぼ無音＝風だけ）
     },
     /** 日の傾き(0=昼..1=夕方)で外の音をそっとやわらげる＝絵だけでなく音も時刻に連れ添う(評価エモ最優先)。室内の猫は不変。 */
     setDayPhase(v) {
-      if (!ctx || !duskShelf) return
+      if (!ctx) return
       v = Math.max(0, Math.min(1, v || 0))
-      try { duskShelf.gain.setTargetAtTime(-v * 5.0, now(), 1.2) } catch { /* 無視 */ } // 高域を最大-5dB＝夕方の空気がやわらぐ（虫や鳥の刺さりが和らぐ）
+      if (duskShelf) { try { duskShelf.gain.setTargetAtTime(-v * 5.0, now(), 1.2) } catch { /* 無視 */ } } // 高域を最大-5dB＝夕方の空気がやわらぐ（虫や鳥の刺さりが和らぐ）
+      if (Math.abs(v - dayPhaseV) < 0.02) return
+      dayPhaseV = v
+      for (const l of layers) applyLayerGain(l, 1.2) // 虫の声の交代(油蝉↔ヒグラシ)はゆっくり(1.2s)＝唐突に切り替わらない
     },
     /** 鳥が驚いて飛び立つ羽音（近づくと数回の柔らかい羽ばたき）。ごく控えめに。 */
     birdFlush() {

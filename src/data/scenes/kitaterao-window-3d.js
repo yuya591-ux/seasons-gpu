@@ -32,11 +32,11 @@ export default {
   driftPeriod: 300,
   phenomena: {},
 
-  // 夏の夕暮れの街＝ヒグラシのカナカナ（夕方の蝉）＋ごく淡い風（既存のCC0素材を再利用）。
-  // 時間帯がduskなので、昼のアブラゼミ(ジリジリ)でなく夕方のヒグラシに（情景に合う蝉へ差し替え）。
+  // 夏の夕暮れの街。日が暮れていくにつれ、夕のヒグラシが退き、宵の鈴虫が満ちる＝同じ情景の中で時間が動く
+  // （眺めるが「過ごす」へ）。日の傾き(dayFade)で交代。立体の街だけ実際にドリフトする（既存のCC0素材を再利用）。
   sounds: [
-    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.4, loop: true },
-    { id: 'suzumushi', label: '鈴虫', src: 'audio/kitaterao-window-3d-night/suzumushi.mp3', gain: 0.2, loop: true },
+    { id: 'higurashi', label: 'ヒグラシ', src: 'audio/summer-rain-dusk/higurashi.mp3', gain: 0.4, loop: true, dayFade: 'out' },
+    { id: 'suzumushi', label: '鈴虫', src: 'audio/kitaterao-window-3d-night/suzumushi.mp3', gain: 0.26, loop: true, swell: true, dayFade: 'in' },
     { id: 'wind', label: '風', src: 'audio/winter-snow-night/wind.mp3', gain: 0.07, loop: true },
   ],
 }
