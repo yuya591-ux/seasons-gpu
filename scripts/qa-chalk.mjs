@@ -31,12 +31,12 @@ await page.waitForTimeout(2800)
 await page.screenshot({ path: 'scripts/_shots/chalk_window.png' })
 // 至近（生WebGLだが形の確認用）
 const out = await page.evaluate(() => {
-  const X = 0, Z = 6, gy = window.__town3dHeights(X, Z).heightAt
-  const a = window.__town3dShotAt(X - 0.5, gy + 2.6, Z + 4.2, X, gy + 0.1, Z, 46)
-  const b = window.__town3dShotAt(X, gy + 6.0, Z + 0.6, X, gy, Z, 44) // ほぼ真上＝輪の形
+  const X = 11, Z = -24, gy = window.__town3dHeights(X, Z).heightAt
+  const a = window.__town3dShotAt(X - 1.6, gy + 1.5, Z + 2.4, X, gy + 0.8, Z, 46) // 立ち姿で網と虫かごを正面から
+  const b = window.__town3dShotAt(X + 2.2, gy + 1.3, Z + 2.6, X + 0.4, gy + 0.6, Z + 0.3, 44)
   return { gy: +gy.toFixed(2), a, b }
 })
-console.log('広場けんけんぱ gy=' + out.gy)
+console.log('虫網と虫かご gy=' + out.gy)
 if (out.a) writeFileSync('scripts/_shots/chalk.png', Buffer.from(out.a.split(',')[1], 'base64'))
 if (out.b) writeFileSync('scripts/_shots/chalk_top.png', Buffer.from(out.b.split(',')[1], 'base64'))
 console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0, 4)) : 'エラー無し')

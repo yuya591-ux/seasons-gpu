@@ -6438,6 +6438,22 @@ export async function mountTown3d(parent, opts = {}) {
       town.add(ke)
     }
   }
+  // ── 立てかけた捕虫網と虫かご。さっきまで虫捕りをしていた子の気配＝「人の不在の現前」。
+  //    公園の縁の草地に、網を地に挿して少し傾け、足もとに虫かご。説明文は置かない（歩いて気づく＝『夏休み』の象徴）。
+  if (kind !== 'yato') {
+    const nx = 11, nz = -24, ny = heightAt(nx, nz)
+    if (ny > SEA.level + 0.4 && !blockedAt(nx, nz)) {
+      const ng = new THREE.Group(); ng.position.set(nx, ny, nz); ng.rotation.y = 0.7
+      const bamboo = toon(0xc6a868), netCol = toon(0xeef0ea), kagoCol = toon(0xdfe6cf), kagoDk = toon(0x9aa884)
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 1.5, 6), bamboo); pole.position.set(0, 0.72, 0); pole.rotation.z = 0.14; pole.castShadow = true; ng.add(pole) // 竹竿を地に挿して少し傾ける
+      const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.014, 6, 16), bamboo); hoop.position.set(0.2, 1.46, 0); hoop.rotation.y = Math.PI / 2; ng.add(hoop) // 網の輪
+      const bag = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.34, 12, 1, true), netCol); bag.position.set(0.2, 1.28, 0); ng.add(bag) // 網の袋（下にすぼまる）
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.26, 12), kagoCol); body.position.set(0.42, 0.13, 0.34); body.castShadow = true; ng.add(body) // 虫かごの胴
+      const lid = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 6, 0, 6.2832, 0, 1.2), kagoDk); lid.position.set(0.42, 0.26, 0.34); ng.add(lid) // 丸い蓋
+      const grip = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 6, 12, Math.PI), kagoDk); grip.position.set(0.42, 0.3, 0.34); ng.add(grip) // 提げ手
+      town.add(ng)
+    }
+  }
   // ── 港町の少女（添付の模倣）＝2D立ち絵の主人公キャラ。港・水辺・街角に。──
   for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
