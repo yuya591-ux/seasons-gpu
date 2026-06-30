@@ -6147,11 +6147,42 @@ export async function mountTown3d(parent, opts = {}) {
   const peepCols = [0x5a78a0, 0xc06a6a, 0x6a8a5a, 0xb0a060, 0x8a6aa0, 0xd0d0c8, 0x4a5560, 0xcf6f93, 0xd0904e]
   const pantsCols = [0x3a3a44, 0x4a4036, 0x33414e, 0x46342e, 0x55504a], hairCols = [0x2a221c, 0x1e1a16, 0x3a2e24, 0x4c3727, 0x6b5038]
   const skinCols = [0xf0c49c, 0xf6d2b0, 0xe8b489]
-  const peepBodyMat = toon(0xffffff); peepBodyMat.vertexColors = true // 歩行者の静止部(胴/首/頭/髪/目)を1メッシュへ統合する共有材
+  const peepBodyMat = toon(0xffffff); peepBodyMat.vertexColors = true // 歩行者の静止部(胴/首/頭/髪)を1メッシュへ統合する共有材
+  // ── 顔は「大きなアニメの目鼻を描いた1枚のテクスチャ」を頭前面に貼る（調査ベースの刷新：ローポリ3Dの魅力は“面に描いた目鼻”＋大きな塊＝小さな3D粒の寄せ集めより読みやすく軽い）。虹彩色×髪色でキャッシュ。住人(makeResident)と歩行者(makePeep)で共有するため両者より前に置く。
+  const faceTexCache = new Map()
+  const makeFaceTex = (irisHex, hairHex) => {
+    const key = (irisHex >>> 0) + '|' + (hairHex >>> 0); const cc = faceTexCache.get(key); if (cc) return cc
+    const S = 128, cv = document.createElement('canvas'); cv.width = S; cv.height = S; const x = cv.getContext('2d')
+    const hex = (h) => '#' + (h >>> 0).toString(16).padStart(6, '0').slice(-6)
+    const iris = hex(irisHex || 0x5a4632), hair = hex(hairHex || 0x2a2420), lash = '#2a221d'
+    const eye = (cx) => { // 優しい瞳：黒一色をやめ温かい焦げ茶＋虹彩＋瞳孔＋大きなつや。小さめ横長で「サングラス」を脱し生命感を出す
+      x.fillStyle = '#4a3a30'; x.beginPath(); x.ellipse(cx, 63, 9, 11.5, 0, 0, 7); x.fill() // 瞳の外形（焦げ茶）
+      x.fillStyle = iris; x.beginPath(); x.ellipse(cx, 64.5, 6, 8, 0, 0, 7); x.fill() // 虹彩（設定色）
+      x.fillStyle = '#241c17'; x.beginPath(); x.ellipse(cx, 65, 3, 4, 0, 0, 7); x.fill() // 瞳孔
+      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 2.6, 58.5, 3.4, 4.2, 0, 0, 7); x.fill() // 大きなつや＝生命感
+      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 2.8, 67, 1.5, 0, 7); x.fill()
+      x.strokeStyle = '#3a2c24'; x.globalAlpha = 0.5; x.lineWidth = 2.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(cx - 8, 56.5); x.quadraticCurveTo(cx, 53.5, cx + 8, 56.5); x.stroke(); x.globalAlpha = 1 // 薄い上まぶた（睨まない柔らかい弧）
+    }
+    eye(48); eye(80) // 左右間隔を詰める（離れすぎ＝サングラス感の解消）
+    x.strokeStyle = hair; x.globalAlpha = 0.42; x.lineWidth = 3; x.lineCap = 'round' // 眉＝細く短くうっすら
+    x.beginPath(); x.moveTo(41, 44); x.quadraticCurveTo(48, 40.5, 55, 44); x.stroke()
+    x.beginPath(); x.moveTo(73, 44); x.quadraticCurveTo(80, 40.5, 87, 44); x.stroke()
+    x.globalAlpha = 1
+    x.fillStyle = 'rgba(150,110,95,0.32)'; x.beginPath(); x.arc(64, 82, 2.1, 0, 7); x.fill() // 鼻＝小さな点
+    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.6; x.lineCap = 'round'; x.beginPath(); x.moveTo(56, 95); x.quadraticCurveTo(64, 100, 72, 95); x.stroke() // 優しい微笑み
+    x.fillStyle = 'rgba(235,162,150,0.42)'; x.beginPath(); x.ellipse(34, 81, 9, 6, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(94, 81, 9, 6, 0, 0, 7); x.fill() // 頬の柔らかい赤み（目の下へ寄せる）
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; faceTexCache.set(key, tex); return tex
+  }
+  // 歩行者の顔（黒い点2つを脱し、住人と同じ目鼻のテクスチャを頭前面の弧へ貼る）。ジオメトリ・材は iris×髪 でキャッシュ＝描画コールは1体あたり+1のみ。
+  const peepIris = [0x5a86c2, 0x5a9e60, 0xb88a3e, 0x9a6238, 0x7a5aa8]
+  const peepFaceGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.26, 14, 1, true, -0.86, 1.72)
+  const peepFaceMatCache = new Map()
+  const peepFaceMat = (irisHex, hairHex) => { const k = (irisHex >>> 0) + '|' + (hairHex >>> 0); let m = peepFaceMatCache.get(k); if (!m) { m = new THREE.MeshToonMaterial({ map: makeFaceTex(irisHex, hairHex), gradientMap: grad, transparent: true, alphaTest: 0.42, depthWrite: false, fog: true }); peepFaceMatCache.set(k, m) } return m }
   const makePeep = () => {
     const g = new THREE.Group(), legs = [], arms = []
     // 色は先に確定（R()の消費順は従来通り: ズボン→上着→髪→肌）＝下流の決定的配置を崩さない
     const pantHex = pantsCols[(R() * pantsCols.length) | 0], topHex = peepCols[(R() * peepCols.length) | 0], hairHex = hairCols[(R() * hairCols.length) | 0], skinHex = skinCols[(R() * skinCols.length) | 0]
+    const irisHex = peepIris[(Math.max(0, hairCols.indexOf(hairHex)) + 2) % peepIris.length] // 虹彩は髪色から導出＝R()を消費せず、下流の決定的配置を一切ずらさない
     const pm = toon(pantHex), tm = toon(topHex)
     // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く。少し長く細く＝寸胴(壺)を解消。可動なので統合しない。
     for (const s of [-1, 1]) { const leg = new THREE.Group(); const lm = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.066, 0.68, 6), pm); lm.position.y = -0.34; lm.castShadow = true; leg.add(lm); leg.position.set(s * 0.1, 0.74, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点）
@@ -6164,8 +6195,8 @@ export async function mountTown3d(parent, opts = {}) {
     bbake(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 7).toNonIndexed().translate(0, 1.37, 0), skinHex) // 首
     const hg = new THREE.SphereGeometry(0.17, 10, 9).toNonIndexed(); hg.scale(0.94, 1.06, 0.96); hg.translate(0, 1.55, 0); bbake(hg, skinHex) // 頭（小さめ＝約7頭身）
     bbake(new THREE.SphereGeometry(0.183, 10, 9, 0, Math.PI * 2, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.58, -0.012), hairHex) // 髪（上＋後ろ・顔は出す）
-    for (const s of [-1, 1]) bbake(new THREE.SphereGeometry(0.026, 5, 4).toNonIndexed().translate(s * 0.06, 1.56, 0.152), 0x241c16) // 目（歩いて寄ると顔のある人）
     if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bgeos, false); if (m) { const body = new THREE.Mesh(m, peepBodyMat); body.castShadow = true; g.add(body) } bgeos.forEach((q) => q.dispose()) }
+    const pface = new THREE.Mesh(peepFaceGeo, peepFaceMat(irisHex, hairHex)); pface.position.set(0, 1.532, 0); pface.renderOrder = 2; pface.castShadow = false; g.add(pface) // 顔＝目鼻のテクスチャ（黒い点2つを脱し「顔のある人」へ。共有ジオメトリ/材で描画コール+1のみ）
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
     g.userData = { legs, arms }
     return g
@@ -6325,32 +6356,7 @@ export async function mountTown3d(parent, opts = {}) {
   const GIRL_BAG = ['#9c7d56', '#7e6748', '#a98c63', '#6e5a44', '#8a6a52']
   const GR = (a) => a[(R() * a.length) | 0]
   const girlCfg = () => ({ hair: GR(GIRL_HAIR), skin: GR(GIRL_SKIN), top: GR(GIRL_TOP), bottom: GR(GIRL_BOT), bag: GR(GIRL_BAG) })
-  // （顔テクスチャ方式は廃止。3D住人は元の幾何の目鼻に戻し、主人公だけ2D立ち絵。）
-  // ── 顔は「大きなアニメの目鼻を描いた1枚のテクスチャ」を頭前面に貼る（調査ベースの刷新：ローポリ3Dの魅力は“面に描いた目鼻”＋大きな塊＝小さな3D粒の寄せ集めより読みやすく軽い）。虹彩色×髪色でキャッシュ。
-  const faceTexCache = new Map()
-  const makeFaceTex = (irisHex, hairHex) => {
-    const key = (irisHex >>> 0) + '|' + (hairHex >>> 0); const cc = faceTexCache.get(key); if (cc) return cc
-    const S = 128, cv = document.createElement('canvas'); cv.width = S; cv.height = S; const x = cv.getContext('2d')
-    const hex = (h) => '#' + (h >>> 0).toString(16).padStart(6, '0').slice(-6)
-    const iris = hex(irisHex || 0x5a4632), hair = hex(hairHex || 0x2a2420), lash = '#2a221d'
-    const eye = (cx) => { // 優しい瞳：黒一色をやめ温かい焦げ茶＋虹彩＋瞳孔＋大きなつや。小さめ横長で「サングラス」を脱し生命感を出す
-      x.fillStyle = '#4a3a30'; x.beginPath(); x.ellipse(cx, 63, 9, 11.5, 0, 0, 7); x.fill() // 瞳の外形（焦げ茶）
-      x.fillStyle = iris; x.beginPath(); x.ellipse(cx, 64.5, 6, 8, 0, 0, 7); x.fill() // 虹彩（設定色）
-      x.fillStyle = '#241c17'; x.beginPath(); x.ellipse(cx, 65, 3, 4, 0, 0, 7); x.fill() // 瞳孔
-      x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx - 2.6, 58.5, 3.4, 4.2, 0, 0, 7); x.fill() // 大きなつや＝生命感
-      x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.arc(cx + 2.8, 67, 1.5, 0, 7); x.fill()
-      x.strokeStyle = '#3a2c24'; x.globalAlpha = 0.5; x.lineWidth = 2.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(cx - 8, 56.5); x.quadraticCurveTo(cx, 53.5, cx + 8, 56.5); x.stroke(); x.globalAlpha = 1 // 薄い上まぶた（睨まない柔らかい弧）
-    }
-    eye(48); eye(80) // 左右間隔を詰める（離れすぎ＝サングラス感の解消）
-    x.strokeStyle = hair; x.globalAlpha = 0.42; x.lineWidth = 3; x.lineCap = 'round' // 眉＝細く短くうっすら
-    x.beginPath(); x.moveTo(41, 44); x.quadraticCurveTo(48, 40.5, 55, 44); x.stroke()
-    x.beginPath(); x.moveTo(73, 44); x.quadraticCurveTo(80, 40.5, 87, 44); x.stroke()
-    x.globalAlpha = 1
-    x.fillStyle = 'rgba(150,110,95,0.32)'; x.beginPath(); x.arc(64, 82, 2.1, 0, 7); x.fill() // 鼻＝小さな点
-    x.strokeStyle = '#bd7a68'; x.lineWidth = 3.6; x.lineCap = 'round'; x.beginPath(); x.moveTo(56, 95); x.quadraticCurveTo(64, 100, 72, 95); x.stroke() // 優しい微笑み
-    x.fillStyle = 'rgba(235,162,150,0.42)'; x.beginPath(); x.ellipse(34, 81, 9, 6, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(94, 81, 9, 6, 0, 0, 7); x.fill() // 頬の柔らかい赤み（目の下へ寄せる）
-    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; faceTexCache.set(key, tex); return tex
-  }
+  // （顔テクスチャ makeFaceTex は歩行者(makePeep)と共有するため、上方＝makePeep の前へ移設済み。）
   const makeResident = (cfg = {}) => {
     // アニメ寄りだが人に近い：自然なアーモンドの目・一体感のある体・関節（膝/肘）・接地影。約6頭身。
     const g = new THREE.Group()
