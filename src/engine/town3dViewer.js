@@ -6425,6 +6425,19 @@ export async function mountTown3d(parent, opts = {}) {
       town.add(en)
     }
   }
+  // ── けんけんぱの白墨（チョーク）の輪。子どもがさっきまで路傍で遊んでいた跡＝今は誰もいない「人の不在の現前」。
+  //    舗装に薄く描かれた○の連なり（一つ／二つ並び）と、転がした一本のチョーク。説明文は置かない（歩いて気づく＝『夏休み』の手触り）。
+  if (kind !== 'yato') {
+    const cx0 = 0, cz0 = 6 // 窓のすぐ前の広場（PLAZA_HOME）。開けた平地で、窓辺の眺めの手前に見える子の遊び場
+    if (heightAt(cx0, cz0) > SEA.level + 0.4 && !blockedAt(cx0, cz0)) {
+      const ke = new THREE.Group(); ke.position.set(cx0, 0, cz0) // 各輪は地形高さに沿わせる（緩斜面でも浮き沈みしない）
+      const chalk = toon(0xd8d3c4), ring = new THREE.TorusGeometry(0.36, 0.04, 6, 20) // 退色した白墨（共有材を汚さぬよう専用色・専用ジオメトリ）
+      const cell = [[0], [0], [-0.44, 0.44], [0], [-0.44, 0.44], [0], [-0.44, 0.44]] // ○／○／○○／○／○○／○／○○（けんけんぱの並び。広場に収まるよう横へ伸ばす）
+      cell.forEach((dz, i) => { const x = -3 + i * 1.0; dz.forEach((z) => { const r = new THREE.Mesh(ring, chalk); r.rotation.x = Math.PI / 2; r.position.set(x, heightAt(cx0 + x, cz0 + z) + 0.02, z); ke.add(r) }) })
+      const sgx = 3.6, sgz = 0.4, stub = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6), toon(0xeae3d0)); stub.rotation.z = Math.PI / 2; stub.rotation.y = 0.5; stub.position.set(sgx, heightAt(cx0 + sgx, cz0 + sgz) + 0.03, sgz); ke.add(stub) // 転がした白墨を一本
+      town.add(ke)
+    }
+  }
   // ── 港町の少女（添付の模倣）＝2D立ち絵の主人公キャラ。港・水辺・街角に。──
   for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
