@@ -353,6 +353,8 @@ export async function mountTown3d(parent, opts = {}) {
   const onDayPhase = typeof opts.onDayPhase === 'function' ? opts.onDayPhase : () => {} // 日の傾き(0..1)を外へ伝える＝音も時刻に連れ添う（夕方は外音がやわらぐ）
   let lastDayPhase = -1 // 直近に伝えた日の傾き（変化時だけ通知）
   const onChime = typeof opts.onChime === 'function' ? opts.onChime : () => {} // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
+  const onEveningChime = typeof opts.onEveningChime === 'function' ? opts.onEveningChime : () => {} // 夕暮れの街に流れるチャイム（夕方の合図）
+  let eveChimeT = -1 // 夕方チャイムの次回時刻（-1=未初期化。初回に夕夜の街かを判定して仕込む）
   const reduceMotion = !!opts.reduceMotion // 視差軽減: 突発・大きな動き（花火/気球/飛行機雲/流れ星等）の定期イベントを止める
   const skyTop = new THREE.Color(pal.skyTop || '#7fb0d8')
   const skyHorizon = new THREE.Color(pal.horizon || '#f2dcc0')
@@ -754,6 +756,8 @@ export async function mountTown3d(parent, opts = {}) {
   let crossing = null // 踏切（電車が近づくと遮断機が下り警報灯が点滅）
   let gulls = [] // 海鳥（湾の上を旋回する）
   const sparrows = [] // 電線にとまるスズメ（窓辺の微小イベント＝時々ぴょこっと跳ね、尾を振る＝静止した影でなく生きた小鳥）
+  const clothSway = [] // 風にそよぐ布（干し物・布団・暖簾）＝焼き込みで静止した街に「呼吸」を足す。frameで竿の根元を軸にゆらす
+  const tvGlow = [] // 夜の窓のテレビの青い明滅（在宅の気配＝誰かが茶の間でテレビを観ている）。frameで明るさをちらつかせる
   let crane = null // ガントリークレーンの動く部分（トロリー＋フック）
   let tug = null // 湾を行き来するタグボート
   let ferry = null // 湾を渡る連絡船
@@ -1651,11 +1655,13 @@ export async function mountTown3d(parent, opts = {}) {
         // 出窓（前面から張り出す窓＝フラットな壁を脱し、近接でも凹凸の佇まい）。2階に。
         if (h > 4.2 && hr() < 0.42) { const by = h * 0.64, bx = (hr() < 0.5 ? -1 : 1) * w * 0.26, bz = df - 0.32
           const bay = new THREE.BoxGeometry(1.4, 1.15, 0.64); bay.translate(bx, by, bz); propL.push({ geo: colGeo(bay, 0xe6ddc8) }) // 出窓の箱
-          const bglass = new THREE.BoxGeometry(1.16, 0.84, 0.06); bglass.translate(bx, by, bz - 0.33); propL.push({ geo: colGeo(bglass, (isNight || duskAmt > 0.36) ? 0xffcaa0 : 0x46545e) }) // ガラス（夕暮れ〜夜は灯る色＝在宅の気配）
+          const bayLit = isNight || duskAmt > 0.36, bayTv = bayLit && hr() < 0.22 // 一部はテレビの青（部屋ごとに違う暮らし）
+          const bglass = new THREE.BoxGeometry(1.16, 0.84, 0.06); bglass.translate(bx, by, bz - 0.33); propL.push({ geo: colGeo(bglass, bayLit ? (bayTv ? 0x9fbfe0 : 0xffcaa0) : 0x46545e) }) // ガラス（夕暮れ〜夜は灯る色＝在宅の気配。青=テレビ）
           const broof = new THREE.BoxGeometry(1.6, 0.12, 0.82); broof.translate(bx, by + 0.62, bz + 0.04); propL.push({ geo: colGeo(broof, 0x8a7e70) }) } // 出窓の小屋根
         // 夕暮れに一部の家の窓が暖かく灯る＝在宅の気配（「無人のジオラマ」を脱す最大の合図）。暗い窓と混ぜる。頂点色で焼いて統合（描画コール不変）。
         { const homeLit = (isNight || duskAmt > 0.36) && hr() < 0.62, wy = h > 4.2 ? h * 0.66 : h * 0.5, wx = dx2 + (hr() < 0.5 ? -1 : 1) * w * 0.3
-          const win = new THREE.BoxGeometry(0.82, 0.66, 0.05); win.translate(wx, wy, df - 0.05); propL.push({ geo: colGeo(win, homeLit ? 0xffcb8e : 0x39454f) }) // 灯る窓 or 暗い窓
+          const wr2 = hr(), winCol = homeLit ? (wr2 < 0.2 ? 0x9fbfe0 : wr2 < 0.34 ? 0xffb464 : 0xffcb8e) : 0x39454f // 灯る窓（青=テレビ/濃い橙=台所/淡い暖色=居間）or 暗い窓
+          const win = new THREE.BoxGeometry(0.82, 0.66, 0.05); win.translate(wx, wy, df - 0.05); propL.push({ geo: colGeo(win, winCol) }) // 灯る窓 or 暗い窓
           const sash = new THREE.BoxGeometry(0.9, 0.06, 0.06); sash.translate(wx, wy - 0.34, df - 0.06); propL.push({ geo: colGeo(sash, 0xe8e0ce) }) } // 窓の下桟
         // 玄関先の植木鉢（手入れされている気配）。素焼きの鉢＋緑の株。
         if (hr() < 0.5) { const px2 = dx2 + (hr() < 0.5 ? 0.78 : -0.78), pz2 = df - 0.42
@@ -2254,6 +2260,59 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 風にそよぐ干し物（街が呼吸する＝焼き込みで静止した洗濯物に「動く生気」を足す。煙だけだった動きに仲間を増やす）。──
+  // 骨組み(竿・柱)は静止トゥーンで軽量、布だけ各々を個別メッシュにして竿の根元を軸にそよがせる（frameで更新）。歩く目線に入る通り・home付近へ点在。
+  if (kind !== 'yato' && weather !== 'snow') {
+    const clothCols = [0x9fb0c4, 0xc9a6b0, 0xc4bca0, 0xb0b8a8, 0xd8c8a0, 0xa8c0cc, 0xd0b0a0] // くすんだ生活色（布団・シャツ・タオル）
+    const rackFrame = toon(0xb0aaa0) // 物干し竿・柱（淡い灰）
+    // 決定的配置(R()非消費＝生成列を乱さない)。home広場のそば＋中央通り沿いの開けた所。
+    const racks = [[3.4, 2, 0.2], [-3.6, 9, -0.3], [6.5, -14, 1.4], [-6.2, -26, -1.2], [7.2, -40, 1.5], [-7.0, -54, -1.4], [5.8, -68, 1.3]]
+    for (const [rx, rz, ra] of racks) {
+      const gy = heightAt(rx, rz); if (gy < SEA.level + 0.6 || blockedAt(rx, rz)) continue
+      const grp = new THREE.Group(); grp.position.set(rx, gy, rz); grp.rotation.y = ra; town.add(grp)
+      const barY = 1.46, span = 1.9
+      for (const px of [-span / 2, span / 2]) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, barY, 6), rackFrame); pole.position.set(px, barY / 2, 0); grp.add(pole) } // 二本柱
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, span + 0.16, 6), rackFrame); bar.rotation.z = Math.PI / 2; bar.position.y = barY; grp.add(bar) // 竿
+      const nC = 3, cols2 = clothCols
+      for (let k = 0; k < nC; k++) {
+        const isFut = k === 1 // 真ん中は布団（幅広）
+        const cw = isFut ? 1.1 : 0.5 + (k * 0.13), ch = isFut ? 0.78 : 0.62
+        const sw = new THREE.Group(); sw.position.set(-span / 2 + 0.34 + k * 0.6, barY - 0.02, 0); grp.add(sw) // 竿の上＝そよぐ支点
+        const cm = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, 0.03), toon(cols2[(k + Math.abs((rx * 7 + rz) | 0)) % cols2.length]))
+        cm.position.y = -ch / 2; cm.castShadow = true; sw.add(cm) // 布（支点からぶら下げる）
+        clothSway.push({ g: sw, ph: (rx * 1.7 + rz * 0.6 + k) % 6.28, ax: 0.5 }) // 洗濯物=よく揺れる
+      }
+    }
+    // 軒先の布団（ベランダ手すりに掛けて干す＝昼の生活感。手すり越しに大きく一枚）。
+    for (const [fx, fz, fa] of [[-4.2, -8, 0.2], [4.6, -34, -0.4], [-5.4, -60, 0.3]]) {
+      const gy = heightAt(fx, fz); if (gy < SEA.level + 0.6) continue
+      const grp = new THREE.Group(); grp.position.set(fx, gy + 1.7, fz); grp.rotation.y = fa; town.add(grp)
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), rackFrame); rail.rotation.z = Math.PI / 2; grp.add(rail)
+      const sw = new THREE.Group(); grp.add(sw)
+      const fut = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.92, 0.06), toon(clothCols[(Math.abs((fx * 5 + fz) | 0) + 3) % clothCols.length]))
+      fut.position.y = -0.46; fut.castShadow = true; sw.add(fut)
+      clothSway.push({ g: sw, ph: (fx + fz) % 6.28, ax: 0.22 }) // 布団=重い＝揺れ控えめ
+    }
+  }
+
+  // ── ゴミ集積所（青ネットを掛けた袋の山＋小さな札＝日本の路傍の象徴。収集日の生活リズムを感じさせる「人の暮らし」の痕跡）。──
+  if (kind !== 'yato') {
+    const bagCol = 0xe6e2d4 // 乳白のゴミ袋
+    for (const [gx, gz, ga] of [[5.4, -10, 0.3], [-6.0, -38, -0.4], [6.6, -64, 1.2]]) {
+      const gy = heightAt(gx, gz); if (gy < SEA.level + 0.6 || blockedAt(gx, gz)) continue
+      const grp = new THREE.Group(); grp.position.set(gx, gy, gz); grp.rotation.y = ga; town.add(grp)
+      const bm = toon(bagCol) // 丸めたゴミ袋の山（乳白）。共有材で軽量。
+      for (const [bx, by, bz, br] of [[-0.35, 0.26, 0, 0.3], [0.3, 0.24, 0.1, 0.28], [0, 0.44, -0.05, 0.26], [-0.1, 0.22, 0.3, 0.24]]) {
+        const bag = new THREE.Mesh(new THREE.IcosahedronGeometry(br, 1), bm); bag.position.set(bx, by, bz); bag.scale.y = 0.85; bag.castShadow = true; grp.add(bag)
+      }
+      const net = new THREE.Mesh(new THREE.SphereGeometry(0.66, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshToonMaterial({ color: 0x3f6f86, gradientMap: grad, transparent: true, opacity: 0.55, fog: true })) // 青ネット（袋を覆う低いドーム・半透明）
+      net.position.y = 0.16; net.scale.set(1.15, 0.95, 0.92); grp.add(net)
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5), toon(0x9a958c)); post.position.set(0.72, 0.5, 0.42); grp.add(post) // 札の支柱
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.34, 0.04), toon(0xe8e4d6)); plate.position.set(0.72, 0.92, 0.42); plate.rotation.y = -0.3; grp.add(plate) // 札（役割の気配。文字は出さず色面で静かに）
+      colliders.push({ x: gx, z: gz, r: 0.8 })
+    }
+  }
+
   // ── 縁台（軒先の木の腰掛け＝夕涼みに腰掛けて街を眺める。「眺めて整う」の足場）。決定的配置(R()非消費)＋統合で軽量。 ──
   { const benG = [], legG = [], potG = [], plG = []
     for (const [bx, bz] of [[7.2, -16], [-6.8, -34], [8.2, -52], [-7.2, -64]]) {
@@ -2301,6 +2360,15 @@ export async function mountTown3d(parent, opts = {}) {
     const lit = duskAmt > 0.2
     const sg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.0, 1.0), lit ? new THREE.MeshBasicMaterial({ color: sc[3], fog: true }) : toon(sc[3]))
     sg.position.set(sx + facing * 2.25, gy + 2.9, sz + 1.5); town.add(sg)
+    // 2階の窓（店主の住まい＝夕夜に灯る。半分は茶の間のテレビの青が明滅＝「誰かが暮らしている」）。店の実体の前面に貼る。
+    if (lit) {
+      const tvHere = ((sx * 3 + sz) | 0) % 2 === 0
+      const base = new THREE.Color(tvHere ? 0x9fbfe0 : 0xffd2a0)
+      const wmat = new THREE.MeshBasicMaterial({ color: base.clone(), fog: true })
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.95, 1.3), wmat); win2.position.set(sx + facing * 2.22, gy + 2.5, sz - 0.4); town.add(win2)
+      const sashH = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 1.36), toon(0xcfc6b6)); sashH.position.set(sx + facing * 2.22, gy + 2.5, sz - 0.4); town.add(sashH) // 中桟
+      if (tvHere) tvGlow.push({ mat: wmat, base, ph: (sx + sz) % 6.28 })
+    }
   }
 
   // ── 大きなランドマーク（大型スーパー）。歩行目線でも商品化レベルの店構え＝ガラスの店先＋自動ドア＋庇＋外壁の継ぎ目＋屋上設備＋駐車場。 ──
@@ -6400,7 +6468,8 @@ export async function mountTown3d(parent, opts = {}) {
     return g
   }
   // ── home（現代）の住人を要所に ──
-  const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 } ]
+  // 歩く目線で出会う近景の住人は高品質(makeResident)で。窓辺の眺めの手前(広場)＋よく歩く通り沿いにも足し、「人の形が甘い」遠景peepでなく作り込んだ人と出会えるように。
+  const residentSpots = [ { x: 0, z: -25 }, { x: STATION.x - 1.4, z: STATION.z + STATION.r - 1.2 }, { x: 13, z: -16 }, { x: -44, z: -18 }, { x: DOWNTOWN.x - 2, z: DOWNTOWN.z + 9 }, { x: 2, z: -30 }, { x: 4.5, z: 4 }, { x: -4.5, z: -12 }, { x: 7, z: -46 }, { x: -7, z: -58 } ]
   const placeResident = (hx, hz, cfg) => {
     if (blockedAt(hx, hz)) { // 配置点が建物の中なら近くの空きへ寄せる（実機FB: 住民が建物に食い込む）
       let ok = false
@@ -6413,7 +6482,7 @@ export async function mountTown3d(parent, opts = {}) {
   // ── home の通りを行き交う人々（人の気配の密度＝降り立った街の賑わい）。歩く人(中央通り)＋佇む人(駅前/公園/副都心)。
   // 旧mkPeep2は静止した円柱＋球で「人形・生きてるか分からない」との実機FB→makePeepでアニメさせpeeps配列へ（歩く/佇む）。
   if (kind !== 'yato') {
-    for (let i = 0; i < 8; i++) { const z = -84 + R() * 96, x = (R() < 0.5 ? -1 : 1) * (2.4 + R() * 1.5), py = heightAt(x, z); if (py < SEA.level + 1 || (Math.abs(z - RAIL.z) < 3 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1)) continue; const g = makePeep(); const dir = x < 0 ? 1 : -1; g.position.set(x, py, z); Object.assign(g.userData, { dir, x, speed: 1.0 + R() * 0.7, z, ph: R() * 6.28 }); town.add(g); peeps.push(g) } // 中央通りを歩く
+    for (let i = 0; i < (LIGHT ? 8 : 12); i++) { const z = -84 + R() * 96, x = (R() < 0.5 ? -1 : 1) * (2.4 + R() * 1.5), py = heightAt(x, z); if (py < SEA.level + 1 || (Math.abs(z - RAIL.z) < 3 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1)) continue; const g = makePeep(); const dir = x < 0 ? 1 : -1; g.position.set(x, py, z); Object.assign(g.userData, { dir, x, speed: 0.85 + R() * 0.9, z, ph: R() * 6.28 }); town.add(g); peeps.push(g) } // 中央通りを歩く（人通りの密度＝賑わい。速度に幅＝急ぐ人/そぞろ歩き）
     for (const [cx, cz, n] of [[STATION.x, STATION.z + STATION.r - 2, 4], [PARK.x, PARK.z, 3], [DOWNTOWN.x, DOWNTOWN.z, 3]]) for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 3 + R() * 6, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, py = heightAt(x, z); if (py < SEA.level + 1.2 || x > SEA.coast || blockedAt(x, z)) continue; const g = makePeep(); g.position.set(x, py, z); Object.assign(g.userData, { loiter: true, hx: x, hz: z, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 }); town.add(g); peeps.push(g) } } // 駅前/公園/副都心の人だかり（佇む）
   // ── 街角の野仏（お地蔵さん）。昭和の住宅地の路傍にあった祈りの点＝「誰かが手を合わせた気配」＝人の不在の現前。
   //    赤いよだれかけ・手向けの一輪・積み石。説明文は置かない（歩いて気づく人だけのもの）。雲海の野仏(IPセーフな独自意匠)をhomeへ移植。
@@ -8482,6 +8551,22 @@ export async function mountTown3d(parent, opts = {}) {
           if (heightAt(nx, nz) > SEA.level + 1 && !blockedAt(nx, nz)) { u.tx = nx; u.tz = nz; u.moving = true } else u.moveT = 1.5 + Math.random() * 2 } }
     }
     for (const k of koinobori) { k.grp.rotation.y = Math.sin(t * 1.1 + k.ph) * 0.32; k.grp.rotation.z = 0.05 + Math.sin(t * 0.85 + k.ph) * 0.12 } // 鯉のぼりが風になびく
+    // 干し物・布団が風にそよぐ（街が呼吸する）。竿の根元を軸にゆらし、時々ふっと強い風（突風）で大きくなびく。歩く目線/低空でのみ更新＝高空は省く。
+    if (clothSway.length && (active.mode !== 'fly' || (active.flyP || 0) < 0.8)) {
+      const gust = 0.5 + 0.5 * Math.sin(t * 0.31) * Math.sin(t * 0.17 + 1.3) // 0..1 のゆるい突風の波
+      for (const c of clothSway) {
+        const w = (0.5 + gust * 0.9) * c.ax // 突風で振れ幅が増す
+        c.g.rotation.z = Math.sin(t * (0.9 + c.ax) + c.ph) * w + Math.sin(t * 2.3 + c.ph) * 0.03 // 横揺れ（大きなうねり＋細かなはためき）
+        c.g.rotation.x = Math.sin(t * 1.3 + c.ph * 1.7) * w * 0.4 // 奥行きへの揺れ
+      }
+    }
+    // 夜の窓のテレビの青い明滅（茶の間で誰かがテレビを観ている＝在宅の気配）。明るさを不規則にちらつかせ、時々ふっと場面が変わる。
+    if (tvGlow.length && (active.mode !== 'fly' || (active.flyP || 0) < 0.85)) {
+      for (const tv of tvGlow) {
+        const f = 0.62 + 0.38 * Math.abs(Math.sin(t * 2.3 + tv.ph) * Math.sin(t * 0.73 + tv.ph * 1.7)) + (Math.sin(t * 9.1 + tv.ph) > 0.97 ? 0.25 : 0) // ゆらぎ＋時々の場面転換のフラッシュ
+        tv.mat.color.copy(tv.base).multiplyScalar(Math.min(1.2, f))
+      }
+    }
     for (const sb of swanBoats) { const u = sb.userData, a = t * 0.25 + u.ph; sb.position.set(u.cx + Math.cos(a) * u.rad, sb.position.y, u.cz + Math.sin(a) * u.rad); sb.rotation.y = -a + Math.PI / 2 } // スワンボートが池を漂う
     for (const b of boats) { b.position.y = SEA.level + 0.15 + Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.7 + b.userData.ph) * 0.05 } // 小舟が波に揺れる
     if (seaTex) { seaTex.offset.y = (t * 0.012) % 1; seaTex.offset.x = Math.sin(t * 0.06) * 0.01 } // 海面のさざ波がゆっくり流れる
@@ -9236,6 +9321,9 @@ export async function mountTown3d(parent, opts = {}) {
     { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12) || (active.mode === 'walk' && (active.sitAmt || 0) > 0.6) // 歩いて立ち止まり腰をおろすと、ふと澄んだ鈴が満ちる
       // 実時計 t で計る（休息中は描画が間引かれ dt が頭打ちになるため、dt 積算だと鈴が遅れる）
       if (calm) { if (t >= chimeT) { chimeT = t + 8 + R() * 10; onChime(); chimeCount++ } } else chimeT = t + 4 + R() * 4 }
+    // 夕暮れの街にどこからか流れるチャイム（夕方の合図＝「もうおうちへ」の郷愁）。夕夜の街(home)でだけ・初回＋ごくたまに。高空や別世界（城下町/雲海）では鳴らさない。
+    if (eveChimeT < 0) eveChimeT = (kind !== 'yato' && (isNight || duskAmt > 0.36)) ? t + 11 + R() * 6 : Infinity
+    else if (t >= eveChimeT) { eveChimeT = t + 240 + R() * 180; if (active.mode !== 'fly' || (active.flyP || 0) < 0.7) onEveningChime() }
     // 操作ゲージの塗りを今の値で更新（＋寄る/速く/上昇で上がる向き）。高さは見渡せる実用域(汀〜90)で正規化。
     zoomGauge.set((3.0 - active.zoomTarget) / 2.6)
     speedGauge.set((active.speedMul - 0.35) / 1.35)

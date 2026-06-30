@@ -983,6 +983,25 @@ export function createAudio(opts) {
         try { o.start(t0); o.stop(t0 + dec + 0.1) } catch { /* 無視 */ }
       }
     },
+    /** 夕暮れの街にどこからか流れる和音のチャイム（防災無線の夕方の合図を思わせる＝「もう夕方、おうちへ」の郷愁）。
+     *  既存曲は模さず、やわらかな下降の鐘の独自フレーズ。拡声器越しのように少しこもらせ遠くから届く。夕夜の街でだけ・ごくたまに鳴る。 */
+    eveningChime() {
+      if (!ctx || muted || !ctx.createOscillator) return
+      const t0 = now() + 0.05
+      const phrase = [587.3, 493.9, 440.0, 587.3, 392.0] // D5 B4 A4 D5 G4（独自の下降フレーズ＝特定の曲を模さない）
+      const lp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null // 拡声器越しのこもり（遠さ）
+      if (lp) { lp.type = 'lowpass'; lp.frequency.value = 2000; lp.Q.value = 0.5 }
+      const busOut = lp || master; if (lp) lp.connect(master)
+      phrase.forEach((f, i) => {
+        const at = t0 + i * 0.62 // ゆったり間をおいて一音ずつ
+        for (const [mul, amp, dec] of [[1, 0.03, 2.4], [2.0, 0.011, 1.6], [3.01, 0.005, 1.0]]) { // 基音＋倍音で鐘の響き
+          const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f * mul
+          const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(amp, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + dec)
+          o.connect(g).connect(busOut)
+          try { o.start(at); o.stop(at + dec + 0.1) } catch { /* 無視 */ }
+        }
+      })
+    },
     /** 見回しの角度(yaw)で音場を左右に動かす（右を向くと音は左へ＝視覚と一致）。聴覚にも窓の外の広がりを。 */
     setLookPan(yaw) {
       lookPan = Math.max(-0.45, Math.min(0.45, -(yaw || 0) * 0.16))

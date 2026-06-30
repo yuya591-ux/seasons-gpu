@@ -211,6 +211,7 @@ function start() {
           onMeow: (pitch, kind) => { if (!sleepFading) audio.meow(pitch, kind) }, // 窓辺の猫がタップ反応で鳴く（にゃーん）
           onFlockWing: () => { if (!sleepFading) audio.flockWing() }, // 渡りの群れに並走すると羽音
           onChime: () => { if (!sleepFading) audio.chime() }, // 静かな瞬間（雲上で休む/止空で佇む）にふと澄んだ鈴が満ちる
+          onEveningChime: () => { if (!sleepFading) audio.eveningChime() }, // 夕暮れの街にどこからか流れるチャイム（夕方の合図＝「もうおうちへ」の郷愁）。夕夜の街でだけ・ごくたまに
           onLocation: (name) => { if (ui && ui.setLocation) ui.setLocation(name) }, // いまの居場所をモードピルに表示＝飛行中の迷子防止（評価UX-U2）
           discovered: getWorldState().discovered, // 既に辿り着いた時代エリア＝光の標を淡く沈め、未訪の地へ誘いを集める（死蔵された世界の救出）
           onDiscover: (id) => markDiscovered(id), // 飛んで辿り着いた地を静かに記録（世界に進みが刻まれる。達成度は出さない）
