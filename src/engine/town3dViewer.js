@@ -6183,10 +6183,16 @@ export async function mountTown3d(parent, opts = {}) {
     // 色は先に確定（R()の消費順は従来通り: ズボン→上着→髪→肌）＝下流の決定的配置を崩さない
     const pantHex = pantsCols[(R() * pantsCols.length) | 0], topHex = peepCols[(R() * peepCols.length) | 0], hairHex = hairCols[(R() * hairCols.length) | 0], skinHex = skinCols[(R() * skinCols.length) | 0]
     const irisHex = peepIris[(Math.max(0, hairCols.indexOf(hairHex)) + 2) % peepIris.length] // 虹彩は髪色から導出＝R()を消費せず、下流の決定的配置を一切ずらさない
-    const pm = toon(pantHex), tm = toon(topHex)
-    // 脚は股関節(上端)を支点に振れるよう、ジオメトリを下げて Group の原点を股に置く。少し長く細く＝寸胴(壺)を解消。可動なので統合しない。
-    for (const s of [-1, 1]) { const leg = new THREE.Group(); const lm = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.066, 0.68, 6), pm); lm.position.y = -0.34; lm.castShadow = true; leg.add(lm); leg.position.set(s * 0.1, 0.74, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点）
-    for (const s of [-1, 1]) { const arm = new THREE.Group(); const am = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.046, 0.52, 6), tm); am.position.y = -0.26; am.castShadow = true; arm.add(am); arm.position.set(s * 0.205, 1.28, 0); arm.rotation.z = s * 0.08; g.add(arm); arms.push(arm) } // 腕（肩支点・可動なので別）
+    const shoeHex = 0x33302b // 靴（暗い差し色）
+    // 手足を1メッシュへ統合し頂点色で焼く小ヘルパー（袖＋手／すね＋靴を各1メッシュ＝描画コール不変のまま手と足を足す）。材は統合体と同じ頂点色トゥーンを共有。
+    const limb = (parts) => { const gs = []; for (const [geo, hex] of parts) { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); gs.push(geo) }
+      const merged = BufferGeometryUtils.mergeGeometries ? BufferGeometryUtils.mergeGeometries(gs, false) : gs[0]; const m = new THREE.Mesh(merged || gs[0], peepBodyMat); m.castShadow = true; gs.forEach((q) => { if (q !== m.geometry) q.dispose() }); return m }
+    // 脚は股関節(上端)を支点に振れるようGroup原点を股に置く。すね＋足(靴)を1メッシュへ＝棒脚を脱す。
+    for (const s of [-1, 1]) { const leg = new THREE.Group(); const fo = new THREE.SphereGeometry(0.052, 8, 6).toNonIndexed(); fo.scale(1.0, 0.5, 1.7); fo.translate(0, -0.64, 0.045) // 足（前に伸ばした扁平な靴）
+      const lm = limb([[new THREE.CylinderGeometry(0.08, 0.062, 0.62, 7).toNonIndexed().translate(0, -0.31, 0), pantHex], [fo, shoeHex]]); leg.add(lm); leg.position.set(s * 0.1, 0.74, 0); g.add(leg); legs.push(leg) } // 2本の脚（股支点・足つき）
+    // 腕は肩支点。袖＋手を1メッシュへ＝棒腕を脱す。ほんの少し前へ／外へ＝こわばりを抜く。
+    for (const s of [-1, 1]) { const arm = new THREE.Group(); const ha = new THREE.SphereGeometry(0.044, 8, 6).toNonIndexed(); ha.scale(0.92, 1.0, 0.8); ha.translate(0, -0.49, 0.012) // 手（小さく平たく）
+      const am = limb([[new THREE.CylinderGeometry(0.052, 0.041, 0.46, 7).toNonIndexed().translate(0, -0.24, 0), topHex], [ha, skinHex]]); arm.add(am); arm.position.set(s * 0.2, 1.28, 0); arm.rotation.z = s * 0.11; arm.rotation.x = -0.04; g.add(arm); arms.push(arm) } // 腕（肩支点・手つき・relaxed）
     // 胴＋首＋頭＋髪＋目を頂点色で1メッシュへ統合＝歩行者1体の描画コールを 8→5 に（窓辺=発熱ホットスポットで効く。腕脚の可動は維持）。
     const bgeos = []
     const bbake = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); bgeos.push(geo) }
