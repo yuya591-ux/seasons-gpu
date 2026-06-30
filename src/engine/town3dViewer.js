@@ -8817,6 +8817,15 @@ export async function mountTown3d(parent, opts = {}) {
       // 引いた三人称カメラ：focus の後ろ上から望む。ピンチのズーム(active.zoom)で引き具合を可変。後ろが建物/地面なら寄せてのめり込みを防ぐ。
       const fp = active.flyPos
       const back0 = (isWalk ? FLY.walkBack : FLY.camBack) * active.zoom * (active.wide && !isWalk ? 1.5 : 1) // 広角モードはさらに引く
+      // 腰をおろす: 歩いていて立ち止まり、しばらく動かずにいると、カメラがそっと下がり視線が和らぐ＝「ただ過ごす」手触り。
+      // 動き出すとすっと立ち上がる。受動的＝操作でも達成でもなく、留まれば世界がそっと応える（後段で鈴も満ちる）。
+      if (isWalk && (active.flyP || 0) > 0.6) {
+        const moving = Math.hypot(active.vel.x, active.vel.z) > 0.7 || active.climb !== 0
+        active.stillT = moving ? 0 : (active.stillT || 0) + dt
+        const tgt = active.stillT > 2.2 ? 1 : 0
+        active.sitAmt = (active.sitAmt || 0) + (tgt - (active.sitAmt || 0)) * Math.min(1, dt * (tgt ? 0.7 : 3.4))
+      } else { active.stillT = 0; if (active.sitAmt) active.sitAmt = Math.max(0, active.sitAmt - dt * 4) }
+      const sit = isWalk ? (active.sitAmt || 0) : 0
       const upOff = (isWalk ? FLY.walkUp : FLY.camUp) * (0.5 + 0.5 * active.zoom) * (active.wide && !isWalk ? 1.35 : 1) // 引くほど少し高い位置から見渡す（広角は更に高く）
       const ahead = isWalk ? FLY.walkAhead : FLY.camAhead
       // 後方アンカーが建物にめり込む時だけ寄せる。ただし blockedAt は高さを見ない平面判定なので、上空を巡航中に
@@ -8848,14 +8857,14 @@ export async function mountTown3d(parent, opts = {}) {
       else active.camBackCur += (backTgt - active.camBackCur) * 0.1
       const back = active.camBackCur
       let dcx = fp.x - fwdX * back, dcz = fp.z - fwdZ * back
-      let dcy = fp.y - fwdY * back + upOff
+      let dcy = fp.y - fwdY * back + upOff - sit * 0.7 // 腰をおろすと目線がそっと下がる
       // 海上では海底基準だと水面より下に潜り「水中から水板を見る」変な絵になる→水面(SEA.level)を下限に。
-      const camFloor = Math.max(heightAt(dcx, dcz), SEA.level) + (isWalk ? 1.35 : 1.6) // 歩行は一人称寄り＝目線をやや低く許す
+      const camFloor = Math.max(heightAt(dcx, dcz), SEA.level) + (isWalk ? 1.35 - sit * 0.55 : 1.6) // 歩行は一人称寄り＝目線をやや低く許す（座ると更に低く）
       if (dcy < camFloor) dcy = camFloor
       if (!active.camReady) { active.camPos.set(dcx, dcy, dcz); active.camReady = true } // 飛び立ち/着地直後はスナップ
       else { const cl = isWalk ? FLY.walkCamLag : FLY.camLag; active.camPos.x += (dcx - active.camPos.x) * cl; active.camPos.y += (dcy - active.camPos.y) * cl; active.camPos.z += (dcz - active.camPos.z) * cl } // 歩行は密着＝地に足のついた手応え／飛行は緩い遅れ＝空気の流れ
 
-      let aLookX = fp.x + fwdX * ahead, aLookY = fp.y + fwdY * ahead + Math.sin(t * 0.5) * 0.04, aLookZ = fp.z + fwdZ * ahead
+      let aLookX = fp.x + fwdX * ahead, aLookY = fp.y + fwdY * ahead + Math.sin(t * 0.5) * 0.04 - sit * 0.55, aLookZ = fp.z + fwdZ * ahead // 座ると視線も少し落ちて手前の路へ和らぐ
       // オートシネマ: 接線に沿って機体は流れつつ、視線は名所の中心へ向ける＝名所を画面に保つオービット
       if (!isWalk && active.cinema > 0.01 && active.cineLM) {
         const cm = active.cinema * 0.92, lx = active.cineLM.x, lz = active.cineLM.z, ly = heightAt(lx, lz) + 15
@@ -9102,7 +9111,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 夜の灯りの息づき（篝火/松明＝炎の揺らぎ・ガス灯＝穏やかな明滅）。二重サインで不規則に。
     for (const g of nightGlows) g.m.opacity = Math.max(0, g.base * (1 + g.amp * (Math.sin(t * g.sp + g.ph) * 0.6 + Math.sin(t * g.sp * 1.73 + g.ph * 1.3) * 0.4)))
     // 静かな瞬間の鈴＝雲上で休む/止空でじっと佇むと、ふと澄んだ音が満ちる（整う）。嫌われたBGMパッドの代わりの、自然で控えめな癒しの音色。
-    { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12)
+    { const calm = active.onCloud || (active.mode === 'fly' && !active.cruise && Math.hypot(active.vel.x, active.vel.z) < 1.6 && (active.flyP || 0) > 0.6 && active.flyPos.y > SEA_Y - 12) || (active.mode === 'walk' && (active.sitAmt || 0) > 0.6) // 歩いて立ち止まり腰をおろすと、ふと澄んだ鈴が満ちる
       // 実時計 t で計る（休息中は描画が間引かれ dt が頭打ちになるため、dt 積算だと鈴が遅れる）
       if (calm) { if (t >= chimeT) { chimeT = t + 8 + R() * 10; onChime(); chimeCount++ } } else chimeT = t + 4 + R() * 4 }
     // 操作ゲージの塗りを今の値で更新（＋寄る/速く/上昇で上がる向き）。高さは見渡せる実用域(汀〜90)で正規化。
@@ -9532,6 +9541,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dPalProbe = () => ({ duskAmt: +duskAmt.toFixed(2), isNight, snowy: SNOWY, skyTop: '#' + skyTop.getHexString(), skyBright: +skyBright.toFixed(3) }) // 検証用: 時間帯
     window.__town3dDrift = (f) => { drift.t = DRIFT_SECS * Math.max(0, Math.min(1, f || 0)) } // 検証用: 日の傾きのドリフトを任意の進み具合(0..1)へ早送り
     window.__town3dClimb = (v) => { if (active) active.climb = v || 0 } // 検証用（旧）
+    window.__town3dSit = () => +((active && active.sitAmt) || 0).toFixed(2) // 検証用: 歩行で立ち止まった「腰をおろす」量(0..1)
     window.__town3dSteer = (dx, dy) => applyTown3dSteer(dx || 0, dy || 0) // 検証用: 飛行のドラッグ操舵(画面比)。横=旋回・縦=上昇下降
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
     window.__town3dLowCruise = (b) => { if (active) { active.lowCruise = !!b; if (b) active.cruise = true } } // 検証用: 低空滑空(自転車)モード
