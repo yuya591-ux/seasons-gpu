@@ -6393,6 +6393,23 @@ export async function mountTown3d(parent, opts = {}) {
       town.add(jizo)
     }
   }
+  // ── 縁台と置き忘れた麦わら帽子。誰かがさっきまで夕涼みしていた気配＝人の不在の現前（手ぬぐいを縁に掛けて）。
+  //    野仏とは別の「人の気配」を街の別の一角に。説明文は置かない（歩いて気づく）。
+  if (kind !== 'yato') {
+    const bx = -6.0, bz = -6, by = heightAt(bx, bz)
+    if (by > SEA.level + 0.5 && !blockedAt(bx, bz)) {
+      const en = new THREE.Group(); en.position.set(bx, by, bz); en.rotation.y = 0.6
+      const wood = toon(0x8a6a44), woodDk = toon(0x6a4f33)
+      const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.46), wood); top.position.y = 0.44; top.castShadow = true; en.add(top) // 天板
+      for (const sx of [-0.62, 0.62]) for (const sz of [-0.16, 0.16]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.08), woodDk); leg.position.set(sx, 0.21, sz); leg.castShadow = true; en.add(leg) } // 脚
+      const hat = new THREE.Group(); hat.position.set(0.36, 0.5, 0.0) // 麦わら帽子（つば＋丸い冠）を置き忘れて
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 0.025, 16), toon(0xd0af6c)); hat.add(brim)
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8, 0, 6.2832, 0, 1.25), toon(0xc6a25e)); crown.position.y = 0.05; hat.add(crown)
+      hat.children.forEach((m) => { m.castShadow = true }); en.add(hat)
+      const towel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.34, 0.3), toon(0x35506e)); towel.position.set(-0.52, 0.3, 0.0); en.add(towel) // 縁に掛けた藍の手ぬぐい
+      town.add(en)
+    }
+  }
   // ── 港町の少女（添付の模倣）＝2D立ち絵の主人公キャラ。港・水辺・街角に。──
   for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
