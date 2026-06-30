@@ -1651,8 +1651,16 @@ export async function mountTown3d(parent, opts = {}) {
         // 出窓（前面から張り出す窓＝フラットな壁を脱し、近接でも凹凸の佇まい）。2階に。
         if (h > 4.2 && hr() < 0.42) { const by = h * 0.64, bx = (hr() < 0.5 ? -1 : 1) * w * 0.26, bz = df - 0.32
           const bay = new THREE.BoxGeometry(1.4, 1.15, 0.64); bay.translate(bx, by, bz); propL.push({ geo: colGeo(bay, 0xe6ddc8) }) // 出窓の箱
-          const bglass = new THREE.BoxGeometry(1.16, 0.84, 0.06); bglass.translate(bx, by, bz - 0.33); propL.push({ geo: colGeo(bglass, isNight ? 0xffcaa0 : 0x46545e) }) // ガラス（夜は灯る色）
+          const bglass = new THREE.BoxGeometry(1.16, 0.84, 0.06); bglass.translate(bx, by, bz - 0.33); propL.push({ geo: colGeo(bglass, (isNight || duskAmt > 0.36) ? 0xffcaa0 : 0x46545e) }) // ガラス（夕暮れ〜夜は灯る色＝在宅の気配）
           const broof = new THREE.BoxGeometry(1.6, 0.12, 0.82); broof.translate(bx, by + 0.62, bz + 0.04); propL.push({ geo: colGeo(broof, 0x8a7e70) }) } // 出窓の小屋根
+        // 夕暮れに一部の家の窓が暖かく灯る＝在宅の気配（「無人のジオラマ」を脱す最大の合図）。暗い窓と混ぜる。頂点色で焼いて統合（描画コール不変）。
+        { const homeLit = (isNight || duskAmt > 0.36) && hr() < 0.62, wy = h > 4.2 ? h * 0.66 : h * 0.5, wx = dx2 + (hr() < 0.5 ? -1 : 1) * w * 0.3
+          const win = new THREE.BoxGeometry(0.82, 0.66, 0.05); win.translate(wx, wy, df - 0.05); propL.push({ geo: colGeo(win, homeLit ? 0xffcb8e : 0x39454f) }) // 灯る窓 or 暗い窓
+          const sash = new THREE.BoxGeometry(0.9, 0.06, 0.06); sash.translate(wx, wy - 0.34, df - 0.06); propL.push({ geo: colGeo(sash, 0xe8e0ce) }) } // 窓の下桟
+        // 玄関先の植木鉢（手入れされている気配）。素焼きの鉢＋緑の株。
+        if (hr() < 0.5) { const px2 = dx2 + (hr() < 0.5 ? 0.78 : -0.78), pz2 = df - 0.42
+          const pot = new THREE.CylinderGeometry(0.15, 0.12, 0.26, 7); pot.translate(px2, 0.13, pz2); propL.push({ geo: colGeo(pot, 0xb07a52) })
+          const grn = new THREE.SphereGeometry(0.2, 7, 6); grn.scale(1, 1.2, 1); grn.translate(px2, 0.4, pz2); propL.push({ geo: colGeo(grn, season === 'autumn' ? 0x9a8a3a : 0x5f8a44) }) }
         // 物干し竿＋洗濯物（2階の前＝昭和平成の生活感・前面の奥行き）
         if (h > 4.2 && !SNOW && hr() < 0.4) { const py = h - 0.85, pz = df - 0.55
           for (const px of [-w * 0.3, w * 0.3]) { const pole = new THREE.BoxGeometry(0.05, 0.72, 0.05); pole.translate(px, py + 0.36, pz); propL.push({ geo: colGeo(pole, 0x9a958c) }) }
