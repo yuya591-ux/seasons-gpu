@@ -8257,7 +8257,7 @@ export async function mountTown3d(parent, opts = {}) {
     // 痕跡の発見: 歩いて近づくと初回だけ静かに通い帳へ（達成度・通知は出さない＝そっと絵日記に残るだけ＝『夏休み』の小さな発見）。
     if (traces.length && active.mode === 'walk') { const fp = active.flyPos
       for (const tr of traces) { if (visitedAreas.has(tr.id)) continue
-        if (Math.hypot(fp.x - tr.x, fp.z - tr.z) < 2.8) { visitedAreas.add(tr.id); onDiscover(tr.id); onTrace(tr.name) } } }
+        if (Math.hypot(fp.x - tr.x, fp.z - tr.z) < 2.8) { visitedAreas.add(tr.id); onDiscover(tr.id); onTrace(tr.name); onChime(); chimeCount++ } } } // 見つけた一拍にかすかな鈴（達成音でなく佇む時と同じ静かな鈴）
     // いまの居場所をそっと伝える（飛行/歩行中の迷子防止）。窓辺は空文字＝表示を消す。変化時だけ通知。
     { let loc = ''
       if (active.mode !== 'window') {

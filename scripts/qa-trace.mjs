@@ -35,7 +35,9 @@ const reached = await page.evaluate(() => (window.__town3dDbg && window.__town3d
 
 // 絵日記の総数を localStorage 全文から数える（保存キーに依存せず、痕跡の語が増えたかを見る）
 const journalText = () => page.evaluate(() => Object.values(localStorage).join('\n'))
+const chimeCount = () => page.evaluate(() => (window.__town3dSoundCounts ? window.__town3dSoundCounts().chime : -1))
 const before = await journalText()
+const chime0 = await chimeCount()
 
 // 痕跡の座標へ順に寄る（歩行モードを保ったまま flyPos を移す）
 const visit = async (x, z) => {
@@ -47,10 +49,12 @@ await visit(11, -24)   // 虫とり網
 await visit(6.4, -41)  // お地蔵さま
 const after = await journalText()
 
+const chime1 = await chimeCount()
 const hits = ['白い跡', '虫とり網', 'お地蔵'].map((w) => ({ w, found: after.includes(w) }))
 console.log('到達mode=「' + reached + '」')
 console.log('絵日記の痕跡語: ' + JSON.stringify(hits))
 console.log('before長=' + before.length + ' after長=' + after.length)
+console.log('鈴: ' + chime0 + '→' + chime1)
 console.log(errs.length ? 'エラー: ' + JSON.stringify(errs.slice(0, 4)) : 'エラー無し')
 await browser.close()
 cleanup()
