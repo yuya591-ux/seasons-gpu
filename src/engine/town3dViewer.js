@@ -6190,11 +6190,14 @@ export async function mountTown3d(parent, opts = {}) {
     // 胴＋首＋頭＋髪＋目を頂点色で1メッシュへ統合＝歩行者1体の描画コールを 8→5 に（窓辺=発熱ホットスポットで効く。腕脚の可動は維持）。
     const bgeos = []
     const bbake = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); bgeos.push(geo) }
-    bbake(new THREE.CylinderGeometry(0.2, 0.135, 0.6, 10).toNonIndexed().translate(0, 1.04, 0), topHex) // 胴（肩→腰のテーパー）
-    { const sh = new THREE.SphereGeometry(0.21, 10, 6).toNonIndexed(); sh.scale(1.0, 0.4, 0.6); sh.translate(0, 1.3, 0); bbake(sh, topHex) } // 肩（横に張る稜線＝円柱の天面でなく肩のある人型）
-    bbake(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 7).toNonIndexed().translate(0, 1.37, 0), skinHex) // 首
-    const hg = new THREE.SphereGeometry(0.17, 10, 9).toNonIndexed(); hg.scale(0.94, 1.06, 0.96); hg.translate(0, 1.55, 0); bbake(hg, skinHex) // 頭（小さめ＝約7頭身）
-    bbake(new THREE.SphereGeometry(0.183, 10, 9, 0, Math.PI * 2, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.58, -0.012), hairHex) // 髪（上＋後ろ・顔は出す）
+    bbake(new THREE.CylinderGeometry(0.185, 0.132, 0.62, 14).toNonIndexed().translate(0, 1.04, 0), topHex) // 胴（肩→腰のテーパー・肩を少し狭め角を丸める）
+    { const sh = new THREE.SphereGeometry(0.195, 14, 8).toNonIndexed(); sh.scale(1.0, 0.42, 0.62); sh.translate(0, 1.3, 0); bbake(sh, topHex) } // 肩（横に張る稜線・少し狭め滑らかに）
+    bbake(new THREE.CylinderGeometry(0.048, 0.058, 0.1, 8).toNonIndexed().translate(0, 1.37, 0), skinHex) // 首
+    const hg = new THREE.SphereGeometry(0.17, 12, 10).toNonIndexed(); hg.scale(0.94, 1.06, 0.96); hg.translate(0, 1.55, 0); bbake(hg, skinHex) // 頭（小さめ＝約7頭身）
+    // 髪：兜(額〜目まで覆う一枚半球)を脱し、頭頂クラウン＋うなじ＋中央分けの前髪へ＝額を見せて顔が立つ（全てベイク統合＝描画コール不変・R()不消費）
+    { const crown = new THREE.SphereGeometry(0.182, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.47).toNonIndexed(); crown.scale(1.0, 1.06, 0.99); crown.translate(0, 1.556, -0.004); bbake(crown, hairHex) } // 頭頂を覆い額の手前で止める
+    { const nape = new THREE.SphereGeometry(0.137, 10, 8).toNonIndexed(); nape.scale(1.04, 0.92, 0.7); nape.translate(0, 1.498, -0.092); bbake(nape, hairHex) } // 後頭部〜うなじ（後ろだけ下げる）
+    for (const s of [-1, 1]) { const fr = new THREE.SphereGeometry(0.062, 8, 6).toNonIndexed(); fr.scale(1.05, 0.52, 0.44); fr.translate(s * 0.052, 1.62, 0.138); bbake(fr, hairHex) } // 中央分けの前髪（左右に分け額を出す・目にかからない高さ）
     if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bgeos, false); if (m) { const body = new THREE.Mesh(m, peepBodyMat); body.castShadow = true; g.add(body) } bgeos.forEach((q) => q.dispose()) }
     const pface = new THREE.Mesh(peepFaceGeo, peepFaceMat(irisHex, hairHex)); pface.position.set(0, 1.532, 0); pface.renderOrder = 2; pface.castShadow = false; g.add(pface) // 顔＝目鼻のテクスチャ（黒い点2つを脱し「顔のある人」へ。共有ジオメトリ/材で描画コール+1のみ）
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
