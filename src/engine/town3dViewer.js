@@ -4723,6 +4723,21 @@ export async function mountTown3d(parent, opts = {}) {
 
   // ── 谷戸の中身（棚田・茅葺の横溝屋敷・屋敷林・せせらぎ・点在する農家）。谷戸のみ。 ──
   if (kind === 'yato') {
+    // ── 谷の入口の田の神の祠。田畑を見守る小さな石の祠＋供えられた一輪＝里の祈りの気配（人の不在の現前）。
+    //    実在の獅子ヶ谷の谷戸に、固有名を出さず情緒として。説明文は置かない（歩いて気づく）。雲海/home の痕跡を谷戸へ。
+    { const fx = 8.5, fz = 6, fy = heightAt(fx, fz)
+      if (fy > SEA.level + 0.3 && !blockedAt(fx, fz)) {
+        const hok = new THREE.Group(); hok.position.set(fx, fy, fz); hok.rotation.y = -2.2 // 谷（棚田）の方へ向く
+        const stone = toon(0x9c988e), wood = toon(0x5a4636), roofM = toon(0x6e5d44), darkM = toon(0x241c17)
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.22, 0.54), stone); base.position.y = 0.11; base.castShadow = true; hok.add(base) // 台石
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.36), wood); body.position.y = 0.45; body.castShadow = true; hok.add(body) // 祠の身舎
+        const dook = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.04), darkM); dook.position.set(0, 0.42, 0.185); hok.add(dook) // 暗い内陣
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.3, 4), roofM); roof.position.y = 0.83; roof.rotation.y = Math.PI / 4; roof.castShadow = true; hok.add(roof) // 寄棟の小屋根
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 4), toon(0x5a7a3a)); stem.position.set(0.1, 0.33, 0.32); hok.add(stem)
+        const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), toon(0xe8c060)); bloom.position.set(0.1, 0.45, 0.32); hok.add(bloom) // 供えられた一輪（菜の花色）
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.06, 8), stone); cup.position.set(-0.12, 0.25, 0.3); hok.add(cup) // 水を供える小さな器
+        town.add(hok)
+      } }
     // 棚田: 谷底に水田と青田が並ぶ。畦道は区画の隙間で表す。
     // 水鏡: 平板な水色でなく「空・地平・朝日を映す水面」に。情景の空色のグラデ＋斜めの陽の照り返し＋さざ波を
     // 描き、自発光のように明るいMeshBasicで反射の質感を出す（評価指摘: 今は空を映さない平板な板）。
