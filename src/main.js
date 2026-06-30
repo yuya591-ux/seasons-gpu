@@ -214,6 +214,7 @@ function start() {
           onLocation: (name) => { if (ui && ui.setLocation) ui.setLocation(name) }, // いまの居場所をモードピルに表示＝飛行中の迷子防止（評価UX-U2）
           discovered: getWorldState().discovered, // 既に辿り着いた時代エリア＝光の標を淡く沈め、未訪の地へ誘いを集める（死蔵された世界の救出）
           onDiscover: (id) => markDiscovered(id), // 飛んで辿り着いた地を静かに記録（世界に進みが刻まれる。達成度は出さない）
+          onTrace: (name) => { const dt = new Date(); addJournalEntry(`${dt.getMonth() + 1}月${dt.getDate()}日、${name}。`) }, // 歩いて近づいた痕跡を、その日の一行として絵日記へ（死蔵された作り込みの救出。通知は出さずそっと残す）
           onDayPhase: (v) => { if (!sleepFading) audio.setDayPhase(v) }, // 日の傾きで外の音もそっとやわらぐ＝絵だけでなく音も時刻に連れ添う（評価エモ最優先）
           onContextRestore: () => { applyScene(next, false) }, // WebGLコンテキスト喪失（実機のバックグラウンド復帰/メモリ逼迫）から復帰したら、同じ情景を組み直して黒画面固定を防ぐ（評価 技術-致命3）
         })

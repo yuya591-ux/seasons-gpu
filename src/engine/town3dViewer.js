@@ -8027,6 +8027,20 @@ export async function mountTown3d(parent, opts = {}) {
   // 未訪の地だけを灯す＝既に辿り着いた時代エリアの光は淡く沈め、まだ見ぬ街へ誘いを集める（worldState.discovered）。
   const visitedAreas = new Set(Object.keys(opts.discovered || {}))
   const onDiscover = typeof opts.onDiscover === 'function' ? opts.onDiscover : () => {}
+  const onTrace = typeof opts.onTrace === 'function' ? opts.onTrace : () => {}
+  // ── 街のあちこちに置いた「人の気配の痕跡」を、歩いて近づくと"見つけた"として通い帳に静かに残す（死蔵された作り込みの救出＝評価パネルの核心）。
+  //    座標は痕跡を置いた地点と同じ。生成ガード（陸地/未塞）を満たした痕跡だけ登録する。達成度は出さない＝そっと絵日記に一行だけ。
+  const traces = []
+  if (kind !== 'yato') {
+    for (const t of [
+      { id: 'tr-kenken', x: 0, z: 6, name: '広場で子どもらの遊んだ白い跡を見た' },
+      { id: 'tr-mushi', x: 11, z: -24, name: '池のほとりの虫とり網と虫かごを見た' },
+      { id: 'tr-jizo', x: 6.4, z: -41, name: '路傍のお地蔵さまに出会った' },
+      { id: 'tr-engawa', x: -6, z: -6, name: '夕涼みの縁台と置き忘れの麦わら帽子を見た' },
+    ]) if (heightAt(t.x, t.z) > SEA.level + 0.4 && !blockedAt(t.x, t.z)) traces.push(t)
+  } else {
+    traces.push({ id: 'tr-hokora', x: 8.5, z: 6, name: '棚田の畦の田の神さまの祠に出会った' }) // 谷戸の祠（棚田ブロックで生成）
+  }
   const beacons = []
   if (kind !== 'yato') {
     const bc = document.createElement('canvas'); bc.width = 32; bc.height = 96; const bgx = bc.getContext('2d')
@@ -8240,6 +8254,10 @@ export async function mountTown3d(parent, opts = {}) {
         const seenDim = visitedAreas.has(b.id) ? 0.2 : 1 // 既に訪れた地の光は淡く沈め、まだ見ぬ街を際立たせる
         const op = fa * 0.36 * seenDim * Math.max(0, Math.min(1, (d - 70) / 120))
         b.m.visible = op > 0.012; if (b.m.visible) b.m.material.opacity = op * (0.82 + 0.18 * Math.sin(t * 0.7 + b.x * 0.01)) } } // 遠いほど灯り、近づく(70u以内)と消える＝着いたら役目を終える
+    // 痕跡の発見: 歩いて近づくと初回だけ静かに通い帳へ（達成度・通知は出さない＝そっと絵日記に残るだけ＝『夏休み』の小さな発見）。
+    if (traces.length && active.mode === 'walk') { const fp = active.flyPos
+      for (const tr of traces) { if (visitedAreas.has(tr.id)) continue
+        if (Math.hypot(fp.x - tr.x, fp.z - tr.z) < 2.8) { visitedAreas.add(tr.id); onDiscover(tr.id); onTrace(tr.name) } } }
     // いまの居場所をそっと伝える（飛行/歩行中の迷子防止）。窓辺は空文字＝表示を消す。変化時だけ通知。
     { let loc = ''
       if (active.mode !== 'window') {
