@@ -6375,6 +6375,24 @@ export async function mountTown3d(parent, opts = {}) {
   if (kind !== 'yato') {
     for (let i = 0; i < 8; i++) { const z = -84 + R() * 96, x = (R() < 0.5 ? -1 : 1) * (2.4 + R() * 1.5), py = heightAt(x, z); if (py < SEA.level + 1 || (Math.abs(z - RAIL.z) < 3 && x > RAIL.x0 - 1 && x < RAIL.x1 + 1)) continue; const g = makePeep(); const dir = x < 0 ? 1 : -1; g.position.set(x, py, z); Object.assign(g.userData, { dir, x, speed: 1.0 + R() * 0.7, z, ph: R() * 6.28 }); town.add(g); peeps.push(g) } // 中央通りを歩く
     for (const [cx, cz, n] of [[STATION.x, STATION.z + STATION.r - 2, 4], [PARK.x, PARK.z, 3], [DOWNTOWN.x, DOWNTOWN.z, 3]]) for (let i = 0; i < n; i++) { const a = R() * 6.28, rr = 3 + R() * 6, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, py = heightAt(x, z); if (py < SEA.level + 1.2 || x > SEA.coast || blockedAt(x, z)) continue; const g = makePeep(); g.position.set(x, py, z); Object.assign(g.userData, { loiter: true, hx: x, hz: z, rad: 0.3 + R() * 0.6, ph: R() * 6.28, sp: 0.3 + R() * 0.4, face: R() * 6.28 }); town.add(g); peeps.push(g) } } // 駅前/公園/副都心の人だかり（佇む）
+  // ── 街角の野仏（お地蔵さん）。昭和の住宅地の路傍にあった祈りの点＝「誰かが手を合わせた気配」＝人の不在の現前。
+  //    赤いよだれかけ・手向けの一輪・積み石。説明文は置かない（歩いて気づく人だけのもの）。雲海の野仏(IPセーフな独自意匠)をhomeへ移植。
+  if (kind !== 'yato') {
+    const jx = 6.4, jz = -41, jy = heightAt(jx, jz)
+    if (jy > SEA.level + 0.5 && !blockedAt(jx, jz)) {
+      const jizo = new THREE.Group(); jizo.position.set(jx, jy, jz); jizo.rotation.y = -0.5 // 通りの方へ少し向く
+      const stone = toon(0x9c988e), moss = toon(0x6f7a44), bibCol = toon(isNight ? 0x7a2e26 : 0xbe3b2e)
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.5, 8), stone); base.position.y = 0.25; base.castShadow = true; jizo.add(base) // 台石
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 0.9, 10), stone); body.position.y = 0.95; body.castShadow = true; jizo.add(body) // 体（顔は描かない丸みのある石仏）
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), stone); head.position.y = 1.58; head.scale.y = 1.08; head.castShadow = true; jizo.add(head)
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.29, 12, 6, 0, 6.2832, 0, 1.05), moss); cap.position.y = 1.62; jizo.add(cap) // 頭にむした苔
+      const bib = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.34, 0.42, 10, 1, true), bibCol); bib.position.y = 1.16; jizo.add(bib) // 赤いよだれかけ
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 4), toon(0x5a7a3a)); stem.position.set(0.32, 0.66, 0.16); jizo.add(stem)
+      const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), toon(0xe8a0b4)); bloom.position.set(0.32, 0.83, 0.16); jizo.add(bloom) // 手向けの一輪
+      for (let i = 0; i < 3; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(0.075 - i * 0.015, 6, 5), stone); p.position.set(-0.34, 0.56 + i * 0.1, 0.2); p.scale.y = 0.7; p.castShadow = true; jizo.add(p) } // 積み石
+      town.add(jizo)
+    }
+  }
   // ── 港町の少女（添付の模倣）＝2D立ち絵の主人公キャラ。港・水辺・街角に。──
   for (const sp of [{ x: HARBOR.x - 3, z: HARBOR.z + 4 }, { x: 70, z: -38 }, { x: -43, z: -15 }, { x: 4, z: -27 }, { x: STATION.x + 2, z: STATION.z + STATION.r - 2 }]) placeGirl(sp.x + (R() - 0.5) * 1.4, sp.z + (R() - 0.5) * 1.4, girlCfg())
   // ── 各エリア（時代）の住人を、装い・小道具を時代に合わせて量産（近景=walk/低空で映える） ──
