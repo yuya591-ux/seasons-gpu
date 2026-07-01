@@ -1289,6 +1289,36 @@ export async function mountTown3d(parent, opts = {}) {
     crowdAnim.push(mesh)
     return mesh // 動く旅人(cityWalkers)等が参照して動かせるよう返す
   }
+  // ── 城下を歩く旅人（cityWalkers専用）＝mkCrowdPersonを「脚が振れる」版に。胴＋腕＋頭は1メッシュにbake（腕は静止）、
+  //    脚だけ左右2グループで股支点に振る＝歩みで脚を交互に運び「滑る蝋人形」を脱す。動く人は各城下で十数体＝描画コール増は限定的。──
+  const mkWalkerFig = (px, py, pz, bodyCol, sc = 0.7) => {
+    const skinHex = 0xe6c6a4, hairHex = 0x2a1f18
+    const legHex = new THREE.Color(bodyCol).multiplyScalar(0.62).getHex()
+    const g = new THREE.Group(); g.position.set(px, py, pz); g.rotation.y = R() * 6.28; g.scale.setScalar(sc)
+    const paint = (geo, hex) => { const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); return geo }
+    // 胴＋首＋頭＋髪＋目＋腕（静止）＝1メッシュ。座標は mkCrowdPerson に合わせる。
+    const bg = []
+    bg.push(paint(new THREE.CylinderGeometry(0.2, 0.165, 0.34, 9).toNonIndexed().translate(0, 1.0, 0), bodyCol)) // 胸
+    bg.push(paint(new THREE.CylinderGeometry(0.165, 0.2, 0.34, 9).toNonIndexed().translate(0, 0.69, 0), legHex)) // 腰
+    { const sh = new THREE.SphereGeometry(0.205, 9, 6).toNonIndexed(); sh.scale(1.0, 0.4, 0.62); sh.translate(0, 1.16, 0); bg.push(paint(sh, bodyCol)) } // 肩
+    bg.push(paint(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed().translate(0, 1.21, 0), skinHex)) // 首
+    { const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); hd.translate(0, 1.33, 0); bg.push(paint(hd, skinHex)) } // 頭
+    bg.push(paint(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.35, -0.012), hairHex)) // 髪
+    for (const s of [-1, 1]) bg.push(paint(new THREE.SphereGeometry(0.022, 5, 4).toNonIndexed().translate(s * 0.05, 1.35, 0.118), hairHex)) // 目
+    const aM = new THREE.Matrix4()
+    for (const s of [-1, 1]) { const arm = new THREE.CylinderGeometry(0.03, 0.038, 0.56, 5).toNonIndexed(); aM.makeRotationZ(s * 0.07).setPosition(s * 0.205, 0.84, 0.02); arm.applyMatrix4(aM); bg.push(paint(arm, bodyCol)); bg.push(paint(new THREE.SphereGeometry(0.043, 6, 5).toNonIndexed().translate(s * 0.225, 0.55, 0.03), skinHex)) } // 腕＋手（静止）
+    if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bg, false); if (m) { const body = new THREE.Mesh(m, crowdMat); body.castShadow = true; g.add(body) } bg.forEach((q) => q.dispose()) }
+    // 脚×2（股支点＝y0.56で振れる）。すね＋足を1メッシュに。
+    const legs = []
+    for (const s of [-1, 1]) { const lg = new THREE.Group(); lg.position.set(s * 0.095, 0.56, 0)
+      const lgeo = [paint(new THREE.CylinderGeometry(0.075, 0.058, 0.5, 6).toNonIndexed().translate(0, -0.25, 0), legHex), paint(new THREE.BoxGeometry(0.1, 0.05, 0.18).toNonIndexed().translate(0, -0.5, 0.055), legHex)]
+      const lm = BufferGeometryUtils.mergeGeometries ? BufferGeometryUtils.mergeGeometries(lgeo, false) : lgeo[0]
+      const leg = new THREE.Mesh(lm || lgeo[0], crowdMat); leg.castShadow = true; lgeo.forEach((q) => { if (q !== leg.geometry) q.dispose() }); lg.add(leg); g.add(lg); legs.push(lg) }
+    if (Math.hypot(px, pz) > 58) { const csh = new THREE.Mesh(crowdShadowGeo, contactShadowMat); csh.rotation.x = -Math.PI / 2; csh.position.y = 0.05; csh.renderOrder = 3; g.add(csh) } // 足元の柔らかい影（時代エリアは静的焼き影の外）
+    g.userData = { legs, walker: true } // walker=true＝crowdAnimの近接微揺れ対象外（cityWalkerが自前で動かす）
+    town.add(g)
+    return g
+  }
   // 祭りの会場を「平らに造成した土の広場」の上に据える。斜面/坂でも水平な地面を一枚敷き、その上に会場と人を乗せる
   // （道や坂のど真ん中でやぐらが傾く・周回する踊り手が浮き沈みする、を根絶。下手側の側面は土留めの擁壁に見える＝造成地らしさ）。
   const festPad = (fx, fz, padR) => {
@@ -3697,7 +3727,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const yago = ['魚', '酒', '米', '茶', '薬', '呉服', '両替', '蕎麦', '飯', '宿', '油', '炭', '団子', '塩'] // 城下の店の屋号（縦書きの木の掛看板）
           for (let k = 0; k < 13; k++) { const a2 = (k / 13) * 6.28 + 0.3; if (angGap(a2) < 0.34) continue; const r2 = 22 + R() * 9, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue
             mkSignV(px, py + 1.4, pz, a2 + Math.PI / 2 + (R() - 0.5) * 0.4, yago[k % yago.length], season === 'winter' ? 0xeae0cc : 0xe6d8b8, 0x3a2a1a) } } // 城下の店の看板
-        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = mkCrowdPerson(ex + Math.cos(ang) * r0, heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), ez + Math.sin(ang) * r0, kimono[(j * 2 + 1) % kimono.length], 0.7); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人（初期位置を置く＝遠方時に原点へ取り残されない）
+        for (const av of [0.4, 1.7, 3.0, 4.4, 5.6]) for (let j = 0; j < 3; j++) { const ang = av + (R() - 0.5) * 0.12, r0 = 24 + j * 5, r1 = 54 + R() * 8; const wg = mkWalkerFig(ex + Math.cos(ang) * r0, heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), ez + Math.sin(ang) * r0, kimono[(j * 2 + 1) % kimono.length], 0.7); cityWalkers.push({ g: wg, cx: ex, cz: ez, ang, r0, r1, y0: heightAt(ex + Math.cos(ang) * r0, ez + Math.sin(ang) * r0), y1: heightAt(ex + Math.cos(ang) * r1, ez + Math.sin(ang) * r1), sp: 0.05 + R() * 0.04, ph: R() * 2 }) } // 大通りを行き交う人（脚が振れる旅人・初期位置を置く＝遠方時に原点へ取り残されない）
         // ── 城下の市の床店＋犬猫＝降り立った時に出会う江戸の賑わい。 ──
         { const edoGoods = [0xc8702e, 0x7a8a3a, 0xb04030, 0xd0a850, 0x9a5a3a, 0x5a7a8a]
           for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28 + 0.3, r2 = 27 + R() * 15, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
@@ -4160,7 +4190,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const sgKim = [0x6a5a3e, 0x4a4038, 0x7a4030, 0x40506a, 0x55603a, 0x5a5a5e] // 戦国の城下の人々（陣笠・素朴な色）
           for (let k = 0; k < 5; k++) { const zz = sz + 26 - R() * 52, cl = senValley(zz), px = sx + cl + (R() - 0.5) * 18, pz = zz + (R() - 0.5) * 3, py = senH(px, pz); if (py > 13 || !senInland(px, pz)) continue; mkCrowdPerson(px, py, pz, sgKim[k % sgKim.length], 0.66) } // 人らしい体に（こけし人形を脱す）。遠景の人は少なめ（作り込んだ住人placeEraを増やした）
           for (let j = 0; j < 10; j++) { const z0 = sz + 20 - j * 4.4, cl = senValley(z0); if (senH(sx + cl + 4.8, z0) < SEA.level + 1.2) continue // 街道が陸地の所だけに旅人を置く（水際/海の上を歩かせない）
-            const wg = mkCrowdPerson(sx + cl + 4.8, senH(sx + cl + 4.8, z0), z0, sgKim[j % sgKim.length], 0.66) // 人らしい体（胴＋首＋小頭＋髪）に＝こけし人形を脱す
+            const wg = mkWalkerFig(sx + cl + 4.8, senH(sx + cl + 4.8, z0), z0, sgKim[j % sgKim.length], 0.66) // 脚が振れる旅人（歩みで脚を交互に運ぶ＝滑る蝋人形を脱す）
             // 旅人は地面の高さに沿って歩く。水際に踏み込む手前(senH<SEA.level+1)で折り返す＝海の上を歩かない。
             cityWalkers.push({ g: wg, road: true, x0: sx + cl + 4.8, z0, len: 8 + R() * 6, sp: 0.05 + R() * 0.04, ph: R() * 2, fn: (u) => { const zz = z0 - u, c2 = senValley(zz), xx = sx + c2 + 4.8, gh = senH(xx, zz); if (gh < SEA.level + 1) { const c3 = senValley(z0), x3 = sx + c3 + 4.8; return { x: x3, y: senH(x3, z0), z: z0 } } return { x: xx, y: gh, z: zz } } }) } // 街道を行き交う旅人
           const sgmei = ['酒', '鍛冶', '旅籠', '飯', '馬', '薬'] // 城下の店（質素な木の掛看板）
@@ -8857,13 +8887,15 @@ export async function mountTown3d(parent, opts = {}) {
           if (w.posed && jump > 2.5) { const k = 1 - Math.exp(-7 * dt); w.g.position.x += (p.x - w.g.position.x) * k; w.g.position.y += (ty - w.g.position.y) * k; w.g.position.z += (p.z - w.g.position.z) * k }
           else w.g.position.set(p.x, ty, p.z)
           w.posed = true
-          w.g.rotation.y = tt < 1 ? 0 : Math.PI // 歩みに合わせ上下（mkCrowdPersonは統合メッシュ＝子を持たないので本体yへ反映）
+          w.g.rotation.y = tt < 1 ? 0 : Math.PI // 進む向き
+          { const lgs = w.g.userData.legs; if (lgs) { const ga = Math.sin(t * 5 + w.ph * 3); lgs[0].rotation.x = ga * 0.46; lgs[1].rotation.x = -ga * 0.46 } } // 脚を交互に運ぶ（mkWalkerFig＝脚が振れる。弾みと同位相）
           continue
         }
         if (Math.hypot(fp.x - w.cx, fp.z - w.cz) > 150) continue
         const tt = (t * w.sp + w.ph) % 2, f = tt < 1 ? tt : 2 - tt, r = w.r0 + (w.r1 - w.r0) * f
         const px = w.cx + Math.cos(w.ang) * r, pz = w.cz + Math.sin(w.ang) * r
-        w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0) // 歩みに合わせ上下（統合メッシュ＝本体yへ反映）
+        w.g.position.set(px, w.y0 + (w.y1 - w.y0) * f + Math.abs(Math.sin(t * 5 + w.ph * 3)) * 0.06, pz); w.g.rotation.y = w.ang + (tt < 1 ? Math.PI : 0) // 歩みに合わせ上下＋進む向き
+        { const lgs = w.g.userData.legs; if (lgs) { const ga = Math.sin(t * 5 + w.ph * 3); lgs[0].rotation.x = ga * 0.46; lgs[1].rotation.x = -ga * 0.46 } } // 脚を交互に運ぶ
       }
       // 戦国の谷の霧がゆっくり横へ漂う（近くを飛ぶ時だけ更新＝軽量）
       if (senMist.length && Math.hypot(fp.x - SENGOKU.x, fp.z - SENGOKU.z) < 220) for (let i = 0; i < senMist.length; i++) { const m = senMist[i]; m.position.x += Math.sin(t * 0.12 + i * 1.7) * dt * 0.6 }
