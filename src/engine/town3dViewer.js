@@ -8472,7 +8472,20 @@ export async function mountTown3d(parent, opts = {}) {
         let pz = u.hz + Math.cos(t * u.sp * 0.8 + u.ph * 1.3) * u.rad
         if (blockedAt(px, pz)) { px = u.hx; pz = u.hz } // 揺れた先が建物なら定位置へ（食い込み防止）
         p.position.set(px, heightAt(px, pz) + Math.abs(Math.sin(t * 2.4 + u.ph)) * 0.05, pz)
-        p.rotation.y = u.face + Math.sin(t * 0.3 + u.ph) * 0.7
+        // 会話の気配（home等の人だまり）: 時々近くの人へ向き直り、しばらくそちらを向いて揺れを抑える＝「言葉を交わす」情景。
+        // 見える範囲(約60u)だけ・約3秒毎に間引く近傍探索。residentの会話(be4c681)と揃えて群衆にも広げる。
+        if (pd2 < 3600) {
+          if (u.socialT === undefined) u.socialT = R() * 3
+          u.socialT -= dt
+          if (u.socialT <= 0) { u.socialT = 3 + R() * 3.4
+            let best = null, bd = 10.24 // 3.2u以内の最寄りの人
+            for (const o of peeps) { if (o === p || o.userData.frozen) continue; const ox = o.position.x - px, oz = o.position.z - pz, od = ox * ox + oz * oz; if (od < bd) { bd = od; best = o } }
+            if (best) { u.chatFace = Math.atan2(best.position.x - px, best.position.z - pz); u.chat = 2 + R() * 2 }
+          }
+          if (u.chat > 0) u.chat -= dt
+        }
+        const chatting = u.chat > 0 && u.chatFace !== undefined
+        p.rotation.y = (chatting ? u.chatFace : u.face) + Math.sin(t * 0.3 + u.ph) * (chatting ? 0.12 : 0.7) // 会話中は相手へ向き直り、見回しの揺れを抑える
         const idle = Math.sin(t * (1.2 + (u.cadMul || 1) * 0.4) + u.ph) * (0.07 + (u.armAmp || 0.3) * 0.14) // 佇み＝そっと重心を移す（深さ・速さの個体差）
         if (legs[0]) { legs[0].rotation.x = idle; legs[1].rotation.x = -idle * 0.6 } // 片脚に体重を預ける非対称＝棒立ちを脱す
         if (arms[0]) { arms[0].rotation.x = -0.05 - idle * 0.5; arms[1].rotation.x = -0.05 + idle * 0.5 } // 腕は軽く前・控えめに揺れる
