@@ -6208,7 +6208,16 @@ export async function mountTown3d(parent, opts = {}) {
     if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bgeos, false); if (m) { const body = new THREE.Mesh(m, peepBodyMat); body.castShadow = true; g.add(body) } bgeos.forEach((q) => q.dispose()) }
     const pface = new THREE.Mesh(peepFaceGeo, peepFaceMat(irisHex, hairHex)); pface.position.set(0, 1.532, 0); pface.renderOrder = 2; pface.castShadow = false; g.add(pface) // 顔＝目鼻のテクスチャ（黒い点2つを脱し「顔のある人」へ。共有ジオメトリ/材で描画コール+1のみ）
     g.scale.setScalar(0.86 + R() * 0.28) // 背丈の個体差（子供〜大人）
-    g.userData = { legs, arms }
+    // 歩き癖の個体差（描画コール不変・R()の float 範囲のみ＝配列添字は触らず安全）。全員が同じ振幅・同じ歩調で
+    // 機械的に行進する“ロボット感”を崩し、一人ひとり違う歩みに＝群れが生きて見える（実機FB: まだ生きている感が足りない）。
+    g.userData = { legs, arms,
+      gaitAmp: 0.42 + R() * 0.34, // 歩幅（脚の振れ）: よく歩く人・のんびり歩く人
+      armAmp: 0.24 + R() * 0.30,  // 腕の振り: 大きく振る人・ほとんど振らない人
+      cadMul: 0.86 + R() * 0.32,  // 歩調の速さの癖（同じ移動速度でも足の運びの速さは人それぞれ）
+      bob: 0.042 + R() * 0.034,   // 頭の弾みの深さ
+      sway: (R() - 0.5) * 0.14,   // 左右の重心の揺れ癖（肩をわずかに振る）
+      armLead: (R() - 0.5) * 0.7, // 腕と脚の位相ずれ（完全な逆位相を崩す＝生身のばらつき）
+    }
     return g
   }
   peeps = []
@@ -8418,9 +8427,9 @@ export async function mountTown3d(parent, opts = {}) {
         if (blockedAt(px, pz)) { px = u.hx; pz = u.hz } // 揺れた先が建物なら定位置へ（食い込み防止）
         p.position.set(px, heightAt(px, pz) + Math.abs(Math.sin(t * 2.4 + u.ph)) * 0.05, pz)
         p.rotation.y = u.face + Math.sin(t * 0.3 + u.ph) * 0.7
-        const idle = Math.sin(t * 1.6 + u.ph) * 0.12 // 佇み＝そっと重心を移す程度
-        if (legs[0]) { legs[0].rotation.x = idle; legs[1].rotation.x = -idle }
-        if (arms[0]) { arms[0].rotation.x = -idle * 0.6; arms[1].rotation.x = idle * 0.6 }
+        const idle = Math.sin(t * (1.2 + (u.cadMul || 1) * 0.4) + u.ph) * (0.07 + (u.armAmp || 0.3) * 0.14) // 佇み＝そっと重心を移す（深さ・速さの個体差）
+        if (legs[0]) { legs[0].rotation.x = idle; legs[1].rotation.x = -idle * 0.6 } // 片脚に体重を預ける非対称＝棒立ちを脱す
+        if (arms[0]) { arms[0].rotation.x = -0.05 - idle * 0.5; arms[1].rotation.x = -0.05 + idle * 0.5 } // 腕は軽く前・控えめに揺れる
         continue
       }
       u.z += u.dir * u.speed * dt
@@ -8440,11 +8449,11 @@ export async function mountTown3d(parent, opts = {}) {
         for (const ox of [0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.2, -2.2, 3.0, -3.0]) { if (!blockedAt(u.x + ox, u.z)) { u.x += ox; u.lane = u.x; snapped = true; break } } // 柱が密で寄り切れない時は最近傍の空きへ即スナップ＝貫通フレームを作らない
         if (!snapped) { u.z += u.dir * 1.4; if (u.z > 18) u.z = -52; if (u.z < -52) u.z = 18; u.x = u.baseX; u.lane = u.baseX } // それでも詰まり点(街灯+建物に挟まれ)なら一歩先へ抜ける
       }
-      const cad = 6 + u.speed * 2.2, sw = Math.sin(t * cad + u.ph) // 歩調（速いほど速く運ぶ）
-      p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(Math.sin(t * cad + u.ph)) * 0.06, u.z) // 一歩ごとに弾む
-      p.rotation.y = u.dir > 0 ? 0 : Math.PI
-      if (legs[0]) { legs[0].rotation.x = sw * 0.55; legs[1].rotation.x = -sw * 0.55 } // 脚を交互に振る
-      if (arms[0]) { arms[0].rotation.x = -sw * 0.4; arms[1].rotation.x = sw * 0.4 } // 腕は脚と逆位相
+      const cad = (6 + u.speed * 2.2) * (u.cadMul || 1), sw = Math.sin(t * cad + u.ph) // 歩調（速いほど速く運ぶ・人ごとの癖cadMul）
+      p.position.set(u.x, heightAt(u.x, u.z) + Math.abs(sw) * (u.bob || 0.06), u.z) // 一歩ごとに弾む（弾みの深さも個体差）
+      p.rotation.y = (u.dir > 0 ? 0 : Math.PI) + sw * (u.sway || 0) // 歩みに合わせ肩をわずかに左右へ振る癖＝生身の重心移動
+      if (legs[0]) { const la = u.gaitAmp || 0.55; legs[0].rotation.x = sw * la; legs[1].rotation.x = -sw * la } // 脚を交互に（歩幅は個体差）
+      if (arms[0]) { const asw = Math.sin(t * cad + u.ph + (u.armLead || 0)), aa = u.armAmp || 0.4; arms[0].rotation.x = -0.05 - asw * aa; arms[1].rotation.x = -0.05 + asw * aa } // 腕は脚とほぼ逆位相＋わずかな位相ずれ・振り幅の個体差（肘は少し前へ）
     }
     // 作り込んだ住人: エリア内をゆっくり行き交い（手足を振って歩く）、たまに佇んで見回す。
     // 近く（見える範囲）の住人だけ更新＝遠い時代エリアの人々を毎フレーム動かさない＝滑らかさを守りつつ人を増やせる。
