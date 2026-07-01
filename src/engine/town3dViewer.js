@@ -57,16 +57,16 @@ const FLY = {
   steerYaw: 2.4,    // 横ドラッグ→旋回の効き（画面幅いっぱいのドラッグでこのrad）
   steerPitch: 2.2,  // 縦ドラッグ→上昇下降(機首上下)の効き
   // 画角
-  fov: 72, walkFov: 68,
+  fov: 72, walkFov: 78,   // 歩行の画角を広げる（横持ち主軸＝広い視野で街を望む。狭い一人称の窮屈さを断つ）
   fovSpeedGain: 7,  // 高速時に画角が広がる量(度)＝速度の高揚
   // 出入り・見回し
   enterDur: 1.7, pitchMax: 1.2, landDur: 1.4,
   lookEase: 0.18,   // 見回し（右ドラッグ）の追従
   // 引いた三人称“浮遊カメラ”（後方上から望む）
   camBack: 11.5, camUp: 3.6, camAhead: 9,     // 飛行: 後方/上/注視先（既定をやや引き気味＝街を広く望む。±ズームで前後可変）
-  walkBack: 1.4, walkUp: 0.15, walkAhead: 6.0, // 歩行: 一人称（通行人と目線を揃え・水平に前方を望む＝街路に立つ人の眺め。見下ろしのジオラマ感を断つ。アバター無し）
+  walkBack: 2.9, walkUp: 1.1, walkAhead: 7.2, // 歩行: 引いた三人称の「空気感」（飛行の気持ちよさに寄せる＝実機FB）。既定zoom1.56で実効back≈4.5/up≈1.4＝頭ひとつ上の肩越しから街を広く望む（見下ろし過ぎず接地感を残す）。ズーム−で一人称の親密さ、＋で広い眺めへ。壁際では自動で寄る(checkBlock)。アバター無し
   camLag: 0.12,     // 飛行カメラ位置の遅れ追従（わずかな揺らぎ＝空気の流れ）
-  walkCamLag: 0.3,  // 歩行カメラの追従（飛行より密着＝地に足のついた一人称の手応え。浮いた遅延を流用しない）
+  walkCamLag: 0.18, // 歩行カメラの追従（飛行(0.12)に寄せた空気感＝ゆるやかに遅れて追う浮遊の手触り。密着しすぎる一人称の硬さを脱す）
   // 旋回バンク（飛行の没入の要）
   bankMax: 0.32,    // 最大ロール(rad≈18°)。穏当に（酔い配慮）
   bankGain: 2.2,    // 旋回・横移動入力→バンク量
@@ -9099,7 +9099,7 @@ export async function mountTown3d(parent, opts = {}) {
       lookX = lerp(look.x, aLookX, flyAmt); lookY = lerp(look.y, aLookY, flyAmt); lookZ = lerp(look.z, aLookZ, flyAmt)
       upX = lerp(0, TMP_UP2.x, flyAmt); upY = lerp(1, TMP_UP2.y, flyAmt); upZ = lerp(0, TMP_UP2.z, flyAmt)
       const speedMag = Math.hypot(active.vel.x, active.vel.y, active.vel.z)
-      const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? 0 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain) + (active.wide && !isWalk ? 26 : 0) // 広角モードで視界を広げる
+      const aloftFov = (isWalk ? FLY.walkFov : FLY.fov) + (isWalk ? Math.min(1, speedMag / FLY.walkSpeed) * 3 : Math.min(1, speedMag / FLY.speed) * FLY.fovSpeedGain) + (active.wide && !isWalk ? 26 : 0) // 歩行も進むと画角がわずかに広がる（速度の高揚を控えめに）／広角モードで視界を広げる
       fov = lerp(winFov, aloftFov, flyAmt)
       if (thr > 0.001) fov += thr * 6.5 // 踏み出す閾＝画角がふっと広がり、視界が前へ吸い込まれて開ける（窓を越えて空へ踏み出す高揚）
       if (!isWalk && active.cinema > 0.01) fov += Math.sin(t * 0.16) * 2.6 * active.cinema // オートシネマの呼吸する画角（ゆっくり広→狭）
