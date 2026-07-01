@@ -1,22 +1,16 @@
 // 情景レジストリ。新しい情景の追加は「データファイルを作って、ここに1行 import で足す」だけ。
 // 既存は一切触らない（非破壊・疎結合）。
+//
+// 【整理・2026-07】表に出ていた25枚を「場所ごと」の二階層ギャラリーに集約した（src/ui/ui.js）のに合わせ、
+// 長らく public:false で誰にも見えていなかった死蔵の情景（旧・実写の窓×8／旧・高台の下町×3／夏の晴れ真昼／
+// 旧・屋上×2／旧・朝の谷戸／実証デモ×3＝計18）をレジストリごと撤去した。公開情景(25枚)は不変。
+// これらの render 種別は runtime の文字列判定なので、データを消しても分岐が呼ばれなくなるだけ（非破壊）。
+// もし将来これらを復活させたいときは、git 履歴からファイルを戻し、この配列に import を1行足せばよい。
 
-import photoWindowTown from './photo-window-town.js'
-import photoWindowDusk from './photo-window-dusk.js'
-import photoWindowNight from './photo-window-night.js'
-import photoWindowSea from './photo-window-sea.js'
-import photoWindowSpring from './photo-window-spring.js'
-import photoWindowWinter from './photo-window-winter.js'
-import photoWindowAutumn from './photo-window-autumn.js'
-import photoWindowSnowNight from './photo-window-snow-night.js'
 import summerRainDusk from './summer-rain-dusk.js'
 import summerRainMorning from './summer-rain-morning.js'
 import summerRainNight from './summer-rain-night.js'
 import autumnRainDusk from './autumn-rain-dusk.js'
-import summerClearNoon from './summer-clear-noon.js'
-import summerDuskDowntown from './summer-dusk-downtown.js'
-import winterSnowNightDowntown from './winter-snow-night-downtown.js'
-import summerRainNightDowntown from './summer-rain-night-downtown.js'
 import summerMorningMountains from './summer-morning-mountains.js'
 import summerDuskSeaside from './summer-dusk-seaside.js'
 import autumnDuskCornerRoom from './autumn-dusk-corner-room.js'
@@ -25,9 +19,6 @@ import summerMorningCornerRoom from './summer-morning-corner-room.js'
 import springDuskCornerRoom from './spring-dusk-corner-room.js'
 import springMorningCornerRoom from './spring-morning-corner-room.js'
 import winterSnowDuskCornerRoom from './winter-snow-dusk-corner-room.js'
-import shishigayaMorningYato from './shishigaya-morning-yato.js'
-import kitateraoRooftop from './kitaterao-rooftop.js'
-import kitateraoRooftopNight from './kitaterao-rooftop-night.js'
 import kitateraoWindow3d from './kitaterao-window-3d.js'
 import kitateraoWindow3dSunset from './kitaterao-window-3d-sunset.js'
 import kitateraoWindow3dRain from './kitaterao-window-3d-rain.js'
@@ -41,20 +32,8 @@ import shishigayaWindow3d from './shishigaya-window-3d.js'
 import shishigayaWindow3dAutumn from './shishigaya-window-3d-autumn.js'
 import shishigayaWindow3dSnow from './shishigaya-window-3d-snow.js'
 import shishigayaWindow3dSpring from './shishigaya-window-3d-spring.js'
-import panoDemo from './pano-demo.js'
-import splatDemo from './splat-demo.js'
-import roomDemo from './room-demo.js'
 
 export const SCENES = [
-  // 実写の窓（Flux写真が主役）＝最も実写。ショーケースとして先頭に。
-  photoWindowTown,
-  photoWindowDusk,
-  photoWindowNight,
-  photoWindowSea,
-  photoWindowSpring,
-  photoWindowAutumn,
-  photoWindowWinter,
-  photoWindowSnowNight,
   // 本物の3Dの坂の街（四季）＝アプリの主役。ギャラリーの先頭に並べて第一印象にする。
   kitateraoWindow3d,
   kitateraoWindow3dSunset,
@@ -69,30 +48,20 @@ export const SCENES = [
   shishigayaWindow3dSpring,
   shishigayaWindow3dAutumn,
   shishigayaWindow3dSnow,
-  // 角部屋シリーズ（シェーダー）
+  // 角部屋シリーズ（立体の街エンジンへ載せ替え済み）
   autumnDuskCornerRoom,
   autumnRainNightCornerRoom,
   summerMorningCornerRoom,
   springDuskCornerRoom,
   springMorningCornerRoom,
   winterSnowDuskCornerRoom,
-  // 下町・自然・その他のシェーダー情景
+  // 雨の窓（旗艦rainGlass）と、旅先の窓（海辺・山あい）
   summerRainDusk,
   summerRainMorning,
   summerRainNight,
   autumnRainDusk,
-  summerClearNoon,
-  summerDuskDowntown,
-  winterSnowNightDowntown,
-  summerRainNightDowntown,
   summerMorningMountains,
   summerDuskSeaside,
-  shishigayaMorningYato,
-  kitateraoRooftop,
-  kitateraoRooftopNight,
-  panoDemo,
-  splatDemo,
-  roomDemo,
 ]
 
 /** 軸の組み合わせから情景を引く。未登録なら undefined。 */
