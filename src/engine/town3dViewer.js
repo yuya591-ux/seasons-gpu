@@ -1277,7 +1277,16 @@ export async function mountTown3d(parent, opts = {}) {
     // 接地影: 静的影は原点±60しか焼かない＝時代エリア(遠い)の群衆は影が無く宙に浮く。足元に柔らかい影の円を「メッシュの子」で付け、
     // 移動(cityWalkers)にも追従させる(円なので回転は不問)。原点近く(home)は実影があるので付けない＝二重で濃くならない・描画コールも増やさない。
     if (Math.hypot(px, pz) > 58) { const csh = new THREE.Mesh(crowdShadowGeo, contactShadowMat); csh.rotation.x = -Math.PI / 2; csh.position.y = 0.05; csh.renderOrder = 3; mesh.add(csh) }
-    mesh.userData.cph = R() * 6.28; mesh.userData.cy0 = py; mesh.userData.crot = mesh.rotation.y; crowdAnim.push(mesh) // 近接の微揺れ用（cityWalkerになった個体はwalkerフラグで除外）
+    // 近接の微揺れ用（cityWalkerになった個体はwalkerフラグで除外）。統合メッシュ＝手足は動かせないので、
+    // 見回し(rotation.y)・弾み(y)・片足重心の傾き(rotation.z)に個体差を持たせ「同期した蝋人形」を脱す。
+    // 個体差は既存の cph から導出＝新たな R() を消費しない（時代エリアの配置カスケードを起こさない）。
+    const cph = R() * 6.28
+    mesh.userData.cph = cph; mesh.userData.cy0 = py; mesh.userData.crot = mesh.rotation.y
+    mesh.userData.cswAmp = 0.09 + (0.5 + 0.5 * Math.sin(cph * 3.1)) * 0.30 // 見回しの振れ幅（じっと/よく見回す）
+    mesh.userData.cswSpd = 0.26 + (0.5 + 0.5 * Math.cos(cph * 2.3)) * 0.36 // 見回しの速さの癖
+    mesh.userData.cLean = Math.sin(cph * 5.7) * 0.06                       // 片足に体重を預ける傾きの癖（rotation.z）
+    mesh.userData.cbobSpd = 1.0 + (0.5 + 0.5 * Math.sin(cph * 1.7)) * 0.9  // 弾みの速さの個体差
+    crowdAnim.push(mesh)
     return mesh // 動く旅人(cityWalkers)等が参照して動かせるよう返す
   }
   // 祭りの会場を「平らに造成した土の広場」の上に据える。斜面/坂でも水平な地面を一枚敷き、その上に会場と人を乗せる
@@ -8298,15 +8307,22 @@ export async function mountTown3d(parent, opts = {}) {
   climbWrap.appendChild(climbUp); climbWrap.appendChild(climbDn); pad.appendChild(climbWrap)
   const altGauge = mkGauge(climbWrap, [0.12, 0.65], [{ at: 0.05, t: '地上' }, { at: 0.97, t: '雲海' }]) // ↑上昇で上がる＝今の高さ。おすすめ＝街を見渡せる低〜中空。地上/雲海ラベルで「どこまで昇れば別世界か」を示す
   let climbShown = false
+  // 昇降の「押している間ずっと」の状態を保持し、frameで毎フレーム再宣言する（下の dvY 直前）。
+  // ＝別の指（見回し/操舵）を置いたり離したりしても上昇/下降が切れない（実機FB: 右で角度・向きを変えると決まって上昇が止まる）。
+  // climbHeld=押している向き(±1)／0=離した。climbPointerId=押している指のid（その指の pointerup だけで解除）。
+  let climbHeld = 0, climbPointerId = null
   for (const [cbtn, dir] of [[climbUp, 1], [climbDn, -1]]) {
-    const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir; altGauge.show() }
-    const cend = (e) => { if (e) e.stopPropagation(); if (active) active.climb = 0 }
-    // pointerleaveは外す（実機FB: 指が僅かにボタン端からズレると降下/上昇が止まる・効かない不具合の主因）。setPointerCaptureでpointerupは確実にボタンへ届く。
-    cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cend); cbtn.addEventListener('pointercancel', cend)
+    const cstart = (e) => { e.preventDefault(); e.stopPropagation(); try { cbtn.setPointerCapture(e.pointerId) } catch { /* 無視 */ } if (active) active.climb = dir; climbHeld = dir; climbPointerId = e.pointerId; altGauge.show() }
+    const cup = (e) => { if (e) e.stopPropagation(); if (active) active.climb = 0; climbHeld = 0; climbPointerId = null } // 指を離した＝解除
+    // ★pointercancel では解除しない：2本目の指(見回し/操舵)を置いた瞬間にブラウザが1本目へ cancel を飛ばすことがあり、
+    //   それで上昇が切れるのが実機FBの主因。押している向きは climbHeld に保持して frame で毎フレーム再宣言＝紛れて切れない。
+    //   本当に指を離した時だけ cup(pointerup)/winClimbUp で解除する（touch-action:none で微動でも pointerup は確実に届く）。
+    cbtn.addEventListener('pointerdown', cstart); cbtn.addEventListener('pointerup', cup)
   }
-  // 保険: 画面のどこで指を離しても昇降入力を確実に解除（setPointerCapture失敗時もボタンが押しっぱなしにならない）。
+  // 保険: 昇降ボタンを握っていた指を画面のどこで離しても確実に解除（setPointerCapture失敗時の押しっぱなし防止）。
+  // ただし「昇降を握っている指」だけを対象にする＝見回し/操舵の指を離しても昇降は続く（同時操作を保つ）。
   // 名前付き＝dispose で確実に外す（無名だと情景往復のたび window へ溜まる＝リスナー漏れ・評価エンジニア）。
-  const winClimbUp = () => { if (active) active.climb = 0 }
+  const winClimbUp = (e) => { if (active && e && e.pointerId === climbPointerId) { active.climb = 0; climbHeld = 0; climbPointerId = null } }
   window.addEventListener('pointerup', winClimbUp)
   // ── 補助操作の畳み込み: 既定は「すすむ/とまる＋↑↓昇降＋ズーム」のみ常駐し、補助の「速く/遅く・広く」は
   //    この⚙トグルを押した時だけ展開＝飛行時に操作子が一斉に出る"コックピット化"を解消し画面を一枚の絵に保つ（評価UX致命1）。──
@@ -8488,7 +8504,20 @@ export async function mountTown3d(parent, opts = {}) {
         u.pauseT -= dt
         for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x *= Math.max(0, 1 - dt * 5)
         for (let i = 0; i < u.arms.length; i++) u.arms[i].rotation.x = (u.arms[i].userData.base || 0) - 0.05 + Math.sin(t * 1.15 + u.ph + i * 3.1) * 0.05 // 非対称＋わずかに前へ休める
-        if (u.headG) { u.headG.rotation.y = Math.sin(t * 0.22 + u.ph) * 0.5; u.headG.position.y = 1.6 + Math.sin(t * 1.5 + u.ph) * 0.004 }
+        // 会話の気配（全エリア共通）: 佇んでいる間、時々近くの人へ向き直り、しばらくそちらを向いて小さくうなずく＝「言葉を交わしている」情景。
+        // 見える範囲(約60u)だけ・約3秒毎に間引いて近傍探索＝負荷を抑える。u.faceを相手方向にすると本体が後段でなめらかに向き直る。
+        if (rd2 < 3600) {
+          if (u.socialT === undefined) u.socialT = R() * 3
+          u.socialT -= dt
+          if (u.socialT <= 0) { u.socialT = 2.6 + R() * 3.4
+            let best = null, bd = 12.25 // 3.5u以内の最寄りの人
+            for (const o of residents) { if (o === r) continue; const ox = o.position.x - r.position.x, oz = o.position.z - r.position.z, od = ox * ox + oz * oz; if (od < bd) { bd = od; best = o } }
+            if (best) { u.face = Math.atan2(best.position.x - r.position.x, best.position.z - r.position.z); u.chat = 2.2 + R() * 2.2; u.pauseT = Math.max(u.pauseT, u.chat + 0.4) } // 相手へ向き直り、会話が済むまで留まる
+          }
+          if (u.chat > 0) u.chat -= dt
+        }
+        const chatting = u.chat > 0
+        if (u.headG) { u.headG.rotation.y = Math.sin(t * (chatting ? 1.1 : 0.22) + u.ph) * (chatting ? 0.16 : 0.5); u.headG.position.y = 1.6 + Math.sin(t * (chatting ? 2.4 : 1.5) + u.ph) * (chatting ? 0.01 : 0.004) } // 会話中は相手へ頭を落ち着け、相槌のように小さく速くうなずく
         if (u.pauseT <= 0) { const a = R() * 6.28, rr = 1.5 + R() * u.rad, nx = u.ax + Math.cos(a) * rr, nz = u.az + Math.sin(a) * rr
           if (heightAt(nx, nz) > SEA.level + 0.6) { u.tx = nx; u.tz = nz; u.moving = true } else u.pauseT = 1 + R() * 2 }
       }
@@ -8500,7 +8529,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 静的な群衆の近接微揺れ（市の人だかり等が「蝋人形」に見えないよう、近くの者だけそっと向きを変え重心を移す。アート監督致命3）。
     for (const m of crowdAnim) { const u = m.userData; if (u.walker) continue
       const cdx = m.position.x - active.flyPos.x, cdz = m.position.z - active.flyPos.z; if (cdx * cdx + cdz * cdz > 2700) continue // 近く(約52u)だけ＝負荷を抑える
-      m.rotation.y = u.crot + Math.sin(t * 0.4 + u.cph) * 0.22; m.position.y = u.cy0 + Math.abs(Math.sin(t * 1.3 + u.cph)) * 0.03 }
+      m.rotation.y = u.crot + Math.sin(t * (u.cswSpd || 0.4) + u.cph) * (u.cswAmp || 0.22) // 見回し（振れ幅・速さは個体差）
+      m.rotation.z = (u.cLean || 0) * (0.7 + 0.3 * Math.sin(t * 0.5 + u.cph)) // 片足重心の傾き癖＝棒立ちの同期を脱す（足元支点なので自然な立ち姿）
+      m.position.y = u.cy0 + Math.abs(Math.sin(t * (u.cbobSpd || 1.3) + u.cph)) * 0.026 } // 呼吸のような弾み（速さの個体差）
     // 木がそよ風に揺れる。低空で自機が近くを過ぎると、その風圧で外側へなびく（通過の余波）。
     const wakeOn = active && active.mode === 'fly' && active.flyP > 0.5
     const wakeSpd = wakeOn ? Math.min(1, Math.hypot(active.vel.x, active.vel.z) / FLY.speed) : 0
@@ -8964,6 +8995,7 @@ export async function mountTown3d(parent, opts = {}) {
         const cruiseS = ((active.cruise ? FLY.cruiseSpeed * active.speedMul * (active.arrivalSlow || 1) : 0) + cineSpeed) * (active.lowCruise ? 0.55 : 1) // 速さは speedMul で可変＋目的地で自動減速＋シネマの周回。低空滑空はゆるめる
         // 進むのは水平方向だけ＝見下ろし/見上げの角度に関係なく一定速度で前進（見下ろしても降下しない）。
         dvX = Math.sin(active.flyYaw) * cruiseS
+        if (climbHeld) active.climb = climbHeld // 昇降ボタンを押している間は毎フレーム上昇/下降を再宣言＝見回し/操舵の指を挟んでも切れない（実機FB）
         dvY = active.lowCruise ? 0 : (active.climb || 0) * FLY.climbSpeed // 高さは↑↓ボタンだけ。低空滑空中は地形追従に任せ昇降は効かせない（「空へ戻す」で解除）
         dvZ = -Math.cos(active.flyYaw) * cruiseS
         // 上昇気流＝暖かい場所・雲の塔の上は、巡航しながら通るとふわっと持ち上がる（押さなくても少し昇るソアリング）。
@@ -9005,15 +9037,14 @@ export async function mountTown3d(parent, opts = {}) {
         if ((active.jumpY || 0) > 0 || active.jumpVel) {
           active.jumpVel = (active.jumpVel || 0) - FLY.gravity * dt
           active.jumpY = Math.max(0, (active.jumpY || 0) + active.jumpVel * dt)
-          if (active.jumpY <= 0 && active.jumpVel < 0) { active.jumpVel = 0; active.landDustT = 0.5; active.dipT = 0.28; landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true; onLand(landSurf()) } // 着地＝砂ぼこり＋沈み込み＋着地音
+          if (active.jumpY <= 0 && active.jumpVel < 0) { active.jumpVel = 0; active.dipT = 0.28; onLand(landSurf()) } // 着地＝沈み込み＋着地音（砂ぼこりの輪は撤去：アバター不在なので何もない地面から衝撃波が広がり「見えない人が着地した」ように見えた・実機FB）
         }
         const eyeY = groundY + FLY.eye + (active.jumpY || 0)
         const ky = 1 - Math.pow(0.02, dt / FLY.landDur)
         if ((active.jumpY || 0) > 0.001) active.flyPos.y = eyeY // ジャンプ中は地面追従でなく直接（弾む手応え）
         else active.flyPos.y += (eyeY - active.flyPos.y) * ky // 接地はやわらかく・以降は面に沿う
-        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 降り立った瞬間＝砂ぼこり＋沈み込み＋着地音
-          active.landedFired = true; active.landDustT = 0.7; active.dipT = 0.42
-          landDust.position.set(active.flyPos.x, groundY + 0.06, active.flyPos.z); landDust.visible = true; onLand(landSurf())
+        if (!active.landedFired && active.flyPos.y - eyeY < 0.6) { // 降り立った瞬間＝沈み込み＋着地音（砂ぼこりの輪は撤去＝上記と同理由・実機FB）
+          active.landedFired = true; active.dipT = 0.42; onLand(landSurf())
         }
         // 足音: 歩いた距離を貯め、一歩ぶん進むごとに鳴らす（止まっている間は鳴らない）
         const hstep = Math.hypot(active.vel.x, active.vel.z) * dt
@@ -9290,7 +9321,7 @@ export async function mountTown3d(parent, opts = {}) {
     const showSpeed = active.mode === 'fly' && active.flyP > 0.4 // 速度ボタンは飛行のときだけ
     if (showSpeed !== speedShown) { speedShown = showSpeed; speedWrap.classList.toggle('speed--on', showSpeed); if (!showSpeed) stopSpeedHold() }
     if (showSpeed !== wideShown) { wideShown = showSpeed; wideWrap.classList.toggle('wide--on', showSpeed) }
-    if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) active.climb = 0 }
+    if (showSpeed !== climbShown) { climbShown = showSpeed; climbWrap.classList.toggle('climb--on', showSpeed); if (!showSpeed && active) { active.climb = 0; climbHeld = 0; climbPointerId = null } } // 飛行を出たら昇降の保持も解除（walkへ持ち越さない）
     if (showSpeed !== padShown) { padShown = showSpeed; moreBtn.classList.toggle('more--on', showSpeed); if (!showSpeed) pad.classList.remove('pad--open') } // ⚙は飛行時のみ＝飛行を出る時は補助トレイを畳んで次回また素の状態から
     onSpeed(windSpeed01) // 風音を飛行速度で膨らませる（main→audio.setFlyWind）
     onAltitude(altDuck01) // 高空で街の環境音をしぼる（main→audio.setAltitudeDuck）
