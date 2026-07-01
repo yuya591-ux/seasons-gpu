@@ -486,67 +486,102 @@ export function buildUI(opts) {
     const gallery = h('div', 'gallery')
     el.appendChild(gallery)
 
-    const cards = []
-    const headings = []
     // 公開する情景だけ（実証/開発用は public:false で隠す）
     const devMode = /[?&]dev=1/.test(location.search)
     const BASE = import.meta.env.BASE_URL || '/'
     const pubScenes = SCENES.filter((s) => s.status === 'ready' && (s.public !== false || devMode))
-    function makeCard(scene) {
+
+    // ── 「場所」ごとに束ねる二階層のギャラリー（実機FB: 情景が多すぎて特徴が分からない） ──
+    // 入口は「場所」の数だけ（約5〜6）。場所を開くと、その場所の季節・天気・時間ちがいの窓辺が並ぶ。
+    // 情景が増えても入口は増えない＝「広がりすぎ」の見通しを取り戻す。器（データ）はそのまま非破壊。
+    const PLACES = [
+      { key: 'kitaterao', label: '北寺尾の坂の街', desc: '立体の坂の街を窓辺から。飛んで歩いて巡れる',
+        flagship: 'kitaterao-window-3d', test: (s) => s.render === 'town3d' && s.town3dKind !== 'corner' && s.id.startsWith('kitaterao') },
+      { key: 'shishigaya', label: '獅子ヶ谷の谷戸', desc: '谷あいの棚田と茅葺き、ふるさとの窓辺',
+        flagship: 'shishigaya-window-3d', test: (s) => s.render === 'town3d' && s.town3dKind !== 'corner' && s.id.startsWith('shishigaya') },
+      { key: 'corner', label: '高台の角部屋', desc: '二面採光の角部屋から、街を広く見渡す',
+        flagship: 'autumn-dusk-corner-room', test: (s) => s.render === 'town3d' && s.town3dKind === 'corner' },
+      { key: 'rain', label: '雨の窓', desc: 'ガラスをつたう雨だれ、にじむ街あかり',
+        flagship: 'summer-rain-dusk', test: (s) => s.render === 'rainGlass' },
+      { key: 'nature', label: '海辺と山あい', desc: '波の音、朝もやの谷。旅先の窓辺',
+        flagship: 'summer-dusk-seaside', test: (s) => s.render === 'windowSea' || s.render === 'windowMountains' },
+      { key: 'photo', label: '実写の窓', desc: '写真が主役の、いちばん本物に近い窓',
+        flagship: 'photo-window-town', test: (s) => s.render === 'photoWindow' },
+      { key: 'etc', label: 'その他の窓辺', desc: '実証・開発用', test: () => true }, // 上のどれにも入らない残り（通常は空。dev時のみ）
+    ]
+    // 各場所に属する情景を集める（1情景は最初に一致した場所へ）。旗艦を先頭に。
+    const placedIds = new Set()
+    const placeList = []
+    for (const p of PLACES) {
+      const scenes = pubScenes.filter((s) => !placedIds.has(s.id) && p.test(s))
+      if (!scenes.length) continue
+      scenes.forEach((s) => placedIds.add(s.id))
+      scenes.sort((a, b) => (a.id === p.flagship ? -1 : b.id === p.flagship ? 1 : 0))
+      placeList.push({ ...p, scenes })
+    }
+
+    let cards = []          // いま描画中のカード（フィルタ/現在地表示の対象）
+    let level = 'places'    // 'places'=場所一覧 / 'scenes'=ある場所の中
+    // カードの見た目（サムネ＋見出し＋説明）。場所カードも情景カードも同じ体裁。
+    function cardEl(scene, label, desc) {
       const card = h('button', 'scene-card')
-      // 実描画のサムネ（読み込めない時はパレットのグラデへフォールバック）
       const sw = h('span', 'scene-card__swatch')
       const pal = scene.palette.early
       const grad = `linear-gradient(165deg, ${pal.skyTop}, ${pal.skyMid} 55%, ${pal.horizon})`
-      sw.style.backgroundImage = `url("${BASE}thumbs/${scene.id}.jpg"), ${grad}`
+      sw.style.backgroundImage = `url("${BASE}thumbs/${scene.id}.jpg"), ${grad}` // 実描画サムネ→無ければパレット
       const body = h('span', 'scene-card__body')
-      body.appendChild(h('span', 'scene-card__label', scene.label))
-      body.appendChild(h('span', 'scene-card__desc', scene.desc || ''))
-      card.appendChild(sw)
-      card.appendChild(body)
-      card.addEventListener('click', () => selectScene(scene))
-      gallery.appendChild(card)
-      cards.push({ id: scene.id, card, season: (scene.axes && scene.axes.season) || '' })
+      body.appendChild(h('span', 'scene-card__label', label))
+      body.appendChild(h('span', 'scene-card__desc', desc || ''))
+      card.appendChild(sw); card.appendChild(body)
+      return card
     }
-    // シリーズ見出しで一覧の見通しを良くする（情景が増えても探しやすい）。見出しはグリッド全幅に渡る。
-    const groups = [
-      ['実写の窓', (s) => s.render === 'photoWindow'],
-      ['立体の街と谷戸', (s) => s.render === 'town3d' && s.town3dKind !== 'corner'],
-      ['角部屋から', (s) => s.render === 'town3d' && s.town3dKind === 'corner'], // 角部屋も立体の街エンジンへ載せ替え済み
-
-      ['街と自然', () => true], // 残り全部（下町・雨・海・山・屋上・デモ）
-    ]
-    const placed = new Set()
-    for (const [name, test] of groups) {
-      const inGroup = pubScenes.filter((s) => !placed.has(s.id) && test(s))
-      if (!inGroup.length) continue
-      const hEl = h('h3', 'gallery__group', name)
-      gallery.appendChild(hEl)
-      const ids = []
-      for (const scene of inGroup) { placed.add(scene.id); makeCard(scene); ids.push(scene.id) }
-      headings.push({ el: hEl, ids })
+    // 場所一覧を描く（第一階層）。
+    function renderPlaces() {
+      level = 'places'; gallery.textContent = ''; cards = []
+      for (const p of placeList) {
+        const flag = p.scenes.find((s) => s.id === p.flagship) || p.scenes[0]
+        const card = cardEl(flag, p.label, `${p.desc}　・${p.scenes.length}つの眺め`)
+        card.addEventListener('click', () => { renderScenes(p); poke() })
+        gallery.appendChild(card)
+        cards.push({ id: 'place:' + p.key, card, season: '', sceneIds: p.scenes.map((s) => s.id) })
+      }
+      applyFilter(); markCurrent()
     }
-    // 季節フィルタの適用: 一致しないカードと、表示カードが無くなった見出しを隠す。
+    // ある場所の中（季節・天気・時間ちがい）を描く（第二階層）。
+    function renderScenes(p) {
+      level = 'scenes'; gallery.textContent = ''; cards = []
+      const back = h('button', 'gallery__back', `← ${p.label}をとじる`)
+      back.setAttribute('aria-label', '場所の一覧へ戻る')
+      back.addEventListener('click', () => { renderPlaces(); poke() })
+      gallery.appendChild(back)
+      for (const scene of p.scenes) {
+        const card = cardEl(scene, scene.label, scene.desc || '')
+        card.addEventListener('click', () => selectScene(scene))
+        gallery.appendChild(card)
+        cards.push({ id: scene.id, card, season: (scene.axes && scene.axes.season) || '' })
+      }
+      applyFilter(); markCurrent()
+    }
+    // 季節フィルタの適用（両階層共通）。場所カードは「その季節の眺めを持つ場所」だけ残す。
     function applyFilter() {
-      cards.forEach(({ card, season }) => {
-        card.style.display = activeSeason === 'all' || season === activeSeason ? '' : 'none'
-      })
-      headings.forEach(({ el: hEl, ids }) => {
-        const anyVisible = activeSeason === 'all' || ids.some((id) => {
-          const c = cards.find((cc) => cc.id === id)
-          return c && c.season === activeSeason
-        })
-        hEl.style.display = anyVisible ? '' : 'none'
+      cards.forEach((c) => {
+        let show = true
+        if (activeSeason !== 'all') {
+          if (c.sceneIds) show = c.sceneIds.some((id) => { const s = pubScenes.find((x) => x.id === id); return s && s.axes && s.axes.season === activeSeason })
+          else show = c.season === activeSeason
+        }
+        c.card.style.display = show ? '' : 'none'
       })
     }
 
     function markCurrent() {
-      cards.forEach(({ id, card }) => {
-        const on = id === currentScene.id
-        card.classList.toggle('scene-card--on', on)
-        card.setAttribute('aria-pressed', String(on)) // 選択中を支援技術へ（評価 a11y）
+      cards.forEach((c) => {
+        const on = c.sceneIds ? c.sceneIds.includes(currentScene.id) : c.id === currentScene.id // 場所カードは現在地の場所を淡く点灯
+        c.card.classList.toggle('scene-card--on', on)
+        c.card.setAttribute('aria-pressed', String(on)) // 選択中を支援技術へ（評価 a11y）
       })
     }
+    renderPlaces() // 初期表示は場所一覧
 
     function selectScene(scene) {
       if (scene && scene.id !== currentScene.id) {
@@ -573,12 +608,12 @@ export function buildUI(opts) {
     return {
       el,
       open() {
-        markCurrent()
+        renderPlaces() // 開くたび「場所一覧」から始める（前回途中の場所で閉じても迷子にならない）
         el.classList.add('panel--open')
         requestAnimationFrame(() => {
           close.focus({ preventScroll: true }) // 開いたらパネル内へフォーカス（スクロールはカードへ譲る）
-          // いま見ている情景のカードを画面内へ＝開いた瞬間に「自分の居場所」が分かる（長いギャラリーで現在地が画面外だった・評価UX）
-          const cur = cards.find(({ id }) => id === currentScene.id)
+          // いま見ている情景を含む「場所」のカードを画面内へ＝開いた瞬間に「自分の居場所」が分かる（評価UX）
+          const cur = cards.find((c) => (c.sceneIds ? c.sceneIds.includes(currentScene.id) : c.id === currentScene.id))
           if (cur && cur.card.scrollIntoView) cur.card.scrollIntoView({ block: 'center', behavior: 'auto' })
         })
       },

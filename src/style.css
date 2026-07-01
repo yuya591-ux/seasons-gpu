@@ -1165,6 +1165,27 @@ body.pre-start .stagedots {
 .gallery__group:first-child {
   margin-top: 0;
 }
+/* 場所の中から一覧へ戻る帯（グリッド全幅・確実に押せる高さ） */
+.gallery__back {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  margin: 0 0 0.1rem;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.gallery__back:hover,
+.gallery__back:focus-visible {
+  background: rgba(255, 255, 255, 0.11);
+}
 /* 通い帳（訪れた窓辺の静かな記録。達成でなく、気づいたら溜まっている記録） */
 .journal {
   overflow-y: auto;
