@@ -81,7 +81,7 @@ const FLY = {
   turnEase: 0.16,   // （旧）旋回入力のスムージング
   // 歩行（カメラ基準ポイント＆ゴー）: 倒した“画面の向き”へキビキビ向き直り、カメラは進行方向へ緩く後ろから追従。
   walkFace: 10,     // 進行方向へ向き直る速さ(1/s)。大きいほど即座にその向きへ歩き出す＝御しやすい
-  walkCamFollow: 1.8, // カメラが進む向きへ後ろから戻る速さ(1/s)。小さくゆっくり＝急旋回せず酔わない
+  walkCamFollow: 0.9, // カメラが進む向きへ後ろから戻る速さ(1/s)。前進中のみ・前倒し成分の二乗で効く（横移動では0＝視界が振り回されない。実機FB「左スティックで視点が思いっきり変わって酔う」）
   walkLookSens: 2.6, // 右ドラッグでカメラを回す感度（画面幅いっぱいのドラッグでこのrad＝360°近く向ける）
   // 飛べる箱（街を包む範囲）。これを越えない＝手描きの街の縁・未生成の余白を見せない。ランドマーク追加に合わせ広げた。
   // xMax=東の海まで飛び出せる（左右非対称。西は-x、東は海上の島・大橋を越えるxMaxまで）。
@@ -9116,7 +9116,10 @@ export async function mountTown3d(parent, opts = {}) {
           const moveWorld = cy + stickAng                         // カメラ基準を世界の進行方向へ
           let d = moveWorld - active.flyYaw; d = Math.atan2(Math.sin(d), Math.cos(d))
           active.flyYaw += d * Math.min(1, dt * FLY.walkFace)     // 倒した向きへキビキビ向き直る
-          if (!active.lookDragging) { let cd = active.flyYaw - cy; cd = Math.atan2(Math.sin(cd), Math.cos(cd)); active.walkCamYaw = cy + cd * Math.min(1, dt * FLY.walkCamFollow) } // カメラは進む向きへ緩く後ろから
+          // カメラは「前へ歩いている時だけ」ごく緩やかに背後へ整う。横・後ろ移動では回さない＝カメラを回す権利は右手だけ（一般的な3Dの作法）。
+          // 旧: 倒している間つねに1.8/sで進行方向へ追従＝左スティックを横に倒すと視界ごと約90°振り回され酔う（実機FB）。前倒し成分の二乗で横は完全に0。
+          const fwd = Math.max(0, Math.cos(stickAng))
+          if (!active.lookDragging && fwd > 0.01) { let cd = active.flyYaw - cy; cd = Math.atan2(Math.sin(cd), Math.cos(cd)); active.walkCamYaw = cy + cd * Math.min(1, dt * FLY.walkCamFollow * fwd * fwd * mvMag) }
         }
         active.flyPitch += (active.flyPitchTarget - active.flyPitch) * FLY.lookEase
         active.lookYawOff = 0
@@ -10165,10 +10168,12 @@ export async function mountTown3d(parent, opts = {}) {
   const aloftNow = () => active && (active.mode === 'fly' || active.mode === 'walk')
   const setStick = (dx, dy) => {
     let nx = dx / FLY.stickRadius, ny = -dy / FLY.stickRadius // 上方向(画面上)を前進(+)に
-    const m = Math.hypot(nx, ny); if (m > 1) { nx /= m; ny /= m }
-    const dead = FLY.stickDead
-    active.moveX = Math.abs(nx) < dead ? 0 : nx
-    active.moveY = Math.abs(ny) < dead ? 0 : ny
+    let m = Math.hypot(nx, ny); if (m > 1) { nx /= m; ny /= m; m = 1 }
+    // 半径方向の不感帯＝倒した向きを歪めず、しきい値からなめらかに立ち上がる（旧: 軸別の不感帯＝斜め入力で向きが飛ぶ・カクッと動き出す）
+    const g = m < FLY.stickDead ? 0 : (m - FLY.stickDead) / (1 - FLY.stickDead)
+    const s = m > 0 ? g / m : 0
+    active.moveX = nx * s
+    active.moveY = ny * s
     const kx = Math.max(-1, Math.min(1, dx / FLY.stickRadius)) * FLY.stickRadius
     const ky = Math.max(-1, Math.min(1, dy / FLY.stickRadius)) * FLY.stickRadius
     stickKnob.style.transform = `translate(${kx.toFixed(0)}px, ${ky.toFixed(0)}px)`
