@@ -93,6 +93,7 @@ const FLY = {
 // 乗り出し量(0..1)に応じた見上げ/見下ろしの可動範囲。乗り出すほど上も下も大きく振れる。
 // applyTown3dLook(スワイプ時)とframeループ(戻り時の追従)の両方で使い、範囲を一元管理する。
 const pitchLimits = (lean) => ({ up: 1.15 + lean * (CAM.leanPitchUp - 0.65), dn: 0.95 + lean * (CAM.leanPitchDn - 0.5) }) // 部屋の中でも天井(照明)・床まで見回せる。乗り出すと従来どおり空/足下へ
+const yawLimit = (lean) => 1.65 - lean * 0.35 // 見回しの横幅。部屋の中は±94°(側壁・家具が見える)。乗り出すと壁と窓枠に遮られ±74°(合計約150°)＝実FB「乗り出すと360°近く見えるのは不自然、壁があるので外側~180°のはず」
 
 // トゥーンの段階を作る勾配テクスチャ。陰影がはっきり出るセル（暗部まで落とし、形が読める手描き調）。
 // 浅い明るい段階だと拡散と同じ＝プラスチックに見えるため、影側をしっかり暗くし明確な帯にする。
@@ -126,7 +127,7 @@ export function applyTown3dLook(dx, dy) {
     return
   }
   const l = active.lean || 0
-  const yawMax = 1.65 + l * 0.2  // 部屋の中を左右に見渡せる（横を向くと側壁・家具が見える）。乗り出すとさらに広く
+  const yawMax = yawLimit(l)     // 部屋の中を左右に見渡せる。乗り出すと壁・窓枠に遮られて狭まる（旧: 乗り出すと広がる＝壁の遮蔽と逆で不自然だった）
   const lim = pitchLimits(l)     // 上（天井・照明）も下（床・街）も見られる
   // 目標値を動かし、frame loop でイージング追従（指を離しても余韻＝ヌルヌル）。感度UP。
   active.yawTarget = Math.max(-yawMax, Math.min(yawMax, active.yawTarget + dx * 2.4))
@@ -9070,6 +9071,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 乗り出しを戻すと見上げの可動域も縮むので、目標ピッチも追従して下げる（上を向いたまま固まらない）
     const plim = pitchLimits(lean)
     active.pitchTarget = Math.max(-plim.dn, Math.min(plim.up, active.pitchTarget))
+    // 乗り出すと横の見回し幅も壁・窓枠に遮られて縮む＝横を向いたまま乗り出しても目標が追従し、イージングでそっと正面へ戻る
+    const ylim = yawLimit(lean)
+    active.yawTarget = Math.max(-ylim, Math.min(ylim, active.yawTarget))
     // 見回しを目標へ滑らかに追従（イージング＝指を離しても余韻があるヌルヌルの見回し）
     active.yaw += (active.yawTarget - active.yaw) * 0.16
     active.pitch += (active.pitchTarget - active.pitch) * 0.16
