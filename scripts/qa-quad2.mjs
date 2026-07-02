@@ -1,27 +1,22 @@
+// 新しい動物ビルダー(猫/犬/馬)の隔離接写＝造形の確認（前3/4・真横）
 import { chromium } from 'playwright'
-import { writeFileSync } from 'fs'
-const PORT = process.env.PORT || 4896
+import fs from 'node:fs'
+const port = process.env.PORT || '4890'
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 640, height: 560 }, deviceScaleFactor: 2 })
-page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+const page = await browser.newPage({ viewport: { width: 440, height: 900 } })
+page.on('pageerror', (e) => console.log('PAGE EXCEPTION:', e.message))
+page.on('console', (m) => { if (m.type() === 'error') console.log('PAGE ERROR:', m.text()) })
+await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
-await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))
-await page.waitForTimeout(2600)
-await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(500)
-const n = await page.evaluate(() => window.__town3dQuadCount())
-console.log('quadCount', n)
-const idx = [0, 5, 12]
-for (let k = 0; k < idx.length; k++) {
-  const i = idx[k], bx = 200 + k * 6, by = 96, bz = 200
-  const info = await page.evaluate(({ i, bx, by, bz }) => {
-    window.__town3dQuadPin(i, bx, bz, by, Math.PI * 0.62)
-    const q = window.__town3dQuadDbg(i)
-    const dat = window.__town3dShotAt(bx + 1.5, by + 0.7, bz + 1.4, bx, by + 0.45, bz, 40)
-    return { q, dat }
-  }, { i, bx, by, bz })
-  console.log('idx', i, 'pos', JSON.stringify(info.q))
-  writeFileSync(`scripts/_shots/quad2_${k}.png`, Buffer.from(info.dat.split(',')[1], 'base64'))
-}
+await page.evaluate(() => window.__applyScene && window.__applyScene('kitaterao-window-3d'))
+await page.waitForTimeout(2000)
+const save = (du, name) => { if (!du) { console.log('SHOT失敗:', name); return } fs.writeFileSync(`scripts/_shots/quad2-${name}.png`, Buffer.from(du.split(',')[1], 'base64')) }
+save(await page.evaluate(() => window.__town3dQuadShot(0x8a7a5a, 0.55, 5.6, 'cat')), 'cat-front')
+save(await page.evaluate(() => window.__town3dQuadShot(0x5a5a5e, 0.55, 0.8, 'cat')), 'cat-side')
+save(await page.evaluate(() => window.__town3dQuadShot(0xc8c0b4, 0.6, 5.6, 'dog')), 'dog-front')
+save(await page.evaluate(() => window.__town3dQuadShot(0xc8c0b4, 0.6, 0.8, 'dog')), 'dog-side')
+save(await page.evaluate(() => window.__town3dQuadShot(0x5a4030, 1.1, 5.6, 'horse')), 'horse-front')
+save(await page.evaluate(() => window.__town3dQuadShot(0x5a4030, 1.1, 0.8, 'horse')), 'horse-side')
 await browser.close()
+console.log('quad2 done')

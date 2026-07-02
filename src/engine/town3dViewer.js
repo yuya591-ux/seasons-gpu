@@ -1169,22 +1169,86 @@ export async function mountTown3d(parent, opts = {}) {
   // ── 生きもの（街/時代/季節で最適化・水彩のやさしい色）──
   const mkButterfly = (cx, cy, cz, col) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.2, 7), new THREE.MeshToonMaterial({ color: col, gradientMap: grad, side: THREE.DoubleSide, transparent: true, opacity: 0.82, fog: true })); w.position.x = s * 0.1; w.userData.side = s; g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'fly', rad: 1.4 + R() * 2.2 }) } // 羽は陰影付き(toon)＋わずかに透過＝霧/夕の中で煌々と浮かない
   const mkDragonfly = (cx, cy, cz, bodyCol = 0x46665a) => { const g = new THREE.Group(); g.position.set(cx, cy, cz); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5), toon(bodyCol)); body.rotation.z = Math.PI / 2; g.add(body); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.1), new THREE.MeshBasicMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, fog: true })); w.position.set(0, 0.05, s * 0.16); g.add(w) } town.add(g); critters.push({ g, cx, cy, cz, ph: R() * 6.28, type: 'dart', rad: 2 + R() * 3 }) } // 羽は薄く小さく＝遠目に「浮いた四角」に見えない（実機FBの白箱対策）
-  // 四つ足の動物（犬/猫/馬）。body＋4脚＋頭。水彩トーン。frameで尾を振り・首を傾げ・たまに数歩あるく（佇む人形にしない）。
+  // 四つ足の動物（猫/犬/馬）。種ごとの専用造形＝「色違いの同一ブロック」を脱し、それぞれの生き物のシルエットに（セルルック・デフォルメ歓迎）。
+  // アニメ契約は従来どおり: userData.headG(rotation.y=見回し)/tailG(rotation.y=尾振り)/legs[](rotation.x=歩様・股支点)。
+  // パーツは頂点色ベイクで 胴1＋頭1＋脚4＋尾1＋接地影1 ＝8メッシュに統合（旧13より軽く、形は種別に）。
   const quads = []
-  const animalEyeMat = toon(0x14100c) // 動物の黒目（共有・描画コール節約のため1材を使い回す）
-  const mkQuad = (x, y, z, ry, col, sc) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
-    const tcol = toon(col), isHorse = sc >= 0.9 // 馬は鼻面と耳が長い
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27 * sc, 0.7 * sc, 4, 9), tcol); body.rotation.z = Math.PI / 2; body.position.y = 0.7 * sc; body.castShadow = true; g.add(body)
-    const headG = new THREE.Group(); headG.position.set(0.58 * sc, 0.96 * sc, 0); g.add(headG) // 首振りの支点
-    headG.add(new THREE.Mesh(new THREE.SphereGeometry(0.25 * sc, 9, 8), tcol)) // 頭
-    { const muz = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * sc, 0.145 * sc, (isHorse ? 0.34 : 0.22) * sc, 7), tcol); muz.rotation.z = Math.PI / 2; muz.position.set((isHorse ? 0.27 : 0.21) * sc, (isHorse ? -0.04 : -0.07) * sc, 0); headG.add(muz) } // 鼻面（前へ突き出す＝犬猫馬らしい横顔）
-    for (const es of [-1, 1]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08 * sc, (isHorse ? 0.22 : 0.17) * sc, 5), tcol); ear.position.set(-0.03 * sc, 0.25 * sc, es * 0.13 * sc); ear.rotation.x = es * -0.18; headG.add(ear) // 耳×2（立ち耳）
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.036 * sc, 6, 5), animalEyeMat); eye.position.set(0.18 * sc, 0.06 * sc, es * 0.11 * sc); headG.add(eye) } // 黒目×2＝近くで生気
-    const legs = []
-    for (const [lx, lz] of [[0.4, 0.2], [0.4, -0.2], [-0.4, 0.2], [-0.4, -0.2]]) { const legG = new THREE.Group(); legG.position.set(lx * sc, 0.7 * sc, lz * sc); g.add(legG); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.06 * sc, 0.7 * sc, 6), tcol); leg.position.y = -0.35 * sc; legG.add(leg); const paw = new THREE.Mesh(new THREE.SphereGeometry(0.075 * sc, 6, 5), tcol); paw.scale.set(1, 0.7, 1.25); paw.position.y = -0.7 * sc; legG.add(paw); legs.push(legG) } // 脚は股支点で振る＋足先（前へ伸びる肉球で接地感）
-    const tailG = new THREE.Group(); tailG.position.set(-0.55 * sc, 0.8 * sc, 0); g.add(tailG); const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.02 * sc, 0.5 * sc, 5), tcol); tail.position.y = -0.25 * sc; tail.rotation.z = 0.7; tailG.add(tail)
-    const sh = new THREE.Mesh(dynShadowGeo, contactShadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.04; sh.scale.set(1.3 * sc, 2.0 * sc, 1); sh.renderOrder = 1; g.add(sh) // 足元の接地影（俯瞰で浮かない）
-    g.userData = { headG, tailG, legs, sc, hx: x, hz: z, face: ry, ph: Math.random() * 6.28, moving: false, tx: x, tz: z, moveT: 2 + Math.random() * 6, speed: 0.5 + Math.random() * 0.4 }
+  const quadMat = toon(0xffffff); quadMat.vertexColors = true // 動物の共有トゥーン材（頂点色）
+  const mkQuad = (x, y, z, ry, col, sc, kind) => {
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry
+    kind = kind || (sc >= 0.9 ? 'horse' : 'cat') // 旧呼び出し互換（明示なしは大きさで馬/猫）
+    const s = sc
+    const dark = new THREE.Color(col).multiplyScalar(0.42).getHex() // 縞/たてがみ/蹄の濃色
+    const lite = new THREE.Color(col).lerp(new THREE.Color(0xfff2dc), 0.5).getHex() // 胸元/鼻面の淡色
+    const qM = new THREE.Matrix4(), qE = new THREE.Euler()
+    const part = (arr, geo, hex, px, py, pz, rx = 0, ryy = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
+      geo = geo.toNonIndexed(); geo.scale(sx, sy, sz)
+      qM.makeRotationFromEuler(qE.set(rx, ryy, rz)).setPosition(px, py, pz); geo.applyMatrix4(qM)
+      const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3)
+      for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b }
+      geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); arr.push(geo)
+    }
+    const merge = (arr, parent, cast) => { if (!BufferGeometryUtils.mergeGeometries) return null; const m = BufferGeometryUtils.mergeGeometries(arr, false); arr.forEach((ge) => ge.dispose()); if (!m) return null; const mesh = new THREE.Mesh(m, quadMat); mesh.castShadow = !!cast; parent.add(mesh); return mesh }
+    const headG = new THREE.Group(), tailG = new THREE.Group(), legs = []
+    const mkLeg = (lx, ly, lz, r0, r1, len, hoofHex, hoofH) => { // 股支点グループ＋(脚＋足先)1メッシュ
+      const lp = new THREE.Group(); lp.position.set(lx, ly, lz); g.add(lp)
+      const arr = []
+      part(arr, new THREE.CylinderGeometry(r0, r1, len, 6), col, 0, -len / 2, 0)
+      if (hoofHex !== undefined) part(arr, new THREE.CylinderGeometry(r1 * 1.2, r1 * 1.28, hoofH, 6), hoofHex, 0, -len - hoofH / 2 + 0.01, 0) // 蹄
+      else part(arr, new THREE.SphereGeometry(r1 * 1.18, 6, 5), col, 0, -len + r1 * 0.2, r1 * 0.45, 0, 0, 0, 1, 0.72, 1.25) // 肉球の足先（前へ・皿状に広げない）
+      merge(arr, lp); legs.push(lp)
+    }
+    const bodyG = [], headP = [], tailP = []
+    if (kind === 'cat') { // 猫＝丸い頭・短い脚・上へ曲がる尾・背の縞（winCatの意匠を歩く体へ）
+      part(bodyG, new THREE.CapsuleGeometry(0.20 * s, 0.46 * s, 4, 10), col, 0, 0.44 * s, 0, 0, 0, Math.PI / 2)
+      part(bodyG, new THREE.SphereGeometry(0.175 * s, 8, 7), lite, 0.22 * s, 0.40 * s, 0, 0, 0, 0, 0.9, 0.85, 0.9) // 胸元の淡い毛
+      headG.position.set(0.40 * s, 0.60 * s, 0)
+      part(headP, new THREE.SphereGeometry(0.20 * s, 10, 8), col, 0.04 * s, 0.02 * s, 0, 0, 0, 0, 0.95, 0.88, 0.92) // 丸い頭
+      part(headP, new THREE.SphereGeometry(0.095 * s, 7, 6), lite, 0.17 * s, -0.05 * s, 0, 0, 0, 0, 0.9, 0.68, 0.95) // マズル
+      part(headP, new THREE.SphereGeometry(0.024 * s, 5, 4), 0xc97878, 0.245 * s, -0.025 * s, 0) // 桃色の鼻
+      for (const es of [-1, 1]) {
+        part(headP, new THREE.ConeGeometry(0.075 * s, 0.15 * s, 4), col, -0.02 * s, 0.185 * s, es * 0.10 * s, es * -0.16, 0, 0)
+        part(headP, new THREE.ConeGeometry(0.038 * s, 0.08 * s, 4), 0xd8a4a0, -0.005 * s, 0.175 * s, es * 0.10 * s, es * -0.16, 0, 0) // 内耳
+        part(headP, new THREE.SphereGeometry(0.030 * s, 6, 5), 0x1c1612, 0.155 * s, 0.045 * s, es * 0.085 * s) // 目
+      }
+      tailG.position.set(-0.42 * s, 0.52 * s, 0)
+      part(tailP, new THREE.TorusGeometry(0.155 * s, 0.026 * s, 5, 10, 2.4), col, -0.024 * s, 0.153 * s, 0, 0, 0, -Math.PI * 0.45) // 上へ曲がる尾（弧の始点を付け根に接地＝浮いた輪にしない）
+      for (const [lx, lz] of [[0.20, 0.10], [0.20, -0.10], [-0.20, 0.10], [-0.20, -0.10]]) mkLeg(lx * s, 0.42 * s, lz * s, 0.046 * s, 0.036 * s, 0.40 * s)
+    } else if (kind === 'dog') { // 犬＝立ち耳・突き出た鼻面・背に巻く尾（柴のシルエット）
+      part(bodyG, new THREE.CapsuleGeometry(0.21 * s, 0.50 * s, 4, 10), col, 0, 0.50 * s, 0, 0, 0, Math.PI / 2)
+      part(bodyG, new THREE.SphereGeometry(0.185 * s, 8, 7), lite, 0.24 * s, 0.44 * s, 0, 0, 0, 0, 0.9, 0.9, 0.92) // 胸元
+      headG.position.set(0.42 * s, 0.66 * s, 0)
+      part(headP, new THREE.SphereGeometry(0.20 * s, 10, 8), col, 0.02 * s, 0.02 * s, 0, 0, 0, 0, 1, 0.92, 0.92)
+      part(headP, new THREE.CylinderGeometry(0.075 * s, 0.098 * s, 0.20 * s, 7), lite, 0.21 * s, -0.045 * s, 0, 0, 0, Math.PI / 2) // 鼻面
+      part(headP, new THREE.SphereGeometry(0.036 * s, 6, 5), 0x241c16, 0.315 * s, -0.03 * s, 0) // 黒い鼻先
+      for (const es of [-1, 1]) {
+        part(headP, new THREE.ConeGeometry(0.08 * s, 0.17 * s, 4), col, -0.015 * s, 0.20 * s, es * 0.105 * s, es * -0.14, 0, -0.1)
+        part(headP, new THREE.SphereGeometry(0.032 * s, 6, 5), 0x1c1612, 0.16 * s, 0.05 * s, es * 0.09 * s) // 目
+      }
+      tailG.position.set(-0.40 * s, 0.66 * s, 0)
+      part(tailP, new THREE.TorusGeometry(0.10 * s, 0.032 * s, 5, 10, 4.4), col, -0.036 * s, 0.093 * s, 0, 0, 0, -1.2) // 背に巻く尾（弧の始点を付け根に接地＝柴の巻き尾）
+      for (const [lx, lz] of [[0.22, 0.11], [0.22, -0.11], [-0.22, 0.11], [-0.22, -0.11]]) mkLeg(lx * s, 0.48 * s, lz * s, 0.052 * s, 0.040 * s, 0.46 * s)
+    } else { // 馬＝長い脚・起き上がる首・面長の頭・たてがみ・垂れる尾＋蹄
+      part(bodyG, new THREE.CapsuleGeometry(0.30 * s, 0.72 * s, 4, 10), col, 0, 1.05 * s, 0, 0, 0, Math.PI / 2)
+      part(bodyG, new THREE.CylinderGeometry(0.115 * s, 0.165 * s, 0.55 * s, 8), col, 0.45 * s, 1.30 * s, 0, 0, 0, -0.72) // 首（前上がり）
+      part(bodyG, new THREE.BoxGeometry(0.34 * s, 0.55 * s, 0.055 * s), dark, 0.335 * s, 1.38 * s, 0, 0, 0, -0.72, 0.16, 1, 1) // たてがみ（首の背）
+      headG.position.set(0.62 * s, 1.55 * s, 0)
+      part(headP, new THREE.SphereGeometry(0.135 * s, 9, 7), col, 0, 0.01 * s, 0, 0, 0, 0, 1, 0.95, 0.9) // 額
+      part(headP, new THREE.CylinderGeometry(0.128 * s, 0.082 * s, 0.40 * s, 8), col, 0.17 * s, -0.065 * s, 0, 0, 0, Math.PI / 2 - 0.35) // 面長の頭（先細り・やや下向き）
+      part(headP, new THREE.CylinderGeometry(0.085 * s, 0.088 * s, 0.09 * s, 8), lite, 0.335 * s, -0.125 * s, 0, 0, 0, Math.PI / 2 - 0.35) // 鼻先の淡色
+      part(headP, new THREE.BoxGeometry(0.10 * s, 0.14 * s, 0.05 * s), dark, -0.045 * s, 0.115 * s, 0, 0, 0, -0.5) // 前髪
+      for (const es of [-1, 1]) {
+        part(headP, new THREE.ConeGeometry(0.05 * s, 0.14 * s, 4), col, -0.05 * s, 0.16 * s, es * 0.07 * s, es * -0.12, 0, 0)
+        part(headP, new THREE.SphereGeometry(0.034 * s, 6, 5), 0x1c1612, 0.075 * s, 0.03 * s, es * 0.105 * s) // 目（側頭）
+      }
+      tailG.position.set(-0.48 * s, 1.18 * s, 0)
+      part(tailP, new THREE.CylinderGeometry(0.055 * s, 0.018 * s, 0.62 * s, 6), dark, -0.09 * s, -0.28 * s, 0, 0, 0, 0.32) // 垂れる尾
+      for (const [lx, lz] of [[0.30, 0.14], [0.30, -0.14], [-0.30, 0.14], [-0.30, -0.14]]) mkLeg(lx * s, 0.95 * s, lz * s, 0.075 * s, 0.050 * s, 0.88 * s, 0x2a2119, 0.07 * s)
+    }
+    merge(bodyG, g, true); g.add(headG); merge(headP, headG, true); g.add(tailG); merge(tailP, tailG)
+    const sh = new THREE.Mesh(dynShadowGeo, contactShadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.04
+    sh.scale.set((kind === 'horse' ? 1.6 : 1.2) * s, (kind === 'horse' ? 2.6 : 1.8) * s, 1); sh.renderOrder = 1; g.add(sh) // 足元の接地影
+    g.userData = { headG, tailG, legs, sc, kind, hx: x, hz: z, face: ry, ph: Math.random() * 6.28, moving: false, tx: x, tz: z, moveT: 2 + Math.random() * 6, speed: (kind === 'horse' ? 0.8 : 0.5) + Math.random() * 0.4 }
     town.add(g); quads.push(g); return g }
   // 屋台/床店（市の賑わい＝着地の散歩で出会う活気）。柱＋差し掛け屋根＋商品台＋籠＋色とりどりの品＋暖簾。
   const makeStall = (x, gy, z, rot, opts = {}) => {
@@ -3752,7 +3816,7 @@ export async function mountTown3d(parent, opts = {}) {
         { const edoGoods = [0xc8702e, 0x7a8a3a, 0xb04030, 0xd0a850, 0x9a5a3a, 0x5a7a8a]
           for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28 + 0.3, r2 = 27 + R() * 15, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
             makeStall(px, py, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, { roof: R() < 0.5 ? 'reed' : 'cloth', roofCol: R() < 0.5 ? 0xb84a3e : 0x4a5a6a, goods: edoGoods, noren: R() < 0.5 ? 0x2a4a6a : 0x8a3a2a }) }
-          for (let k = 0; k < 3; k++) { const a = R() * 6.28, r2 = 25 + R() * 16, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xc8b89a : 0x4a4038, 0.6 + R() * 0.12) } }
+          for (let k = 0; k < 3; k++) { const a = R() * 6.28, r2 = 25 + R() * 16, px = ex + Math.cos(a) * r2, pz = ez + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xc8b89a : 0x4a4038, 0.6 + R() * 0.12, k === 0 ? 'dog' : 'cat') } }
         const addPine = (px, py, pz) => { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2.0, 6), toon(0x6a4f38)); tr.position.set(px, py + 1.0, pz); town.add(tr); const fc = toon(season === 'autumn' ? 0x8a7a40 : 0x4e6e44); for (const [cy, cr, ch] of [[2.3, 1.7, 1.8], [3.3, 1.25, 1.55], [4.2, 0.82, 1.35]]) { const fo = new THREE.Mesh(new THREE.ConeGeometry(cr, ch, 8), fc); fo.position.set(px, py + cy, pz); fo.castShadow = true; town.add(fo) } } // 松/杉＝段重ねの円錐（層のある常緑樹）
         // 城下に木立を散らす（家々の合間・辻・空き地を緑で埋める＝home並みの緑量へ）。統合で軽量（1本ごとのドローコールを増やさない）。
         { const leafC = season === 'spring' ? 0x7faa4e : season === 'autumn' ? 0xcf8a38 : season === 'winter' ? 0xcdd6cc : 0x5a7e44
@@ -4062,7 +4126,7 @@ export async function mountTown3d(parent, opts = {}) {
           // 城下の犬猫（街道をうろつく）
           for (let k = 0; k < 3; k++) { const zz = sz + 24 - k * 8 - R() * 4, cl = senValley(zz), px = sx + cl + (R() < 0.5 ? 6 : -6) + (R() - 0.5) * 2, gh = senH(px, zz)
             if (gh < SEA.level + 1.4 || !senInland(px, zz, 1.4)) continue
-            mkQuad(px, gh, zz, R() * 6.28, k === 0 ? 0xc8b89a : 0x6a5a48, 0.62 + R() * 0.12) }
+            mkQuad(px, gh, zz, R() * 6.28, k === 0 ? 0xc8b89a : 0x6a5a48, 0.62 + R() * 0.12, k === 0 ? 'dog' : 'cat') }
           // 店先の積み荷（俵/樽）
           for (let s = 7; s < 38; s += 8) { const zz = sz + 30 - s * 2.1, cl = senValley(zz), side = (s % 16 < 8) ? 1 : -1, px = sx + cl + side * 7.6, gh = senH(px, zz)
             if (gh < SEA.level + 1.4 || gh > 13 || !senInland(px, zz, 1.4)) continue
@@ -4429,7 +4493,7 @@ export async function mountTown3d(parent, opts = {}) {
           { const taiGoods = [0xc85038, 0x6a8a9a, 0xd0a040, 0x9a5a3a, 0xb87050, 0x7a8a4a]
             for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.28 + 0.5, r2 = 16 + R() * 22, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue
               makeStall(px, py, pz, a + Math.PI / 2 + (R() - 0.5) * 0.4, { roof: 'cloth', roofCol: [0xc23a4a, 0x3a7a6a, 0xd0a040][(R() * 3) | 0], goods: taiGoods, noren: 0xd8d0c0 }) }
-            for (let k = 0; k < 2; k++) { const a = R() * 6.28, r2 = 14 + R() * 20, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xddd6c8 : 0x5a5a5e, 0.58 + R() * 0.12) } }
+            for (let k = 0; k < 2; k++) { const a = R() * 6.28, r2 = 14 + R() * 20, px = tx + Math.cos(a) * r2, pz = tz + Math.sin(a) * r2, py = heightAt(px, pz); if (py < SEA.level + 1.5) continue; mkQuad(px, py, pz, R() * 6.28, k === 0 ? 0xddd6c8 : 0x5a5a5e, 0.58 + R() * 0.12, k === 0 ? 'cat' : 'dog') } }
           // ── ガス灯（大正ロマンの象徴）＋丸ポスト＝降り立った港町の近景。夕夜は暖かく灯る。 ──
           { const gc = document.createElement('canvas'); gc.width = gc.height = 32; const gcx = gc.getContext('2d'); const gg = gcx.createRadialGradient(16, 16, 1, 16, 16, 16); gg.addColorStop(0, 'rgba(255,207,138,0.95)'); gg.addColorStop(1, 'rgba(255,200,120,0)'); gcx.fillStyle = gg; gcx.fillRect(0, 0, 32, 32); const gtex = new THREE.CanvasTexture(gc)
             const ironMat = toon(0x3a3a40), glassLit = new THREE.MeshBasicMaterial({ color: 0xffd089, fog: true }), glassDk = toon(0x46484e)
@@ -4522,8 +4586,8 @@ export async function mountTown3d(parent, opts = {}) {
           if (flyOK && !isNight) for (let k = 0; k < 5; k++) { const a = R() * 6.28, r = 14 + R() * 34, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkButterfly(px, py + 1.4 + R() * 2.0, pz, flyCols[k % flyCols.length]) } // 蝶（春夏の昼・目線寄りに低く）
           // 蜻蛉（夏=水辺の青緑／秋=野山を群れる赤とんぼ）。秋は戦国の棚田の上にも舞い、現代は数を増やす＝降り立つと出会える。
           if (dartOK && (kind !== 'sengoku' || season === 'autumn')) { const dN = season === 'autumn' ? (kind === 'home' ? 7 : 4) : 3; for (let k = 0; k < dN; k++) { const a = R() * 6.28, r = 14 + R() * 24, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1) continue; mkDragonfly(px, py + 1.4 + R() * 0.8, pz, dartCol) } }
-          const animals = kind === 'sengoku' ? [[0x5a4030, 1.1]] : kind === 'edo' ? [[0x5a4030, 1.1], [0xc8c0b4, 0.55], [0x6a6258, 0.5]] : kind === 'taisho' ? [[0xc8c0b4, 0.55], [0x4a4038, 0.5], [0xddd6c8, 0.55]] : [[0xc8c0b4, 0.55], [0x5a5a5e, 0.5], [0x8a7a5a, 0.55]] // 戦国=馬/江戸=馬犬猫/大正=犬猫/現代=犬猫
-          for (const [col, sc] of animals) { const a = R() * 6.28, r = 12 + R() * 26, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; mkQuad(px, py, pz, R() * 6.28, col, sc) }
+          const animals = kind === 'sengoku' ? [[0x5a4030, 1.1, 'horse']] : kind === 'edo' ? [[0x5a4030, 1.1, 'horse'], [0xc8c0b4, 0.55, 'dog'], [0x6a6258, 0.5, 'cat']] : kind === 'taisho' ? [[0xc8c0b4, 0.55, 'dog'], [0x4a4038, 0.5, 'cat'], [0xddd6c8, 0.55, 'cat']] : [[0xc8c0b4, 0.55, 'dog'], [0x5a5a5e, 0.5, 'cat'], [0x8a7a5a, 0.55, 'cat']] // 戦国=馬/江戸=馬犬猫/大正=犬猫/現代=犬猫
+          for (const [col, sc, qk] of animals) { const a = R() * 6.28, r = 12 + R() * 26, px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r, py = heightAt(px, pz); if (py < SEA.level + 1.2) continue; mkQuad(px, py, pz, R() * 6.28, col, sc, qk) }
         }
       }
       // ── 行き先の気配（飛び立つと方角がそれとなく分かる導線）。東=城下町への澪標／北=山城への鳥居の海路 ──
@@ -9901,13 +9965,14 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dQuadPin = (i, x, z, y, face = 0) => { const q = quads[i]; if (!q) return; const u = q.userData; u.moving = false; u.moveT = 1e9; u.hx = x; u.hz = z; q.position.set(x, y !== undefined ? y : heightAt(x, z), z); q.rotation.y = face } // 検証用: 犬猫を座標(任意y)に固定（shotAtで接写）
     window.__town3dQuadCount = () => quads.length
     window.__town3dQuadDbg = (i) => { const q = quads[i]; if (!q) return null; return { x: q.position.x, y: q.position.y, z: q.position.z, vis: q.visible, sc: q.userData.sc } } // 検証用: 犬猫の現在位置/可視/スケール
-    window.__town3dQuadShot = (col = 0x8a7a5a, sc = 0.7, yaw = 2.0) => { // 検証用: 犬猫馬を原点に1頭だけ作り、隔離シーンで正確に接写（造形の確認）
-      const g = mkQuad(0, 0, 0, yaw, col, sc); town.remove(g); const qi = quads.indexOf(g); if (qi >= 0) quads.splice(qi, 1)
+    window.__town3dQuadShot = (col = 0x8a7a5a, sc = 0.7, yaw = 2.0, kind) => { // 検証用: 犬猫馬を原点に1頭だけ作り、隔離シーンで正確に接写（造形の確認）
+      const g = mkQuad(0, 0, 0, yaw, col, sc, kind); town.remove(g); const qi = quads.indexOf(g); if (qi >= 0) quads.splice(qi, 1)
       const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
       const dl = new THREE.DirectionalLight(0xffffff, 0.9); dl.position.set(0.4, 1, 1.2); s.add(dl)
       const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.3); dl2.position.set(-0.7, 0.4, 0.6); s.add(dl2); s.add(g)
-      const W = 520, H = 460, cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 30), r = 2.5 * sc
-      cam.position.set(r, 0.85 * sc, r); cam.lookAt(0, 0.5 * sc, 0)
+      const horse = (kind || (sc >= 0.9 ? 'horse' : '')) === 'horse'
+      const W = 520, H = 460, cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 30), r = (horse ? 3.4 : 2.5) * sc
+      cam.position.set(r, (horse ? 1.5 : 0.85) * sc, r); cam.lookAt(0, (horse ? 0.95 : 0.5) * sc, 0)
       const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
       renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
