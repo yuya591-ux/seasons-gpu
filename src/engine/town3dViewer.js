@@ -8557,7 +8557,11 @@ export async function mountTown3d(parent, opts = {}) {
     // 時代エリアの距離カリング：群の「最も近い縁(中心距離−半径)」が霧(fog.far)の外に出たら非表示にする。
     // 固定330で切ると、大きな島(半径〜240)の中心が330でも近縁は90u＝霧の手前で鮮明なまま現れ「ポップ」した（評価エモ指摘）。
     // fog.far基準にすると、縁が霧で完全に溶けた所で切替＝見た目の瞬断が消え、近づくと霞からゆっくり立ち現れる（現代home建物と同じ方式）。
-    for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz) - e.r; const ff = scene.fog.far; const want = d < (e.vis ? ff + 30 : ff); if (want !== e.vis) { e.vis = want; e.grp.visible = want } }
+    for (const e of eraCull) { const d = Math.hypot(active.flyPos.x - e.cx, active.flyPos.z - e.cz) - e.r; const ff = scene.fog.far; const want = d < (e.vis ? ff + 30 : ff); if (want !== e.vis) { e.vis = want; e.grp.visible = want
+      // 非表示の間は部分木ごと行列走査もスキップ（matrixWorldAutoUpdate=false）＝遠い時代の数千ノードの毎フレーム更新という発熱の純損失を削る。再表示時に一度だけ焼き直す
+      e.grp.matrixWorldAutoUpdate = want
+      if (want) e.grp.updateMatrixWorld(true)
+    } }
     // 遠景ランドマークの誘い: 飛行中、遠いほど淡く灯り近づくと消える光の標＝渡りの目印（窓辺/着地では消す）。
     if (beacons.length) { const fa = active.flyP || 0, fp = active.flyPos
       for (const b of beacons) { const d = Math.hypot(fp.x - b.x, fp.z - b.z)
@@ -9619,7 +9623,8 @@ export async function mountTown3d(parent, opts = {}) {
     const roomAmtF = Math.max(0, 1 - lean)
     // 室内は不透明（街を遮蔽してfill節約・カクつき対策）。乗り出すとカメラが窓の開口を抜けて前へ出る＝室内は背後へ退く。
     // lean>0.16で非表示＝カメラがベランダの手すり/窓枠へ達する前に室内ごと消す（貫通して見えるのを防ぐ）。空/地上でも非表示。
-    winRoom.visible = flyAmt < 0.6 && lean < 0.16
+    const wrVis = flyAmt < 0.6 && lean < 0.16
+    if (winRoom.visible !== wrVis) { winRoom.visible = wrVis; winRoom.matrixWorldAutoUpdate = wrVis; if (wrVis) winRoom.updateMatrixWorld(true) } // 飛行で隠れている間は室内(200+ノード)の行列走査ごとスキップ＝発熱削減。窓辺へ戻ったら一度だけ焼き直す
     // 帰還の儀式「ただいま」: 旅から窓辺へ戻りきった瞬間、澄んだ鈴がひとつ満ち、眠っていた猫が顔を上げてこちらを見る＝
     // 出発点でしかなかった窓が「帰る家」になる（エモ最重要: 帰る場所が無く旅が一周しない）。直前の季節/時刻はドリフトが継続＝引き継がれる。
     if (active.justReturned && flyAmt < 0.18) { active.justReturned = false; onChime()
