@@ -5436,17 +5436,21 @@ export async function mountTown3d(parent, opts = {}) {
       const pg = new THREE.IcosahedronGeometry(s, 2); pg.scale(1, 0.58, 1); pg.translate((R() - 0.5) * 24, up * 7, (R() - 0.5) * 11) // 分割を上げて積雲を丸く
       puffGeos.push(cloudCol(pg, (up < 0.25 ? cloudBot : topMat).color.getHex())) // 色を頂点色で焼く（雲底=翳り/雲頂=地域色）
     }
-    if (puffGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(puffGeos, false); if (m) g.add(new THREE.Mesh(m, cloudVC)); puffGeos.forEach((x) => x.dispose()) } // 群内のパフを1メッシュへ統合
+    if (puffGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(puffGeos, false); if (m) { const fm = cloudVC.clone(); g.add(new THREE.Mesh(m, fm)); g.userData.fadeMat = fm } puffGeos.forEach((x) => x.dispose()) } // 群内のパフを1メッシュへ統合。材は群ごとに複製＝カメラ近接フェードを群単位でかける
     g.position.set(cx, 66 + R() * 34, cz) // 積雲の基準高度を上げる(旧54→66)＝巡航帯(y30-60)の上に浮かせ「雲が地面/稜線に近く空が低い」を解消（低空滑空・歩行の空の抜けが一段広がる）。66-100で雲海(88)前後・巻雲(98+)の下に層をなす
+    g.userData.x0 = cx - 150; g.userData.x1 = cx + 150 // 漂流の折返しは生まれた空の窓内。全雲一律(x>130→-130)だと江戸(x≈640)等の雲が初回フレームでhomeの空へ瞬間移動し吹き溜まる
+    g.userData.fadeR0 = 20; g.userData.fadeR1 = 40; g.userData.fadeW = 1.8 // 近接フェードの半径（縦はfadeW倍で扁平）＝迫った雲は溶けて視界を塗りつぶさない
     scene.add(g); clouds.push(g)
   }
   // 巻雲（cirrus）＝高い空の薄い刷毛のような筋雲（晴天/夕。雨雪では出さない）。平たく細長く淡い＝空に高さと多様さ。
   if (!SNOWY && weather !== 'rain') {
     const ciN = LIGHT ? 6 : 11, ciMat = mkCloud(isNight ? 0x8088a0 : 0xf4f1ea)
     for (let i = 0; i < ciN; i++) {
-      const g = new THREE.Group(), n = 4 + ((R() * 4) | 0)
-      for (let j = 0; j < n; j++) { const s = 5 + R() * 9, wisp = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), ciMat); wisp.position.set((R() - 0.5) * 40, 0, (R() - 0.5) * 6); wisp.scale.set(1.7, 0.16, 0.5); g.add(wisp) }
-      g.position.set((R() - 0.5) * 920, 98 + R() * 20, -120 - R() * 340); g.rotation.y = R() * 3; scene.add(g); clouds.push(g)
+      const g = new THREE.Group(), n = 4 + ((R() * 4) | 0), fm = ciMat.clone() // 材は群ごとに複製＝カメラ近接フェード用
+      for (let j = 0; j < n; j++) { const s = 5 + R() * 9, wisp = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), fm); wisp.position.set((R() - 0.5) * 40, 0, (R() - 0.5) * 6); wisp.scale.set(1.7, 0.16, 0.5); g.add(wisp) }
+      const ciX = (R() - 0.5) * 920 // R()の消費順はposition.setの引数評価順(x→y→z)と同一＝配置は不変
+      g.position.set(ciX, 98 + R() * 20, -120 - R() * 340); g.rotation.y = R() * 3; scene.add(g); clouds.push(g)
+      g.userData = { fadeMat: fm, x0: ciX - 170, x1: ciX + 170, fadeR0: 26, fadeR1: 52, fadeW: 3 } // 巻雲は薄く横長＝縦の重みを強く
     }
   }
 
@@ -9318,20 +9322,32 @@ export async function mountTown3d(parent, opts = {}) {
       // 高速時の速度感＝画面の縁がそっと締まるヴィネット（飛行のみ・変化時だけ書き換え）
       const vig = (isWalk ? 0 : Math.min(1, speedMag / FLY.speed)) * flyAmt
       if (Math.abs(vig - speedVigCur) > 0.02) { speedVigCur = vig; speedVig.style.opacity = (vig * 0.5).toFixed(2) }
-      // 雲を抜けると白くかすむ＝いちばん近い雲の中心までの距離で白みを出す（飛行のみ）
-      let nearC = 1e9
-      if (!isWalk) for (const c of clouds) { const dx = c.position.x - active.flyPos.x, dy = c.position.y - active.flyPos.y, dz = c.position.z - active.flyPos.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < nearC) nearC = d2 }
-      // 積雲の芯のごく近くは淡く霞む（巡航の開放感を優先＝弱め）。
-      const cumHaze = Math.max(0, 1 - Math.sqrt(nearC) / 5.0)
+      // 雲の近接フェード＝迫った積雲/巻雲を群ごとに透明へ溶かし、不透明メッシュが視界を塗りつぶすのを根絶（実機FB「飛行中に目の前が真っ白」）。
+      // 雲はfog:false＝近接フォグ(構図ガード)が効かない盲点。材のopacityを距離で落とし、遠のけば不透明へ戻す。白ベール(cumHaze)はフェード進行に連動＝「霧として抜ける」体感。
+      let cumHaze = 0
+      const cloudFadeOn = !isWalk && flyAmt > 0.3
+      for (const c of clouds) {
+        const u = c.userData, fm = u.fadeMat
+        if (!fm) continue
+        let f = 1
+        if (cloudFadeOn) {
+          const dx = c.position.x - active.flyPos.x, dy = (c.position.y - active.flyPos.y) * u.fadeW, dz = c.position.z - active.flyPos.z
+          f = Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dy * dy + dz * dz) - u.fadeR0) / (u.fadeR1 - u.fadeR0)))
+        }
+        if (f < 1) { fm.transparent = true; fm.opacity = f; c.visible = f > 0.02; if (1 - f > cumHaze) cumHaze = 1 - f }
+        else if (fm.transparent) { fm.transparent = false; fm.opacity = 1; c.visible = true }
+      }
       // 雲海・入道雲を突き抜けるときだけ白く包まれる手応え（高所限定＝街の一望は損なわない）。
       let seaCross = 0, towerHaze = 0
       if (cloudSea) { const dY = Math.abs(active.flyPos.y - (SEA_Y + 2)); seaCross = Math.max(0, 1 - dY / 13) } // 雲海のデッキを突き抜ける高さ(SEA_Y+2≈90)で最も白く包まれ、島の高さ(≈108-110)では晴れる＝群島が白霞に呑まれず見えるように（旧: ピーク102で島の高さが真っ白だった）
       for (const tc of towerCenters) { const dh = Math.hypot(tc.x - active.flyPos.x, tc.z - active.flyPos.z); if (dh < 18 && active.flyPos.y > SEA_Y - 16 && active.flyPos.y < tc.yTop + 4) towerHaze = Math.max(towerHaze, 1 - dh / 18) }
-      const hazeOp = isWalk ? 0 : Math.min(0.6, Math.max(cumHaze * 0.14, seaCross * 0.34, towerHaze * 0.55)) * flyAmt // 雲海の白包みを 0.5→0.34 へ控えめに＝突き抜けの手応えは残しつつ群島が見える（評価: 雲海が白に呑まれて見えない）
+      const hazeOp = isWalk ? 0 : Math.min(0.6, Math.max(cumHaze * 0.22, seaCross * 0.34, towerHaze * 0.55)) * flyAmt // 雲海の白包みを 0.5→0.34 へ控えめに＝突き抜けの手応えは残しつつ群島が見える（評価: 雲海が白に呑まれて見えない）。cumHazeは近接フェード連動で0.22=溶けた雲の中は淡い霧
       if (Math.abs(hazeOp - cloudHazeCur) > 0.02) { cloudHazeCur = hazeOp; cloudHaze.style.opacity = hazeOp.toFixed(2) }
       // 雲海の出現＝高く昇るほど淡く現れ、突き抜けると街が雲の下に消える別世界（窓辺・巡航では opacity0 で開けた空）。
       if (cloudSea) {
-        const seaOp = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 70) / 22)) * flyAmt // y70で現れy92で満ちる（巡航では消えている）
+        // デッキと目線が揃う帯(SEA_Y+2±12)では雲海を薄める＝うねる面が視界全部を特徴のない白壁で塗りつぶす白飛びを防ぐ（実機FB「目の前が真っ白」の主犯）。帯を出れば元の濃さ＝上空の別世界・島の眺めは不変
+        const bandThin = 0.3 + 0.7 * Math.min(1, Math.abs(active.flyPos.y - (SEA_Y + 2)) / 12)
+        const seaOp = isWalk ? 0 : Math.max(0, Math.min(1, (active.flyPos.y - 70) / 22)) * flyAmt * bandThin // y70で現れy92で満ちる（巡航では消えている）
         cloudSea.visible = seaOp > 0.02
         if (cloudSea.visible) { for (const m of seaMats) m.opacity = seaOp; if (seaUni) seaUni.uTime.value = t } // 雲海が見えている間だけ、うねりの時刻を進める
 
@@ -9707,7 +9723,7 @@ export async function mountTown3d(parent, opts = {}) {
     }
 
     // 雲がゆっくり流れる
-    for (const c of clouds) { c.position.x += 0.01; if (c.position.x > 130) c.position.x = -130 }
+    for (const c of clouds) { const u = c.userData; c.position.x += 0.01; if (c.position.x > (u.x1 ?? 130)) c.position.x = u.x0 ?? -130 } // 折返しは各雲が生まれた空の窓内（一律±130だと遠方エリアの雲がhomeへ瞬間移動して吹き溜まる）
     // 雲海をゆっくり漂うもの（雲海のぬし＝鯨／空の灯籠／渡りの群れ／雲の滝）。
     // 低空（窓辺・街の巡航）では雲海の世界は霧で見えない＝隠して更新も止める＝発熱低減（見た目は不変）。
     const cloudHi = (active.flyP || 0) > 0.4 && active.flyPos.y > 52
@@ -9959,7 +9975,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dCruise = (b) => setTown3dCruise(!!b) // 検証用: とまる(false)/すすむ(true)
     window.__town3dLowCruise = (b) => { if (active) { active.lowCruise = !!b; if (b) active.cruise = true } } // 検証用: 低空滑空(自転車)モード
     window.__town3dZoom = (v) => { if (active) { active.zoomTarget = Math.max(0.4, Math.min(3.0, v || 1)); active.zoom = active.zoomTarget } } // 検証用: ズーム(0.4寄り〜3.0引き)
-    window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1)]) // 検証用: 雲の位置一覧
+    window.__town3dClouds = () => clouds.map((c) => [+c.position.x.toFixed(1), +c.position.y.toFixed(1), +c.position.z.toFixed(1), c.userData.fadeMat ? +c.userData.fadeMat.opacity.toFixed(2) : 1]) // 検証用: 雲の位置一覧＋近接フェードの不透明度
     window.__town3dDbg = () => active && ({ // 検証用: 自機の状態（モード・速度・バンク等）
       mode: active.mode, fly: +active.flyP.toFixed(2), x: +active.flyPos.x.toFixed(1), y: +active.flyPos.y.toFixed(1), z: +active.flyPos.z.toFixed(1),
       yaw: +active.flyYaw.toFixed(2), camYaw: +(active.walkCamYaw || 0).toFixed(2), pitch: +active.flyPitch.toFixed(2),
