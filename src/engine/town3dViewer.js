@@ -1560,7 +1560,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   // 中央の通り（舗装。電柱が沿い、車・人が行き交う）。地形に沿うリボン。街のみ。
   if (kind !== 'yato') {
-    const rg = new THREE.PlaneGeometry(7.5, 130, 1, 56); rg.rotateX(-Math.PI / 2)
+    const rg = new THREE.PlaneGeometry(7.5, 130, 4, 56); rg.rotateX(-Math.PI / 2) // 幅方向も4分割して地形に沿わせる（1分割だと横断勾配で路面中央に地面が最大28cm突き抜けていた）
     const rp = rg.attributes.position
     const rcol = []
     for (let i = 0; i < rp.count; i++) {
@@ -1589,9 +1589,11 @@ export async function mountTown3d(parent, opts = {}) {
       const curbGeos = []
       for (const sideC of [-1, 1]) {
         for (let z = 28; z > -98; z -= 2.4) {
-          const cx = sideC * 3.95, cy = heightAt(cx, z) + 0.11
+          const cx = sideC * 3.95, y0 = heightAt(cx, z - 1.25), y1 = heightAt(cx, z + 1.25) // 両端の高さで傾ける（segAlleyと同じ作法）＝坂で縁石の端が浮かない
           const seg = new THREE.BoxGeometry(0.34, 0.22, 2.5)
-          seg.applyMatrix4(new THREE.Matrix4().makeTranslation(cx, cy, z))
+          const cm4 = new THREE.Matrix4().makeRotationX(-Math.atan2(y1 - y0, 2.5))
+          cm4.setPosition(cx, (y0 + y1) / 2 + 0.11, z)
+          seg.applyMatrix4(cm4)
           curbGeos.push(seg)
         }
       }
@@ -3779,14 +3781,16 @@ export async function mountTown3d(parent, opts = {}) {
         const plinthMat = mottleMat(season === 'winter' ? 0xbcc0c2 : 0x8c867c, 120, 0.12, [2, 1]) // 石の土台
         for (const [geos, mat] of [[wallA, tWall], [wallB, wallBMat], [wall3, wall3Mat], [plE, plinthMat], [litG, litMat]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = mat !== litMat; mesh.receiveShadow = mat !== litMat; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
         // ── 城下の街路網（放射の大通り8本＋大手門参道＋環状道路3本）＝入り組んだ道。地形に沿う土の道。統合で軽量。 ──
-        { const roadMat = mottleMat(season === 'winter' ? 0xc8ccc6 : 0x7e7050, 120, 0.1, [5, 5]), roadGeos = [], rM = new THREE.Matrix4() // 城下の土の道にムラ＝踏み固められた土の質感
-          const seg = (x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, py = heightAt(px, pz); if (py < SEA.level + 0.6) return; const bg = new THREE.BoxGeometry(w, 0.16, len + 0.9); rM.makeRotationY(Math.atan2(dx, dz)).setPosition(px, py + 0.09, pz); bg.applyMatrix4(rM); roadGeos.push(bg) }
-          const road = (x0, z0, x1, z1, w) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w) }
+        { const roadMat = mottleMat(season === 'winter' ? 0xc8ccc6 : 0x7e7050, 120, 0.1, [5, 5]), roadGeos = [], rM = new THREE.Matrix4(), rMx = new THREE.Matrix4() // 城下の土の道にムラ＝踏み固められた土の質感
+          // 両端の高さで傾けた1区間（home路地segAlleyと同じ作法）＝坂で端が浮く/刺さるのを断つ。
+          // h=道の種別ごとの厚み。底は地面+0.01で揃え天面だけ種別で変える＝交差の重ね置きで天面が同一高さになるZファイティングを断つ。
+          const seg = (x0, z0, x1, z1, w, h = 0.16) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const y0 = heightAt(x0, z0), y1 = heightAt(x1, z1), py = (y0 + y1) / 2; if (py < SEA.level + 0.6) return; const bg = new THREE.BoxGeometry(w, h, len + 0.9); rMx.makeRotationX(-Math.atan2(y1 - y0, len)).premultiply(rM.makeRotationY(Math.atan2(dx, dz))); rMx.setPosition((x0 + x1) / 2, py + 0.01 + h / 2, (z0 + z1) / 2); bg.applyMatrix4(rMx); roadGeos.push(bg) }
+          const road = (x0, z0, x1, z1, w, h) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w, h) }
           for (const av of [...avenues, Math.PI]) road(ex + Math.cos(av) * 18, ez + Math.sin(av) * 18, ex + Math.cos(av) * 118, ez + Math.sin(av) * 118, av === Math.PI ? 5.2 : 4.0) // 放射の大通り（参道は太め・外周まで延伸）
-          for (const rr0 of ringRoads) { let prev = null; for (let s = 0; s <= 56; s++) { const a = s / 56 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev) road(prev.x, prev.z, px, pz, 3.8); prev = { x: px, z: pz } } } // 環状道路
+          for (const rr0 of ringRoads) { let prev = null; for (let s = 0; s <= 56; s++) { const a = s / 56 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev) road(prev.x, prev.z, px, pz, 3.8, 0.24); prev = { x: px, z: pz } } } // 環状道路（厚み違い=大通りとの交差でZファイト無し）
           // ── 城下の路地網（同心円の細い路地＋大通りの間の放射の路地＝路地裏。建物の列の間を縫う土の細道） ──
-          for (let rr0 = 24; rr0 <= 112; rr0 += 6.0) { if (ringRoads.some((r) => Math.abs(r - rr0) < 3)) continue; let prev = null; for (let s = 0; s <= 48; s++) { const a = s / 48 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev && angGap(a) > 0.26) road(prev.x, prev.z, px, pz, 1.7); prev = { x: px, z: pz } } } // 同心円の路地
-          for (const av of avenues) { const av2 = av + Math.PI / avenues.length; road(ex + Math.cos(av2) * 20, ez + Math.sin(av2) * 20, ex + Math.cos(av2) * 112, ez + Math.sin(av2) * 112, 1.7) } // 放射の路地（大通りの間に）
+          for (let rr0 = 24; rr0 <= 112; rr0 += 6.0) { if (ringRoads.some((r) => Math.abs(r - rr0) < 3)) continue; let prev = null; for (let s = 0; s <= 48; s++) { const a = s / 48 * 6.2832, px = ex + Math.cos(a) * rr0, pz = ez + Math.sin(a) * rr0; if (prev && angGap(a) > 0.26) road(prev.x, prev.z, px, pz, 1.7, 0.2); prev = { x: px, z: pz } } } // 同心円の路地
+          for (const av of avenues) { const av2 = av + Math.PI / avenues.length; road(ex + Math.cos(av2) * 20, ez + Math.sin(av2) * 20, ex + Math.cos(av2) * 112, ez + Math.sin(av2) * 112, 1.7, 0.28) } // 放射の路地（大通りの間に）
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, roadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
         roofGeos.forEach((geos, i) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, roofMats[i]); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } })
@@ -4163,19 +4167,19 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         // ── 街道（谷底の川の東岸に沿う道）＋城の平場へ登る坂道。senHに沿わせ統合で軽量。 ──
-        { const mtRoadMat = mottleMat(season === 'winter' ? 0xc2c6c2 : 0x6e6450, 100, 0.18, [2, 4]), roadGeos = [], rM = new THREE.Matrix4(); let prev = null // 土の路面（石/轍のムラ＝歩く道の質感）
+        { const mtRoadMat = mottleMat(season === 'winter' ? 0xc2c6c2 : 0x6e6450, 100, 0.18, [2, 4]), roadGeos = [], rM = new THREE.Matrix4(), rMx = new THREE.Matrix4(); let prev = null // 土の路面（石/轍のムラ＝歩く道の質感）
           for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + 4.8, gh = senH(px, zz), py = gh + 0.08 // 川の東岸の街道
             if (gh < SEA.level + 1.2 || gh > 15) { prev = null; continue } // 水際/海の上には道を敷かない（地面の高さに沿わせる）
-            if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3 && len < 6) { const bg = new THREE.BoxGeometry(2.6, 0.16, len + 0.6); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } }
+            if (prev) { const ddx = px - prev.x, ddz = zz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3 && len < 6) { const bg = new THREE.BoxGeometry(2.6, 0.16, len + 0.6); rMx.makeRotationX(-Math.atan2(py - prev.py, len)).premultiply(rM.makeRotationY(Math.atan2(ddx, ddz))); rMx.setPosition((px + prev.x) / 2, (py + prev.py) / 2, (zz + prev.z) / 2); bg.applyMatrix4(rMx); roadGeos.push(bg) } } // 両端の高さで傾ける＝坂で端が浮かない（segAlleyと同じ作法）
             prev = { x: px, z: zz, py } }
           // ── 城下の裏道（街道に並行する裏路地）＋横道（街道から裏へ）＝谷あいの城下の路地 ──
-          const lane = (offset, w) => { let pv = null; for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + offset, gh = senH(px, zz), py = gh + 0.07; if (gh < SEA.level + 1.2 || py > 15) { pv = null; continue } if (pv) { const ddx = px - pv.x, ddz = zz - pv.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(w, 0.14, len + 0.5); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + pv.x) / 2, (py + pv.py) / 2, (zz + pv.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } } pv = { x: px, z: zz, py } } }
+          const lane = (offset, w) => { let pv = null; for (let s = 0; s <= 40; s++) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), px = sx + cl + offset, gh = senH(px, zz), py = gh + 0.07; if (gh < SEA.level + 1.2 || py > 15) { pv = null; continue } if (pv) { const ddx = px - pv.x, ddz = zz - pv.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(w, 0.14, len + 0.5); rMx.makeRotationX(-Math.atan2(py - pv.py, len)).premultiply(rM.makeRotationY(Math.atan2(ddx, ddz))); rMx.setPosition((px + pv.x) / 2, (py + pv.py) / 2, (zz + pv.z) / 2); bg.applyMatrix4(rMx); roadGeos.push(bg) } } pv = { x: px, z: zz, py } } }
           lane(11, 1.7); lane(-7, 1.7) // 東の裏道・西岸の道
-          for (let s = 4; s <= 34; s += 6) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), x0 = sx + cl + 4, x1 = sx + cl + 12, y = senH((x0 + x1) / 2, zz); if (y < SEA.level + 1.2) continue; const bg = new THREE.BoxGeometry(8.4, 0.14, 1.6); bg.applyMatrix4(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y + 0.06, zz)); roadGeos.push(bg) } // 横道（街道→東の裏道）
+          for (let s = 4; s <= 34; s += 6) { const zz = sz + 32 - s * 2.2, cl = senValley(zz), x0 = sx + cl + 4, x1 = sx + cl + 12, y = senH((x0 + x1) / 2, zz); if (y < SEA.level + 1.2) continue; const y0 = senH(x0, zz), y1 = senH(x1, zz), bg = new THREE.BoxGeometry(8.4, 0.14, 1.6); const m4 = new THREE.Matrix4().makeRotationZ(Math.atan2(y1 - y0, 8.4)); m4.setPosition((x0 + x1) / 2, (y0 + y1) / 2 + 0.02, zz); bg.applyMatrix4(m4); roadGeos.push(bg) } // 横道（街道→東の裏道）。両端の高さで傾け、天面を街道(+0.16)/裏道(+0.14)より低く＝交差の重ね置きZファイトを断つ
           prev = null // 街道から城の平場へ登る坂道
           const r0x = sx + senValley(bz + 12) + 4.8, r0z = bz + 12
           for (let s = 0; s <= 14; s++) { const f = s / 14, px = r0x + (bx - r0x) * f, pz = r0z + (bz + 9 - r0z) * f, py = senH(px, pz) + 0.12
-            if (prev) { const ddx = px - prev.x, ddz = pz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(2.0, 0.16, len + 0.5); rM.makeRotationY(Math.atan2(ddx, ddz)).setPosition((px + prev.x) / 2, (py + prev.py) / 2, (pz + prev.z) / 2); bg.applyMatrix4(rM); roadGeos.push(bg) } }
+            if (prev) { const ddx = px - prev.x, ddz = pz - prev.z, len = Math.hypot(ddx, ddz); if (len > 0.3) { const bg = new THREE.BoxGeometry(2.0, 0.16, len + 0.5); rMx.makeRotationX(-Math.atan2(py - prev.py, len)).premultiply(rM.makeRotationY(Math.atan2(ddx, ddz))); rMx.setPosition((px + prev.x) / 2, (py + prev.py) / 2, (pz + prev.z) / 2); bg.applyMatrix4(rMx); roadGeos.push(bg) } } // 城への坂道＝勾配が最も急な道。傾けて連ねる＝階段状の浮きを断つ
             prev = { x: px, z: pz, py } }
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, mtRoadMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
@@ -4448,14 +4452,15 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28; tput(tx + 6 + Math.cos(a) * 7.6, tz - 4 + Math.sin(a) * 7.6, 0.85 + R() * 0.3) } // 時計塔広場をぐるりと並木
         }
         // ── 港町の街路（碁盤の目の道＝区画整理された大正の町。石畳の道）。地形に沿わせ統合で軽量。 ──
-        { const paveMat = mottleMat(season === 'winter' ? 0xc4c8c6 : 0x8e8a84, 100, 0.1, [3, 1]), roadGeos = [], rM = new THREE.Matrix4()
-          const seg = (x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, py = heightAt(px, pz); if (py < SEA.level + 0.6 || taishoCanal(px, pz) < 4) return; const bg = new THREE.BoxGeometry(w, 0.16, len + 0.9); rM.makeRotationY(Math.atan2(dx, dz)).setPosition(px, py + 0.09, pz); bg.applyMatrix4(rM); roadGeos.push(bg) }
-          const road = (x0, z0, x1, z1, w) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w) }
+        { const paveMat = mottleMat(season === 'winter' ? 0xc4c8c6 : 0x8e8a84, 100, 0.1, [3, 1]), roadGeos = [], rM = new THREE.Matrix4(), rMx = new THREE.Matrix4()
+          // 両端の高さで傾けた1区間（home路地segAlleyと同じ作法）＋h=道の種別ごとの厚み（縦×横の交差で天面が同一高さになるZファイティングを断つ。底は+0.01で揃える）
+          const seg = (x0, z0, x1, z1, w, h = 0.16) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 0.5) return; const px = (x0 + x1) / 2, pz = (z0 + z1) / 2, y0 = heightAt(x0, z0), y1 = heightAt(x1, z1), py = (y0 + y1) / 2; if (py < SEA.level + 0.6 || taishoCanal(px, pz) < 4) return; const bg = new THREE.BoxGeometry(w, h, len + 0.9); rMx.makeRotationX(-Math.atan2(y1 - y0, len)).premultiply(rM.makeRotationY(Math.atan2(dx, dz))); rMx.setPosition(px, py + 0.01 + h / 2, pz); bg.applyMatrix4(rMx); roadGeos.push(bg) }
+          const road = (x0, z0, x1, z1, w, h) => { const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 5)); for (let s = 0; s < steps; s++) seg(x0 + (x1 - x0) * s / steps, z0 + (z1 - z0) * s / steps, x0 + (x1 - x0) * (s + 1) / steps, z0 + (z1 - z0) * (s + 1) / steps, w, h) }
           for (let n = -5; n <= 5; n++) { const gx = n * 19; if (Math.abs(gx) > TAISHO.r - 6) continue; road(tx + gx, tz - 84, tx + gx, tz + 90, 4.2) } // 縦の通り（建物の空けと一致）
-          for (let mm = -4; mm <= 5; mm++) { const gz = mm * 19; if (Math.abs(gz) > TAISHO.r - 6) continue; road(tx - 96, tz + gz, tx + 96, tz + gz, 4.2) } // 横の通り
+          for (let mm = -4; mm <= 5; mm++) { const gz = mm * 19; if (Math.abs(gz) > TAISHO.r - 6) continue; road(tx - 96, tz + gz, tx + 96, tz + gz, 4.2, 0.22) } // 横の通り
           // 路地（主要街路の間に細い道＝区画を細かく割る路地裏。本物の港町の入り組んだ街路へ） ──
-          for (let n = -5; n <= 4; n++) { const gx = n * 19 + 9.5; if (Math.abs(gx) > TAISHO.r - 6) continue; road(tx + gx, tz - 82, tx + gx, tz + 88, 1.8) } // 縦の路地
-          for (let mm = -4; mm <= 4; mm++) { const gz = mm * 19 + 9.5; if (Math.abs(gz) > TAISHO.r - 6) continue; road(tx - 94, tz + gz, tx + 94, tz + gz, 1.8) } // 横の路地
+          for (let n = -5; n <= 4; n++) { const gx = n * 19 + 9.5; if (Math.abs(gx) > TAISHO.r - 6) continue; road(tx + gx, tz - 82, tx + gx, tz + 88, 1.8, 0.19) } // 縦の路地
+          for (let mm = -4; mm <= 4; mm++) { const gz = mm * 19 + 9.5; if (Math.abs(gz) > TAISHO.r - 6) continue; road(tx - 94, tz + gz, tx + 94, tz + gz, 1.8, 0.25) } // 横の路地
           if (roadGeos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (m) { const rmesh = new THREE.Mesh(m, paveMat); rmesh.receiveShadow = true; town.add(rmesh) } roadGeos.forEach((g) => g.dispose()) }
         }
         // 桟橋（海へ突き出す木の桟橋）
