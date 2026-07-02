@@ -771,9 +771,27 @@ export async function mountTown3d(parent, opts = {}) {
   const litFlicker = (mat, amp, sp) => { if (mat) nightGlows.push({ m: mat, base: mat.opacity, amp, sp, ph: R() * 6.28 }) } // 灯りのグローを揺らぎに登録（base=元の濃さ・amp=揺れ幅・sp=速さ）
   // 歩行時の当たり判定（円で近似）。建物の敷地＋木の幹を積む＝散策で建物を貫通せず、幹も避けて歩く。
   const colliders = []
+  // 空間グリッド（8mセル）: 時代エリアの町家まで全戸登録すると数千件になるため、全件線形走査をやめ
+  // 「その地点のセルに重なるコライダーだけ」を見る。登録数が変わったら次の判定時に自動で作り直す。
+  const COL_CELL = 8
+  let colGrid = null, colGridN = 0
+  const rebuildColGrid = () => {
+    colGrid = new Map(); colGridN = colliders.length
+    for (const c of colliders) {
+      const r = c.hw !== undefined ? Math.hypot(c.hw, c.hd) : c.r
+      const x0 = Math.floor((c.x - r) / COL_CELL), x1 = Math.floor((c.x + r) / COL_CELL)
+      const z0 = Math.floor((c.z - r) / COL_CELL), z1 = Math.floor((c.z + r) / COL_CELL)
+      for (let ix = x0; ix <= x1; ix++) for (let iz = z0; iz <= z1; iz++) {
+        const k = ix * 100003 + iz; let arr = colGrid.get(k); if (!arr) { arr = []; colGrid.set(k, arr) } arr.push(c)
+      }
+    }
+  }
   // 建物フットプリント(円/向き付き矩形)に入るか。住民配置・徘徊・歩行で共用するので関数本体スコープの早い位置で定義（配置時はcollidersが既に積まれている）。
   const blockedAt = (x, z) => {
-    for (const c of colliders) { const dx = x - c.x, dz = z - c.z
+    if (!colGrid || colGridN !== colliders.length) rebuildColGrid() // 未構築/登録数変化で作り直し（0件で呼ばれてもnull参照しない）
+    const cell = colGrid.get(Math.floor(x / COL_CELL) * 100003 + Math.floor(z / COL_CELL))
+    if (!cell) return false
+    for (const c of cell) { const dx = x - c.x, dz = z - c.z
       if (c.hw !== undefined) { // 向き付き矩形（建物の敷地）＝局所座標へ回して矩形内か判定
         const lx = dx * c.cos - dz * c.sin, lz = dx * c.sin + dz * c.cos
         if (lx > -c.hw && lx < c.hw && lz > -c.hd && lz < c.hd) return true
@@ -2231,7 +2249,8 @@ export async function mountTown3d(parent, opts = {}) {
     }
 
     // ── 踏切（道が線路と交わる所。電車が近づくと遮断機が下り、警報灯が点滅する）。──
-    const crossX = 6
+    // 中央通り(x=0)と線路は必ず平面交差するため、踏切はその交点に置く（以前のx=6は幹線とズレて「無踏切で電車が道路を横切る」見えになっていた）
+    const crossX = 0
     crossing = { gates: [], lamps: [], cx: crossX }
     // 紅白の遮断桿テクスチャ
     const sc = document.createElement('canvas'); sc.width = 64; sc.height = 8; const scx = sc.getContext('2d')
@@ -2243,8 +2262,8 @@ export async function mountTown3d(parent, opts = {}) {
     for (let z = RAIL.z - 6; z <= RAIL.z + 6; z += 1.2) { const seg = new THREE.BoxGeometry(4.6, 0.1, 1.3); seg.applyMatrix4(new THREE.Matrix4().makeTranslation(crossX, heightAt(crossX, z) + 0.07, z)); roadGeos.push(seg) }
     if (BufferGeometryUtils.mergeGeometries) { const rmesh = BufferGeometryUtils.mergeGeometries(roadGeos, false); if (rmesh) { const road = new THREE.Mesh(rmesh, toon(0x6e6a64)); road.receiveShadow = true; town.add(road) } }
     roadGeos.forEach((g) => g.dispose())
-    // 警報機×2（対角の隅）＋遮断桿
-    for (const gp of [[crossX - 2.6, RAIL.z - 3, 1], [crossX + 2.6, RAIL.z + 3, -1]]) {
+    // 警報機×2（対角の隅）＋遮断桿。柱は車道(半幅3.75)の外＝路肩に立てる
+    for (const gp of [[crossX - 3.4, RAIL.z - 3, 1], [crossX + 3.4, RAIL.z + 3, -1]]) {
       const px = gp[0], pz = gp[1], barDir = gp[2]
       const g = new THREE.Group(); g.position.set(px, heightAt(px, pz), pz); town.add(g)
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3.3, 6), toon(0x2a2a2e)); post.position.y = 1.65; post.castShadow = true; g.add(post)
@@ -3667,6 +3686,7 @@ export async function mountTown3d(parent, opts = {}) {
             const hd = oodana ? 2.8 + R() * 1.3 : kura ? hw : 1.7 + R() * 1.0
             const hh = two ? 3.0 + R() * 1.3 : kura ? 2.9 + R() * 0.7 : oodana ? 2.2 + R() * 0.5 : 1.3 + R() * 0.6
             tmpM.makeRotationY(a).setPosition(hx, hy + hh / 2, hz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); if (!kura) bakeAO(bg, hh); bg.applyMatrix4(tmpM); (kura ? wallB : R() < 0.16 ? wall3 : wallA).push(bg) // 角を面取り＝低ポリの角張りを脱す
+            colliders.push({ x: hx, z: hz, cos: Math.cos(a), sin: Math.sin(a), hw: hw / 2 + 0.15, hd: hd / 2 + 0.15 }) // 歩行: 町家をすり抜けない（R()非消費＝配置シード不変）
             const plg = new THREE.BoxGeometry(hw + 0.5, 0.55, hd + 0.5); tmpM.makeRotationY(a).setPosition(hx, hy + 0.18, hz); plg.applyMatrix4(tmpM); plE.push(plg) // 石の土台（接地）
             const sec = Math.floor((((a % 6.2832) + 6.2832) % 6.2832) / (6.2832 / nSec))
             let ci = (sec * 2 + (sec % 2)) % roofPalette.length; if (R() < 0.22) ci = (ci + 1) % roofPalette.length; if (kura) ci = 2 // 街区基調＋時々隣色で揺らぐ。土蔵は杉皮
@@ -4010,6 +4030,7 @@ export async function mountTown3d(parent, opts = {}) {
               const hw = big ? 3.0 + R() * 1.2 : 2.0 + R() * 1.0, hd = big ? 2.4 + R() * 0.9 : 1.6 + R() * 0.8
               const hh = two ? 2.6 + R() * 0.9 : big ? 2.0 + R() * 0.5 : 1.3 + R() * 0.6
               sgM.makeRotationY(a).setPosition(px, py + hh / 2, pz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); bakeAO(bg, hh); bg.applyMatrix4(sgM); wgeoArr.push(bg)
+              colliders.push({ x: px, z: pz, cos: Math.cos(a), sin: Math.sin(a), hw: hw / 2 + 0.15, hd: hd / 2 + 0.15 }) // 歩行: 城下の家をすり抜けない（R()非消費）
               const rh = thatch ? (two ? 1.9 : 1.4) : (two ? 1.3 : 0.85) // 茅葺は厚く高い屋根
               const rg = senGableUnit.clone(); rg.scale(hw * 1.04, rh, hd * 1.24); sgM.makeRotationY(a).setPosition(px, py + hh - 0.04, pz); rg.applyMatrix4(sgM); (thatch ? sgRT : R() < 0.4 ? sgR2 : sgR).push(rg) // 切妻の屋根（稜線で家屋に＝箱＋4角錐の三角帽を脱す）。茅葺は厚く高い
               if (isNight && R() < 0.5) { sgM.makeRotationY(a).setPosition(px - side * hw * 0.45, py + hh * (two ? 0.6 : 0.45), pz); const lg = new THREE.BoxGeometry(0.5, 0.45, 0.12); lg.applyMatrix4(sgM); sgL.push(lg) }
@@ -4334,6 +4355,7 @@ export async function mountTown3d(parent, opts = {}) {
           else if (tall) { hw = 2.5 + R() * 0.9; hd = 2.5 + R() * 0.9; hh = 4.4 + central * 2.6 + R() * 1.6 } // 看板建築（中心ほど高い）
           else { hw = 2.1 + R() * 1.3; hd = 2.1 + R() * 1.3; hh = 2.2 + central * 1.3 + R() * 1.7 } // 住宅
           tmM.makeRotationY(ang).setPosition(hx, hy + hh / 2, hz); const bg = new RoundedBoxGeometry(hw, hh, hd, 1, Math.min(0.16, Math.min(hw, hd) * 0.07)); if (!isBrick) bakeAO(bg, hh); bg.applyMatrix4(tmM); if (isBrick) twC.push(bg); else twBuckets[(R() * twBuckets.length) | 0].push(bg) // 壁色を振り分け（単調なクリーム一色を脱す）
+          colliders.push({ x: hx, z: hz, cos: Math.cos(ang), sin: Math.sin(ang), hw: hw / 2 + 0.15, hd: hd / 2 + 0.15 }) // 歩行: 港町の家をすり抜けない（R()非消費）
           const plg = new THREE.BoxGeometry(hw + 0.5, 0.55, hd + 0.5); tmM.makeRotationY(ang).setPosition(hx, hy + 0.18, hz); plg.applyMatrix4(tmM); plT.push(plg) // 石の土台（接地）
           const ri = (R() * trBuckets.length) | 0 // 屋根色を振り分け
           if (tall || R() < 0.42) { const rg = new THREE.BoxGeometry(hw + 0.3, 0.4, hd + 0.3); tmM.makeRotationY(ang).setPosition(hx, hy + hh + 0.2, hz); rg.applyMatrix4(tmM); trBuckets[ri].push(rg) } // 陸屋根(洋風・看板建築)
@@ -6150,7 +6172,7 @@ export async function mountTown3d(parent, opts = {}) {
       const light = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true }))
       light.position.set(0, 0.58, dir > 0 ? -1.72 : 1.72); g.add(light)
     }
-    g.userData = { dir, lane: dir > 0 ? -1.5 : 1.5, speed: 7 + R() * 5, z: -90 + R() * 110 }
+    g.userData = { dir, lane: dir > 0 ? -1.5 : 1.5, speed: 7 + R() * 5, z: -16 + R() * 38 } // spawnも走行区間内（R()呼び出し回数は不変＝下流の配置シードを守る）
     town.add(g); cars.push(g)
   }
   // バス（街道を走る大型車。クリーム＋緑帯・夜は室内灯）。cars に混ぜて同じ流れで走る。
@@ -6164,7 +6186,7 @@ export async function mountTown3d(parent, opts = {}) {
     const dir = b === 0 ? 1 : -1
     const tail = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.18, 0.08), new THREE.MeshBasicMaterial({ color: 0xc23a2c, fog: true })); tail.position.set(0, 0.8, dir > 0 ? 3.34 : -3.34); g.add(tail)
     if (duskAmt > 0.2) { const light = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.22, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: true })); light.position.set(0, 0.78, dir > 0 ? -3.34 : 3.34); g.add(light); const inl = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.5, 5.4), new THREE.MeshBasicMaterial({ color: 0xffe0a0, fog: true })); inl.position.y = 1.7; g.add(inl) }
-    g.userData = { dir, lane: dir > 0 ? -1.7 : 1.7, speed: 5 + R() * 2, z: -90 + R() * 120 }
+    g.userData = { dir, lane: dir > 0 ? -1.7 : 1.7, speed: 5 + R() * 2, z: -16 + R() * 38 } // バスも同区間（R()回数不変）
     town.add(g); cars.push(g)
   }
   // 駅前のロータリー（島・植栽）＋バス停（上屋・ベンチ・丸看板）。駅(34,-44)の手前。
@@ -8450,12 +8472,13 @@ export async function mountTown3d(parent, opts = {}) {
       for (const b of homeBldgs) { const bdx = b.position.x - active.flyPos.x, bdz = b.position.z - active.flyPos.z; const vis = bdx * bdx + bdz * bdz < ff2; if (b.visible !== vis) b.visible = vis } }
     // ステージ実寸が変わったら（飛行で枠が変わる／回転／レイアウト変化）即 aspect を直す＝「横に伸びる」を自動補正
     if (stage.clientWidth !== lastStageW || stage.clientHeight !== lastStageH) applySize()
-    // 車が通りを行き交う
+    // 車が通りを行き交う。走行区間は建物コライダーの無い z∈[-16,22] に限定
+    // （z<-22は中央通りの回廊に家が建つ区間＝レーン上を実測走査で確認済み。家側の除けを広げるとR()消費順が崩れるため車側で閉じる）
     for (const c of cars) {
       const u = c.userData
       u.z += u.dir * u.speed * dt
-      if (u.z > 22) u.z = -95
-      if (u.z < -95) u.z = 22
+      if (u.z > 22) u.z = -16
+      if (u.z < -16) u.z = 22
       c.position.set(u.lane, heightAt(u.lane, u.z) + 0.1, u.z)
       c.rotation.y = u.dir > 0 ? 0 : Math.PI
     }
@@ -8724,7 +8747,11 @@ export async function mountTown3d(parent, opts = {}) {
       if (move) u.x += (u.stops ? (u.speed2 ?? u.speed) : u.speed) * dt
       if (u.x > RAIL.x1 + 2) { u.x = RAIL.x0 - u.len; u.stopDone = false; u.stopUntil = 0 }
       tr.position.set(u.x, 0, RAIL.z)
-      for (const car of tr.children) car.position.y = heightAt(u.x + car.userData.ox, RAIL.z) + 0.05
+      for (const car of tr.children) { // レールの敷かれた範囲(x0..x1)の外に出た車両は隠す＝庭や池の上を線路なしで走る見えを断つ
+        const wx = u.x + car.userData.ox
+        car.position.y = heightAt(wx, RAIL.z) + 0.05
+        car.visible = wx >= RAIL.x0 - 0.6 && wx <= RAIL.x1 + 0.6
+      }
     }
     if (crossing && train) { // 踏切: 電車が近づくと遮断機が下り、警報灯が交互に点滅
       const active = Math.abs(train.userData.x - crossing.cx) < 13
