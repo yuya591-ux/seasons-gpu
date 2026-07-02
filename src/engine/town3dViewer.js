@@ -800,6 +800,17 @@ export async function mountTown3d(parent, opts = {}) {
     }
     return false
   }
+  // 建物の敷地（向き付き矩形コライダー）の中か＝「家に木が食い込む」等の配置違反の検査用（円=木・塔は含めない）。
+  const rectAt = (x, z) => {
+    if (!colGrid || colGridN !== colliders.length) rebuildColGrid()
+    const cell = colGrid.get(Math.floor(x / COL_CELL) * 100003 + Math.floor(z / COL_CELL))
+    if (!cell) return false
+    for (const c of cell) { if (c.hw === undefined) continue
+      const dx = x - c.x, dz = z - c.z, lx = dx * c.cos - dz * c.sin, lz = dx * c.sin + dz * c.cos
+      if (lx > -c.hw && lx < c.hw && lz > -c.hd && lz < c.hd) return true }
+    return false
+  }
+  let buriedTrees = 0, buriedEraTrees = 0; const buriedSamples = [] // 監査: 家に食い込むため取り下げた木の数と場所（dev検証用）
   // 着地で避ける場所（建物＋木の樹冠）。樹冠は大きめ＝木に埋もれて降りない・壁ぎわで降りない。
   const spawnAvoid = []
   // 鎮守の森の神社（飛んでいく目的地のランドマーク）。街の左手の一角を空けて建てる。建物/木の生成で共用するので関数本体スコープに。
@@ -1973,7 +1984,20 @@ export async function mountTown3d(parent, opts = {}) {
       const tall = R() < 0.12
       const h = tall ? lerp(8, 18, R() * R()) : lerp(2.6, 5.5, far) + R() * 2.2
       const type = h > 8.5 ? (R() < 0.55 ? 'apt' : 'mid') : (R() < 0.22 ? 'apt' : 'house')
+      // 中央通りの回廊に壁が深く食い込むセルは「建ててから成果物だけ巻き戻す」＝道の上に家が建つ違和感の根絶（実機FB）。
+      // house()のR()消費は完全に同一のまま走らせるので、他の全配置は不変（skip方式だとR()順が全域でズレて街が丸ごと変わる）。
+      // 巻き戻し対象= house() が書き込む全共有配列（取りこぼすと屋根や小物だけ浮いて残るので全数列挙）＋town.addの1群。
+      const onAve = Math.abs(x) - w / 2 < 2.2 && z > -99 && z < 29
+      const hSnapArrs = onAve ? [acGeos, bldgOutlineGeos, plinthGeos, eaveGeos, bandGeos, fixtureGeos, doorFrameGeos, doorGeos, crateGeos, potGeos, plantGeos, homeBldgs, colliders, spawnAvoid, ...roofGeosByMat] : null // slab/rail/div/fut等はhouse()内ローカル＝家グループごと消えるので対象外
+      const hSnapLens = hSnapArrs ? hSnapArrs.map((a) => a.length) : null
+      const hSnapTown = onAve ? town.children.length : 0
       house(x, z, w, d, h, type)
+      if (hSnapArrs) {
+        for (let ai = 0; ai < hSnapArrs.length; ai++) { const arr = hSnapArrs[ai]
+          for (let k = hSnapLens[ai]; k < arr.length; k++) { const e = arr[k]; if (e && e.dispose) e.dispose(); else if (e && e.geo && e.geo.dispose) e.geo.dispose() }
+          arr.length = hSnapLens[ai] }
+        while (town.children.length > hSnapTown) town.remove(town.children[town.children.length - 1])
+      }
     }
   }
 
@@ -3840,6 +3864,7 @@ export async function mountTown3d(parent, opts = {}) {
           for (let k = 0; k < 76; k++) { const a2 = R() * 6.2832, r2 = 22 + R() * 96, px = ex + Math.cos(a2) * r2, pz = ez + Math.sin(a2) * r2, py = heightAt(px, pz)
             if (py < SEA.level + 1.4 || edoStream(px, pz) < 7 || Math.hypot(px - ex, pz - ez) < 21 || edoFac.some((f) => Math.hypot(px - f.x, pz - f.z) < f.r + 1)) continue // 海/広い川/堀の内/庭園は避ける（拡大した島の外周まで緑を行き渡らせる）
             const pine = R() < 0.4, s = pine ? 1 : 0.85 + R() * 0.5
+            if (rectAt(px, pz)) { buriedEraTrees++; continue } // 町家の中には生やさない（R()は全て消費済み＝配置シード不変）
             const trG = new THREE.CylinderGeometry(0.17 * s, 0.27 * s, 1.9 * s, 6); tmM2.makeTranslation(px, py + 0.95 * s, pz); trG.applyMatrix4(tmM2); trunkGeos.push(trG)
             if (pine) { for (const [cy, cr, ch] of [[2.3, 1.7, 1.8], [3.3, 1.25, 1.55], [4.2, 0.82, 1.35]]) { const fG = new THREE.ConeGeometry(cr, ch, 8); tmM2.makeTranslation(px, py + cy, pz); fG.applyMatrix4(tmM2); coneGeos.push(fG) } } // 松/杉＝段重ねの円錐（単一の尖りを脱し層のある常緑樹に。統合済みで描画コール不変）
             else { const fG = new THREE.IcosahedronGeometry(1.5 * s, 2); tmM2.makeTranslation(px, py + 2.2 * s, pz); fG.applyMatrix4(tmM2); leafGeos.push(fG) } // 雑木
@@ -4241,7 +4266,8 @@ export async function mountTown3d(parent, opts = {}) {
             if (py < SEA.level + 2.5 || py > 30) continue // 海・谷底の町は避け、斜面〜尾根に森
             if (Math.hypot(px - bx, pz - bz) < 12) continue // 城の平場は空ける
             const vd = Math.abs((px - sx) - senValley(pz)); if (vd < 9 && py < 11) continue // 谷底の町並みは避ける
-            const s = 0.85 + R() * 0.5; const trG = new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5); nM.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(nM); trunkGeos.push(trG)
+            const s = 0.85 + R() * 0.5; if (rectAt(px, pz)) { buriedEraTrees++; continue } // 城下の家の中には生やさない（R()消費済み＝配置不変）
+            const trG = new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.5 * s, 5); nM.makeTranslation(px, py + 0.7 * s, pz); trG.applyMatrix4(nM); trunkGeos.push(trG)
             for (const [cy, cr, ch] of [[2.0, 1.55, 2.5], [3.4, 1.12, 2.1], [4.7, 0.68, 1.8]]) { const fG = new THREE.ConeGeometry(cr * s, ch * s, 6); nM.makeTranslation(px, py + cy * s, pz); fG.applyMatrix4(nM); coneGeos.push(fG) } cedarShadow.push([px, py, pz, 1.3 * s]) } // 段重ねの杉（単一の尖りを脱し背の高い常緑樹に）
           for (const [geos, mat] of [[trunkGeos, trunkM], [coneGeos, folM]]) { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const mesh = new THREE.Mesh(m, mat); mesh.castShadow = true; mesh.receiveShadow = true; town.add(mesh) } geos.forEach((g) => g.dispose()) } }
           addContactShadows(cedarShadow) // 尾根の杉の足元に接地影＝斜面に浮く杉を地に着ける
@@ -4344,6 +4370,7 @@ export async function mountTown3d(parent, opts = {}) {
             for (let cxa = -16; cxa <= 24; cxa += 8) { for (const sd of [-1, 1]) {
               const px = tx + cxa, pz = cz0 + 6.8 * sd, py = heightAt(px, pz)
               if (py < SEA.level + 0.8 || taishoCanal(px, pz) < 4.5) continue // 運河の水・汀は避ける
+              if (rectAt(px, pz)) { buriedEraTrees++; continue } // 港町の家の中には生やさない（このループはR()非消費＝配置不変）
               const tg = new THREE.CylinderGeometry(0.16, 0.24, 3.0, 6); tM.makeTranslation(px, py + 1.5, pz); tg.applyMatrix4(tM); trunkG.push(tg)
               if (season !== 'winter') { for (const [ox, oy, oz, r] of [[0, 3.4, 0, 1.3], [-0.7, 3.0, 0.3, 0.85], [0.7, 3.1, -0.3, 0.9], [0.1, 3.9, 0.2, 0.8]]) { const lg = new THREE.IcosahedronGeometry(r, 1); tM.makeTranslation(px + ox, py + oy, pz + oz); lg.applyMatrix4(tM); leafG.push(lg) } }
               else { const lg = new THREE.IcosahedronGeometry(0.95, 1); tM.makeTranslation(px, py + 3.3, pz); lg.applyMatrix4(tM); leafG.push(lg) } // 冬は雪をかぶった樹冠
@@ -6985,6 +7012,17 @@ export async function mountTown3d(parent, opts = {}) {
     }
   }
 
+  // ── 町並みの監査パス: 家に食い込んだ木を取り下げる（全建物コライダー登録後・幹の統合前）。 ──
+  // 根元が建物の敷地（矩形コライダー）内にある木は、葉のグループを外し幹ジオメトリも統合から除外＝屋根から木が生える違和感の根絶。
+  // ビルド後の後処理でR()を一切消費しない＝他の全配置は不変。treesArrとtrunkGeosは tree() で対で積まれる（添字対応）。
+  for (let i = treesArr.length - 1; i >= 0; i--) { const tg2 = treesArr[i]
+    if (rectAt(tg2.position.x, tg2.position.z)) {
+      tg2.visible = false; if (tg2.parent) tg2.parent.remove(tg2)
+      tg2.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose() })
+      trunkGeos[i].dispose(); trunkGeos.splice(i, 1); treesArr.splice(i, 1)
+      buriedTrees++; if (buriedSamples.length < 8) buriedSamples.push([+tg2.position.x.toFixed(1), +tg2.position.z.toFixed(1)])
+    }
+  }
   // 全ての木の幹を1メッシュへ統合（静止）＝ドローコールを大きく削る（葉は木ごとに揺れるので別）。
   if (trunkGeos.length && BufferGeometryUtils.mergeGeometries) {
     const tm = BufferGeometryUtils.mergeGeometries(trunkGeos, false)
@@ -10107,6 +10145,15 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dJumpState = () => active ? { mode: active.mode, jumpY: +(active.jumpY || 0).toFixed(2), jumpVel: +(active.jumpVel || 0).toFixed(2), y: +active.flyPos.y.toFixed(2), btnShown: jumpBtn.classList.contains('jump--show') } : null
     window.__town3dToyPos = () => winCat && winCat.toyG ? { x: +winCat.toyG.position.x.toFixed(2), y: +winCat.toyG.position.y.toFixed(2), z: +winCat.toyG.position.z.toFixed(2), vx: +winCat.toyVX.toFixed(2) } : null
     window.__town3dCatState = () => winCat ? { x: +winCat.g.position.x.toFixed(2), z: +winCat.g.position.z.toFixed(2), relocP: +winCat.relocP.toFixed(2), alert: +winCat.alert.toFixed(2), visitPhase: winCat.visitPhase, sit: +winCat.sitAmt.toFixed(2), react: winCat.react || '' } : null
+    window.__town3dTownAudit = () => { // 検証用: 町並みの配置違反の監査（家に食い込む木＝取り下げ数と残数／道・線路の回廊に載る建物）
+      let treeLeft = 0
+      for (const tr2 of treesArr) if (rectAt(tr2.position.x, tr2.position.z)) treeLeft++
+      let houseOnRoad = 0, houseOnRail = 0; const roadSamples = []
+      for (const c of colliders) { if (c.hw === undefined) continue
+        if (Math.abs(c.x) < 4.2 && c.z > -98 && c.z < 28) { houseOnRoad++; if (roadSamples.length < 8) roadSamples.push([+c.x.toFixed(1), +c.z.toFixed(1), +c.hw.toFixed(1), +c.hd.toFixed(1)]) }
+        if (Math.abs(c.z - RAIL.z) < 2.6 && c.x > RAIL.x0 && c.x < RAIL.x1) houseOnRail++ }
+      return { buriedTrees, buriedEraTrees, treeLeft, houseOnRoad, houseOnRail, trees: treesArr.length, buriedSamples, roadSamples }
+    }
     window.__town3dCatVisit = () => { if (winCat) { winCat.visitCool = 0; winCat.visitT = -1; winCat.alert = 0; winCat.wakeHold = 0; winCat.reactT = 0; winCat.petActive = 0; winCat.visitPhase = 0 } } // 検証用: 窓辺への訪問を今すぐ起こす（次のvisitT判定で発火）
     window.__town3dResTo = (i, x, z) => { if (residents[i]) { const u = residents[i].userData; residents[i].position.set(x, heightAt(x, z), z); u.ax = x; u.az = z; u.tx = x; u.tz = z; u.moving = false; u.pauseT = 999 } } // 検証用: 住人を開けた場所へ移動
     window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
