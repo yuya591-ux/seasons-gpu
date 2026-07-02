@@ -1343,15 +1343,20 @@ export async function mountTown3d(parent, opts = {}) {
     bake(new THREE.CylinderGeometry(0.2, 0.165, 0.34, 9).toNonIndexed(), bodyCol, 1.0) // 胸（肩0.2を張り→腰0.165へ細る上衣）
     bake(new THREE.CylinderGeometry(0.165, 0.2, 0.34, 9).toNonIndexed(), legHex, 0.69) // 腰（くびれ0.165→腰0.2へ広がる下衣＝袴/スカートの裾）
     { const sh = new THREE.SphereGeometry(0.205, 9, 6).toNonIndexed(); sh.scale(1.0, 0.4, 0.62); bake(sh, bodyCol, 1.16) } // 肩（横に張る稜線＝円柱の天面でなく「肩のある人型」。瓶/こけしを明確に脱す）
-    bake(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed(), skinHex, 1.21) // 首
-    const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); bake(hd, skinHex, 1.33) // 小さめの頭＝頭身を伸ばす
-    bake(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed(), hairHex, 1.35, 0, -0.012) // 髪（後頭部）
-    for (const s of [-1, 1]) bake(new THREE.SphereGeometry(0.022, 5, 4).toNonIndexed(), hairHex, 1.35, s * 0.05, 0.118) // 目（歩いて寄ると「顔のある人」と分かる。統合メッシュに焼くので描画コール不変＝中距離LODの代わり）
-    const aM = new THREE.Matrix4() // 腕（肩から下へ・少し外へ）＋手先＝人型の手応え。同じ統合メッシュに焼くので描画コール不変
+    bake(new THREE.CylinderGeometry(0.044, 0.052, 0.13, 6).toNonIndexed(), skinHex, 1.225) // 首（短すぎて頭が肩に埋まるのを解消）
+    const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); bake(hd, skinHex, 1.36) // 小さめの頭＝頭身を伸ばす
+    bake(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed(), hairHex, 1.395, 0, -0.04) // 髪（後上へ＝前髪が顔を覆わない）
+    for (const s of [-1, 1]) bake(new THREE.SphereGeometry(0.023, 5, 4).toNonIndexed(), hairHex, 1.362, s * 0.05, 0.132) // 目（頭の中心高さ）
+    bake(new THREE.SphereGeometry(0.021, 5, 4).toNonIndexed(), 0xd8b493, 1.33, 0, 0.15) // 鼻（横顔に立体＝「点2つの顔」を脱す）
+    bake(new THREE.BoxGeometry(0.05, 0.012, 0.012).toNonIndexed(), 0x9a6a58, 1.298, 0, 0.138) // 口
+    for (const s of [-1, 1]) bake(new THREE.SphereGeometry(0.026, 5, 4).toNonIndexed(), skinHex, 1.34, s * 0.142, -0.005) // 耳
+    const aM = new THREE.Matrix4() // 腕＝上腕＋前腕（肘で前へ曲がる二節）＋手先。棒の一本腕を脱す。同じ統合メッシュに焼くので描画コール不変
     for (const s of [-1, 1]) {
-      const arm = new THREE.CylinderGeometry(0.03, 0.038, 0.56, 5).toNonIndexed(); aM.makeRotationZ(s * 0.07).setPosition(s * 0.205, 0.84, 0.02); arm.applyMatrix4(aM) // 体側へ自然に下ろす（張り出しを減らす）＋少し長く
+      const arm = new THREE.CylinderGeometry(0.032, 0.036, 0.34, 5).toNonIndexed(); aM.makeRotationZ(s * 0.08).setPosition(s * 0.205, 0.95, 0.01); arm.applyMatrix4(aM) // 上腕（体側へ）
       const c = new THREE.Color(bodyCol), a = new Float32Array(arm.attributes.position.count * 3); for (let q = 0; q < a.length; q += 3) { a[q] = c.r; a[q + 1] = c.g; a[q + 2] = c.b } arm.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(arm)
-      bake(new THREE.SphereGeometry(0.043, 6, 5).toNonIndexed(), skinHex, 0.55, s * 0.225, 0.03) // 手先
+      const fore = new THREE.CylinderGeometry(0.027, 0.032, 0.30, 5).toNonIndexed(); aM.makeRotationX(-0.30).setPosition(s * 0.215, 0.66, 0.055); fore.applyMatrix4(aM) // 前腕（肘からやや前へ）
+      const a2 = new Float32Array(fore.attributes.position.count * 3); for (let q = 0; q < a2.length; q += 3) { a2[q] = c.r; a2[q + 1] = c.g; a2[q + 2] = c.b } fore.setAttribute('color', new THREE.BufferAttribute(a2, 3)); geos.push(fore)
+      bake(new THREE.SphereGeometry(0.043, 6, 5).toNonIndexed(), skinHex, 0.52, s * 0.218, 0.10) // 手先
     }
     if (!BufferGeometryUtils.mergeGeometries) return
     const m = BufferGeometryUtils.mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!m) return
@@ -1383,12 +1388,18 @@ export async function mountTown3d(parent, opts = {}) {
     bg.push(paint(new THREE.CylinderGeometry(0.2, 0.165, 0.34, 9).toNonIndexed().translate(0, 1.0, 0), bodyCol)) // 胸
     bg.push(paint(new THREE.CylinderGeometry(0.165, 0.2, 0.34, 9).toNonIndexed().translate(0, 0.69, 0), legHex)) // 腰
     { const sh = new THREE.SphereGeometry(0.205, 9, 6).toNonIndexed(); sh.scale(1.0, 0.4, 0.62); sh.translate(0, 1.16, 0); bg.push(paint(sh, bodyCol)) } // 肩
-    bg.push(paint(new THREE.CylinderGeometry(0.044, 0.052, 0.1, 6).toNonIndexed().translate(0, 1.21, 0), skinHex)) // 首
-    { const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); hd.translate(0, 1.33, 0); bg.push(paint(hd, skinHex)) } // 頭
-    bg.push(paint(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.35, -0.012), hairHex)) // 髪
-    for (const s of [-1, 1]) bg.push(paint(new THREE.SphereGeometry(0.022, 5, 4).toNonIndexed().translate(s * 0.05, 1.35, 0.118), hairHex)) // 目
+    bg.push(paint(new THREE.CylinderGeometry(0.044, 0.052, 0.13, 6).toNonIndexed().translate(0, 1.225, 0), skinHex)) // 首（高く）
+    { const hd = new THREE.SphereGeometry(0.15, 10, 8).toNonIndexed(); hd.scale(0.95, 1.07, 0.96); hd.translate(0, 1.36, 0); bg.push(paint(hd, skinHex)) } // 頭
+    bg.push(paint(new THREE.SphereGeometry(0.163, 9, 7, 0, 6.2832, 0, Math.PI * 0.62).toNonIndexed().translate(0, 1.395, -0.04), hairHex)) // 髪（後上へ）
+    for (const s of [-1, 1]) bg.push(paint(new THREE.SphereGeometry(0.023, 5, 4).toNonIndexed().translate(s * 0.05, 1.362, 0.132), hairHex)) // 目
+    bg.push(paint(new THREE.SphereGeometry(0.021, 5, 4).toNonIndexed().translate(0, 1.33, 0.15), 0xd8b493)) // 鼻
+    bg.push(paint(new THREE.BoxGeometry(0.05, 0.012, 0.012).toNonIndexed().translate(0, 1.298, 0.138), 0x9a6a58)) // 口
+    for (const s of [-1, 1]) bg.push(paint(new THREE.SphereGeometry(0.026, 5, 4).toNonIndexed().translate(s * 0.142, 1.34, -0.005), skinHex)) // 耳
     const aM = new THREE.Matrix4()
-    for (const s of [-1, 1]) { const arm = new THREE.CylinderGeometry(0.03, 0.038, 0.56, 5).toNonIndexed(); aM.makeRotationZ(s * 0.07).setPosition(s * 0.205, 0.84, 0.02); arm.applyMatrix4(aM); bg.push(paint(arm, bodyCol)); bg.push(paint(new THREE.SphereGeometry(0.043, 6, 5).toNonIndexed().translate(s * 0.225, 0.55, 0.03), skinHex)) } // 腕＋手（静止）
+    for (const s of [-1, 1]) { // 腕＝上腕＋前腕（肘で前へ）＋手先。mkCrowdPersonと同じ座標
+      const arm = new THREE.CylinderGeometry(0.032, 0.036, 0.34, 5).toNonIndexed(); aM.makeRotationZ(s * 0.08).setPosition(s * 0.205, 0.95, 0.01); arm.applyMatrix4(aM); bg.push(paint(arm, bodyCol))
+      const fore = new THREE.CylinderGeometry(0.027, 0.032, 0.30, 5).toNonIndexed(); aM.makeRotationX(-0.30).setPosition(s * 0.215, 0.66, 0.055); fore.applyMatrix4(aM); bg.push(paint(fore, bodyCol))
+      bg.push(paint(new THREE.SphereGeometry(0.043, 6, 5).toNonIndexed().translate(s * 0.218, 0.52, 0.10), skinHex)) }
     if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(bg, false); if (m) { const body = new THREE.Mesh(m, crowdMat); body.castShadow = true; g.add(body) } bg.forEach((q) => q.dispose()) }
     // 脚×2（股支点＝y0.56で振れる）。すね＋足を1メッシュに。
     const legs = []
@@ -9980,6 +9991,22 @@ export async function mountTown3d(parent, opts = {}) {
       const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
       const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
       s.remove(g); g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() }); rt.dispose(); return cv.toDataURL()
+    }
+    window.__town3dCrowdShot = (col = 0xb0432e, sc = 0.7, yaw = 0) => { // 検証用: 群衆の一人(mkCrowdPerson)を隔離シーンで接写（顔・腕の造形確認）
+      const p = mkCrowdPerson(0, 0, 0, col, sc); if (!p) return null
+      town.remove(p); const ci = crowdAnim.indexOf(p); if (ci >= 0) crowdAnim.splice(ci, 1); p.rotation.y = yaw
+      const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
+      const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(0.3, 1, 1.3); s.add(dl)
+      const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.25); dl2.position.set(-0.7, 0.4, 0.6); s.add(dl2); s.add(p)
+      const W = 360, H = 560, cam = new THREE.OrthographicCamera(-0.62 * sc, 0.62 * sc, 0.95 * sc, -0.95 * sc, 0.1, 12)
+      cam.position.set(0, 0.78 * sc, 5); cam.lookAt(0, 0.78 * sc, 0)
+      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
+      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx2 = cv.getContext('2d')
+      const img = cx2.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx2.putImageData(img, 0, 0)
+      s.remove(p); p.geometry.dispose(); rt.dispose(); return cv.toDataURL()
     }
     window.__town3dCarShot = (col = 0x3a5a7a) => { // 検証用: 駐車車両(mkCar)を隔離シーンで接写（車輪/窓の確認）
       const g = mkCar(0, 0, 0, 0.5, col)
