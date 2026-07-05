@@ -275,6 +275,7 @@ function start() {
       sleepFading = false
       sleepOverlay.classList.remove('sleep-overlay--on', 'sleep-overlay--done')
       renderer.resume()
+      if (town3dMode) _t3d?.setTown3dPaused?.(false) // 3Dの街も描画を再開（暗転から戻る）
       const st = getState().settings
       audio.setVolume(st.volume) // 音量を戻す
       audio.setMuted(st.muted)
@@ -294,6 +295,7 @@ function start() {
       else {
         sleepOverlay.classList.add('sleep-overlay--done')
         renderer.pause() // 暗転しきったら休む（描画停止＝発熱/電池に配慮）
+        if (town3dMode) _t3d?.setTown3dPaused?.(true) // 3Dの街も暗転の裏で止める（従来は真っ暗な裏で描き続けていた＝純損失）
         audio.setMuted(true)
       }
     }

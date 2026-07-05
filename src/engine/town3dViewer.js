@@ -253,6 +253,12 @@ export function setTown3dSettings(s) {
   if (s.timeStay != null && active.setStay) active.setStay(s.timeStay) // 「時間をとどめる」で日の傾きを凍結
 }
 
+// おやすみの暗転が終わったら描画を止める／触れて戻ったら再開する（発熱・電池配慮）。
+// 2Dレンダラは renderer.pause() で止まるが、3Dの街には停止経路が無く、真っ暗な暗転の裏で16fps×約2100コールを朝まで描き続けていた（純損失）。
+export function setTown3dPaused(on) {
+  if (active) active.paused = !!on
+}
+
 export async function unmountTown3d() {
   token++
   const a = active
@@ -301,7 +307,9 @@ export async function mountTown3d(parent, opts = {}) {
   const PR_FLOOR = LIGHT ? 0.82 : 0.96 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）。高DPR端末で「荒すぎる」のを防ぐため一段引き上げ
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   // アンビエント用途＝省電力GPUを選ばせ発熱/電池を抑える（perf監督C6）。眺める時間が長いので high-performance より low-power が適切。
-  const renderer = new THREE.WebGLRenderer({ antialias: !LIGHT, alpha: false, powerPreference: 'low-power' })
+  // antialias:false＝AAは常用のcomposer(MSAA付き中間RT＋FXAA)が担うため、デフォルトFBのMSAAは最終ブリット(全画面三角形)にしか効かず純粋な無駄（GPUメモリ帯域の浪費・three公式見解）。
+  // composer読込失敗時のフォールバック(直描き)のみAA無しになるが、発生は例外時だけ＝許容（2026-07 発熱対策）。
+  const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'low-power' })
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
   let curQual = QUAL // 現在の描き込み（setQualityで変わる）。'light'では灯りのブルームも切る＝解像度に加え後処理も軽くする
@@ -7511,6 +7519,8 @@ export async function mountTown3d(parent, opts = {}) {
 
   active = {
     renderer, scene, camera, stage, raf: 0,
+    paused: false,                // おやすみの暗転後は true＝描画ループを止める（発熱・電池配慮。setTown3dPaused）
+
     yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0,
     winOpen: 0, winOpenTarget: 0, // 窓をあける（ガラスが横にすべって外気が澄む）。winOpen=ease済みの実値
     winOpenP: 0,                  // 窓あけの線形進行(0..1)。これに ease-in-out をかけて winOpen にする
@@ -8524,6 +8534,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
     if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
+    if (active.paused) return // おやすみの暗転が完了したら描画を止める（真っ暗な裏で描き続けない）。触れて戻ると再開＝発熱・電池配慮
     if (contextLost) return // WebGLコンテキスト喪失中は描画/更新を止める（GLエラーの洪水を避ける。復帰でonContextRestoreが組み直す）
     const t = (performance.now() - startT) / 1000
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
@@ -9980,6 +9991,8 @@ export async function mountTown3d(parent, opts = {}) {
   // 検証用: 見回しを外から設定（?dev=1 のサムネ/撮影で角度を指定）
   if (/[?&]dev=1/.test(location.search)) {
     window.__town3dSetView = (y, p) => { if (active) { active.yaw = active.yawTarget = y || 0; active.pitch = active.pitchTarget = p || 0 } }
+    window.__town3dPaused = (on) => setTown3dPaused(!!on) // 検証用: おやすみ相当の描画停止/再開（active.pausedを立てる）
+    window.__town3dFrame = () => renderer.info.render.frame // 検証用: 実描画したフレーム総数（停止中は増えない＝停止の確認に使う）
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
