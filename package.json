@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "smoke": "node scripts/qa-smoke.mjs"
+    "smoke": "node scripts/qa-smoke.mjs",
+    "walk": "node scripts/qa-debug-walk.mjs"
   },
   "devDependencies": {
     "playwright": "^1.61.0",
