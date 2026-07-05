@@ -6,8 +6,10 @@ const page = await browser.newPage({ viewport: { width: 440, height: 900 }, devi
 await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
-await page.evaluate(() => window.__applyScene && window.__applyScene('kitaterao-window-3d'))
+const scene = process.env.SCENE || 'kitaterao-window-3d'
+await page.evaluate((s) => window.__applyScene && window.__applyScene(s), scene)
 await page.waitForTimeout(2600)
+console.log('SCENE:', scene)
 const dump = await page.evaluate(() => {
   const stage = document.querySelector('.town3d-stage')
   const cs = getComputedStyle(stage)
