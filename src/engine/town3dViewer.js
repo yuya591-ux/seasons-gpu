@@ -7054,7 +7054,7 @@ export async function mountTown3d(parent, opts = {}) {
       LIGHT ? Promise.resolve(null) : import('three/examples/jsm/postprocessing/UnrealBloomPass.js').catch(() => null), // 灯りのブルーム（非力端末は読み込まず＝発熱回避）
     ])
     if (my !== token) return
-    const crt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 2 }) // MSAAは2x（4xはモバイルで帯域・発熱が重く、FXAA併用なので2xで十分・2026-06）
+    const crt = new THREE.WebGLRenderTarget(W, H, { samples: 0 }) // MSAAは切りFXAA一本化＝中間RTの多重サンプルバッファ(帯域/メモリ)を省く。輪郭はFXAAが担い実機で差はごく僅か（2026-07 発熱対策・AB検証済）
     composer = new EffectComposer(renderer, crt)
     composer.addPass(new RenderPass(scene, camera))
     fxaaPass = new ShaderPass(FXAAShader)
@@ -7067,7 +7067,7 @@ export async function mountTown3d(parent, opts = {}) {
       const bThr = isNight ? 0.72 : duskAmt > 0.25 ? 0.84 : 0.90 // 昼はかなり高いしきい値＝太陽のきらめき/灯りだけ滲ませ、白い雲の面は光らせない
       const bRad = isNight ? 0.62 : 0.5
       bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, bRad, bThr)
-      bloomWanted = bs > 0.04
+      bloomWanted = bs > 0.10 // 昼(bs=0.05)/雪昼(0.03)のほぼ不可視ブルームは焚かない＝毎フレの多段ぼかしを省き発熱を下げる。夕(0.13+)/夜(0.62)の灯りの滲みは完全維持（値は離散なので0.10で綺麗に分離）
       bloomPass.enabled = bloomWanted && curQual !== 'light' // 軽やか品質では後処理ブルームを切る（発熱回避）
       composer.addPass(bloomPass)
     }
@@ -9992,6 +9992,8 @@ export async function mountTown3d(parent, opts = {}) {
   if (/[?&]dev=1/.test(location.search)) {
     window.__town3dSetView = (y, p) => { if (active) { active.yaw = active.yawTarget = y || 0; active.pitch = active.pitchTarget = p || 0 } }
     window.__town3dPaused = (on) => setTown3dPaused(!!on) // 検証用: おやすみ相当の描画停止/再開（active.pausedを立てる）
+    window.__town3dBloom = (on) => { if (bloomPass) { bloomPass.enabled = !!on; return bloomPass.strength } return null } // 検証用: ブルームを強制ON/OFF（同一フレームでのAB＝アニメ差を排除）
+    window.__town3dBloomInfo = () => bloomPass ? { enabled: bloomPass.enabled, strength: +bloomPass.strength.toFixed(3), wanted: bloomWanted } : null // 検証用: 現情景のブルーム状態
     window.__town3dFrame = () => renderer.info.render.frame // 検証用: 実描画したフレーム総数（停止中は増えない＝停止の確認に使う）
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
