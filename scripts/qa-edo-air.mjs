@@ -21,10 +21,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const TX = 640, TZ = -46
 const VIEWS = [
-  ['01-aerial-low.png', [TX + 8, 82, TZ + 210], [TX, 6, TZ - 8], 54],   // 低い斜め俯瞰
-  ['02-map-top.png', [TX, 225, TZ + 60], [TX, 2, TZ], 56],              // ほぼ真上（海岸線の輪郭）
-  ['03-aerial-nw.png', [TX - 130, 96, TZ + 130], [TX + 10, 4, TZ - 30], 54], // 北西からの斜俯瞰
-  ['04-shore-low.png', [TX - 44, 36, TZ + 145], [TX - 34, 9, TZ - 10], 56], // 低空＝汀のなだらかさ
+  ['01-aerial-low.png', [TX + 6, 118, TZ + 240], [TX + 6, 6, TZ - 20], 56],   // 低い斜め俯瞰（南から島全体）
+  ['02-map-top.png', [TX + 6, 305, TZ - 6], [TX + 6, 2, TZ - 6], 60],          // ほぼ真上（不定形の海岸線の輪郭）
+  ['03-aerial-nw.png', [TX - 155, 125, TZ + 150], [TX + 10, 4, TZ - 20], 54],  // 北西からの斜俯瞰
+  ['04-shore-low.png', [TX - 44, 36, TZ + 150], [TX - 30, 9, TZ - 6], 56],     // 低空＝汀のなだらかさ
+  ['05-aerial-e.png', [TX + 210, 120, TZ + 40], [TX + 30, 4, TZ - 10], 54],    // 東（半島）からの俯瞰
 ]
 
 ;(async () => {
