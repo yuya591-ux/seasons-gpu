@@ -1056,6 +1056,20 @@ export async function mountTown3d(parent, opts = {}) {
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
   }
+  // 汀の砂浜: bakeGroundVColors の後段で、海面近くの低い頂点だけ砂色へ寄せる（水際ほど強い）＝草の斜面が直に青へ落ちるのを脱し「海へ自然につながる渚」に。
+  // baseY=メッシュのworld-y基準（頂点のworld高= baseY + local-y）。R()不使用・描画コール不変・共有関数は無改変。
+  const beachTint = (geo, baseY, sand = 0xd8c9a2) => {
+    const pos = geo.attributes.position, col = geo.attributes.color; if (!col) return
+    const cs = new THREE.Color(sand), tc = new THREE.Color()
+    for (let i = 0; i < pos.count; i++) {
+      const wy = baseY + pos.getY(i)                                   // 頂点の海抜
+      const t = Math.max(0, Math.min(1, (SEA.level + 6 - wy) / 6))     // 汀(-10)〜約-4の帯で1→0（渚を広めに）
+      if (t <= 0) continue
+      tc.setRGB(col.getX(i), col.getY(i), col.getZ(i)).lerp(cs, t * 0.9) // 水際ほど砂へ（線形＝帯全体でしっかり読める）
+      col.setXYZ(i, tc.r, tc.g, tc.b)
+    }
+    col.needsUpdate = true
+  }
   // ── 時代の建物の正面テクスチャ（格子窓/連子窓/洋風窓）＝近づいても「窓のある建物」に。最初の街の質感へ統一する。 ──
   const makeFacade = (kind, baseHex) => {
     const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), base = new THREE.Color(baseHex)
@@ -3716,6 +3730,7 @@ export async function mountTown3d(parent, opts = {}) {
             snowE ? 0xdde3dc : season === 'autumn' ? 0x9a8a4e : season === 'spring' ? 0x86984e : 0x86864c, // 草地（乾いた緑）
             snowE ? 0xd2d8d2 : season === 'autumn' ? 0x9a8048 : 0x9a8c5a, // 乾いた地肌
             snowE ? 0xcdd2cc : 0x8a7448, 0.6) // 斜面の土
+          if (season !== 'winter') beachTint(gI, 0) // 汀の砂浜（メッシュはy=0基準。冬は雪の渚なので除外）
           const em = mottleMat(0xffffff, 150, 0.1, [44, 44]); em.vertexColors = true // 反復を上げ近接で地面の細部（過拡大の平滑を脱す）
           if (em.map) { em.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); em.map.needsUpdate = true }
           const gmesh = new THREE.Mesh(gI, em); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
@@ -4368,6 +4383,7 @@ export async function mountTown3d(parent, opts = {}) {
             snowT ? 0xcfd0ca : season === 'autumn' ? 0x90884e : 0x86905a, // 苔/草地
             snowT ? 0xc9c8c2 : 0x9c948a, // 石土
             snowT ? 0xc2c2bc : 0x8a7e68, 0.72) // 斜面の地肌
+          if (season !== 'winter') beachTint(gI, gy) // 汀の砂浜（冬は雪の渚なので除外）
           const tm = mottleMat(0xffffff, 150, 0.1, [46, 46]); tm.vertexColors = true // 反復を上げ近接で地面の細部（過拡大の平滑を脱す）
           if (tm.map) { tm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); tm.map.needsUpdate = true }
           const gmesh = new THREE.Mesh(gI, tm); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
