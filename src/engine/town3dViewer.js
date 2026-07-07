@@ -894,6 +894,71 @@ export async function mountTown3d(parent, opts = {}) {
     L = Math.min(L, -ellipseIn(x, z, TAISHO.x + 60, TAISHO.z - 6, 28, 22, 0.2))   // 東に切れ込む入り江（湾）を彫る
     return L
   }
+  // ── 島の汀の作り込み（homeの南海岸の渚を、島の閉じた海岸線へ流用）。エリア中心ローカルで焼き＋position=中心＝距離カリングに乗る。
+  //    ①寄せ返しの白波リボン（海と同じuTimeのシェーダー＝フレーム追加負荷ゼロ）②乾いた砂の流木・寄り石・浜草。R()不使用＝配置シード不変。
+  let _coastFoamMat = null
+  const coastFoamMat = () => {
+    if (_coastFoamMat) return _coastFoamMat
+    const nc = document.createElement('canvas'); nc.width = nc.height = 64; const ncx = nc.getContext('2d') // 泡のレース（柔らかい白斑）
+    ncx.fillStyle = '#000'; ncx.fillRect(0, 0, 64, 64)
+    for (let q = 0; q < 260; q++) { ncx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.7})`; ncx.beginPath(); ncx.arc(Math.random() * 64, Math.random() * 64, 0.6 + Math.random() * 2.2, 0, 6.2832); ncx.fill() } // Math.random＝種付きR()を消費しない
+    const ntex = new THREE.CanvasTexture(nc); ntex.wrapS = ntex.wrapT = THREE.RepeatWrapping
+    const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true, side: THREE.DoubleSide }) // 両面＝リボンの法線向きに関係なく見える（片面だと裏面カリングで消える）
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = seaUniforms.uTime; sh.uniforms.uNoise = { value: ntex }
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vUvF = uv;\n  vWPf = (modelMatrix * vec4(transformed,1.0)).xyz;')
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform sampler2D uNoise;\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
+        .replace('#include <fog_fragment>', `#include <fog_fragment>
+          float aw = vUvF.x;                                          // 0=陸(砂) .. 1=海
+          float wf = 0.50 + 0.32 * sin(uTime * 0.42 - vWPf.z * 0.045 - vWPf.x * 0.02); // 寄せ返しの先端（汀沿いに位相がずれ斜めに寄せる）
+          float band = smoothstep(0.16, 0.0, abs(aw - wf));           // 先端の白いレース
+          float behind = smoothstep(wf - 0.02, 1.0, aw) * 0.5;        // 先端より海側の残り泡
+          float lace = texture2D(uNoise, vUvF * vec2(2.5, 8.0) + vec2(uTime * 0.03, uTime * 0.07)).r;
+          float foam = clamp(band + behind, 0.0, 1.0) * (0.55 + 0.45 * lace);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.95, 0.98, 1.0), 0.9);
+          gl_FragColor.a *= clamp(foam, 0.0, 1.0) * 0.92;
+        `)
+    }
+    _coastFoamMat = m; return m
+  }
+  const addCoastDetail = (cx, cz, landFn) => {
+    if (kind === 'yato') return
+    // ① 寄せ返しの白波リボン（角度で島の海岸線を一周＝閉じた渚）
+    const N = 140, fpos = [], fuv = []; let prev = null
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * 6.2832, ca = Math.cos(a), sa = Math.sin(a), rc = coastR(landFn, cx, cz, a)
+      const lx = ca * (rc - 3.4), lz = sa * (rc - 3.4), ly = heightAt(cx + lx, cz + lz) + 0.06 // 陸側(砂)は地面へ
+      const sx = ca * (rc + 2.6), sz = sa * (rc + 2.6), sy = SEA.level + 0.05                  // 海側は海面へ
+      const cur = { L: [lx, ly, lz], S: [sx, sy, sz], al: i / N }
+      if (prev) { const pv = (v, ax, al) => { fpos.push(v[0], v[1], v[2]); fuv.push(ax, al) } // uv=(across:0陸..1海, along:0..1)
+        pv(prev.L, 0, prev.al); pv(prev.S, 1, prev.al); pv(cur.S, 1, cur.al)
+        pv(prev.L, 0, prev.al); pv(cur.S, 1, cur.al); pv(cur.L, 0, cur.al) }
+      prev = cur
+    }
+    if (fpos.length) {
+      const fg = new THREE.BufferGeometry()
+      fg.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3)); fg.setAttribute('uv', new THREE.Float32BufferAttribute(fuv, 2)); fg.computeVertexNormals()
+      const foam = new THREE.Mesh(fg, coastFoamMat()); foam.position.set(cx, 0, cz); foam.renderOrder = 2; foam.frustumCulled = false; town.add(foam)
+    }
+    // ② 乾いた砂の流木・寄り石・浜草（iで決定的に散らす＝R()を消費せず後段の配置を乱さない）
+    const driftG = [], stoneG = [], grassG = [], dM = new THREE.Matrix4()
+    for (let i = 0; i < 72; i++) {
+      const a = (i / 72) * 6.2832, ca = Math.cos(a), sa = Math.sin(a), rc = coastR(landFn, cx, cz, a)
+      const br = rc - 5.0 - (i % 3) * 1.4, bx = ca * br, bz = sa * br, by = heightAt(cx + bx, cz + bz) // 汀の少し上＝乾いた砂
+      if (by < SEA.level + 0.2 || by > SEA.level + 5.0) continue // 砂の帯だけ（内陸/海は除外）
+      const sel = i % 4
+      if (sel === 0) { const len = 2.0 + (i % 4) * 0.5, dg = new THREE.BoxGeometry(len, 0.28, 0.34); dM.makeRotationY(a + 0.6 + i * 0.4).setPosition(bx, by + 0.12, bz); dg.applyMatrix4(dM); driftG.push(dg) } // 流木（寝かせた材）
+      else if (sel === 1) { for (let s = 0; s < 3; s++) { const sg = new THREE.IcosahedronGeometry(0.26 + (s % 2) * 0.12, 0); sg.scale(1.3, 0.6, 1.1); dM.makeTranslation(bx + (s - 1) * 0.5, by + 0.1, bz + (s % 2 ? 0.4 : -0.3)); sg.applyMatrix4(dM); stoneG.push(sg) } } // 寄り石
+      else { for (let s = 0; s < 4; s++) { const h = 0.42 + (s % 3) * 0.16, gg = new THREE.ConeGeometry(0.05, h, 4); dM.makeRotationZ((s - 1.5) * 0.16).setPosition(bx + (s - 1.5) * 0.16, by + h / 2, bz + (i % 2 ? 0.2 : -0.2)); gg.applyMatrix4(dM); grassG.push(gg) } } // 浜草（砂丘の草株）
+    }
+    const addMerged = (geos, mat, shadow) => { if (geos.length && BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries(geos, false); if (m) { const me = new THREE.Mesh(m, mat); me.castShadow = shadow; me.position.set(cx, 0, cz); town.add(me) } geos.forEach((g) => g.dispose()) } }
+    addMerged(driftG, toon(season === 'winter' ? 0x8a8278 : 0x9a8a72), true)
+    addMerged(stoneG, toon(0x9a958c), true)
+    addMerged(grassG, toon(season === 'winter' ? 0xb8c0b4 : season === 'autumn' ? 0xa89a5a : 0x7a9455), false)
+  }
   // 戦国＝「霧の谷あいの城下町」の地形（単一の急な円錐を脱し、川の谷＋両側のなだらかな尾根＋背後の山並みへ作り替え）。
   // 南(+z=現代/海の側)に河口が開き、川が谷を南北に蛇行。谷底に城下町、東の尾根の中腹の平場(bluff)に城。
   // 起伏は意図配置のガウス丘の和＝放射対称でなく自然。海(SEA.level)へ向け裾が落ちる。メッシュ/配置/heightAt が共有。
@@ -3765,6 +3830,7 @@ export async function mountTown3d(parent, opts = {}) {
           } } // 城下〜外周の田畑（外周の地肌を埋める）＋町なかの庭木
         // 海岸の磯（島の汀に岩が点々＝海岸線のクオリティ）
         for (let k = 0; k < 26; k++) { const a = (k / 26) * 6.2832 + R() * 0.2, rr = coastR(edoLand, ex, ez, a) - 3 + R() * 6, rx = ex + Math.cos(a) * rr, rz = ez + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.3, 0), toon(season === 'winter' ? 0x9c9c98 : 0x837c70)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3 + R() * 0.5, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.65; rk.castShadow = true; town.add(rk) }
+        addCoastDetail(EDO.x, EDO.z, edoLand) // 汀の白波リボン＋流木/寄り石/浜草（homeの渚を島の閉じた海岸線へ）
         // 江戸の堀・川を「空を映す水鏡」に（海テクスチャ流用の平らな青を脱す＝谷戸/home/大正と質を揃える）。さざ波は決定的パターン＝R()列を乱さない。
         const ewc = document.createElement('canvas'); ewc.width = ewc.height = 64; const ewx = ewc.getContext('2d')
         const ewg = ewx.createLinearGradient(0, 0, 0, 64); ewg.addColorStop(0, '#' + new THREE.Color(0x6ea2c4).lerp(skyTop, 0.34).getHexString()); ewg.addColorStop(1, '#' + new THREE.Color(0x46708e).lerp(skyHorizon, 0.18).getHexString())
@@ -4670,6 +4736,7 @@ export async function mountTown3d(parent, opts = {}) {
           trams.push({ g: tram, x0: rx0, x1: rx1, z: railZ, sp: 7 + R() * 2, ph: R() * 100 })
         }
         for (let k = 0; k < 16; k++) { const a = (k / 16) * 6.2832 + R() * 0.25, rr = coastR(taishoLand, tx, tz, a) - 3 + R() * 6, rx = tx + Math.cos(a) * rr, rz = tz + Math.sin(a) * rr, ry = heightAt(rx, rz); const rk = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 1.2, 0), toon(0x7c766a)); rk.position.set(rx, Math.max(SEA.level, ry) + 0.3, rz); rk.rotation.set(R() * 3, R() * 3, R() * 3); rk.scale.y = 0.6; town.add(rk) } // 汀の磯（うねる海岸線に沿わせる）
+        addCoastDetail(TAISHO.x, TAISHO.z, taishoLand) // 汀の白波リボン＋流木/寄り石/浜草（homeの渚を島の閉じた海岸線へ）
       }
       // ── 異時代の島々を本物の島に：開発された街の外周に森のベルト＋汀の磯を巡らせ「海から唐突に街が浮かぶ」違和感を消す ──
       { const beltTrunk = [], beltLeaf = [], beltCone = [], rockGeos = [], nM = new THREE.Matrix4()
