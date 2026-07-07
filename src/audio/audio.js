@@ -454,9 +454,9 @@ export function createAudio(opts) {
     } catch { /* LFO非対応でもベース音量で鳴る */ }
     try { wsrc.start(); rsrc.start(); csrc.start() } catch { /* 無視 */ }
   }
-  //  夏祭りの囃子（太鼓＋締太鼓＋笛＋鉦＋人のざわめき）。setFestival(近さ0..1)が音量を満ち引きさせ、
-  //  遠くは brightLP で高域がこもり（太鼓だけが届く）→近づくと笛・鉦が際立つ＝「近づくと普通の音に近づく」を表現。
-  //  太鼓は低音をスマホで歪ませないため中域の thump＋クリックで拍を出す（低音ドローンの教訓）。
+  //  夏祭りの囃子（遠くから届く太鼓の律動＋締太鼓＋鉦＋人のざわめき）。setFestival(近さ0..1)が音量を満ち引きさせ、
+  //  遠くは brightLP で高域がこもり（太鼓の胴だけが届く）→近づくと締太鼓・鉦の刻みが立つ＝「近づくほど賑わいが満ちる」。
+  //  合成の笛の旋律は「作り物のBGM」に聞こえるため撤去（実機FB）。祭りらしさは“本物の太鼓の律動”で出す。太鼓は低音をスマホで歪ませないため中域中心。
   let festNode = null
   const festState = { amt: 0 }
   function startFestival() {
@@ -471,42 +471,39 @@ export function createAudio(opts) {
     const msrc = ctx.createBufferSource(); msrc.buffer = buf; msrc.loop = true
     const mhp = ctx.createBiquadFilter(); mhp.type = 'highpass'; mhp.frequency.value = 380
     const mbp = ctx.createBiquadFilter(); mbp.type = 'bandpass'; mbp.frequency.value = 700; mbp.Q.value = 0.7
-    const mg = ctx.createGain(); mg.gain.value = 0.5; msrc.connect(mhp).connect(mbp).connect(mg).connect(fg)
+    const mg = ctx.createGain(); mg.gain.value = 0.42; msrc.connect(mhp).connect(mbp).connect(mg).connect(fg)
     try { msrc.start() } catch { /* 無視 */ }
     festNode = { fg, bright, pan: fPan, nextNote: ctx.currentTime + 0.12, step: 0, sched: null }
-    // 太鼓の一打（中域の thump＋クリック。低音はスマホで歪むので高め）
-    const taiko = (tt, hi) => {
-      const o = ctx.createOscillator(); o.type = 'sine'; const g = ctx.createGain(); const f0 = hi ? 300 : 190
-      o.frequency.setValueAtTime(f0 * 1.7, tt); o.frequency.exponentialRampToValueAtTime(f0, tt + 0.06)
-      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(hi ? 0.44 : 0.6, tt + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, tt + (hi ? 0.11 : 0.2)) // 大太鼓のドンドンを抑え華やかな囃子へ（実機FB）
-      o.connect(g).connect(fg); o.start(tt); o.stop(tt + 0.28)
-      const cg2 = ctx.createGain(); cg2.gain.setValueAtTime(0.1, tt); cg2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.03)       // クリック＝遠くでも拍が分かる
-      const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = 900; cl.Q.value = 0.8
+    // 太鼓の一打（中域の胴＋皮の当たり。低音はスマホで歪むので中域中心。vel=強弱でヒューマナイズ）
+    const taiko = (tt, hi, vel = 1) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; const g = ctx.createGain(); const f0 = hi ? 300 : 176
+      o.frequency.setValueAtTime(f0 * 1.8, tt); o.frequency.exponentialRampToValueAtTime(f0, tt + 0.07)
+      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime((hi ? 0.42 : 0.6) * vel, tt + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, tt + (hi ? 0.12 : 0.24))
+      o.connect(g).connect(fg); o.start(tt); o.stop(tt + 0.3)
+      if (!hi) { const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.setValueAtTime(f0 * 1.2, tt); o2.frequency.exponentialRampToValueAtTime(f0 * 0.64, tt + 0.1); const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, tt); g2.gain.exponentialRampToValueAtTime(0.28 * vel, tt + 0.006); g2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.27); o2.connect(g2).connect(fg); o2.start(tt); o2.stop(tt + 0.32) } // 大太鼓の胴鳴り（締まった低めの倍音で重みを足す）
+      const cg2 = ctx.createGain(); cg2.gain.setValueAtTime(0.09 * vel, tt); cg2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.03)       // 皮の当たり＝遠くでも拍が分かる
+      const cl = ctx.createBiquadFilter(); cl.type = 'bandpass'; cl.frequency.value = hi ? 1400 : 900; cl.Q.value = 0.8
       const nb = ctx.createBufferSource(); nb.buffer = buf; nb.loop = true; nb.connect(cl).connect(cg2).connect(fg); try { nb.start(tt); nb.stop(tt + 0.05) } catch { /* 無視 */ }
     }
-    const fue = (tt, freq, dur) => {  // 笛（やわらかい三角波＋ビブラート。brightを通すので近づくほど際立つ）
-      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = freq
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.34, tt + 0.05); g.gain.setTargetAtTime(0.0001, tt + dur * 0.6, 0.12) // 笛の旋律を立てる＝祭りらしさ（実機FB）
-      const v = ctx.createOscillator(); v.frequency.value = 5.5; const vg = ctx.createGain(); vg.gain.value = freq * 0.008; v.connect(vg).connect(o.frequency)
-      o.connect(g).connect(bright); try { o.start(tt); o.stop(tt + dur + 0.1); v.start(tt); v.stop(tt + dur + 0.1) } catch { /* 無視 */ }
-    }
-    const kane = (tt, vol = 0.13) => {  // 鉦（チャンチキ）＝金属質の高い点。volで強弱（チャン=強/チキ=弱）＝祭りらしい金物の刻み
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(vol, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + (vol > 0.1 ? 0.16 : 0.1)) // 鉦の高い点を立てる＝祭りらしさ
+    // 合成の笛旋律(fue)は「作り物のBGM」に聞こえたため撤去（実機FB）。祭りらしさは太鼓の律動＋鉦の刻み＋ざわめきで出す。
+    const kane = (tt, vol = 0.08) => {  // 鉦（あたり鉦）＝金属質の高い点。控えめに（太鼓を主役に）。非整数倍で本物の金物寄りに
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.001, tt); g.gain.exponentialRampToValueAtTime(vol, tt + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.12)
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600; hp.connect(g).connect(bright)
-      for (const f of [2700, 3550, 4300]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hp); try { o.start(tt); o.stop(tt + 0.18) } catch { /* 無視 */ } }
+      for (const f of [2740, 3510, 4270, 5300]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * (0.995 + Math.random() * 0.01); o.connect(hp); try { o.start(tt); o.stop(tt + 0.15) } catch { /* 無視 */ } }
     }
-    // 囃子のパターン（1小節=8ステップ。盆踊り風の繰り返し）。2=大太鼓 1=締太鼓 0=休。
-    const STEP = 0.3, taikoPat = [2, 0, 1, 0, 2, 0, 1, 0], kanePat = [0.15, 0, 0.08, 0, 0.15, 0, 0.08, 0] // 鉦のチャンチキ刻み（強拍=チャン／裏拍=チキ＝祭りらしい金物の律動を効かせる）
-    const fueA = [880, 0, 1047, 1175, 1047, 0, 880, 0], fueB = [1175, 0, 1047, 880, 784, 0, 880, 0]   // 2小節で交互＝単調さを避ける
+    // 囃子の律動（1小節=16ステップ＝4拍×16分。本物の祭り太鼓の転がるグルーヴ）。2=大太鼓 1=締太鼓 0=休。
+    const STEP = 0.15, taikoPat = [2, 0, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 1, 0, 1] // 大太鼓=1拍3拍／締太鼓の刻みと終端のドコドンで踊れる律動に
+    const kanePat = [0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0]   // 鉦のチキ刻み（控えめ＝太鼓が主役／近づいた時だけ鳴る）
     const schedule = () => {
       if (!festNode) return
       const ahead = ctx.currentTime + 0.25
       while (festNode.nextNote < ahead) {
         if (festState.amt > 0.005) {  // 近くに祭りが無い時は音符を作らない（無駄な処理を省く）
-          const tt = festNode.nextNote, s = festNode.step % 8, bar = Math.floor(festNode.step / 8)
-          const tp = taikoPat[s]; if (tp === 2) taiko(tt, false); else if (tp === 1) taiko(tt, true)
-          const fn = (bar % 2 ? fueB : fueA)[s]; if (fn) fue(tt, fn, STEP * 0.9)
-          const kp = kanePat[s]; if (kp) kane(tt, kp)
+          const s = festNode.step % 16
+          const tt = festNode.nextNote + (Math.random() - 0.5) * 0.012 // 微小な間のゆらぎ＝機械的な反復を避ける（ヒューマナイズ）
+          const tp = taikoPat[s], vel = 0.82 + Math.random() * 0.3
+          if (tp === 2) taiko(tt, false, vel); else if (tp === 1) taiko(tt, true, vel * 0.9)
+          const kp = kanePat[s]; if (kp && festState.amt > 0.35) kane(tt, kp) // 鉦は近づいた時だけ（遠くは太鼓の胴だけ届く）
         }
         festNode.nextNote += STEP; festNode.step++
       }
