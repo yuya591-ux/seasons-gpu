@@ -5690,6 +5690,8 @@ export async function mountTown3d(parent, opts = {}) {
     const tn = (col) => new THREE.MeshToonMaterial({ color: col, gradientMap: grad })
     const collarMat = new THREE.MeshBasicMaterial({ color: isNight ? 0xb0b6c8 : 0xf4f3ee, transparent: true, opacity: isNight ? 0.42 : 0.62, depthWrite: false, fog: false }) // 雲の襟（島の腰に巻く薄雲）
     const isleGrassMat = mottleMat(isleGrass, 150, 0.19, [3, 3]) // 島の草頂＝水彩ムラ（ベタ塗りの平面を脱す。色斑を大きめ＝島スケールで面の変化が読める）。全島で共有＝描画コール/テクスチャを増やさない
+    const isleTreeMats = (isNight ? [0x2c4632, 0x243c2c, 0x35533e] : [0x4a7a48, 0x568a50, 0x3e6a3e]).map((c) => tn(c)) // 樹冠を数色の緑で層に＝脱ローポリの奥行き（全島共有）
+    const isleBarkMat = tn(isNight ? 0x3a2e26 : 0x5a4634)
     const makeFloatIsle = (r) => {
       const g = new THREE.Group()
       g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 2.4, 22), isleGrassMat)) // 草の頂（水彩ムラ）
@@ -5705,11 +5707,11 @@ export async function mountTown3d(parent, opts = {}) {
         for (let i = 0; i < ng; i++) { const a = R() * 6.28, rr = r * (0.3 + R() * 0.64), tg = new THREE.ConeGeometry(0.11, 0.42 + R() * 0.5, 4); tg.translate(Math.cos(a) * rr, 1.45, Math.sin(a) * rr); gg.push(tg) }
         if (gg.length && BufferGeometryUtils.mergeGeometries) { const gm = BufferGeometryUtils.mergeGeometries(gg, false); gg.forEach((x) => x.dispose()); if (gm) g.add(new THREE.Mesh(gm, grassC)) } }
       if (!isNight) for (let i = 0; i < nb + 2; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), tn([0xeef0ee, 0xf0d850, 0xe6a8cc, 0xf0b8d0][(R() * 4) | 0])); fl.position.set(Math.cos(a) * rr, 1.42, Math.sin(a) * rr); g.add(fl) } // 野花の彩り（昼・縁に）
-      const treeC = tn(isNight ? 0x2c4632 : 0x4a7a48), barkC = tn(isNight ? 0x3a2e26 : 0x5a4634), ntr = r > 14 ? 2 : 1 // 小さな木を外縁(r*0.8以遠＝中央の構造物の外)に。縦の緑で群島のシルエットを豊かに
-      for (let i = 0; i < ntr; i++) { const a = R() * 6.28, rr = r * (0.8 + R() * 0.12), tx = Math.cos(a) * rr, tz = Math.sin(a) * rr, th = 2.4 + R() * 1.6
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.3, th, 6), barkC); trunk.position.set(tx, 1.2 + th / 2, tz); g.add(trunk)
-        const c1 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 + R() * 0.7, 1), treeC); c1.scale.y = 0.95; c1.position.set(tx, 1.2 + th + 0.7, tz); g.add(c1)
-        const c2 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 + R() * 0.5, 1), treeC); c2.position.set(tx + (R() - 0.5) * 1.2, 1.2 + th + 0.1, tz + (R() - 0.5) * 1.2); g.add(c2) }
+      const ntr = r > 14 ? 2 : 1 // 小さな木を外縁(r*0.78以遠＝中央の構造物の外)に。縦の緑で群島のシルエットを豊かに
+      for (let i = 0; i < ntr; i++) { const a = R() * 6.28, rr = r * (0.78 + R() * 0.14), tx = Math.cos(a) * rr, tz = Math.sin(a) * rr, th = 2.4 + R() * 1.6, cy = 1.2 + th
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.3, th, 6), isleBarkMat); trunk.position.set(tx, 1.2 + th / 2, tz); g.add(trunk)
+        for (const [dx, dy, dz, rad, ci] of [[0, 0.7, 0, 1.5 + R() * 0.6, 0], [(R() - 0.5) * 1.5, 0.05, (R() - 0.5) * 1.5, 1.05 + R() * 0.5, 1], [(R() - 0.5) * 1.2, 1.35, (R() - 0.5) * 1.0, 0.85 + R() * 0.4, 2]]) {
+          const cl = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 2), isleTreeMats[ci]); cl.scale.y = 0.94; cl.position.set(tx + dx, cy + dy, tz + dz); g.add(cl) } } // 3層の樹冠（det2で丸く・色差で立体＝脱ローポリ）
       return g
     }
     const isles = []
