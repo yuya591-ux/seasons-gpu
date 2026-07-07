@@ -5689,9 +5689,10 @@ export async function mountTown3d(parent, opts = {}) {
     const isleGrass = isNight ? 0x3a5642 : 0x6f9a5c, isleRock = isNight ? 0x484540 : 0x7b6f60
     const tn = (col) => new THREE.MeshToonMaterial({ color: col, gradientMap: grad })
     const collarMat = new THREE.MeshBasicMaterial({ color: isNight ? 0xb0b6c8 : 0xf4f3ee, transparent: true, opacity: isNight ? 0.42 : 0.62, depthWrite: false, fog: false }) // 雲の襟（島の腰に巻く薄雲）
+    const isleGrassMat = mottleMat(isleGrass, 150, 0.19, [3, 3]) // 島の草頂＝水彩ムラ（ベタ塗りの平面を脱す。色斑を大きめ＝島スケールで面の変化が読める）。全島で共有＝描画コール/テクスチャを増やさない
     const makeFloatIsle = (r) => {
       const g = new THREE.Group()
-      g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 2.4, 22), tn(isleGrass))) // 草の頂
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 2.4, 22), isleGrassMat)) // 草の頂（水彩ムラ）
       const rk = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.96, r * 0.2, r * 1.0, 16), tn(isleRock)); rk.position.y = -r * 0.5; g.add(rk) // 下へ細る岩肌（先を切った台形＝針のように尖った逆円錐を脱す）
       // 雲の襟＝島の腰に薄い雲のクッションを巻き、岩の底を雲海に溶かす（とがった底が宙に浮いて見えるのを防ぐ）。1メッシュに統合＝描画コール+1のみ。
       { const collarGeos = [], nc = 5 + ((r / 7) | 0), cM = new THREE.Matrix4()
@@ -5700,8 +5701,8 @@ export async function mountTown3d(parent, opts = {}) {
       // 草の頂にぽつぽつ低木＝平らな草地を脱し雲の島に緑の生命感（少数・島は低空で一括カリング＝発熱安全）
       const bushC = tn(isNight ? 0x2e4a36 : 0x4f7a4e), grassC = tn(isNight ? 0x32543a : 0x5f8a4e), nb = 3 + ((r / 7) | 0)
       for (let i = 0; i < nb; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4), bs = 0.6 + R() * 0.9; const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(bs, 1), bushC); bush.scale.y = 0.6 + R() * 0.4; bush.position.set(Math.cos(a) * rr, 1.2 + bs * 0.4, Math.sin(a) * rr); g.add(bush) } // 大小の茂みを縁に寄せて（中央の構造物を避ける）
-      { const gg = [], ng = 5 + ((r / 4) | 0) // 草むら＝縁に沿った小さな草の束（1メッシュへ統合＝瑞々しさを足しても描画+1のみ）
-        for (let i = 0; i < ng; i++) { const a = R() * 6.28, rr = r * (0.55 + R() * 0.38), tg = new THREE.ConeGeometry(0.12, 0.5 + R() * 0.45, 4); tg.translate(Math.cos(a) * rr, 1.45, Math.sin(a) * rr); gg.push(tg) }
+      { const gg = [], ng = 14 + ((r * 0.8) | 0) // 草むら＝縁〜内側まで密に（1メッシュへ統合＝瑞々しさを足しても描画+1のみ。平らな草地を脱す）
+        for (let i = 0; i < ng; i++) { const a = R() * 6.28, rr = r * (0.3 + R() * 0.64), tg = new THREE.ConeGeometry(0.11, 0.42 + R() * 0.5, 4); tg.translate(Math.cos(a) * rr, 1.45, Math.sin(a) * rr); gg.push(tg) }
         if (gg.length && BufferGeometryUtils.mergeGeometries) { const gm = BufferGeometryUtils.mergeGeometries(gg, false); gg.forEach((x) => x.dispose()); if (gm) g.add(new THREE.Mesh(gm, grassC)) } }
       if (!isNight) for (let i = 0; i < nb + 2; i++) { const a = R() * 6.28, rr = r * (0.5 + R() * 0.4); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), tn([0xeef0ee, 0xf0d850, 0xe6a8cc, 0xf0b8d0][(R() * 4) | 0])); fl.position.set(Math.cos(a) * rr, 1.42, Math.sin(a) * rr); g.add(fl) } // 野花の彩り（昼・縁に）
       const treeC = tn(isNight ? 0x2c4632 : 0x4a7a48), barkC = tn(isNight ? 0x3a2e26 : 0x5a4634), ntr = r > 14 ? 2 : 1 // 小さな木を外縁(r*0.8以遠＝中央の構造物の外)に。縦の緑で群島のシルエットを豊かに
