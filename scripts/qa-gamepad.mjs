@@ -80,6 +80,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   await press(8) // VIEW → 窓辺へ戻る
   s = await gp(); check('VIEW→窓辺へ戻る', s.mode === 'window', { mode: s.mode })
 
+  // ── キーコンフィグ(Phase B): 設定パネルを開き、A を別ボタンへ再割当→保存→既定に戻す ──
+  const padCfgVisible = await page.evaluate(() => { const b = document.querySelector('.town3d-padcfg-btn'); return !!b && getComputedStyle(b).display !== 'none' })
+  check('接続で「⚙コントローラー」表示', padCfgVisible, { visible: padCfgVisible })
+  await page.evaluate(() => document.querySelector('.town3d-padcfg-btn').click()); await sleep(250) // パネルを開く（evaluateで直接click＝オーバーレイに邪魔されない）
+  check('既定マップ A=0', (await gp()).map.A === 0, { A: (await gp()).map.A })
+  await page.evaluate(() => { for (const b of document.querySelectorAll('.town3d-padcfg button')) if (b.textContent === '変更') { b.click(); break } }); await sleep(150) // 最初の行(A)の「変更」（パネル内に限定）
+  check('割当キャプチャ開始(cap=A)', (await gp()).cap === 'A', { cap: (await gp()).cap })
+  await press(5) // ボタン5を押す → A へ割り当て
+  check('A をボタン5へ再割当', (await gp()).map.A === 5, { A: (await gp()).map.A })
+  const saved = await page.evaluate(() => localStorage.getItem('seasons_padmap'))
+  check('localStorage へ保存', !!saved && JSON.parse(saved).A === 5, { saved })
+  await page.evaluate(() => { for (const b of document.querySelectorAll('.town3d-padcfg button')) if (b.textContent === '既定に戻す') { b.click(); break } }); await sleep(150)
+  check('既定に戻す(A=0)', (await gp()).map.A === 0, { A: (await gp()).map.A })
+
   const ng = results.filter((r) => !r.ok)
   console.log('---')
   console.log('errs:', errs.length); if (errs.length) console.log(errs.slice(0, 6).join('\n'))

@@ -8705,13 +8705,16 @@ export async function mountTown3d(parent, opts = {}) {
   // ── ゲームパッド対応A（Backbone One 第2世代＝標準ゲームパッド）。navigator.getGamepads() を frame 先頭で毎フレーム読み、
   //    スティック/ボタンを既存アクションへ合流（非破壊＝タッチ操作はそのまま）。接続中はオンスクリーン操作を薄く退避し、画面に触れると数秒だけ戻す。──
   const GP = { prev: [], connected: false, reshowT: 0, moving: false }
-  const GB = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, L2: 6, R2: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11 } // 標準配置のボタン番号
+  const PAD_DEFAULT = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, L2: 6, R2: 7, VIEW: 8 } // 標準配置のボタン番号（Bで再割当・localStorage保存）
+  const loadPadMap = () => { try { const s = JSON.parse(localStorage.getItem('seasons_padmap') || 'null'); if (s && typeof s === 'object') return Object.assign({}, PAD_DEFAULT, s) } catch (_) { /* 壊れていたら既定 */ } return Object.assign({}, PAD_DEFAULT) }
+  const savePadMap = () => { try { localStorage.setItem('seasons_padmap', JSON.stringify(GB)) } catch (_) { /* 保存不可でもメモリ上は有効 */ } }
+  let GB = loadPadMap()
   if (!document.getElementById('town3d-pad-style')) { // 接続時にオンスクリーン操作を薄く（触ると一時再表示）
     const st = document.createElement('style'); st.id = 'town3d-pad-style'
     st.textContent = '.town3d-stage--pad .town3d-stick,.town3d-stage--pad .town3d-cruise,.town3d-stage--pad .town3d-jump,.town3d-stage--pad .town3d-low,.town3d-stage--pad .town3d-pad,.town3d-stage--pad .town3d-more{opacity:.1;pointer-events:none;transition:opacity .5s ease}.town3d-stage--touch .town3d-stick,.town3d-stage--touch .town3d-cruise,.town3d-stage--touch .town3d-jump,.town3d-stage--touch .town3d-low,.town3d-stage--touch .town3d-pad,.town3d-stage--touch .town3d-more{opacity:1 !important;pointer-events:auto !important}'
     document.head.appendChild(st)
   }
-  const setPadConnected = (on) => { if (GP.connected === on) return; GP.connected = on; stage.classList.toggle('town3d-stage--pad', on); if (!on) stage.classList.remove('town3d-stage--touch') }
+  const setPadConnected = (on) => { if (GP.connected === on) return; GP.connected = on; stage.classList.toggle('town3d-stage--pad', on); if (!on) { stage.classList.remove('town3d-stage--touch'); padPanel.style.display = 'none'; GP.capIdx = null } padCfgBtn.style.display = on ? 'block' : 'none' }
   stage.addEventListener('pointerdown', () => { if (GP.connected) { stage.classList.add('town3d-stage--touch'); GP.reshowT = performance.now() + 3000 } }, true) // 触れたら数秒だけ操作ボタンを戻す
   const pollGamepad = () => {
     if (!navigator.getGamepads || !active) return
@@ -8726,6 +8729,7 @@ export async function mountTown3d(parent, opts = {}) {
     const val = (i) => (bt[i] ? bt[i].value : 0)
     const dz = (v) => { v = v || 0; const a = Math.abs(v); return a < 0.16 ? 0 : Math.sign(v) * (a - 0.16) / 0.84 } // デッドゾーン＋再正規化
     const lx = dz(ax[0]), ly = dz(ax[1]), rx = dz(ax[2]), ry = dz(ax[3])
+    if (GP.capIdx) { for (let i = 0; i < now.length; i++) if (now[i] && !GP.prev[i]) { GB[GP.capIdx] = i; savePadMap(); GP.capIdx = null; if (GP.onRemap) GP.onRemap(); break } GP.prev = now; active.lastInputT = performance.now(); return } // キーコンフィグ: 割当キャプチャ中は次に押したボタンをそのアクションへ（アクションは起こさない）
     const m = active.mode, LK = 0.024, SK = 0.02
     if (m === 'window') {
       if (rx || ry) applyTown3dLook(rx * LK, ry * LK)
@@ -8754,7 +8758,37 @@ export async function mountTown3d(parent, opts = {}) {
     GP.prev = now
     if (acted) { active.lastInputT = performance.now(); active.cinema = 0 } // パッド操作もidle判定を解除（省電力16fpsへ落とさない）
   }
-  if (/[?&]dev=1/.test(location.search)) window.__town3dGp = () => active ? { mode: active.mode, cruise: !!active.cruise, low: !!active.lowCruise, wide: !!active.wide, climb: +(active.climb || 0).toFixed(2), zoom: +active.zoomTarget.toFixed(2), pad: GP.connected } : null // 検証用: ゲームパッドで変わる状態を読む
+  // ── コントローラー設定（アプリ内キーコンフィグ）。接続時に「⚙コントローラー」が出る。各アクションの「変更」を押し、割り当てたいボタンを押す＝localStorage保存。──
+  const padActions = [['A', 'すすむ/とまる・飛び立つ・ジャンプ'], ['R2', '上昇・飛び立つ'], ['L2', '下降'], ['B', '低く流す'], ['X', '着地/また飛び立つ'], ['Y', '広く見る'], ['R1', '寄る'], ['L1', '引く・身を乗り出す'], ['VIEW', '窓辺へ戻る']]
+  const padCfgBtn = document.createElement('button'); padCfgBtn.type = 'button'; padCfgBtn.className = 'town3d-padcfg-btn'; padCfgBtn.textContent = '⚙ コントローラー'
+  padCfgBtn.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);right:8px;z-index:9;display:none;padding:7px 12px;min-height:36px;border:none;border-radius:18px;background:rgba(28,30,38,.5);color:rgba(255,255,255,.9);font-size:12px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);cursor:pointer'
+  stage.appendChild(padCfgBtn)
+  const padPanel = document.createElement('div'); padPanel.className = 'town3d-padcfg'; padPanel.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:12;display:none;flex-direction:column;gap:6px;max-height:82%;overflow:auto;padding:16px;border-radius:16px;background:rgba(24,26,32,.93);color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.5);min-width:290px'
+  stage.appendChild(padPanel)
+  let padRows = []
+  const refreshPadRows = () => { for (const r of padRows) { r.cur.textContent = 'ボタン ' + (GB[r.key] ?? '−'); r.btn.textContent = '変更' } }
+  GP.onRemap = refreshPadRows
+  const buildPadPanel = () => {
+    padPanel.textContent = ''; padRows = []
+    const h = document.createElement('div'); h.textContent = 'コントローラー設定'; h.style.cssText = 'font-size:15px;letter-spacing:.06em'; padPanel.appendChild(h)
+    const hint = document.createElement('div'); hint.textContent = '「変更」を押し、割り当てたいボタンを押してください'; hint.style.cssText = 'font-size:11px;color:rgba(255,255,255,.6);margin-bottom:8px'; padPanel.appendChild(hint)
+    for (const [key, label] of padActions) {
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:8px'
+      const lb = document.createElement('span'); lb.textContent = label; lb.style.cssText = 'flex:1;font-size:12px'
+      const cur = document.createElement('span'); cur.style.cssText = 'font-size:11px;color:rgba(255,255,255,.55);min-width:58px;text-align:right'
+      const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = '変更'; btn.style.cssText = 'padding:6px 12px;min-height:34px;border:none;border-radius:14px;background:rgba(150,196,120,.5);color:#fff;font-size:12px;cursor:pointer'
+      btn.addEventListener('click', (e) => { e.stopPropagation(); refreshPadRows(); GP.capIdx = key; cur.textContent = '押して…'; btn.textContent = '待機' })
+      row.appendChild(lb); row.appendChild(cur); row.appendChild(btn); padPanel.appendChild(row); padRows.push({ key, cur, btn })
+    }
+    const foot = document.createElement('div'); foot.style.cssText = 'display:flex;gap:8px;margin-top:10px'
+    const reset = document.createElement('button'); reset.type = 'button'; reset.textContent = '既定に戻す'; reset.style.cssText = 'flex:1;padding:9px;min-height:42px;border:none;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;font-size:12px;cursor:pointer'
+    reset.addEventListener('click', (e) => { e.stopPropagation(); GB = Object.assign({}, PAD_DEFAULT); savePadMap(); GP.capIdx = null; refreshPadRows() })
+    const close = document.createElement('button'); close.type = 'button'; close.textContent = '閉じる'; close.style.cssText = 'flex:1;padding:9px;min-height:42px;border:none;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;font-size:12px;cursor:pointer'
+    close.addEventListener('click', (e) => { e.stopPropagation(); GP.capIdx = null; padPanel.style.display = 'none' })
+    foot.appendChild(reset); foot.appendChild(close); padPanel.appendChild(foot); refreshPadRows()
+  }
+  padCfgBtn.addEventListener('click', (e) => { e.stopPropagation(); buildPadPanel(); padPanel.style.display = 'flex' })
+  if (/[?&]dev=1/.test(location.search)) window.__town3dGp = () => active ? { mode: active.mode, cruise: !!active.cruise, low: !!active.lowCruise, wide: !!active.wide, climb: +(active.climb || 0).toFixed(2), zoom: +active.zoomTarget.toFixed(2), pad: GP.connected, map: Object.assign({}, GB), cap: GP.capIdx || '' } : null // 検証用: ゲームパッドで変わる状態＋割当を読む
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
