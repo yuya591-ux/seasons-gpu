@@ -8696,12 +8696,66 @@ export async function mountTown3d(parent, opts = {}) {
   for (const w of cityWalkers) if (w.g) w.g.userData.walker = true // 動く旅人は近接微揺れの対象外（自前で動くため）
   window.__town3dFrozen = () => frozenStatic // 検証用: 凍結した静的ノード数
 
+  // ── ゲームパッド対応A（Backbone One 第2世代＝標準ゲームパッド）。navigator.getGamepads() を frame 先頭で毎フレーム読み、
+  //    スティック/ボタンを既存アクションへ合流（非破壊＝タッチ操作はそのまま）。接続中はオンスクリーン操作を薄く退避し、画面に触れると数秒だけ戻す。──
+  const GP = { prev: [], connected: false, reshowT: 0, moving: false }
+  const GB = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, L2: 6, R2: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11 } // 標準配置のボタン番号
+  if (!document.getElementById('town3d-pad-style')) { // 接続時にオンスクリーン操作を薄く（触ると一時再表示）
+    const st = document.createElement('style'); st.id = 'town3d-pad-style'
+    st.textContent = '.town3d-stage--pad .town3d-stick,.town3d-stage--pad .town3d-cruise,.town3d-stage--pad .town3d-jump,.town3d-stage--pad .town3d-low,.town3d-stage--pad .town3d-pad,.town3d-stage--pad .town3d-more{opacity:.1;pointer-events:none;transition:opacity .5s ease}.town3d-stage--touch .town3d-stick,.town3d-stage--touch .town3d-cruise,.town3d-stage--touch .town3d-jump,.town3d-stage--touch .town3d-low,.town3d-stage--touch .town3d-pad,.town3d-stage--touch .town3d-more{opacity:1 !important;pointer-events:auto !important}'
+    document.head.appendChild(st)
+  }
+  const setPadConnected = (on) => { if (GP.connected === on) return; GP.connected = on; stage.classList.toggle('town3d-stage--pad', on); if (!on) stage.classList.remove('town3d-stage--touch') }
+  stage.addEventListener('pointerdown', () => { if (GP.connected) { stage.classList.add('town3d-stage--touch'); GP.reshowT = performance.now() + 3000 } }, true) // 触れたら数秒だけ操作ボタンを戻す
+  const pollGamepad = () => {
+    if (!navigator.getGamepads || !active) return
+    let gp = null; const pads = navigator.getGamepads()
+    for (const p of pads) if (p && p.connected) { gp = p; break }
+    if (!gp) { setPadConnected(false); return }
+    setPadConnected(true)
+    if (GP.reshowT && performance.now() > GP.reshowT) { GP.reshowT = 0; stage.classList.remove('town3d-stage--touch') }
+    const ax = gp.axes || [], bt = gp.buttons || []
+    const now = []; for (let i = 0; i < bt.length; i++) now[i] = !!(bt[i] && bt[i].pressed)
+    const edge = (i) => now[i] && !GP.prev[i]
+    const val = (i) => (bt[i] ? bt[i].value : 0)
+    const dz = (v) => { v = v || 0; const a = Math.abs(v); return a < 0.16 ? 0 : Math.sign(v) * (a - 0.16) / 0.84 } // デッドゾーン＋再正規化
+    const lx = dz(ax[0]), ly = dz(ax[1]), rx = dz(ax[2]), ry = dz(ax[3])
+    const m = active.mode, LK = 0.024, SK = 0.02
+    if (m === 'window') {
+      if (rx || ry) applyTown3dLook(rx * LK, ry * LK)
+      if (lx || ly) applyTown3dLook(lx * LK, ly * LK)
+      setTown3dLean(now[GB.L1]) // L1押しっぱなしで身を乗り出す
+      if (edge(GB.A) || edge(GB.R2)) setTown3dFly(true) // 飛び立つ
+    } else if (m === 'fly') {
+      if (lx || ly) applyTown3dSteer(lx * SK, ly * SK) // 左スティック＝操舵（旋回＋機首）
+      if (rx || ry) applyTown3dLook(rx * LK, ry * LK)  // 右スティック＝見回し
+      const up = val(GB.R2), dn = val(GB.L2); active.climb = up > 0.12 ? up : (dn > 0.12 ? -dn : 0) // R2上昇/L2下降（アナログ）
+      if (edge(GB.A)) active.cruise = !active.cruise // すすむ/とまる
+      if (edge(GB.B)) { active.lowCruise = !active.lowCruise; if (active.lowCruise) active.cruise = true } // 低く流す
+      if (edge(GB.Y)) active.wide = !active.wide // 広く見る
+      if (edge(GB.X)) setTown3dLand(true) // 着地して歩く
+      if (edge(GB.R1)) nudgeZoom(0.8); if (edge(GB.L1)) nudgeZoom(1.25) // 寄る/引く
+    } else if (m === 'walk') {
+      if ((lx || ly) || GP.moving) { active.moveX = lx; active.moveY = ly; GP.moving = !!(lx || ly) } // 左スティック＝歩行（中立時はタッチに譲る）
+      if (rx || ry) applyTown3dLook(rx * LK, ry * LK) // 右スティック＝見回し
+      if (edge(GB.A)) triggerJump() // ジャンプ
+      if (edge(GB.X)) setTown3dLand(false) // また飛び立つ
+      if (edge(GB.R1)) nudgeZoom(0.8); if (edge(GB.L1)) nudgeZoom(1.25)
+    }
+    if (edge(GB.VIEW)) setTown3dFly(false) // 窓辺へ戻る（共通）
+    let acted = !!(lx || ly || rx || ry)
+    for (let i = 0; i < now.length; i++) if (now[i]) { acted = true; break }
+    GP.prev = now
+    if (acted) { active.lastInputT = performance.now(); active.cinema = 0 } // パッド操作もidle判定を解除（省電力16fpsへ落とさない）
+  }
+  if (/[?&]dev=1/.test(location.search)) window.__town3dGp = () => active ? { mode: active.mode, cruise: !!active.cruise, low: !!active.lowCruise, wide: !!active.wide, climb: +(active.climb || 0).toFixed(2), zoom: +active.zoomTarget.toFixed(2), pad: GP.connected } : null // 検証用: ゲームパッドで変わる状態を読む
   function frame() {
     if (!active) return
     active.raf = requestAnimationFrame(frame)
     if (document.hidden) return // 非アクティブ（タブ切替/画面ロック）時は描画も更新も止める＝発熱・電池配慮（CLAUDE.md）
     if (active.paused) return // おやすみの暗転が完了したら描画を止める（真っ暗な裏で描き続けない）。触れて戻ると再開＝発熱・電池配慮
     if (contextLost) return // WebGLコンテキスト喪失中は描画/更新を止める（GLエラーの洪水を避ける。復帰でonContextRestoreが組み直す）
+    pollGamepad() // ゲームパッド（Backbone One等）を毎rAFで読む＝スロットル早期returnの前＝60Hzで拾い、操作中はidleに落とさない
     const t = (performance.now() - startT) / 1000
     // 約30fpsへ間引く（描画と影パスを半減＝発熱を抑える）。dtはクロックから取るので動きは滑らかなまま。
     // ぼーっと眺めている長い時間は約22fpsへ落とす＝電池/発熱を抑える（dtは実クロックなので動きは滑らかなまま）。
