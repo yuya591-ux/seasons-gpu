@@ -1578,6 +1578,12 @@ export async function mountTown3d(parent, opts = {}) {
       const pg2 = new THREE.CylinderGeometry(0.08, 0.1, 5, 6); pg2.translate(ppx, pgy + 2.5, ppz); poleGeos.push(pg2)
       for (let k = 1; k <= 4; k++) { const tt = k / 5, lx2 = fx + (ppx - fx) * tt, lz2 = fz + (ppz - fz) * tt, ly2 = (fgy + 5.8) + ((pgy + 5) - (fgy + 5.8)) * tt - 0.2; const lg = new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8); lg.scale(1, 1.2, 1); lg.translate(lx2, ly2, lz2); lanGeos[k % 3].push(lg) }
     }
+    // 外周をぐるりと連ねる提灯の輪（隣り合うポールの間に垂れる列＝夏祭りの華やぎ。夜は灯る。既存のlanGeosへ統合＝描画コール不変）
+    for (let i = 0; i < NP; i++) {
+      const a0 = i / NP * 6.283, a1 = (i + 1) / NP * 6.283, x0 = fx + Math.cos(a0) * poleR, z0 = fz + Math.sin(a0) * poleR, x1 = fx + Math.cos(a1) * poleR, z1 = fz + Math.sin(a1) * poleR
+      for (let k = 0; k < 5; k++) { const tt = (k + 0.5) / 5, lx2 = x0 + (x1 - x0) * tt, lz2 = z0 + (z1 - z0) * tt, ly2 = fgy + 4.9 - Math.sin(tt * Math.PI) * 0.7 // 中央ほど垂れる
+        const lg = new THREE.CylinderGeometry(0.16, 0.16, 0.3, 8); lg.scale(1, 1.2, 1); lg.translate(lx2, ly2, lz2); lanGeos[(i + k) % 3].push(lg) }
+    }
     if (BufferGeometryUtils.mergeGeometries) {
       const pm = BufferGeometryUtils.mergeGeometries(poleGeos, false); if (pm) town.add(new THREE.Mesh(pm, woodMat)); poleGeos.forEach((g) => g.dispose())
       for (let c = 0; c < 3; c++) { if (lanGeos[c].length) { const lm = BufferGeometryUtils.mergeGeometries(lanGeos[c], false); if (lm) town.add(new THREE.Mesh(lm, lit ? new THREE.MeshBasicMaterial({ color: lantLit[c], fog: true }) : lantCols[c])); lanGeos[c].forEach((g) => g.dispose()) } } // 夜は提灯が灯る
