@@ -6355,16 +6355,12 @@ export async function mountTown3d(parent, opts = {}) {
       scene.add(grp); rainbowArch = grp
     }
     // 鳥の渡り：V字の群れが雲海の上をゆっくり渡る。追いつくと並んで飛べる。
-    { const flock = new THREE.Group(), bm = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3346 : 0x4a4a52, fog: true }), wings = []
-      for (let i = 0; i < (LIGHT ? 7 : 11); i++) { const bird = new THREE.Group()
-        // 翼＝内羽＋翼端を後ろへ折る外羽の2節group（平らな十字でなく、はばたく鳥のしなった翼）。羽ばたきはgroupをz回転（既存frameのwings/side）。
-        for (const s of [-1, 1]) { const wing = new THREE.Group(); wing.userData.side = s
-          const inner = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 0.52), bm); inner.position.x = s * 0.5; wing.add(inner)
-          const outer = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.06, 0.36), bm); outer.position.set(s * 1.28, 0, -0.16); outer.rotation.y = s * 0.42; wing.add(outer) // 翼端を後ろへ折る（swept）
-          bird.add(wing); wings.push(wing) }
-        const bodyGeo = new THREE.ConeGeometry(0.17, 1.5, 5); bodyGeo.rotateX(-Math.PI / 2); bird.add(new THREE.Mesh(bodyGeo, bm)) // 胴（前が尖る紡錘＝箱を脱す）
+    // 造形は道連れと同じ共用かもめ（makeGullBird・関数宣言の巻き上げで後方定義でも呼べる）＝追いついた時の近接に耐える。
+    { const flock = new THREE.Group(), wings = []
+      for (let i = 0; i < (LIGHT ? 7 : 11); i++) { const bird = makeGullBird(1.7, isNight)
+        bird.rotation.y = Math.PI // かもめは+z向き・この群れはローカル-zへ渡るため反転
         const row = Math.ceil(i / 2), sd = i % 2 === 0 ? 1 : -1
-        bird.position.set(sd * row * 2.8, (R() - 0.5) * 0.7, row * 2.3); flock.add(bird) } // V字（先頭から後ろへ広がる）
+        bird.position.set(sd * row * 2.8, (R() - 0.5) * 0.7, row * 2.3); flock.add(bird); wings.push(...bird.userData.wings) } // V字（先頭から後ろへ広がる）
       flock.userData = { wings, baseY: SEA_Y + 32 }; flock.position.set(-320, SEA_Y + 32, -250); flock.rotation.y = -Math.PI / 2 // +Xへ渡る
       scene.add(flock); skyDrifters.push({ o: flock, kind: 'flock' })
     }
@@ -6383,58 +6379,67 @@ export async function mountTown3d(parent, opts = {}) {
   if (THERMALS.length === 0) THERMALS.push({ x: 0, z: -12, r: 26 }) // 谷戸など＝谷の上の上昇気流
 
   // ── 渡る鳥（はばたきながら空を弧で渡る。数羽） ──
+  // 造形は道連れと同じ共用かもめ。userDataは翼参照(wings)を消さないようmergeで足す。
   const birds = []
-  const birdMat = new THREE.MeshBasicMaterial({ color: isNight ? 0x223044 : 0x3a3a40, fog: true })
   for (let i = 0; i < 5; i++) {
-    const b = new THREE.Group()
-    for (const s of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), birdMat)
-      wing.position.x = s * 0.6; b.add(wing); wing.userData.side = s
-    }
-    b.add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.95, 5).rotateX(-Math.PI / 2), birdMat)) // 紡錘の胴＝浮かぶ羽でなく鳥の輪郭
-    b.userData = { cx: (R() - 0.5) * 40, cz: -40 - R() * 40, rad: 18 + R() * 16, yy: 30 + R() * 14, sp: 0.12 + R() * 0.08, ph: R() * 6.28 }
+    const b = makeGullBird(1.15, isNight)
+    Object.assign(b.userData, { cx: (R() - 0.5) * 40, cz: -40 - R() * 40, rad: 18 + R() * 16, yy: 30 + R() * 14, sp: 0.12 + R() * 0.08, ph: R() * 6.28 })
     scene.add(b); birds.push(b)
   }
-  // 飛行中、ふと一羽が並んで飛ぶ（つかの間の道連れ）。たまに現れ、少し伴走して離れていく。
-  // 近接で見えるので、遠くの渡り鳥(暗いシルエット)でなく白×淡灰のかもめとして作り込む＝流線の胴＋起こした頭/くちばし＋
-  // 平たい尾扇、そしてかもめ特有のM字の翼(内羽=腕は水平／外羽=手は上へ折り、先端に黒い風切)。肩を支点にしなやかに羽ばたく。
-  const comp = new THREE.Group()
-  const compWhite = toon(0xf4f2ea), compBeakMat = toon(0xe8a83a)
-  const compWingMat = toon(0xd8dce2); compWingMat.side = THREE.DoubleSide      // 淡い灰（上面が陽に映え、下面も暗くなりすぎない）
-  const compTipMat = toon(0x4a4d55); compTipMat.side = THREE.DoubleSide        // 翼端の黒い風切
-  { // 胴＋頭＋尾（前=+z）を1メッシュに統合。頭は少し起こし、胴は前後へ細る流線に。
-    const cap = new THREE.CapsuleGeometry(0.095, 0.24, 4, 10); cap.rotateX(Math.PI / 2); cap.scale(1, 0.94, 1.18) // 胴（長軸=z・わずかに縦つぶし＋前後に伸ばす）
-    const head = new THREE.SphereGeometry(0.10, 10, 8); head.translate(0, 0.055, 0.26)                            // 頭（前=+z・少し起こす）
-    const tail = new THREE.ConeGeometry(0.10, 0.42, 6); tail.rotateX(-Math.PI / 2); tail.scale(1.7, 0.32, 1); tail.translate(0, -0.005, -0.30) // 平たく広い尾扇（後=-z）
-    let bodyGeo = cap
-    if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries([cap.toNonIndexed(), head.toNonIndexed(), tail.toNonIndexed()], false); if (m) bodyGeo = m }
-    comp.add(new THREE.Mesh(bodyGeo, compWhite))
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.13, 6).rotateX(Math.PI / 2), compBeakMat); beak.position.set(0, 0.05, 0.40); comp.add(beak) // くちばし（頭の前）
-  }
-  { // 翼＝内羽(腕)＋外羽(手)の2節でM字。内羽は水平、外羽は手首から上へ折れ、外羽先に黒い風切。肩を支点に羽ばたく。
-    const innerShape = new THREE.Shape()
-    innerShape.moveTo(0.00, 0.11); innerShape.lineTo(0.24, 0.15); innerShape.lineTo(0.42, 0.12)   // 前縁（付け根→手首）
-    innerShape.lineTo(0.42, -0.10); innerShape.lineTo(0.20, -0.13); innerShape.lineTo(0.00, -0.11); innerShape.closePath() // 後縁
-    const innerGeo = new THREE.ShapeGeometry(innerShape); innerGeo.rotateX(Math.PI / 2)            // 水平に寝かせ前縁を+zへ
-    const outerShape = new THREE.Shape()
-    outerShape.moveTo(0.00, 0.12); outerShape.lineTo(0.22, 0.05); outerShape.lineTo(0.44, -0.03)   // 前縁（手首→尖った翼端）
-    outerShape.lineTo(0.20, -0.10); outerShape.lineTo(0.00, -0.10); outerShape.closePath()          // 後縁
-    const outerGeo = new THREE.ShapeGeometry(outerShape); outerGeo.rotateX(Math.PI / 2)
-    const tipShape = new THREE.Shape()
-    tipShape.moveTo(0.24, 0.02); tipShape.lineTo(0.44, -0.03); tipShape.lineTo(0.20, -0.09); tipShape.closePath() // 翼端の黒い風切
-    const tipGeo = new THREE.ShapeGeometry(tipShape); tipGeo.rotateX(Math.PI / 2); tipGeo.translate(0, 0.006, 0)  // 外羽のわずか上=Zファイト回避
-    const wings = []
-    for (const s of [1, -1]) {
+  // かもめの共用ビルダー（道連れ・V字の行列・雲海の渡り・旋回の鳥を同じ造形に統一）。
+  // 流線の胴＋起こした頭/くちばし＋平たい尾扇、かもめ特有のM字の翼(内羽=腕は水平／外羽=手は上へ折り、先端に黒い風切)。
+  // 前=+z。羽ばたきは userData.wings の各groupを z回転（肩が支点）。ジオメトリ/材質は初回だけ作って全羽で共有＝軽い。
+  // R()は使わない（建て順の乱数列を汚さない）。関数宣言=巻き上げで、先に走る雲海ブロックからも呼べる。
+  function makeGullBird(scale = 1, night = false) {
+    if (!makeGullBird.geo) {
+      const cap = new THREE.CapsuleGeometry(0.095, 0.24, 4, 10); cap.rotateX(Math.PI / 2); cap.scale(1, 0.94, 1.18) // 胴（長軸=z・わずかに縦つぶし＋前後に伸ばす）
+      const head = new THREE.SphereGeometry(0.10, 10, 8); head.translate(0, 0.055, 0.26)                            // 頭（前=+z・少し起こす）
+      const tail = new THREE.ConeGeometry(0.10, 0.42, 6); tail.rotateX(-Math.PI / 2); tail.scale(1.7, 0.32, 1); tail.translate(0, -0.005, -0.30) // 平たく広い尾扇（後=-z）
+      let bodyGeo = cap
+      if (BufferGeometryUtils.mergeGeometries) { const m = BufferGeometryUtils.mergeGeometries([cap.toNonIndexed(), head.toNonIndexed(), tail.toNonIndexed()], false); if (m) bodyGeo = m }
+      const beakGeo = new THREE.ConeGeometry(0.026, 0.13, 6).rotateX(Math.PI / 2) // くちばし（頭の前）
+      const innerShape = new THREE.Shape()
+      innerShape.moveTo(0.00, 0.11); innerShape.lineTo(0.24, 0.15); innerShape.lineTo(0.42, 0.12)   // 前縁（付け根→手首）
+      innerShape.lineTo(0.42, -0.10); innerShape.lineTo(0.20, -0.13); innerShape.lineTo(0.00, -0.11); innerShape.closePath() // 後縁
+      const innerGeo = new THREE.ShapeGeometry(innerShape); innerGeo.rotateX(Math.PI / 2)            // 水平に寝かせ前縁を+zへ
+      const outerShape = new THREE.Shape()
+      outerShape.moveTo(0.00, 0.12); outerShape.lineTo(0.22, 0.05); outerShape.lineTo(0.44, -0.03)   // 前縁（手首→尖った翼端）
+      outerShape.lineTo(0.20, -0.10); outerShape.lineTo(0.00, -0.10); outerShape.closePath()          // 後縁
+      const outerGeo = new THREE.ShapeGeometry(outerShape); outerGeo.rotateX(Math.PI / 2)
+      const tipShape = new THREE.Shape()
+      tipShape.moveTo(0.24, 0.02); tipShape.lineTo(0.44, -0.03); tipShape.lineTo(0.20, -0.09); tipShape.closePath() // 翼端の黒い風切
+      const tipGeo = new THREE.ShapeGeometry(tipShape); tipGeo.rotateX(Math.PI / 2); tipGeo.translate(0, 0.006, 0)  // 外羽のわずか上=Zファイト回避
+      makeGullBird.geo = { bodyGeo, beakGeo, innerGeo, outerGeo, tipGeo }
+      const mkMats = (body, wing, tip, beak) => {
+        const w = toon(wing); w.side = THREE.DoubleSide // 淡い灰（上面が陽に映え、下面も暗くなりすぎない）
+        const tp = toon(tip); tp.side = THREE.DoubleSide // 翼端の黒い風切
+        return { body: toon(body), wing: w, tip: tp, beak: toon(beak) }
+      }
+      makeGullBird.mats = {
+        day: mkMats(0xf4f2ea, 0xd8dce2, 0x4a4d55, 0xe8a83a),   // 白×淡灰のかもめ
+        night: mkMats(0xaab2c4, 0x8a92a6, 0x3a3f4e, 0x8a7048), // 夜は月明かりの淡青に沈める
+      }
+    }
+    const G = makeGullBird.geo, M = night ? makeGullBird.mats.night : makeGullBird.mats.day
+    const g = new THREE.Group(), wings = []
+    g.add(new THREE.Mesh(G.bodyGeo, M.body))
+    const beak = new THREE.Mesh(G.beakGeo, M.beak); beak.position.set(0, 0.05, 0.40); g.add(beak)
+    for (const s of [1, -1]) { // 翼＝内羽(腕)＋外羽(手)の2節でM字。肩を支点に羽ばたく。
       const wing = new THREE.Group(); wing.position.set(s * 0.085, 0.05, 0.04)                     // 肩（羽ばたきの支点）
-      wing.add(new THREE.Mesh(innerGeo, compWingMat))                                              // 内羽（腕・水平）
+      wing.add(new THREE.Mesh(G.innerGeo, M.wing))                                                 // 内羽（腕・水平）
       const outer = new THREE.Group(); outer.position.set(0.42, 0, 0); outer.rotation.z = 0.26     // 手首から外羽を浅く上へ折る＝滑空の自然なM（強すぎると真横で帆に見える）
-      outer.add(new THREE.Mesh(outerGeo, compWingMat)); outer.add(new THREE.Mesh(tipGeo, compTipMat))
+      outer.add(new THREE.Mesh(G.outerGeo, M.wing)); outer.add(new THREE.Mesh(G.tipGeo, M.tip))
       wing.add(outer)
       if (s < 0) wing.scale.x = -1                                                                  // 左翼は鏡像
-      wing.userData.side = s; comp.add(wing); wings.push(wing)
+      wing.userData.side = s; g.add(wing); wings.push(wing)
     }
-    comp.userData.wings = wings
+    g.userData.wings = wings
+    if (scale !== 1) g.scale.setScalar(scale)
+    return g
   }
+  // 飛行中、ふと一羽が並んで飛ぶ（つかの間の道連れ）。たまに現れ、少し伴走して離れていく。
+  // 近接で見えるので、遠くの渡り鳥(暗いシルエット)でなく白×淡灰のかもめとして作り込む（造形は上の共用ビルダー）。
+  const comp = makeGullBird()
   comp.visible = false; scene.add(comp)
   let compActive = false, compT = 0, compCool = 6, compSide = 1
   const compPhase = R() * 6.28
@@ -8010,26 +8015,26 @@ export async function mountTown3d(parent, opts = {}) {
   }
 
   // ── 渡り鳥の群れ（はばたきながら横切る） ──
+  // 造形は道連れと同じ共用かもめ（以前は胴のない羽2枚＝浮かぶ板だった）。
   function evBirdFlock() {
     const g = new THREE.Group()
-    const mat = new THREE.MeshBasicMaterial({ color: isNight ? 0x2a3a4e : 0x39393f, fog: true })
     const n = 13 + ((R() * 8) | 0); const sub = []
     for (let i = 0; i < n; i++) {
-      const b = new THREE.Group()
-      for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.06, 0.42), mat); w.position.x = s * 0.62; w.userData.side = s; b.add(w) }
-      b.userData = { ph: R() * 6.28, rk: Math.ceil(i / 2), sd: i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) }; g.add(b); sub.push(b)
+      const b = makeGullBird(1.25, isNight)
+      Object.assign(b.userData, { ph: R() * 6.28, rk: Math.ceil(i / 2), sd: i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) }); g.add(b); sub.push(b)
     }
     const dir = R() < 0.5 ? 1 : -1
     // V字編隊: 先頭1羽、後方(dirの逆)へ左右(z)に開く。縦窓は横画角が狭いので枠外から入れて確実に横切らせる。
-    for (const b of sub) b.position.set(-dir * b.userData.rk * 1.7 + (R() - 0.5) * 0.5, (R() - 0.5) * 1.2, b.userData.sd * b.userData.rk * 1.5 + (R() - 0.5) * 0.5)
+    for (const b of sub) { b.position.set(-dir * b.userData.rk * 1.7 + (R() - 0.5) * 0.5, (R() - 0.5) * 1.2, b.userData.sd * b.userData.rk * 1.5 + (R() - 0.5) * 0.5); b.rotation.y = dir * Math.PI / 2 } // かもめ(+z向き)を進行方向(ローカル±x)へ
     const a = evAnchor(); g.rotation.y = -a.yaw // 飛行中は進む先を横切らせる
     let lx = dir > 0 ? -46 : 46; const ly = 46 + R() * 18, lz = -38 - R() * 26 // 空を背に飛ばす（山に紛れず映える）
     const setPos = (bob) => { const [wx, wy, wz] = evPos(lx, ly + bob, lz, a); g.position.set(wx, wy, wz) }
     setPos(0); scene.add(g)
     addFx({
-      update: (age, dt) => { lx += dir * 10 * dt; setPos(Math.sin(age * 0.5) * 0.7); for (const b of sub) { const f = Math.sin(age * 9 + b.userData.ph) * 0.5; b.children.forEach((w) => { w.rotation.z = w.userData.side * f }) } return Math.abs(lx) < 50 },
-      cleanup: () => { scene.remove(g); disposeObj(g) },
+      update: (age, dt) => { lx += dir * 10 * dt; setPos(Math.sin(age * 0.5) * 0.7); for (const b of sub) { const f = Math.sin(age * 9 + b.userData.ph) * 0.5; for (const w of b.userData.wings) w.rotation.z = w.userData.side * f } return Math.abs(lx) < 50 },
+      cleanup: () => { scene.remove(g) }, // かもめのジオメトリ/材質は全鳥で共有＝disposeしない（道連れ・渡りが使い続ける）
     })
+    return g // 検証用（__town3dBirdFlockが現在位置を追える）。通常のイベント発火では未使用
   }
 
   // ── 気球がふわりと横切る（昼） ──
@@ -9202,9 +9207,9 @@ export async function mountTown3d(parent, opts = {}) {
       if (st > 0.4 && prev <= 0.4 && birdFlushCool <= 0) { onBirdFlush(); birdFlushCool = 1.6 } // 新たに驚いた瞬間に羽音（連発を抑制）
       u.startle = st
       b.position.set(u.cx + Math.cos(a) * u.rad, u.yy + st * 7 + Math.sin(a * 0.7) * 2.0, u.cz + Math.sin(a) * u.rad)
-      b.rotation.y = -a + Math.PI / 2
+      b.rotation.y = -a // 弧の接線方向へ機首（かもめは+z向き。円周(cos a, sin a)の接線=(-sin a, cos a)）
       const flap = Math.sin(t * 9 + u.ph) * (0.5 + st * 0.5)
-      b.children.forEach((w) => { w.rotation.z = w.userData.side * flap })
+      for (const w of b.userData.wings) w.rotation.z = w.userData.side * flap // 翼だけ回す（children全走査だと胴にside=undefined→NaN回転で胴が消えていた）
     }
     // つかの間の道連れ: 飛行中にたまに一羽が現れ、横に並んで伴走し、終盤は離れていく。
     compCool = Math.max(0, compCool - dt)
@@ -9218,9 +9223,9 @@ export async function mountTown3d(parent, opts = {}) {
       const sp = Math.hypot(active.vel.x, active.vel.z) || 1
       const fx = active.vel.x / sp, fz = active.vel.z / sp, rx = -fz, rz = fx // 進む向きと右（水平）
       const peel = compT < 1.6 ? (1.6 - compT) * 5 : 0 // 終盤は外へ離れる
-      const tx = active.flyPos.x + (compSide * 5 + peel * compSide) * rx + fx * 3
+      const tx = active.flyPos.x + (compSide * 3.2 + peel * compSide) * rx + fx * 2.4 // 横3.2m・前2.4m＝表情が見える近さ（実機FB: 5mは遠かった）
       const ty = active.flyPos.y + 0.5 + Math.sin(t * 0.7) * 0.6 + peel * 1.0
-      const tz = active.flyPos.z + (compSide * 5 + peel * compSide) * rz + fz * 3
+      const tz = active.flyPos.z + (compSide * 3.2 + peel * compSide) * rz + fz * 2.4
       comp.position.x += (tx - comp.position.x) * 0.06
       comp.position.y += (ty - comp.position.y) * 0.06
       comp.position.z += (tz - comp.position.z) * 0.06
@@ -10476,6 +10481,7 @@ export async function mountTown3d(parent, opts = {}) {
       comp.visible = true
       return window.__town3dShotAt(cx, cy, cz, lx, ly, lz, fov)
     }
+    window.__town3dBirdFlock = () => { const g = evBirdFlock(); window.__town3dFlockPos = () => g.position.toArray() } // 検証用: V字のかもめの行列を任意発火＋現在位置を追える（追い撮り用）
   }
 
   // 移動スティック（ぷにコン）の見た目＝触れた場所に出る円とつまみ。空/地上でだけ現れる。
