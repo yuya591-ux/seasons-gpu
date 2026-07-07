@@ -1,7 +1,7 @@
 {
-  "name": "窓辺 ｜ 季節と天気のアンビエント",
-  "short_name": "窓辺",
-  "description": "四季 × 天気 × 時間帯 × 環境音を、ただ眺めて整うアンビエント",
+  "name": "窓のむこう ｜ 季節と記憶の町",
+  "short_name": "窓のむこう",
+  "description": "四季と天気にうつろう記憶の町を、窓辺から眺めて、ときどき窓のむこうへ出かけるアンビエント",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -11,6 +11,6 @@
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
