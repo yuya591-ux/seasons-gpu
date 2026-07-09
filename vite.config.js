@@ -33,11 +33,29 @@ function precacheManifest() {
   }
 }
 
+// WebGPU移行の要: 素の 'three' 読み込みを WebGPU 版ビルド（three/webgpu）へ付け替える。
+// - 'three' と 'three/webgpu' は別モジュール実体（クラスを混ぜると instanceof が壊れる）ため、
+//   town3dViewer と three/examples/jsm/*（内部で 'three' を import する）を丸ごと同じ実体に揃える。
+// - 例外（従来のWebGL実体のまま）: benchGL（発熱ベンチの従来方式側）と、クラシックWebGL必須の
+//   スプラット表示（splatViewer / @mkkellogg/gaussian-splats-3d）。
+function threeWebgpuSwap() {
+  return {
+    name: 'three-webgpu-swap',
+    enforce: 'pre',
+    async resolveId(source, importer, options) {
+      if (source !== 'three') return null
+      const from = (importer || '').replace(/\\/g, '/')
+      if (/benchGL|splatViewer|gaussian-splats/.test(from)) return null
+      return this.resolve('three/webgpu', importer, { skipSelf: true, ...options })
+    },
+  }
+}
+
 // GitHub Pages はリポジトリ名のサブパス配下で公開されるため base を合わせる。
 // 例: https://<ユーザー名>.github.io/seasons/
 export default defineConfig({
   base: BASE,
-  plugins: [precacheManifest()],
+  plugins: [threeWebgpuSwap(), precacheManifest()],
   // three.module は意図的に大きい（動的importで分割済み・PWAで事前キャッシュ）。
   // 既定500KBの警告が出続けて保守ノイズになるため許容上限を上げる（評価 技術-L6）。
   build: {

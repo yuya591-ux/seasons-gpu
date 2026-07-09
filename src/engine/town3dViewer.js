@@ -273,7 +273,9 @@ export async function unmountTown3d() {
 export async function mountTown3d(parent, opts = {}) {
   await unmountTown3d() // 既存を片付け（token をインクリメント）。この後で自分の世代を確定する。
   const my = ++token
-  const THREE = await import('three')
+  const THREE = await import('three') // vite設定(three-webgpu-swap)で three/webgpu へ付け替え済み＝WebGPU版の実体
+  if (my !== token) return
+  const TSL = await import('three/tsl') // ノード式シェーダー（旧GLSL注入の置き換え先）
   if (my !== token) return
   // 近景の建物の角を丸める面取り用（低ポリの箱の角を脱す）。近景の数棟だけに使い性能は据え置く。
   const { RoundedBoxGeometry } = await import('three/examples/jsm/geometries/RoundedBoxGeometry.js')
@@ -309,7 +311,37 @@ export async function mountTown3d(parent, opts = {}) {
   // アンビエント用途＝省電力GPUを選ばせ発熱/電池を抑える（perf監督C6）。眺める時間が長いので high-performance より low-power が適切。
   // antialias:false＝AAは常用のcomposer(MSAA付き中間RT＋FXAA)が担うため、デフォルトFBのMSAAは最終ブリット(全画面三角形)にしか効かず純粋な無駄（GPUメモリ帯域の浪費・three公式見解）。
   // composer読込失敗時のフォールバック(直描き)のみAA無しになるが、発生は例外時だけ＝許容（2026-07 発熱対策）。
-  const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'low-power' })
+  // WebGPURenderer＝iOSのWebGL→Metal変換税を払わない直結描画（実機AB: フレームCPU -37%）。
+  // WebGPU非対応の環境（ヘッドレスCI・古い端末）は内蔵のWebGL2代替バックエンドへ自動で落ちて動作は維持する。
+  const renderer = new THREE.WebGPURenderer({ antialias: false, alpha: false, powerPreference: 'low-power' })
+  try { await renderer.init() } catch (e) { /* 初期化失敗でも代替経路で描画継続を試みる */ }
+  if (my !== token) { try { renderer.dispose() } catch (e2) { /* 無視 */ } if (stage.parentNode) stage.parentNode.removeChild(stage); return }
+  // 異方性フィルタの上限（WebGPU版は renderer.getMaxAnisotropy()。取得失敗時は控えめな8）
+  const maxAniso = () => { try { return renderer.getMaxAnisotropy ? renderer.getMaxAnisotropy() : 8 } catch (e) { return 8 } }
+  // WebGPUではPointsプリミティブが1px固定サイズのため、点群は「Sprite＋インスタンス位置属性」で描く。
+  // 既存の書き方（BufferGeometryのattributes.position更新＋needsUpdate）を保ったまま差し替えられる互換ヘルパー:
+  // 同じ配列をInterleavedBufferで包み直す＝needsUpdateがバッファへ転送され、毎フレームの位置更新がGPUに届く（実験で両バックエンド確認済み）。
+  const pointCloud = (geo, mat) => {
+    const src = geo.attributes.position
+    const ib = new THREE.InstancedInterleavedBuffer(src.array, 3)
+    ib.setUsage(THREE.DynamicDrawUsage)
+    geo.setAttribute('position', new THREE.InterleavedBufferAttribute(ib, 3, 0))
+    mat.positionNode = TSL.instancedBufferAttribute(ib, 'vec3')
+    const pts = new THREE.Sprite(mat)
+    pts.count = src.count
+    pts.frustumCulled = false
+    return pts
+  }
+  // dev検証フック用: RenderTargetの画素を読む（WebGPUは非同期API）。行順を常に「上→下」に揃えて返す
+  // （WebGL2代替バックエンドの読み出しは下→上のため反転して吸収。向きが逆ならQAスクショで即発覚する）。
+  const readRTPixels = async (rt, W2, H2) => {
+    const raw = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, W2, H2)
+    const arr = raw instanceof Uint8Array ? raw : new Uint8Array(raw.buffer || raw)
+    if (renderer.backend && renderer.backend.isWebGPUBackend) return arr
+    const flipped = new Uint8Array(arr.length); const row = W2 * 4
+    for (let y = 0; y < H2; y++) flipped.set(arr.subarray((H2 - 1 - y) * row, (H2 - y) * row), y * row)
+    return flipped
+  }
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
   let curQual = QUAL // 現在の描き込み（setQualityで変わる）。'light'では灯りのブルームも切る＝解像度に加え後処理も軽くする
@@ -321,12 +353,13 @@ export async function mountTown3d(parent, opts = {}) {
   let prFly = false // 上空で解像度をひと段下げているか（離陸/着地でのみ切替＝毎フレームのsetSizeを避ける）
   let lastStageW = 0, lastStageH = 0 // ステージ実寸の追跡（飛行で枠が変わる等の再レイアウトを毎フレーム検知してaspectを直す）
   let composer = null, fxaaPass = null, bloomPass = null // FXAA（輪郭をなめらかに）＋夕夜の灯りのブルーム。読み込み失敗時はnullで通常描画にフォールバック
+  let bloomNode = null, bloomOn = false, rebuildPost = null // ノード式ポストプロセスの実体（bloomPassは互換シム＝enabled切替でrebuildPostを呼ぶ）
   renderer.setPixelRatio(curPR)
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFShadowMap // PCFSoftShadowMapは非推奨で実際は自動でPCFに落ちる→明示してThree.jsの警告を消す（静的影なので見た目は同一）
   // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
-  renderer.shadowMap.autoUpdate = false
+  // WebGPU版は renderer.shadowMap.autoUpdate が無く、ライト側（sun.shadow.autoUpdate/needsUpdate）で制御する（sun作成箇所で設定）。
   stage.appendChild(renderer.domElement)
   // WebGLコンテキスト喪失への備え（評価 技術-致命3）。preventDefault しないと二度と復帰できず黒画面が固定化する。
   // 立体の街は全構築物をmount時に生成するため、その場での再構築は非現実的→復帰時は同じ情景を「組み直す」(onContextRestore)。
@@ -335,7 +368,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.domElement.addEventListener('webglcontextrestored', () => {
     contextLost = false
     if (opts.onContextRestore) { try { opts.onContextRestore() } catch (_) { /* 無視 */ } } // 親(main)が情景を組み直す＝GPU資源を新コンテキストで作り直す
-    else { try { renderer.shadowMap.needsUpdate = true; applySize() } catch (_) { /* 無視 */ } } // フォールバック（最低限の描画継続）
+    else { try { sun.shadow.needsUpdate = true; applySize() } catch (_) { /* 無視 */ } } // フォールバック（最低限の描画継続）
   }, false)
 
   const scene = new THREE.Scene()
@@ -393,25 +426,20 @@ export async function mountTown3d(parent, opts = {}) {
     // どこへ飛んでも空が常に周囲を覆う。半径はカメラのfar(600)内に収め頂部がクリップされないようにする
     // （以前は半径400・原点中心で、戦国/大正へ飛ぶとカメラがドーム外/far外に出て空が無く「黒い虚空」になっていた）。
     const skyGeo = new THREE.SphereGeometry(560, 24, 16)
-    const skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
-      uniforms: { top: skyUniTop, bot: skyUniBot },
-      vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
-      // 3色グラデ＋ディザ。2色の直線ぼかしだと中空がのっぺりし8bitのバンディング(縞)が出る。
-      // 地平=淡く暖、中空=いちばん青が濃い帯、天頂=やや締まる ＝本物の空の層。最後に微小ディザで縞を散らす。
-      fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 bot;
-        void main(){
-          float h = clamp(vP.y/560.0*1.7+0.2, 0.0, 1.0);
-          vec3 base = mix(bot, top, 0.5);
-          float lum = dot(base, vec3(0.299, 0.587, 0.114));
-          vec3 mid = clamp(mix(vec3(lum), base, 1.18), 0.0, 1.0); // 中空の帯を少し彩度上げ＝青の伸び
-          vec3 col = mix(bot, mid, smoothstep(0.0, 0.55, h));
-          col = mix(col, top, smoothstep(0.45, 1.0, h));
-          float d = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-          col += (d - 0.5) / 255.0; // ディザ＝階調の縞を画素ノイズで散らす
-          gl_FragColor = vec4(col, 1.0);
-        }`,
-    })
+    // 3色グラデ＋ディザ（TSL）。2色の直線ぼかしだと中空がのっぺりし8bitのバンディング(縞)が出る。
+    // 地平=淡く暖、中空=いちばん青が濃い帯、天頂=やや締まる ＝本物の空の層。最後に微小ディザで縞を散らす。
+    const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false })
+    {
+      const top = TSL.uniform(skyUniTop.value), bot = TSL.uniform(skyUniBot.value) // 同じColor実体を共有＝frameの色更新がそのまま反映
+      const h = TSL.positionLocal.y.div(560.0).mul(1.7).add(0.2).clamp(0.0, 1.0)
+      const base = TSL.mix(bot, top, 0.5)
+      const lum = base.dot(TSL.vec3(0.299, 0.587, 0.114))
+      const mid = TSL.mix(TSL.vec3(lum), base, 1.18).clamp(0.0, 1.0) // 中空の帯を少し彩度上げ＝青の伸び
+      let col = TSL.mix(bot, mid, TSL.smoothstep(0.0, 0.55, h))
+      col = TSL.mix(col, top, TSL.smoothstep(0.45, 1.0, h))
+      const dth = TSL.fract(TSL.sin(TSL.screenCoordinate.xy.dot(TSL.vec2(12.9898, 78.233))).mul(43758.5453))
+      skyMat.colorNode = col.add(dth.sub(0.5).div(255.0)) // ディザ＝階調の縞を画素ノイズで散らす
+    }
     skyDome = new THREE.Mesh(skyGeo, skyMat); skyDome.frustumCulled = false; skyDome.renderOrder = -1; scene.add(skyDome)
   }
 
@@ -472,6 +500,7 @@ export async function mountTown3d(parent, opts = {}) {
   const sun = new THREE.DirectionalLight(isNight ? 0xa8bbe4 : sunCol.getHex(), isNight ? 0.62 : weather === 'snow' ? 0.86 : 1.02) // 方向光を主役に＝セルの明部/影部をはっきり（線形トーン用に白飛び防止／雪は高反射で白飛びしやすいので一段抑える）
   sun.position.set(isNight ? 24 : -30, 42, isNight ? -16 : 20)
   sun.castShadow = true
+  sun.shadow.autoUpdate = false // 静的影＝一度だけ焼く（WebGPU版はライト側で制御。焼き直しは sun.shadow.needsUpdate = true）
   sun.shadow.mapSize.set(SHADOW_SIZE, SHADOW_SIZE) // 影は一度だけ焼く静的影なので高精細化してもコスト増ゼロ。light端末は1024に落として焼き負荷とメモリを抑える
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 160
   sun.shadow.camera.left = -60; sun.shadow.camera.right = 60
@@ -513,15 +542,23 @@ export async function mountTown3d(parent, opts = {}) {
     const mwNormal = new THREE.Vector3(0.42, 0.62, 0.66).normalize() // 天の川の帯の法線（傾いた大円）
     let placed = 0, guard = 0
     while (placed < (LIGHT ? 380 : 640) && guard < 60000) { guard++; const th = Math.random() * 6.2832, ph = Math.acos(Math.random()); tmp.set(Math.cos(th) * Math.sin(ph), Math.cos(ph), Math.sin(th) * Math.sin(ph)); if (Math.abs(tmp.dot(mwNormal)) > 0.12) continue; addStar(tmp, 0.8 + Math.random() * 1.4); placed++ } // 帯の中だけ密に置く＝天の川
-    const starGeo = new THREE.BufferGeometry()
-    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(spos, 3))
-    starGeo.setAttribute('aph', new THREE.Float32BufferAttribute(sph, 1)); starGeo.setAttribute('asz', new THREE.Float32BufferAttribute(ssz, 1))
-    starMat = new THREE.ShaderMaterial({
-      uniforms: { uT: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-      vertexShader: 'attribute float aph; attribute float asz; varying float vph; void main(){ vph=aph; gl_PointSize=asz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: 'uniform float uT; varying float vph; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; float tw=0.62+0.38*sin(uT*2.2+vph*7.0); gl_FragColor=vec4(0.94,0.96,1.0,(1.0-d*1.7)*tw); }',
-    })
-    scene.add(new THREE.Points(starGeo, starMat))
+    // WebGPUではPointsが1px固定のため、星は「Sprite＋インスタンス属性」で描く（サイズ・per-starきらめきを再現）。
+    const starPos = new THREE.InstancedBufferAttribute(new Float32Array(spos), 3)
+    const starAph = new THREE.InstancedBufferAttribute(new Float32Array(sph), 1)
+    const starAsz = new THREE.InstancedBufferAttribute(new Float32Array(ssz), 1)
+    starMat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+    starMat.uniforms = { uT: TSL.uniform(0) } // frame側の starMat.uniforms.uT.value 更新をそのまま活かす
+    starMat.positionNode = TSL.instancedBufferAttribute(starPos)
+    starMat.sizeNode = TSL.instancedBufferAttribute(starAsz).div(TSL.screenDPR) // 旧gl_PointSize=素の実ピクセル指定に合わせDPR補正
+    starMat.sizeAttenuation = false
+    {
+      const vph = TSL.instancedBufferAttribute(starAph)
+      const d = TSL.uv().sub(0.5).length()
+      const tw = TSL.sin(starMat.uniforms.uT.mul(2.2).add(vph.mul(7.0))).mul(0.38).add(0.62)
+      starMat.colorNode = TSL.vec4(0.94, 0.96, 1.0, d.mul(1.7).oneMinus().mul(tw).mul(TSL.step(d, 0.5)))
+    }
+    const stars = new THREE.Sprite(starMat); stars.count = spos.length / 3; stars.frustumCulled = false
+    scene.add(stars)
     } // ← 星（雨以外）
   } else {
     // 昼/夕＝空に柔らかな太陽の光輪＋淡い彩雲のリング（光輪の外に分光がにじむ実在の現象）。太陽の向きに置きカメラへ追従。
@@ -564,27 +601,22 @@ export async function mountTown3d(parent, opts = {}) {
 
   // 軽いトゥーン（やわらかな水彩調のセル影）。プラスチックな拡散を脱し手描き調へ（3Dの街モード専用）。
   const grad = makeGradient(THREE)
+  const gradRamp = grad // 別名: winRoom内は「grad」が採光の陰影付け関数にシャドウされるため、トゥーンの階調テクスチャはこちらで参照する
   // 雪の積もり: 上を向いた面（屋根・地面・樹冠の上面）だけ白を被せる＝「雪が乗っている」表現。
   // 壁など縦面(normal.y≈0)は白くならない。weather==='snow' の全トゥーン材に共有適用。
   const SNOW = weather === 'snow'
   // 雪冠の色＝昼夕は陽を受けた明るい白／夜は夜空を映した暗い青灰（固定の明るい白だと遠景の雪屋根が
   // 暗い夜空に白く光りブルームで白飛びする＝雪夜だけ眩しい不具合の真因）。混ぜ量も夜は控えめに。
-  const SNOW_RGB = isNight ? '0.42, 0.46, 0.58' : '0.88, 0.90, 0.95'
+  const SNOW_RGB = isNight ? [0.42, 0.46, 0.58] : [0.88, 0.90, 0.95]
   const SNOW_MIX = isNight ? 0.56 : 0.7
   const snowify = (m) => {
     if (!SNOW) return m
-    m.onBeforeCompile = (sh) => {
-      sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vWNSnow;')
-        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vWNSnow = mat3(modelMatrix) * objectNormal;')
-      sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vWNSnow;')
-        .replace('#include <dithering_fragment>', `  float snowK = smoothstep(0.34, 0.74, normalize(vWNSnow).y);\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${SNOW_RGB}), snowK * ${SNOW_MIX});\n#include <dithering_fragment>`)
-    }
-    m.customProgramCacheKey = () => isNight ? 'snowcap-n' : 'snowcap'
+    // 旧: dithering_fragment注入（霧まで済んだ最終色に雪の白を重ねる）。TSLでは outputNode が同じ位置のフック。
+    const snowK = TSL.smoothstep(0.34, 0.74, TSL.normalWorld.y)
+    m.outputNode = TSL.vec4(TSL.mix(TSL.output.rgb, TSL.vec3(SNOW_RGB[0], SNOW_RGB[1], SNOW_RGB[2]), snowK.mul(SNOW_MIX)), TSL.output.a)
     return m
   }
-  const toon = (hex) => snowify(new THREE.MeshToonMaterial({ color: hex, gradientMap: grad }))
+  const toon = (hex) => snowify(new THREE.MeshToonNodeMaterial({ color: hex, gradientMap: grad }))
   // 手描き調の輪郭線（反転ハル）。背面を黒で少し大きく描き、シルエットに線を出す。共有・軽量・霞で遠景は淡く。
   // OUTLINE=線の太さ（後から調整可）。fog:true で遠景の線も空気遠近で淡くなる。
   const OUTLINE = 1.022 // 線の太さ（背面ハルの拡大率。太いと箱の角で剥離して浮くため細めに。調整可）
@@ -725,38 +757,35 @@ export async function mountTown3d(parent, opts = {}) {
   const glintDir = sun.position.clone().normalize()
   const glintCol = new THREE.Color(isNight ? 0x5a6e92 : (weather === 'snow' ? 0xe8eef6 : 0xfff0d2)).lerp(new THREE.Color(0xffc888), (isNight || weather === 'snow') ? 0 : duskAmt) // 昼=暖白／夕=金／夜=淡い月明かり
   // 川・池・水路のきらめき（淡い真水の水面のゆらぎ＝歩いて水辺で映える。海より細かく穏やか）。共有uniformをframeで進める。
-  const freshUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() }, uSky2: { value: skyTop.clone() } } // uSky=地平の色/uSky2=天頂の色。映り込みを縦グラデにする(地平=暖/天頂=空)＝単色の板を脱す。frameで日の傾きに追従
+  const freshUniforms = { uTime: TSL.uniform(0), uSky: TSL.uniform(skyHorizon.clone()), uSky2: TSL.uniform(skyTop.clone()) } // uSky=地平の色/uSky2=天頂の色。映り込みを縦グラデにする(地平=暖/天頂=空)＝単色の板を脱す。frameで日の傾きに追従（TSL uniformの.valueを更新）
+  const uGlintDir = TSL.uniform(glintDir), uGlintCol = TSL.uniform(glintCol) // 太陽きらめきの道（静的）
   const freshWater = (mat) => {
-    mat.onBeforeCompile = (sh) => {
-      sh.uniforms.uTime = freshUniforms.uTime
-      sh.uniforms.uSkyF = freshUniforms.uSky; sh.uniforms.uSky2F = freshUniforms.uSky2 // 共有＝frameで日の傾きに追従（静的な空グラデに動く反射＋時刻で水も染まる）
-      sh.uniforms.uGlintDir = { value: glintDir }; sh.uniforms.uGlintCol = { value: glintCol } // 太陽きらめきの道（静的）
-      sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vWPosF;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPosF = (modelMatrix * vec4(transformed, 1.0)).xyz;')
-      sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSkyF;\nuniform vec3 uSky2F;\nuniform vec3 uGlintDir;\nuniform vec3 uGlintCol;\nvarying vec3 vWPosF;')
-        .replace('#include <map_fragment>', `#include <map_fragment>
-          float phf = uTime;
-          float rp = sin(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + sin(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.4 * sin((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.82, smoothstep(0.55, 1.5, -rp) * 0.30); // 谷はほのかに沈む（沈め過ぎない）
-          diffuseColor.rgb += vec3(1.0, 0.98, 0.9) * smoothstep(0.74, 1.4, rp) * 0.08; // 細かな陽のきらめき（控えめ＝下の鏡面きらめきと二重にしない）
-          // 空の映り込み（フレネル）＝視線が浅い水面ほど空を映す。さざ波で映りの境を揺らす（ベタ塗りの板を脱す）。
-          vec3 vDirF = normalize(cameraPosition - vWPosF);
-          float grazeF = 1.0 - clamp(vDirF.y + rp * 0.05, 0.0, 1.0);
-          float fresF = pow(grazeF, 4.0);
-          vec3 reflF = mix(uSky2F, uSkyF, grazeF); // 視線が浅い(遠い水面)ほど地平の暖色、見下ろすほど天頂の空色＝縦グラデの映り込み
-          diffuseColor.rgb = mix(diffuseColor.rgb, reflF, fresF * 0.34);
-          // 太陽へ向かう鏡面のきらめき＝波の法線が太陽を眼へ反射する所だけ細かくちらつく「きらめきの道」（小さな高輝度点＝Bloomが映え白飛びしない）。
-          float dRxF = 0.85 * cos(vWPosF.x * 0.85 + phf * 0.8) * 0.5 + 0.5 * cos((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
-          float dRzF = 0.7 * cos(vWPosF.z * 0.7 - phf * 0.55) * 0.5 + 0.5 * cos((vWPosF.x + vWPosF.z) * 1.25 + phf * 1.15);
-          vec3 nWF = normalize(vec3(-dRxF * 0.14, 1.0, -dRzF * 0.14));
-          float specF = pow(max(dot(nWF, normalize(vDirF + uGlintDir)), 0.0), 80.0);
-          float twF = 0.5 + 0.5 * sin(vWPosF.x * 5.3 + vWPosF.z * 4.7 + phf * 5.5);
-          diffuseColor.rgb += uGlintCol * specF * twF;
-        `)
-    }
-    mat.customProgramCacheKey = () => 'freshWater'
+    // 旧: map_fragment注入（模様テクスチャの直後にさざ波・空の映り込み・きらめきを重ねる）。
+    // TSLでは colorNode ＝ 色×模様(materialColor)を置き換える同位置のフック（頂点色は後段で自動合成）。
+    mat.colorNode = TSL.Fn(() => {
+      const base = TSL.vec4(TSL.materialColor).toVar()
+      const P = TSL.positionWorld
+      const phf = freshUniforms.uTime
+      const rp = TSL.sin(P.x.mul(0.85).add(phf.mul(0.8))).mul(0.5)
+        .add(TSL.sin(P.z.mul(0.7).sub(phf.mul(0.55))).mul(0.5))
+        .add(TSL.sin(P.x.add(P.z).mul(1.25).add(phf.mul(1.15))).mul(0.4)).toVar()
+      base.rgb.assign(TSL.mix(base.rgb, base.rgb.mul(0.82), TSL.smoothstep(0.55, 1.5, rp.negate()).mul(0.30))) // 谷はほのかに沈む（沈め過ぎない）
+      base.rgb.addAssign(TSL.vec3(1.0, 0.98, 0.9).mul(TSL.smoothstep(0.74, 1.4, rp)).mul(0.08)) // 細かな陽のきらめき（控えめ＝下の鏡面きらめきと二重にしない）
+      // 空の映り込み（フレネル）＝視線が浅い水面ほど空を映す。さざ波で映りの境を揺らす（ベタ塗りの板を脱す）。
+      const vDir = TSL.cameraPosition.sub(P).normalize().toVar()
+      const graze = vDir.y.add(rp.mul(0.05)).clamp(0.0, 1.0).oneMinus().toVar()
+      const fres = graze.pow(4.0)
+      const refl = TSL.mix(freshUniforms.uSky2, freshUniforms.uSky, graze) // 視線が浅い(遠い水面)ほど地平の暖色、見下ろすほど天頂の空色＝縦グラデの映り込み
+      base.rgb.assign(TSL.mix(base.rgb, refl, fres.mul(0.34)))
+      // 太陽へ向かう鏡面のきらめき＝波の法線が太陽を眼へ反射する所だけ細かくちらつく「きらめきの道」（小さな高輝度点＝Bloomが映え白飛びしない）。
+      const dRx = TSL.cos(P.x.mul(0.85).add(phf.mul(0.8))).mul(0.85).mul(0.5).add(TSL.cos(P.x.add(P.z).mul(1.25).add(phf.mul(1.15))).mul(0.5))
+      const dRz = TSL.cos(P.z.mul(0.7).sub(phf.mul(0.55))).mul(0.7).mul(0.5).add(TSL.cos(P.x.add(P.z).mul(1.25).add(phf.mul(1.15))).mul(0.5))
+      const nW = TSL.vec3(dRx.mul(-0.14), 1.0, dRz.mul(-0.14)).normalize()
+      const spec = nW.dot(vDir.add(uGlintDir).normalize()).max(0.0).pow(80.0)
+      const tw = TSL.sin(P.x.mul(5.3).add(P.z.mul(4.7)).add(phf.mul(5.5))).mul(0.5).add(0.5)
+      base.rgb.addAssign(uGlintCol.mul(spec).mul(tw))
+      return base
+    })()
     return mat
   }
   let lightBeam = null // 灯台の光芒（夜に回る）
@@ -903,24 +932,17 @@ export async function mountTown3d(parent, opts = {}) {
     ncx.fillStyle = '#000'; ncx.fillRect(0, 0, 64, 64)
     for (let q = 0; q < 260; q++) { ncx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.7})`; ncx.beginPath(); ncx.arc(Math.random() * 64, Math.random() * 64, 0.6 + Math.random() * 2.2, 0, 6.2832); ncx.fill() } // Math.random＝種付きR()を消費しない
     const ntex = new THREE.CanvasTexture(nc); ntex.wrapS = ntex.wrapT = THREE.RepeatWrapping
-    const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true, side: THREE.DoubleSide }) // 両面＝リボンの法線向きに関係なく見える（片面だと裏面カリングで消える）
-    m.onBeforeCompile = (sh) => {
-      sh.uniforms.uTime = seaUniforms.uTime; sh.uniforms.uNoise = { value: ntex }
-      sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vUvF = uv;\n  vWPf = (modelMatrix * vec4(transformed,1.0)).xyz;')
-      sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform sampler2D uNoise;\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
-        .replace('#include <fog_fragment>', `#include <fog_fragment>
-          float aw = vUvF.x;                                          // 0=陸(砂) .. 1=海
-          float wf = 0.50 + 0.32 * sin(uTime * 0.42 - vWPf.z * 0.045 - vWPf.x * 0.02); // 寄せ返しの先端（汀沿いに位相がずれ斜めに寄せる）
-          float band = smoothstep(0.16, 0.0, abs(aw - wf));           // 先端の白いレース
-          float behind = smoothstep(wf - 0.02, 1.0, aw) * 0.5;        // 先端より海側の残り泡
-          float lace = texture2D(uNoise, vUvF * vec2(2.5, 8.0) + vec2(uTime * 0.03, uTime * 0.07)).r;
-          float foam = clamp(band + behind, 0.0, 1.0) * (0.55 + 0.45 * lace);
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.95, 0.98, 1.0), 0.9);
-          gl_FragColor.a *= clamp(foam, 0.0, 1.0) * 0.92;
-        `)
+    const m = new THREE.MeshBasicNodeMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true, side: THREE.DoubleSide }) // 両面＝リボンの法線向きに関係なく見える（片面だと裏面カリングで消える）
+    // 旧: fog_fragment注入（霧まで済んだ最終色に白い泡を重ね、寄せ返しで透明度を波打たせる）→ outputNode（同位置のフック）
+    {
+      const uvN = TSL.uv(), P = TSL.positionWorld, t = seaUniforms.uTime
+      const aw = uvN.x                                                                       // 0=陸(砂) .. 1=海
+      const wf = TSL.sin(t.mul(0.42).sub(P.z.mul(0.045)).sub(P.x.mul(0.02))).mul(0.32).add(0.50) // 寄せ返しの先端（汀沿いに位相がずれ斜めに寄せる）
+      const band = TSL.smoothstep(0.16, 0.0, aw.sub(wf).abs())                               // 先端の白いレース
+      const behind = TSL.smoothstep(wf.sub(0.02), 1.0, aw).mul(0.5)                          // 先端より海側の残り泡
+      const lace = TSL.texture(ntex, uvN.mul(TSL.vec2(2.5, 8.0)).add(TSL.vec2(t.mul(0.03), t.mul(0.07)))).r
+      const foam = band.add(behind).clamp(0.0, 1.0).mul(lace.mul(0.45).add(0.55))
+      m.outputNode = TSL.vec4(TSL.mix(TSL.output.rgb, TSL.vec3(0.95, 0.98, 1.0), 0.9), TSL.output.a.mul(foam.clamp(0.0, 1.0)).mul(0.92))
     }
     _coastFoamMat = m; return m
   }
@@ -1118,7 +1140,7 @@ export async function mountTown3d(parent, opts = {}) {
     return t
   }
   const mottleMat = (baseHex, n, spread, rep) => {
-    const m = new THREE.MeshToonMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
+    const m = new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: makeMottle(baseHex, n, spread), gradientMap: grad })
     m.map.repeat.set(rep[0], rep[1])
     return snowify(m)
   }
@@ -1188,7 +1210,7 @@ export async function mountTown3d(parent, opts = {}) {
     const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4; t.wrapS = t.wrapT = THREE.RepeatWrapping
     return t
   }
-  const facadeMat = (kind, baseHex) => snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeFacade(kind, baseHex), gradientMap: grad }))
+  const facadeMat = (kind, baseHex) => snowify(new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: makeFacade(kind, baseHex), gradientMap: grad }))
   // 町家の夜の灯り（障子の奥の行灯）。障子の面を暖色に＋組子を影で抜く emissiveMap。R()不使用＝生成乱数列を不変に保つ。
   let machiyaGlowTex = null
   const getMachiyaGlow = () => { if (machiyaGlowTex) return machiyaGlowTex
@@ -1234,7 +1256,7 @@ export async function mountTown3d(parent, opts = {}) {
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4
     return t
   }
-  const tileMat = (hex, repU, repV, dbl) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeTileTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); if (dbl) m.side = THREE.DoubleSide; return m }
+  const tileMat = (hex, repU, repV, dbl) => { const m = snowify(new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: makeTileTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); if (dbl) m.side = THREE.DoubleSide; return m }
   // ── 石垣（野面積み）のテクスチャ。城の裾広がりの石垣は瓦テクスチャの流用だと「滑らかな横縞」に見える＝近接で安っぽい。
   //    段ごとに半石ずらした不揃いの石（布積み）＋暗い目地＋上下のコバの陰影で、間近でも本物の石積みに。──
   const makeStoneTex = (baseHex) => {
@@ -1258,7 +1280,7 @@ export async function mountTown3d(parent, opts = {}) {
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4
     return t
   }
-  const stoneMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeStoneTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
+  const stoneMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: makeStoneTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
   // ── 赤煉瓦（イギリス積み風）のテクスチャ。大正の赤レンガ倉庫・時計塔は色ムラだけだと近接で滑らかな赤一色＝安っぽい。
   //    段ごとに半煉瓦ずらした規則的な煉瓦＋明るいモルタル目地＋一枚ごとの色ゆらぎで、間近でも本物の煉瓦壁に。──
   const makeBrickTex = (baseHex) => {
@@ -1279,7 +1301,7 @@ export async function mountTown3d(parent, opts = {}) {
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.anisotropy = LIGHT ? 1 : 4
     return t
   }
-  const brickMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonMaterial({ color: 0xffffff, map: makeBrickTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
+  const brickMat = (hex, repU, repV) => { const m = snowify(new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: makeBrickTex(hex), gradientMap: grad })); m.map.repeat.set(repU, repV); return m }
   // ── 看板（canvasで店名を描く＝オフラインで鮮明・時代ごとの字体。看板/のれん/ホーロー看板を立てる） ──
   const signCache = {}
   const signMat = (text, bg, fg, vertical, fontPx) => {
@@ -1698,7 +1720,7 @@ export async function mountTown3d(parent, opts = {}) {
     g.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3))
     // テクスチャは「細かい草目」を高反復で（大スケールは頂点色が担うのでタイル感が出ない）。grazing角を綺麗にする異方性も付与。
     const gm = mottleMat(0xffffff, 150, 0.1, [42, 46]); gm.vertexColors = true // 反復を上げ近接(主観視点)で地面の細部が出る（粗い反復は1タイル超拡大で平滑にボケる）
-    if (gm.map) { gm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); gm.map.needsUpdate = true }
+    if (gm.map) { gm.map.anisotropy = Math.min(4, maxAniso()); gm.map.needsUpdate = true }
     const ground = new THREE.Mesh(g, gm)
     ground.receiveShadow = true
     town.add(ground)
@@ -1727,7 +1749,7 @@ export async function mountTown3d(parent, opts = {}) {
     rtx.fillStyle = 'rgba(198,198,198,0.26)'; rtx.fillRect(6, 0, 2, 256); rtx.fillRect(56, 0, 2, 256) // 路肩線
     const roadTex = new THREE.CanvasTexture(rtc); roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 8)
     // トゥーン材＝周りの舗装(mottleMat)と同じ平坦な光の乗り。Lambertは陽光を全受けして路面だけ白飛び/夕方に金色へ浮いていた（評価アート）。
-    const road = new THREE.Mesh(rg, snowify(new THREE.MeshToonMaterial({ map: roadTex, gradientMap: grad, vertexColors: true })))
+    const road = new THREE.Mesh(rg, snowify(new THREE.MeshToonNodeMaterial({ map: roadTex, gradientMap: grad, vertexColors: true })))
     road.position.z = -35; road.receiveShadow = true; town.add(road)
     // 縁石（道の両肩）。短い箱を地形に沿って並べ1メッシュへ統合＝歩くと路肩が立ち、街路が地に着く。
     {
@@ -2310,7 +2332,7 @@ export async function mountTown3d(parent, opts = {}) {
     const wp = wgeo.attributes.position
     for (let i = 0; i < wp.count; i++) wp.setY(i, waterLevel(wp.getZ(i) - 36)) // mesh は z=-36 中心
     wgeo.computeVertexNormals()
-    const water = new THREE.Mesh(wgeo, freshWater(new THREE.MeshToonMaterial({ color: 0xffffff, map: wtex, gradientMap: grad, fog: true })))
+    const water = new THREE.Mesh(wgeo, freshWater(new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: wtex, gradientMap: grad, fog: true })))
     water.position.set(rx, 0, -36); water.receiveShadow = true; town.add(water)
     // 護岸（水際の左右のコンクリ壁。天端は堤の肩＝grade、底は水面下。地形に沿わせ1メッシュへ）
     const bankGeos = []
@@ -3245,7 +3267,7 @@ export async function mountTown3d(parent, opts = {}) {
       else for (let i = 0; i < 30; i++) { pcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.05})`; pcx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
       const ptex = new THREE.CanvasTexture(pc)
       const pondGeo = new THREE.CircleGeometry(pondR + 0.1, 36); pondGeo.rotateX(-Math.PI / 2)
-      const pond = new THREE.Mesh(pondGeo, freshWater(new THREE.MeshToonMaterial({ color: 0xffffff, map: ptex, gradientMap: grad, fog: true })))
+      const pond = new THREE.Mesh(pondGeo, freshWater(new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: ptex, gradientMap: grad, fog: true })))
       pond.position.set(px0, waterY, pz0); pond.receiveShadow = true; town.add(pond)
       // 石組みの縁（地形に沿って水際に段を作る＝池の輪郭がはっきりする。不揃いの石を1メッシュへ）。
       const rimGeos = []
@@ -3692,52 +3714,44 @@ export async function mountTown3d(parent, opts = {}) {
       // 縦グラデをタイルすると沖から「横縞」に見える（評価指摘）→グラデを廃し平坦な海面色に。奥行きは距離フォグで出す。
       wcx.fillStyle = '#' + new THREE.Color(0x216082).lerp(skyTop, 0.05).getHexString(); wcx.fillRect(0, 0, 128, 128) // 濃いめの青を芯に（夕フォグで砂色化しない）
       for (let i = 0; i < 130; i++) { wcx.fillStyle = `rgba(255,255,255,${0.04 + R() * 0.055})`; const s = 1 + R() * 1.6; wcx.fillRect(R() * 128, R() * 128, s, s) } // さざ波＝小さな点（横長ダッシュは横縞に揃うので正方の点に）
-      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(13, 9); wtex.anisotropy = renderer.capabilities.getMaxAnisotropy(); seaTex = wtex // 繰り返しを減らし＋異方性フィルタ＝沖のモアレ/縞を抑える
+      const wtex = new THREE.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(13, 9); wtex.anisotropy = maxAniso(); seaTex = wtex // 繰り返しを減らし＋異方性フィルタ＝沖のモアレ/縞を抑える
       const seaGeo = new THREE.PlaneGeometry(1760, 1180); seaGeo.rotateX(-Math.PI / 2)
       // MeshBasic＝向きの照明に左右されず、海面の色を一定に保つ（広い面が夕日で暖色に焼けるのを防ぐ）。
       // そこへシェーダーで「動くうねり・谷の濃藍・うろこ雲のような波頭・水平線のきらめき」を重ね、ぱっと見て海と分かる水面に。
-      seaUniforms = { uTime: { value: 0 }, uSky: { value: skyHorizon.clone() }, uSky2: { value: skyTop.clone() } } // uSky=空の色（地平寄り）/uSky2=天頂寄り。frameで日の傾きに追従＝夕方は海も金色に
-      const seaMat = new THREE.MeshBasicMaterial({ map: wtex, fog: true })
-      seaMat.onBeforeCompile = (sh) => {
-        sh.uniforms.uTime = seaUniforms.uTime
-        sh.uniforms.uSky = seaUniforms.uSky
-        sh.uniforms.uSky2 = seaUniforms.uSky2
-        sh.uniforms.uGlintDir = { value: glintDir }; sh.uniforms.uGlintCol = { value: glintCol } // 太陽きらめきの道（静的）
-        sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
-        sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uSky;\nuniform vec3 uSky2;\nuniform vec3 uGlintDir;\nuniform vec3 uGlintCol;\nvarying vec3 vWPos;')
-          .replace('#include <map_fragment>', `#include <map_fragment>
-            float ph = uTime;
-            // 大きなうねり＋斜めのさざ波（複数周波の和＝規則的すぎない水面）
-            float sw = sin(vWPos.x * 0.045 + ph * 0.7) * 0.5 + sin(vWPos.z * 0.035 - ph * 0.5) * 0.5;
-            sw += 0.5 * sin((vWPos.x + vWPos.z) * 0.085 + ph * 1.1) + 0.4 * sin(vWPos.z * 0.16 - ph * 1.7);
-            float crest = smoothstep(0.55, 1.5, sw);   // 波頭
-            float trough = smoothstep(0.55, 1.7, -sw);  // 波の谷
-            vec3 deep = vec3(0.07, 0.24, 0.40);
-            vec3 shal = vec3(0.27, 0.54, 0.66);
-            vec3 foam = vec3(0.82, 0.90, 0.95);
-            diffuseColor.rgb = mix(diffuseColor.rgb, deep, trough * 0.55);
-            diffuseColor.rgb = mix(diffuseColor.rgb, shal, crest * 0.30);
-            diffuseColor.rgb += foam * crest * 0.16;
-            // 空の映り込み（フレネル）＝足元は深い藍、視線が浅い遠方ほど空を映して明るむ＝塗りの板でなく「水」の手応え。
-            // 波のうねりで法線を少し傾け、映り込みのエッジを揺らす（鏡面のっぺりを避ける）。
-            vec3 vDir = normalize(cameraPosition - vWPos);
-            float graze = 1.0 - clamp(vDir.y + sw * 0.03, 0.0, 1.0);
-            float fres = pow(graze, 4.0);
-            // 縦グラデ＝近く（見下ろし）は天頂の色、遠く（浅い視線）は地平の色。塗りの板でなく空を映す水面。
-            vec3 refl = mix(uSky2, uSky, graze);
-            diffuseColor.rgb = mix(diffuseColor.rgb, refl, fres * 0.5);
-            // 太陽へ向かう、きらめきの道＝波の法線が太陽を眼へ反射する筋だけ細かく輝く（夕日の道）。小さな高輝度点＝Bloomが映え白飛びしない。
-            float dSx = 0.045 * cos(vWPos.x * 0.045 + ph * 0.7) * 0.5 + 0.085 * cos((vWPos.x + vWPos.z) * 0.085 + ph * 1.1);
-            float dSz = 0.035 * cos(vWPos.z * 0.035 - ph * 0.5) * 0.5 + 0.085 * cos((vWPos.x + vWPos.z) * 0.085 + ph * 1.1) + 0.16 * 0.4 * cos(vWPos.z * 0.16 - ph * 1.7);
-            vec3 nW = normalize(vec3(-dSx * 3.0, 1.0, -dSz * 3.0));
-            float specS = pow(max(dot(nW, normalize(vDir + uGlintDir)), 0.0), 60.0);
-            float twS = 0.5 + 0.5 * sin(vWPos.x * 0.5 + vWPos.z * 0.42 + ph * 5.0);
-            diffuseColor.rgb += uGlintCol * specS * twS;
-          `)
-      }
+      seaUniforms = { uTime: TSL.uniform(0), uSky: TSL.uniform(skyHorizon.clone()), uSky2: TSL.uniform(skyTop.clone()) } // uSky=空の色（地平寄り）/uSky2=天頂寄り。frameで日の傾きに追従＝夕方は海も金色に
+      const seaMat = new THREE.MeshBasicNodeMaterial({ map: wtex, fog: true })
+      // 旧: map_fragment注入 → colorNode（色×さざ波テクスチャの直後にうねり・映り込み・きらめきを重ねる同位置のフック）
+      seaMat.colorNode = TSL.Fn(() => {
+        const base = TSL.vec4(TSL.materialColor).toVar()
+        const P = TSL.positionWorld
+        const ph = seaUniforms.uTime
+        // 大きなうねり＋斜めのさざ波（複数周波の和＝規則的すぎない水面）
+        const sw = TSL.sin(P.x.mul(0.045).add(ph.mul(0.7))).mul(0.5)
+          .add(TSL.sin(P.z.mul(0.035).sub(ph.mul(0.5))).mul(0.5))
+          .add(TSL.sin(P.x.add(P.z).mul(0.085).add(ph.mul(1.1))).mul(0.5))
+          .add(TSL.sin(P.z.mul(0.16).sub(ph.mul(1.7))).mul(0.4)).toVar()
+        const crest = TSL.smoothstep(0.55, 1.5, sw)    // 波頭
+        const trough = TSL.smoothstep(0.55, 1.7, sw.negate()) // 波の谷
+        base.rgb.assign(TSL.mix(base.rgb, TSL.vec3(0.07, 0.24, 0.40), trough.mul(0.55)))
+        base.rgb.assign(TSL.mix(base.rgb, TSL.vec3(0.27, 0.54, 0.66), crest.mul(0.30)))
+        base.rgb.addAssign(TSL.vec3(0.82, 0.90, 0.95).mul(crest).mul(0.16))
+        // 空の映り込み（フレネル）＝足元は深い藍、視線が浅い遠方ほど空を映して明るむ＝塗りの板でなく「水」の手応え。
+        // 波のうねりで法線を少し傾け、映り込みのエッジを揺らす（鏡面のっぺりを避ける）。
+        const vDir = TSL.cameraPosition.sub(P).normalize().toVar()
+        const graze = vDir.y.add(sw.mul(0.03)).clamp(0.0, 1.0).oneMinus().toVar()
+        const fres = graze.pow(4.0)
+        // 縦グラデ＝近く（見下ろし）は天頂の色、遠く（浅い視線）は地平の色。塗りの板でなく空を映す水面。
+        const refl = TSL.mix(seaUniforms.uSky2, seaUniforms.uSky, graze)
+        base.rgb.assign(TSL.mix(base.rgb, refl, fres.mul(0.5)))
+        // 太陽へ向かう、きらめきの道＝波の法線が太陽を眼へ反射する筋だけ細かく輝く（夕日の道）。小さな高輝度点＝Bloomが映え白飛びしない。
+        const dSx = TSL.cos(P.x.mul(0.045).add(ph.mul(0.7))).mul(0.045).mul(0.5).add(TSL.cos(P.x.add(P.z).mul(0.085).add(ph.mul(1.1))).mul(0.085))
+        const dSz = TSL.cos(P.z.mul(0.035).sub(ph.mul(0.5))).mul(0.035).mul(0.5).add(TSL.cos(P.x.add(P.z).mul(0.085).add(ph.mul(1.1))).mul(0.085)).add(TSL.cos(P.z.mul(0.16).sub(ph.mul(1.7))).mul(0.16 * 0.4))
+        const nW = TSL.vec3(dSx.mul(-3.0), 1.0, dSz.mul(-3.0)).normalize()
+        const spec = nW.dot(vDir.add(uGlintDir).normalize()).max(0.0).pow(60.0)
+        const tw = TSL.sin(P.x.mul(0.5).add(P.z.mul(0.42)).add(ph.mul(5.0))).mul(0.5).add(0.5)
+        base.rgb.addAssign(uGlintCol.mul(spec).mul(tw))
+        return base
+      })()
       const seaMesh = new THREE.Mesh(seaGeo, seaMat)
       seaMesh.position.set(0, SEA.level, -300); seaMesh.receiveShadow = true; town.add(seaMesh) // x≈-880..880・z≈-890..290 を広く覆う（Phase0で遠ざけた西=大正/東=江戸/北=戦国への長い渡りの海）
       // ── 渚（波打ち際）。東岸の汀に沿って白い波が寄せて返す＝「海を眺めに降りる」癒しの足場。汀(heightAt=SEA.level)を z沿いに辿り、砂(陸)→海へ垂れるリボンを張る。寄せ返しはシェーダー（海と同じuTimeを共有＝フレーム追加負荷ゼロ）。──
@@ -3768,25 +3782,20 @@ export async function mountTown3d(parent, opts = {}) {
           ncx.fillStyle = '#000'; ncx.fillRect(0, 0, 64, 64)
           for (let q = 0; q < 260; q++) { ncx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.7})`; ncx.beginPath(); ncx.arc(Math.random() * 64, Math.random() * 64, 0.6 + Math.random() * 2.2, 0, 6.2832); ncx.fill() } // 泡の見た目用ノイズ＝Math.random（種付きR()を消費せず後段の配置を乱さない）
           const ntex = new THREE.CanvasTexture(nc); ntex.wrapS = ntex.wrapT = THREE.RepeatWrapping
-          const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true })
-          foamMat.onBeforeCompile = (sh) => {
-            sh.uniforms.uTime = seaUniforms.uTime; sh.uniforms.uNoise = { value: ntex }
-            sh.vertexShader = sh.vertexShader
-              .replace('#include <common>', '#include <common>\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
-              .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vUvF = uv;\n  vWPf = (modelMatrix * vec4(transformed,1.0)).xyz;')
-            sh.fragmentShader = sh.fragmentShader
-              .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform sampler2D uNoise;\nvarying vec2 vUvF;\nvarying vec3 vWPf;')
-              .replace('#include <fog_fragment>', `#include <fog_fragment>
-                float aw = vUvF.x;                                          // 0=陸(砂) .. 1=海。汀(heightAt=SEA.level)は概ね aw≈0.57
-                float wf = 0.50 + 0.34 * sin(uTime * 0.45 - vWPf.z * 0.045); // 寄せ返しの先端（汀沿いに位相がずれ斜めに寄せる）
-                float band = smoothstep(0.16, 0.0, abs(aw - wf));           // 先端の白いレース（最も明るい筋）
-                float behind = smoothstep(wf - 0.02, 1.0, aw) * 0.55;       // 先端より海側＝波の面に残る泡
-                float lace = texture2D(uNoise, vUvF * vec2(2.5, 8.0) + vec2(uTime * 0.03, uTime * 0.07)).r;
-                float foam = clamp(band + behind, 0.0, 1.0) * (0.5 + 0.5 * lace);
-                float endFade = smoothstep(0.0, 0.05, vUvF.y) * smoothstep(1.0, 0.95, vUvF.y); // リボンの z端をそっと消す
-                gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.95, 0.98, 1.0), 0.85); // 白い泡（近くは白く・遠くは少し景色に溶ける）
-                gl_FragColor.a *= clamp(foam, 0.0, 1.0) * 0.95 * endFade;
-              `)
+          const foamMat = new THREE.MeshBasicNodeMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: true })
+          // 旧: fog_fragment注入 → outputNode（霧まで済んだ最終色に白い泡を重ねる同位置のフック）
+          {
+            const uvN = TSL.uv(), P = TSL.positionWorld, t = seaUniforms.uTime
+            const aw = uvN.x                                                          // 0=陸(砂) .. 1=海。汀(heightAt=SEA.level)は概ね aw≈0.57
+            const wf = TSL.sin(t.mul(0.45).sub(P.z.mul(0.045))).mul(0.34).add(0.50)   // 寄せ返しの先端（汀沿いに位相がずれ斜めに寄せる）
+            const band = TSL.smoothstep(0.16, 0.0, aw.sub(wf).abs())                  // 先端の白いレース（最も明るい筋）
+            const behind = TSL.smoothstep(wf.sub(0.02), 1.0, aw).mul(0.55)            // 先端より海側＝波の面に残る泡
+            const lace = TSL.texture(ntex, uvN.mul(TSL.vec2(2.5, 8.0)).add(TSL.vec2(t.mul(0.03), t.mul(0.07)))).r
+            const foam = band.add(behind).clamp(0.0, 1.0).mul(lace.mul(0.5).add(0.5))
+            const endFade = TSL.smoothstep(0.0, 0.05, uvN.y).mul(TSL.smoothstep(1.0, 0.95, uvN.y)) // リボンの z端をそっと消す
+            foamMat.outputNode = TSL.vec4(
+              TSL.mix(TSL.output.rgb, TSL.vec3(0.95, 0.98, 1.0), 0.85), // 白い泡（近くは白く・遠くは少し景色に溶ける）
+              TSL.output.a.mul(foam.clamp(0.0, 1.0)).mul(0.95).mul(endFade))
           }
           const foam = new THREE.Mesh(fg, foamMat); foam.renderOrder = 2; foam.frustumCulled = false; town.add(foam)
         }
@@ -3820,7 +3829,7 @@ export async function mountTown3d(parent, opts = {}) {
             snowE ? 0xcdd2cc : 0x8a7448, 0.6) // 斜面の土
           if (season !== 'winter') beachTint(gI, 0) // 汀の砂浜（メッシュはy=0基準。冬は雪の渚なので除外）
           const em = mottleMat(0xffffff, 150, 0.1, [44, 44]); em.vertexColors = true // 反復を上げ近接で地面の細部（過拡大の平滑を脱す）
-          if (em.map) { em.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); em.map.needsUpdate = true }
+          if (em.map) { em.map.anisotropy = Math.min(4, maxAniso()); em.map.needsUpdate = true }
           const gmesh = new THREE.Mesh(gI, em); gmesh.position.set(ex, 0, ez); gmesh.receiveShadow = true; town.add(gmesh) }
         // 城下の田畑・草地（地面に緑/黄の区画を点在＝のっぺりした砂色を脱す）
         { const fieldCols = season === 'autumn' ? [0xb89a4a, 0x9a8848, 0x8a7a40] : season === 'winter' ? [0xd8dcd6, 0xc8ccc4, 0xb8b0a0] : season === 'spring' ? [0x8aa84e, 0x7a9a44, 0x9ab058] : [0x6e8a48, 0x7e9450, 0x5e7a40]
@@ -3845,7 +3854,7 @@ export async function mountTown3d(parent, opts = {}) {
         ewx.globalAlpha = 0.32; ewx.fillStyle = ewsg; ewx.fillRect(0, 0, 64, 64); ewx.globalAlpha = 1
         for (let i = 0; i < 46; i++) { ewx.fillStyle = 'rgba(255,255,255,0.07)'; ewx.fillRect((i * 29) % 64, (i * 13) % 64, 1 + (i % 2), 1) } // さざ波（決定的＝乱数を消費しない）
         const ewtex = new THREE.CanvasTexture(ewc); ewtex.wrapS = ewtex.wrapT = THREE.RepeatWrapping; ewtex.repeat.set(2, 2)
-        const edoWaterMat = () => freshWater(new THREE.MeshToonMaterial({ map: ewtex, gradientMap: grad, color: isNight ? 0x8a98a4 : 0xffffff, fog: true }))
+        const edoWaterMat = () => freshWater(new THREE.MeshToonNodeMaterial({ map: ewtex, gradientMap: grad, color: isNight ? 0x8a98a4 : 0xffffff, fog: true }))
         // ── 城下を蛇行する小川（平底の河床＋河川敷の草＋木の橋）＝平らな台地に水辺の自然 ──
         { const wmat = edoWaterMat()
           const grassC = season === 'winter' ? 0xb8c0b6 : season === 'autumn' ? 0x9a8a52 : 0x6e8a48
@@ -4179,7 +4188,7 @@ export async function mountTown3d(parent, opts = {}) {
           gI.setAttribute('color', new THREE.Float32BufferAttribute(vcol, 3)); gI.computeVertexNormals()
           const mRep = Math.max(24, Math.round(isz / 6)) // home/江戸/大正と同じ密度の細かい草目＝近接で地面がベタ塗りに見えるのを脱す（評価アート）
           const mMat = mottleMat(0xffffff, 150, 0.1, [mRep, mRep]); mMat.vertexColors = true // 戦国の地面だけ素のtoon=テクスチャ無しで近接がのっぺりしていた→他エリアと統一
-          if (mMat.map) { mMat.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); mMat.map.needsUpdate = true }
+          if (mMat.map) { mMat.map.anisotropy = Math.min(4, maxAniso()); mMat.map.needsUpdate = true }
           const mtn = new THREE.Mesh(gI, mMat); mtn.position.set(sx, 0, sz); mtn.receiveShadow = true; town.add(mtn)
         }
         // ── 奥の山並み（重なり合う稜線を大気遠近で淡く。城の背後＝北と両袖に不均等に。接近路の南は海を開ける）──
@@ -4192,7 +4201,7 @@ export async function mountTown3d(parent, opts = {}) {
           }
         }
         // ── 川（谷を南北に蛇行し、南の河口で海へ注ぐ。水辺に城下町が沿う）──
-        { const rmat = freshWater(new THREE.MeshBasicMaterial({ map: seaTex || wtex, color: isNight ? 0x2c3842 : 0x52666c, fog: true })), rgeos = [], rM = new THREE.Matrix4(); let prev = null // 落ち着いた深い水色＋穏やかなきらめき（谷川の水辺）
+        { const rmat = freshWater(new THREE.MeshBasicNodeMaterial({ map: seaTex || wtex, color: isNight ? 0x2c3842 : 0x52666c, fog: true })), rgeos = [], rM = new THREE.Matrix4(); let prev = null // 落ち着いた深い水色＋穏やかなきらめき（谷川の水辺）
           for (let s = 0; s <= 42; s++) { const zz = sz + 36 - s * 2.5, cl = senValley(zz), px = sx + cl, gh = senH(px, zz), py = Math.max(SEA.level - 0.1, gh) - 0.04
             if (gh > 8.5) break // 谷頭で止める（川が山へ登って見えるのを防ぐ＝水源は山の中）
             const wdt = Math.max(2.2, 5.0 - Math.max(0, gh - 1) * 0.45) // 上流ほど細る（水の主張を抑え川幅を絞る）
@@ -4372,7 +4381,7 @@ export async function mountTown3d(parent, opts = {}) {
         //    谷側に石の畦(擁壁)を立てる＝バラけた板でなく「階段状に揃う棚田」。夏春は水鏡、秋は刈田、冬は雪。統合で軽量。 ──
         { const isWaterSeason = season === 'summer' || season === 'spring'
           // freshWaterで空を映すフレネル反射を載せる＝不透明なベタ青の板("青三角")を脱し、homeの棚田と同じ空を映す水鏡に（評価アート①-c）。
-          const padWaterMat = freshWater(new THREE.MeshBasicMaterial({ map: wtex, color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8ab0b4), fog: true })) // 水鏡（空を映す水田）
+          const padWaterMat = freshWater(new THREE.MeshBasicNodeMaterial({ map: wtex, color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8ab0b4), fog: true })) // 水鏡（空を映す水田）
           const padGreenMat = toon(season === 'autumn' ? 0xbfa850 : season === 'winter' ? 0xdfe4e6 : 0x6f9450) // 青田/刈田/雪田
           const wallM = toon(season === 'winter' ? 0xc6c8c2 : 0x6f6552)
           const padWG = [], padGG = [], wallG = [], pM = new THREE.Matrix4()
@@ -4475,7 +4484,7 @@ export async function mountTown3d(parent, opts = {}) {
             snowT ? 0xc2c2bc : 0x8a7e68, 0.72) // 斜面の地肌
           if (season !== 'winter') beachTint(gI, gy) // 汀の砂浜（冬は雪の渚なので除外）
           const tm = mottleMat(0xffffff, 150, 0.1, [46, 46]); tm.vertexColors = true // 反復を上げ近接で地面の細部（過拡大の平滑を脱す）
-          if (tm.map) { tm.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); tm.map.needsUpdate = true }
+          if (tm.map) { tm.map.anisotropy = Math.min(4, maxAniso()); tm.map.needsUpdate = true }
           const gmesh = new THREE.Mesh(gI, tm); gmesh.position.set(tx, gy, tz); gmesh.receiveShadow = true; town.add(gmesh) } // 港町の島の地面（石畳/土）
         // ── 運河（港から内陸へ引かれた石積みの水路＋石橋）＝大正の港町の水辺 ──
         { const cz0 = tz + 17, stone = mottleMat(0x9a948a, 150, 0.12, [2, 1])
@@ -4486,7 +4495,7 @@ export async function mountTown3d(parent, opts = {}) {
           const csg = ccx.createLinearGradient(20, 64, 44, 0); csg.addColorStop(0, 'rgba(255,255,255,0)'); csg.addColorStop(0.5, '#' + sunCol.clone().lerp(new THREE.Color(0xffffff), 0.2).getHexString()); csg.addColorStop(1, 'rgba(255,255,255,0)'); ccx.globalAlpha = 0.34; ccx.fillStyle = csg; ccx.fillRect(0, 0, 64, 64); ccx.globalAlpha = 1
           for (let i = 0; i < 36; i++) { ccx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.06})`; ccx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) }
           const canalTex = new THREE.CanvasTexture(ccv); canalTex.wrapS = canalTex.wrapT = THREE.RepeatWrapping
-          const cwmat = freshWater(new THREE.MeshToonMaterial({ map: canalTex, gradientMap: grad, color: isNight ? 0x5e6f7e : 0xaccad8, fog: true })) // 青みを残す＋穏やかなきらめき（運河の水辺で映える）
+          const cwmat = freshWater(new THREE.MeshToonNodeMaterial({ map: canalTex, gradientMap: grad, color: isNight ? 0x5e6f7e : 0xaccad8, fog: true })) // 青みを残す＋穏やかなきらめき（運河の水辺で映える）
           for (let cx0 = -TAISHO.r + 8; cx0 <= 28; cx0 += 5) { const px = tx + cx0, cy = heightAt(px, cz0)
             const w = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 6.4), cwmat); w.rotation.x = -Math.PI / 2; w.position.set(px, cy + 0.28, cz0); town.add(w) // 水面（広い水路＝俯瞰に水の青と反射を、地上に水辺の散歩を）
             for (const side of [-1, 1]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.2, 0.7), stone); wall.position.set(px, cy + 1.0, cz0 + 3.6 * side); wall.castShadow = true; town.add(wall) } } // 石積みの護岸
@@ -4792,8 +4801,8 @@ export async function mountTown3d(parent, opts = {}) {
           const g = new THREE.BufferGeometry(), pos = new Float32Array(count * 3), ph = new Float32Array(count)
           for (let i = 0; i < count; i++) { pos[i * 3] = cx + (R() - 0.5) * spread; pos[i * 3 + 1] = SEA.level + 4 + R() * 46; pos[i * 3 + 2] = cz + (R() - 0.5) * spread; ph[i] = R() * 6.28 }
           g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-          const m = new THREE.PointsMaterial({ map: fxDot, color: col, size: sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true, blending: isNight ? THREE.AdditiveBlending : THREE.NormalBlending })
-          const pts = new THREE.Points(g, m); pts.frustumCulled = false; town.add(pts)
+          const m = new THREE.PointsNodeMaterial({ map: fxDot, color: col, size: sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true, blending: isNight ? THREE.AdditiveBlending : THREE.NormalBlending })
+          const pts = pointCloud(g, m); town.add(pts)
           return { pts, g, m, ph, y0: SEA.level + 4, yH: 46 }
         }
         edoFx = mkFx(EDO.x, EDO.z, 160, 200, isNight ? 0xffe0a0 : 0xf2bcce, isNight ? 2.5 : 2.1) // 江戸: 夜=蛍/昼=桜の花びら（大きくゆっくり＝ノスタルジー）
@@ -5157,7 +5166,7 @@ export async function mountTown3d(parent, opts = {}) {
       cx.globalAlpha = sunStrength; cx.fillStyle = sg; cx.fillRect(0, 0, 64, 64); cx.globalAlpha = 1
       for (let i = 0; i < 40; i++) { cx.fillStyle = `rgba(255,255,255,${0.05 + R() * 0.05})`; cx.fillRect(R() * 64, R() * 64, 1 + R() * 2, 1) } // さざ波
       const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping
-      return new THREE.MeshToonMaterial({ color: 0xffffff, map: t, gradientMap: grad, fog: true }) // トゥーンで陰影を乗せ白飛びを防ぐ
+      return new THREE.MeshToonNodeMaterial({ color: 0xffffff, map: t, gradientMap: grad, fog: true }) // トゥーンで陰影を乗せ白飛びを防ぐ
     }
     const waterMat = freshWater(makeWaterMirror(0.34))  // 水を張った田（空を映す水鏡＋穏やかなきらめき）
     const waterSun = freshWater(makeWaterMirror(0.58))  // 朝日を照り返す明るい水面＋きらめき
@@ -5899,13 +5908,13 @@ export async function mountTown3d(parent, opts = {}) {
         const lc = new THREE.Mesh(new THREE.ConeGeometry(0.92, 0.6, 6), lantStone); lc.position.set(6.8, GY + 2.4, -2); g.add(lc)
         const lintel = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.8, 1.0), stone); lintel.position.set(-3.6, GY + 5.5, 5); lintel.rotation.z = 0.17; g.add(lintel) // 倒れかけた石の門（鳥居の名残）＝立ち柱に横石が斜めに架かる
         for (let k = 0; k < 4; k++) { const t = k / 4, ss = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.18, 7), stone); ss.position.set(9 - t * 7, GY + 0.5, 9 - t * 8); ss.rotation.y = k; g.add(ss) } // 飛び石の小径（橋から歩いてきた誰かの気配）
-        const pool = new THREE.Mesh(new THREE.CircleGeometry(1.9, 18), freshWater(new THREE.MeshToonMaterial({ color: isNight ? 0x33484a : 0x86a8a0, gradientMap: grad, fog: true }))); pool.rotation.x = -Math.PI / 2; pool.position.set(-1.4, GY + 0.46, 2.4); g.add(pool) // 根元から滴る水＝空を映す静かな水鏡
+        const pool = new THREE.Mesh(new THREE.CircleGeometry(1.9, 18), freshWater(new THREE.MeshToonNodeMaterial({ color: isNight ? 0x33484a : 0x86a8a0, gradientMap: grad, fog: true }))); pool.rotation.x = -Math.PI / 2; pool.position.set(-1.4, GY + 0.46, 2.4); g.add(pool) // 根元から滴る水＝空を映す静かな水鏡
         const leafG = new THREE.Group(); const leafMat = tn(isNight ? 0x4a5a3a : 0x9ab36a); leafMat.side = THREE.DoubleSide // 御神木から舞い落ちる葉（エモさの白眉＝ゆっくり舞い、根元で湧き直す）
         for (let i = 0; i < (LIGHT ? 7 : 12); i++) { const lf2 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.7), leafMat); const lx = 1 + (R() - 0.5) * 11, lz = -2 + (R() - 0.5) * 11; lf2.position.set(lx, GY + 2 + R() * 11, lz); lf2.userData = { x0: lx, z0: lz, ph: R() * 6.28, spd: 0.5 + R() * 0.5 }; leafG.add(lf2) }
         g.add(leafG); skyDrifters.push({ o: leafG, kind: 'leaffall' })
       } else if (n.kind === 'paddy') { // 空の棚田と水鏡＝谷戸の段々田を空へ。水を張った田が空/夕陽を鏡のように映す（故郷の幹と直結・ノスタルジー）
         const mud = tn(isNight ? 0x4a4038 : 0x7a6048), ridge = tn(isNight ? 0x3a4632 : 0x5f7340)
-        const padW = freshWater(new THREE.MeshToonMaterial({ color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8caaa4), gradientMap: grad, fog: true })) // 水鏡（空を映す水田・1材を全段で共有）
+        const padW = freshWater(new THREE.MeshToonNodeMaterial({ color: isNight ? 0x35505e : (season === 'spring' ? 0xa6c4c4 : 0x8caaa4), gradientMap: grad, fog: true })) // 水鏡（空を映す水田・1材を全段で共有）
         const baseR2 = n.r - 1, tiers = 4, tierH = 1.05, step = (baseR2 - 4) / tiers
         const tuftGeos = []
         for (let k = 0; k < tiers; k++) {
@@ -5991,11 +6000,17 @@ export async function mountTown3d(parent, opts = {}) {
         const NL = LIGHT ? 14 : 22, lpos = new Float32Array(NL * 3), laph = new Float32Array(NL)
         for (let i = 0; i < NL; i++) { const a = R() * 6.28, rr = R() * 1.42; lpos[i * 3] = Math.cos(a) * rr; lpos[i * 3 + 1] = GY + 0.54; lpos[i * 3 + 2] = Math.sin(a) * rr; laph[i] = R() * 6.28 }
         const lgeo = new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lpos, 3)); lgeo.setAttribute('aph', new THREE.BufferAttribute(laph, 1))
-        const lmat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-          uniforms: { uT: { value: 0 }, uOp: { value: 0 } },
-          vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.25+0.75*(0.5+0.5*sin(uT*1.7+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=2.7*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
-          fragmentShader: 'varying float vtw; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(1.0,0.79,0.62, a*vtw*uOp); }' })
-        const lpts = new THREE.Points(lgeo, lmat); lpts.frustumCulled = false; g.add(lpts)
+        const lmat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+        lmat.uniforms = { uT: TSL.uniform(0), uOp: TSL.uniform(0) } // frame側の .uniforms.uT/.uOp 更新をそのまま活かす
+        {
+          const aph = TSL.instancedBufferAttribute(new THREE.InstancedBufferAttribute(laph, 1), 'float')
+          const vtw = TSL.sin(lmat.uniforms.uT.mul(1.7).add(aph)).mul(0.5).add(0.5).mul(0.75).add(0.25)
+          const a = TSL.smoothstep(0.5, 0.0, TSL.uv().sub(0.5).length())
+          lmat.colorNode = TSL.vec4(1.0, 0.79, 0.62, a.mul(vtw).mul(lmat.uniforms.uOp))
+          lmat.sizeAttenuation = false
+          lmat.sizeNode = TSL.float(60.0).div(TSL.positionView.z.negate().max(1.0)).mul(2.7).div(TSL.screenDPR) // 旧gl_PointSize（実ピクセル）と同値
+        }
+        const lpts = pointCloud(lgeo, lmat); g.add(lpts)
         // 水底から立ちのぼるやわらかな光の柱（天と地をつなぐ気配。夕夜に暖かく・昼はごく淡く）。井戸坑の中に収め屋根を突き抜けない。
         const colOp = isNight ? 0.23 : (dk > 0.15 ? 0.13 : 0.06)
         const shaftCol = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.3, 3.3, 16, 1, true), new THREE.MeshBasicMaterial({ color: isNight ? 0xffd0a0 : 0xfff0d8, transparent: true, opacity: colOp, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); shaftCol.position.set(0, GY + 2.1, 0); g.add(shaftCol) // 柱頭(beam GY+4)へ向け立ちのぼる光＝天と地をつなぐ気配
@@ -6098,31 +6113,36 @@ export async function mountTown3d(parent, opts = {}) {
     // 焼いた頂点階調(暖頂→冷底)が雲の陰影＝トゥーンの硬い帯やグレーの濁りを出さず、やわらかく明るい水彩の雲に。
     // さらに onBeforeCompile で「生きたうねり（低周波の波＋流れ）＋陽の差す斜面の持ち上げ・きらめき＋外周の霞溶かし」を加える。
     // 波の解析勾配から法線を作る自己完結シェーダー（geometryのnormal attributeに依存しない＝MeshBasicでも堅牢）。
-    seaUni = { uTime: { value: 0 } }
+    seaUni = { uTime: TSL.uniform(0) }
     const seaSunDir = sun.position.clone().normalize()
     const seaSunCol = new THREE.Color(isNight ? 0x9fb0d8 : 0xfff2d8).lerp(new THREE.Color(0xffc070), dk)
     // 雲海に灯る暖かい光のにじみ＝谷(暗部)ほど琥珀色が灯る「街明かりが雲を染める」郷愁。夜が最強＝帰ってきた心地、朝夕は金、昼は控えめ。
     const seaWarm = new THREE.Color(isNight ? 0xffba7c : 0xffd49c)
     const seaWarmAmt = isNight ? 0.26 : (0.05 + dk * 0.18)
+    const uSeaSunDir = TSL.uniform(seaSunDir), uSeaSunCol = TSL.uniform(seaSunCol), uSeaWarm = TSL.uniform(seaWarm)
     const applySeaShader = (mat) => {
-      mat.onBeforeCompile = (sh) => {
-        sh.uniforms.uTime = seaUni.uTime
-        sh.uniforms.uSunDir = { value: seaSunDir }
-        sh.uniforms.uSunCol = { value: seaSunCol }
-        sh.uniforms.uSeaR = { value: seaR }
-        sh.uniforms.uWarm = { value: seaWarm }; sh.uniforms.uWarmAmt = { value: seaWarmAmt }
-        sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime; varying vec3 vSeaN; varying float vSeaC;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  float _wx = transformed.x, _wz = transformed.z;\n  float _p1 = _wx*0.020 + uTime*0.16, _p2 = _wz*0.024 - uTime*0.12, _p3 = (_wx+_wz)*0.012 + uTime*0.08;\n  transformed.y += sin(_p1)*cos(_p2)*3.0 + sin(_p3)*1.8;\n  float _dx = 0.020*cos(_p1)*cos(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  float _dz = -0.024*sin(_p1)*sin(_p2)*3.0 + 0.012*cos(_p3)*1.8;\n  vSeaN = normalize(vec3(-_dx, 1.0, -_dz));\n  vSeaC = length((modelMatrix * vec4(transformed,1.0)).xz);')
-        sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uSeaR; uniform vec3 uWarm; uniform float uWarmAmt; varying vec3 vSeaN; varying float vSeaC;')
-          .replace('#include <dithering_fragment>', '  float _ndl = dot(normalize(vSeaN), uSunDir);\n  gl_FragColor.rgb *= (0.90 + smoothstep(-0.2, 0.7, _ndl) * 0.10);\n  gl_FragColor.rgb += uSunCol * pow(max(_ndl, 0.0), 10.0) * 0.05;\n  float _lum = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, uWarm, uWarmAmt * (0.45 + 0.55 * (1.0 - clamp(_lum, 0.0, 1.0))));\n  gl_FragColor.a *= 1.0 - smoothstep(uSeaR*0.80, uSeaR*0.998, vSeaC);\n#include <dithering_fragment>')
-      }
-      mat.customProgramCacheKey = () => 'cloudsea'
+      // 旧: begin_vertex＋dithering_fragment注入 → positionNode（うねりの持ち上げ）＋outputNode（陽の面の持ち上げ・琥珀のにじみ・外周フェード）。
+      // 法線は波の解析勾配から自作（geometryのnormal属性に依存しない＝MeshBasicでも堅牢）。
+      const t = seaUni.uTime
+      const wx = TSL.positionLocal.x, wz = TSL.positionLocal.z
+      const p1 = wx.mul(0.020).add(t.mul(0.16)), p2 = wz.mul(0.024).sub(t.mul(0.12)), p3 = wx.add(wz).mul(0.012).add(t.mul(0.08))
+      const disp = TSL.sin(p1).mul(TSL.cos(p2)).mul(3.0).add(TSL.sin(p3).mul(1.8))
+      const displaced = TSL.vec3(wx, TSL.positionLocal.y.add(disp), wz)
+      mat.positionNode = displaced
+      const dx = TSL.cos(p1).mul(TSL.cos(p2)).mul(0.020 * 3.0).add(TSL.cos(p3).mul(0.012 * 1.8))
+      const dz = TSL.sin(p1).mul(TSL.sin(p2)).mul(-0.024 * 3.0).add(TSL.cos(p3).mul(0.012 * 1.8))
+      const seaN = TSL.varying(TSL.vec3(dx.negate(), 1.0, dz.negate()).normalize()) // 頂点段で計算して補間
+      const seaC = TSL.varying(TSL.modelWorldMatrix.mul(TSL.vec4(displaced, 1.0)).xz.length())
+      const ndl = seaN.normalize().dot(uSeaSunDir)
+      const lit = TSL.output.rgb.mul(TSL.smoothstep(-0.2, 0.7, ndl).mul(0.10).add(0.90))
+        .add(uSeaSunCol.mul(ndl.max(0.0).pow(10.0)).mul(0.05))
+      const lum = lit.dot(TSL.vec3(0.299, 0.587, 0.114))
+      const warmed = TSL.mix(lit, uSeaWarm, TSL.float(seaWarmAmt).mul(lum.clamp(0.0, 1.0).oneMinus().mul(0.55).add(0.45)))
+      mat.outputNode = TSL.vec4(warmed, TSL.output.a.mul(TSL.smoothstep(seaR * 0.80, seaR * 0.998, seaC).oneMinus()))
       return mat
     }
-    const seaMat = applySeaShader(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false }))
-    const discMat = applySeaShader(new THREE.MeshBasicMaterial({ color: seaLowC, transparent: true, opacity: 0, depthWrite: false, fog: false }))
+    const seaMat = applySeaShader(new THREE.MeshBasicNodeMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false }))
+    const discMat = applySeaShader(new THREE.MeshBasicNodeMaterial({ color: seaLowC, transparent: true, opacity: 0, depthWrite: false, fog: false }))
     seaMats.push(seaMat, discMat)
     // 雲の切れ間＝雲海の所々に穴を開け、はるか下の地上が覗く（高さの実感＝奥行き）。下地に穴・その部分は雲塊も置かない。
     const gaps = [{ x: 15, z: -25, r: 40 }, { x: 120, z: 28, r: 44 }, { x: -135, z: -120, r: 46 }, { x: 210, z: -300, r: 44 }] // 街・東の海・西の住宅・渡りの空の上に開ける
@@ -6201,7 +6221,7 @@ export async function mountTown3d(parent, opts = {}) {
 
     // やさしい幻想：雲海のぬし＝雲を泳ぐ大きな鯨＋寄り添う子鯨。なめらかな紡錘形の体が進行波でうねって泳ぎ、
     // 背に陽/月のリム光が乗る。時々ふっと潮を吹く（生命の気配・白眉）。
-    { const whaleUniforms = { uTime: { value: 0 } } // 進行波の時刻（frameで更新）。親子で共有＝同調して泳ぐ
+    { const whaleUniforms = { uTime: TSL.uniform(0) } // 進行波の時刻（frameで更新）。親子で共有＝同調して泳ぐ
       // 背=暗め／腹=明るめのカウンターシェード（夜は青く沈め、夕は背の高い側をわずかに茜へ）。
       const backC = new THREE.Color(isNight ? 0x4c5670 : 0x8496ab).lerp(new THREE.Color(0xd9a878), dk * 0.5)
       const bellyC = new THREE.Color(isNight ? 0x6a7691 : 0xc2cdda).lerp(new THREE.Color(0xe6c79c), dk * 0.4)
@@ -6223,20 +6243,21 @@ export async function mountTown3d(parent, opts = {}) {
       { const pos = whaleGeo.attributes.position, n = pos.count, arr = new Float32Array(n * 3), c = new THREE.Color() // 背暗→腹明のカウンターシェードを頂点色に焼く
         for (let i = 0; i < n; i++) { let ty = (pos.getY(i) + 8) / 16; ty = Math.max(0, Math.min(1, ty)); ty = ty * ty * (3 - 2 * ty); c.copy(bellyC).lerp(backC, ty); arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b }
         whaleGeo.setAttribute('color', new THREE.BufferAttribute(arr, 3)) }
-      // 進行波で体がうねって泳ぐ＋背にリム光（既存 snowify と同じ onBeforeCompile 注入）。
-      const whaleMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: grad, vertexColors: true, fog: true })
-      whaleMat.onBeforeCompile = (sh) => {
-        sh.uniforms.uTime = whaleUniforms.uTime
-        sh.uniforms.uRimColor = { value: new THREE.Color(isNight ? 0x6f7da0 : 0xfff0d8).lerp(new THREE.Color(0xffc89c), dk) }
-        sh.uniforms.uRimStr = { value: isNight ? 0.30 : 0.42 }
-        sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime; varying vec3 vRimN; varying vec3 vRimV;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  float _a = clamp((20.0 - transformed.x) / 50.0, 0.0, 1.0); _a *= _a;\n  transformed.y += _a * 3.4 * sin(transformed.x * 0.12 + uTime * 1.6);\n  vec4 _mv = modelViewMatrix * vec4(transformed, 1.0); vRimV = -_mv.xyz; vRimN = normalize(normalMatrix * objectNormal);')
-        sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform vec3 uRimColor; uniform float uRimStr; varying vec3 vRimN; varying vec3 vRimV;')
-          .replace('#include <dithering_fragment>', '  float _rim = pow(1.0 - clamp(dot(normalize(vRimN), normalize(vRimV)), 0.0, 1.0), 2.5); gl_FragColor.rgb += uRimColor * _rim * uRimStr;\n#include <dithering_fragment>')
+      // 進行波で体がうねって泳ぐ＋背にリム光（旧: begin_vertex＋dithering_fragment注入 → positionNode＋outputNode）。
+      const whaleMat = new THREE.MeshToonNodeMaterial({ color: 0xffffff, gradientMap: grad, vertexColors: true, fog: true })
+      {
+        const uRimColor = TSL.uniform(new THREE.Color(isNight ? 0x6f7da0 : 0xfff0d8).lerp(new THREE.Color(0xffc89c), dk))
+        const uRimStr = TSL.uniform(isNight ? 0.30 : 0.42)
+        whaleMat.positionNode = TSL.Fn(() => {
+          const p = TSL.positionLocal.toVar()
+          const a = TSL.float(20.0).sub(p.x).div(50.0).clamp(0.0, 1.0).toVar()
+          a.mulAssign(a)
+          p.y.addAssign(a.mul(3.4).mul(TSL.sin(p.x.mul(0.12).add(whaleUniforms.uTime.mul(1.6)))))
+          return p
+        })()
+        const rim = TSL.transformedNormalView.normalize().dot(TSL.positionView.negate().normalize()).clamp(0.0, 1.0).oneMinus().pow(2.5)
+        whaleMat.outputNode = TSL.vec4(TSL.output.rgb.add(uRimColor.mul(rim).mul(uRimStr)), TSL.output.a)
       }
-      whaleMat.customProgramCacheKey = () => 'skywhale'
       const eyeMat = new THREE.MeshBasicMaterial({ color: 0x14161c, fog: true })
       const addEyes = (g, k) => { for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.9 * k, 8, 8), eyeMat); e.position.set(13.5 * k, 1.1 * k, sd * 5.4 * k); g.add(e) } }
       const whale = new THREE.Group()
@@ -6343,11 +6364,16 @@ export async function mountTown3d(parent, opts = {}) {
 
     // やさしい幻想：雲海の上にかかる大きな虹のアーチ。晴れた日に現れ、くぐると淡い分光に包まれる（実際にくぐれる夢の虹）。
     { const grp = new THREE.Group(), mats = []
-      const bowFrag = 'varying float vR; uniform float uOp,uInner,uOuter,uRev,uScale; vec3 hsv(float h){ vec3 p=abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.); return clamp(p-1.,0.,1.); } void main(){ float rr=(vR-uInner)/(uOuter-uInner); float h=mix(0.78,0.0,rr); if(uRev>0.5) h=mix(0.0,0.78,rr); vec3 col=mix(vec3(1.0),hsv(h),0.58); float edge=smoothstep(0.0,0.22,rr)*(1.0-smoothstep(0.78,1.0,rr)); gl_FragColor=vec4(col, edge*uOp*uScale); }'
       const makeBow = (inner, outer, reversed, opScale) => {
-        const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
-          uniforms: { uOp: { value: 0 }, uInner: { value: inner }, uOuter: { value: outer }, uRev: { value: reversed ? 1 : 0 }, uScale: { value: opScale } },
-          vertexShader: 'varying float vR; void main(){ vR=length(position.xy); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ', fragmentShader: bowFrag })
+        // 旧ShaderMaterial（虹の色相環＋やわらかい縁）をTSLで（uOpのみframeから更新）。
+        const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide })
+        mat.uniforms = { uOp: TSL.uniform(0) }
+        const rr = TSL.positionLocal.xy.length().sub(inner).div(outer - inner)
+        const h = reversed ? TSL.mix(TSL.float(0.0), TSL.float(0.78), rr) : TSL.mix(TSL.float(0.78), TSL.float(0.0), rr)
+        const hsv = TSL.fract(h.add(TSL.vec3(0.0, 2.0 / 3.0, 1.0 / 3.0))).mul(6.0).sub(3.0).abs().sub(1.0).clamp(0.0, 1.0)
+        const col = TSL.mix(TSL.vec3(1.0), hsv, 0.58)
+        const edge = TSL.smoothstep(0.0, 0.22, rr).mul(TSL.smoothstep(0.78, 1.0, rr).oneMinus())
+        mat.colorNode = TSL.vec4(col, edge.mul(mat.uniforms.uOp).mul(opScale))
         const ring = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 120, 1, 0, Math.PI), mat); ring.frustumCulled = false; grp.add(ring); mats.push(mat)
       }
       makeBow(98, 122, false, 1.0); makeBow(132, 152, true, 0.26) // 主虹＋淡い副虹
@@ -6717,7 +6743,7 @@ export async function mountTown3d(parent, opts = {}) {
   const girlTint = new THREE.Color(isNight ? 0x9aa6c0 : sunCol.getHex()).multiplyScalar(isNight ? 0.5 : 0.86)
   const makeGirlStandee = (cfg) => {
     const cv = document.createElement('canvas'); cv.width = 360; cv.height = 720; drawHarborGirl2D(cv.getContext('2d'), cfg || {})
-    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy()
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = maxAniso()
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, fog: true }); mat.color.copy(girlTint)
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 2.1), mat); m.position.y = 1.03
     const grp = new THREE.Group(); grp.add(m)
@@ -7081,7 +7107,7 @@ export async function mountTown3d(parent, opts = {}) {
       eraCover(SENGOKU.x, SENGOKU.z, SENGOKU.r, NE, [0x5c7a3a, 0x6e8c46, 0x52702f]) // 戦国=谷の緑（谷底の川は低くheightAtで除外）
     }
     // 検証用: 住人を1体、任意の向きで清潔な背景に正射影レンダして等倍PNGで返す（造形の作り込み確認に最適）。
-    if (/[?&]dev=1/.test(location.search)) window.__town3dFigShot = (yaw, cfgJson, faceZoom) => {
+    if (/[?&]dev=1/.test(location.search)) window.__town3dFigShot = async (yaw, cfgJson, faceZoom) => {
       const cfg = cfgJson ? JSON.parse(cfgJson) : { skin: 0xf7d8bc, hair: 0x241c18, iris: 0x4a3a2c, outfit: 'blouse', top: 0xf0ece2, bottom: 0x2e3a42, hairStyle: 'bob', prop: 'bag', bagCol: 0x8a7256 }
       const fig = makeResident(cfg); fig.rotation.y = yaw || 0
       const sc = new THREE.Scene(); sc.add(new THREE.AmbientLight(0xfff6ec, 0.9))
@@ -7090,13 +7116,13 @@ export async function mountTown3d(parent, opts = {}) {
       const W = faceZoom ? 440 : 360, H = faceZoom ? 440 : 560
       const cam = faceZoom ? new THREE.OrthographicCamera(-0.29, 0.29, 0.29, -0.29, 0.1, 12) : new THREE.OrthographicCamera(-0.62, 0.62, 0.95, -0.95, 0.1, 12)
       if (faceZoom) { cam.position.set(0, 1.13, 5); cam.lookAt(0, 1.13, 0) } else { cam.position.set(0, 0.9, 5); cam.lookAt(0, 0.9, 0) }
-      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const rt = new THREE.RenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
-      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(sc, cam)
-      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.render(sc, cam)
+      const buf = await readRTPixels(rt, W, H)
       renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
       const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
-      const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
+      const img = cx.createImageData(W, H); img.data.set(buf.subarray(0, W * H * 4)); cx.putImageData(img, 0, 0)
       sc.remove(fig); fig.traverse((o) => { if (o.geometry && o.geometry !== resShadowGeo) o.geometry.dispose(); if (o.material && o.material !== RES_OUTLINE && o.material !== resShadowMat) o.material.dispose() }); rt.dispose()
       return cv.toDataURL()
     }
@@ -7119,14 +7145,13 @@ export async function mountTown3d(parent, opts = {}) {
     }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    const mat = new THREE.PointsMaterial({
+    const mat = new THREE.PointsNodeMaterial({
       color: weather === 'snow' ? 0xfdfdff : weather === 'petals' ? 0xf2bcd0 : 0xcf7e38, // 落ち葉=暖色の橙
       size: weather === 'snow' ? 0.5 : weather === 'petals' ? 0.85 : 0.95,
       transparent: true, opacity: weather === 'snow' ? 0.92 : 0.85,
       sizeAttenuation: true, fog: true, depthWrite: false,
     })
-    const pts = new THREE.Points(geo, mat)
-    pts.frustumCulled = false
+    const pts = pointCloud(geo, mat)
     scene.add(pts)
     // 落ち葉・花びらは大きく舞う（横揺れを強く）。雪はまっすぐ静かに落ちる。
     weatherPts = { pts, pos, spd, phs, N, swirl: weather === 'snow' ? 0.9 : weather === 'petals' ? 2.6 : 3.0 }
@@ -7139,16 +7164,16 @@ export async function mountTown3d(parent, opts = {}) {
     const pos = new Float32Array(N * 3), spd = new Float32Array(N), phs = new Float32Array(N)
     for (let i = 0; i < N; i++) { pos[i * 3] = bx + (R() - 0.5) * R0 * 2; pos[i * 3 + 1] = floor + R() * 20; pos[i * 3 + 2] = bz + (R() - 0.5) * R0 * 2; spd[i] = 0.7 + R() * 0.9; phs[i] = R() * 6.28 }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    const mat = new THREE.PointsMaterial({ color: season === 'spring' ? 0xf2bcd0 : 0xd07e2a, size: season === 'spring' ? 0.8 : 0.92, transparent: true, opacity: 0.92, sizeAttenuation: true, fog: true, depthWrite: false })
-    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
+    const mat = new THREE.PointsNodeMaterial({ color: season === 'spring' ? 0xf2bcd0 : 0xd07e2a, size: season === 'spring' ? 0.8 : 0.92, transparent: true, opacity: 0.92, sizeAttenuation: true, fog: true, depthWrite: false })
+    const pts = pointCloud(geo, mat); scene.add(pts)
     seasonFall = { pts, pos, spd, phs, N, bx, bz, R0, floor, swirl: season === 'spring' ? 2.2 : 2.8 }
     // 歩く人に追従する近景の層（カメラ周りの箱で循環。降り立つとどこでも花びら/落ち葉が舞う＝散歩の没入）。
     const nN = LIGHT ? 34 : 60, nHX = 13, nHY = 11
     const npos = new Float32Array(nN * 3), nspd = new Float32Array(nN), nphs = new Float32Array(nN)
     for (let i = 0; i < nN; i++) { npos[i * 3] = (R() - 0.5) * nHX * 2; npos[i * 3 + 1] = R() * nHY; npos[i * 3 + 2] = (R() - 0.5) * nHX * 2; nspd[i] = 0.55 + R() * 0.8; nphs[i] = R() * 6.28 }
     const ngeo = new THREE.BufferGeometry(); ngeo.setAttribute('position', new THREE.BufferAttribute(npos, 3))
-    const nmat = new THREE.PointsMaterial({ color: season === 'spring' ? 0xf4c2d6 : 0xd8813a, size: season === 'spring' ? 0.5 : 0.58, transparent: true, opacity: 0, sizeAttenuation: true, fog: true, depthWrite: false })
-    const npts = new THREE.Points(ngeo, nmat); npts.frustumCulled = false; npts.visible = false; scene.add(npts)
+    const nmat = new THREE.PointsNodeMaterial({ color: season === 'spring' ? 0xf4c2d6 : 0xd8813a, size: season === 'spring' ? 0.5 : 0.58, transparent: true, opacity: 0, sizeAttenuation: true, fog: true, depthWrite: false })
+    const npts = pointCloud(ngeo, nmat); npts.visible = false; scene.add(npts)
     nearFall = { pts: npts, mat: nmat, pos: npos, spd: nspd, phs: nphs, N: nN, HX: nHX, HY: nHY, swirl: season === 'spring' ? 2.4 : 3.0 }
   }
 
@@ -7220,35 +7245,43 @@ export async function mountTown3d(parent, opts = {}) {
   const eye = kind === 'yato'
     ? new THREE.Vector3(0, 28, 27)  // 谷戸: 少し低く・谷へ寄る（棚田と茅葺屋敷が映える）
     : new THREE.Vector3(0, 31, 30)  // 街: 高台の上階から見下ろす
-  // ── FXAA（輪郭のギザギザをなめらかに）。MSAA付きの中間ターゲット→FXAA→OutputPass(色空間を正しく)。失敗時はnullで通常描画へ。──
+  // ── FXAA＋ブルーム（ノード式ポストプロセス）。旧EffectComposer(WebGL)をWebGPUのPostProcessingへ載せ替え。
+  //    描画→(ブルーム加算)→出力変換(sRGB)→FXAA の順＝旧チェーンと同じ「最終画へのAA」。失敗時はnullで通常描画へ。──
   try {
-    const [{ EffectComposer }, { RenderPass }, { ShaderPass }, { OutputPass }, { FXAAShader }, bloomMod] = await Promise.all([
-      import('three/examples/jsm/postprocessing/EffectComposer.js'),
-      import('three/examples/jsm/postprocessing/RenderPass.js'),
-      import('three/examples/jsm/postprocessing/ShaderPass.js'),
-      import('three/examples/jsm/postprocessing/OutputPass.js'),
-      import('three/examples/jsm/shaders/FXAAShader.js'),
-      LIGHT ? Promise.resolve(null) : import('three/examples/jsm/postprocessing/UnrealBloomPass.js').catch(() => null), // 灯りのブルーム（非力端末は読み込まず＝発熱回避）
+    const [{ fxaa }, bloomMod] = await Promise.all([
+      import('three/addons/tsl/display/FXAANode.js'),
+      LIGHT ? Promise.resolve(null) : import('three/addons/tsl/display/BloomNode.js').catch(() => null), // 灯りのブルーム（非力端末は読み込まず＝発熱回避）
     ])
     if (my !== token) return
-    const crt = new THREE.WebGLRenderTarget(W, H, { samples: 0 }) // MSAAは切りFXAA一本化＝中間RTの多重サンプルバッファ(帯域/メモリ)を省く。輪郭はFXAAが担い実機で差はごく僅か（2026-07 発熱対策・AB検証済）
-    composer = new EffectComposer(renderer, crt)
-    composer.addPass(new RenderPass(scene, camera))
-    fxaaPass = new ShaderPass(FXAAShader)
-    composer.addPass(fxaaPass)
-    // 夕夜の灯り（窓/街灯/提灯/自販機）がふわっと滲んで光るブルーム。ハーフ解像度＋高しきい値で「灯りだけ」を控えめに。昼/非力端末はstrength0で無効化＝負荷ゼロ。
-    if (bloomMod && bloomMod.UnrealBloomPass) {
+    const scenePass = TSL.pass(scene, camera, { samples: 0 }) // MSAAは切りFXAA一本化（2026-07 発熱対策・AB検証済）
+    const scenePassColor = scenePass.getTextureNode()
+    // 夕夜の灯り（窓/街灯/提灯/自販機）がふわっと滲んで光るブルーム。高しきい値で「灯りだけ」を控えめに。昼/非力端末は無効化＝負荷ゼロ。
+    if (bloomMod && bloomMod.bloom) {
       // 夜=強め／はっきりした夕=ほのか／昼=ごく淡く「いちばん明るい所」だけ滲ませる（雲海のきらめき・クジラのリム光・水面・雲頂・窓灯り）。
       // 昼は高しきい値で水彩の中間調を濁さず、雪天の昼は白飛び回避でさらに弱く。
       const bs = isNight ? 0.62 : duskAmt > 0.25 ? 0.09 + duskAmt * 0.16 : (weather === 'snow' ? 0.03 : 0.05) // 昼/夕はごく控えめ（広く明るい雲面が眩しく白飛びするのを防ぐ・実機FB）
       const bThr = isNight ? 0.72 : duskAmt > 0.25 ? 0.84 : 0.90 // 昼はかなり高いしきい値＝太陽のきらめき/灯りだけ滲ませ、白い雲の面は光らせない
       const bRad = isNight ? 0.62 : 0.5
-      bloomPass = new bloomMod.UnrealBloomPass(new THREE.Vector2(Math.max(64, W / 2), Math.max(64, H / 2)), bs, bRad, bThr)
+      bloomNode = bloomMod.bloom(scenePassColor, bs, bRad, bThr)
       bloomWanted = bs > 0.10 // 昼(bs=0.05)/雪昼(0.03)のほぼ不可視ブルームは焚かない＝毎フレの多段ぼかしを省き発熱を下げる。夕(0.13+)/夜(0.62)の灯りの滲みは完全維持（値は離散なので0.10で綺麗に分離）
-      bloomPass.enabled = bloomWanted && curQual !== 'light' // 軽やか品質では後処理ブルームを切る（発熱回避）
-      composer.addPass(bloomPass)
+      bloomOn = bloomWanted && curQual !== 'light' // 軽やか品質では後処理ブルームを切る（発熱回避）
     }
-    composer.addPass(new OutputPass())
+    composer = new THREE.PostProcessing(renderer)
+    composer.outputColorTransform = false // 出力変換(renderOutput)を自前でFXAAの前に置く＝sRGB化した最終画にAAをかける（旧OutputPass相当）
+    rebuildPost = () => {
+      const src = (bloomOn && bloomNode) ? scenePassColor.add(bloomNode) : scenePassColor
+      composer.outputNode = fxaa(TSL.renderOutput(src))
+      composer.needsUpdate = true
+    }
+    rebuildPost()
+    // 既存コード（setQuality/自動品質/devフック）が触る bloomPass 互換シム＝enabledの切替でチェーンを組み直す
+    if (bloomNode) {
+      bloomPass = {
+        get enabled() { return bloomOn },
+        set enabled(v) { const nv = !!v; if (nv !== bloomOn) { bloomOn = nv; if (rebuildPost) rebuildPost() } },
+        get strength() { return bloomNode.strength.value },
+      }
+    }
   } catch (e) { composer = null }
 
   // ── 室内の窓枠（3Dの壁＋窓の開口）。部屋の中から窓越しに外を覗く“本物”の手応え＝近い窓枠と遠い景色が
@@ -7280,8 +7313,8 @@ export async function mountTown3d(parent, opts = {}) {
     // 立ってチカチカするので平らな箱にする（しきい値を上げて家具だけ丸める）。
     const box = (w, h, d, x, y, z, mat) => { const r = Math.min(0.09, Math.min(w, h, d) * 0.3); const g = r > 0.03 ? new RoundedBoxGeometry(w, h, d, 2, r) : new THREE.BoxGeometry(w, h, d); const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m } // grad=窓からの採光の陰影（家具にも）。角を少し丸めて柔らかく（街の水彩トゥーンに合わせる）
     const cyl = (rt, rb, h, x, y, z, mat, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat); m.position.set(x, y, z); m.renderOrder = 2; grad(m); winRoom.add(m); return m }
-    const maxAniso = renderer.capabilities.getMaxAnisotropy() // 浅い角度の床テクスチャの明滅(モアレ)を抑える
-    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; return t }
+    const roomAniso = maxAniso() // 浅い角度の床テクスチャの明滅(モアレ)を抑える
+    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = roomAniso; return t }
     // テクスチャ: 畳・天井板・カレンダー・障子
     // 畳: 市松に目を互い違い（縦目／横目）＋畳縁で“ちゃんとした畳の間”に。目は低コントラスト・粗めでモアレ(チカチカ)を避ける。
     const tatTex = cv(256, 256, (x) => {
@@ -7604,8 +7637,8 @@ export async function mountTown3d(parent, opts = {}) {
       for (let i = 0; i < N; i++) { const x0 = (R() - 0.5) * 3.1, y0 = FY + 0.45 + R() * (oT - FY - 0.3), z0 = 0.5 + R() * 2.7; dp[i * 3] = x0; dp[i * 3 + 1] = y0; dp[i * 3 + 2] = z0; base.push({ x0, y0, z0, ph: R() * 6.28, sp: 0.25 + R() * 0.4, amp: 0.05 + R() * 0.07 }) }
       const dgeo = new THREE.BufferGeometry(); dgeo.setAttribute('position', new THREE.BufferAttribute(dp, 3))
       const dCol = isNight ? new THREE.Color(0xffe0a8) : new THREE.Color(0xffeccb).lerp(sunCol, 0.5) // 夜は灯り色の微粒
-      const dmat = new THREE.PointsMaterial({ color: dCol, size: 0.026, transparent: true, opacity: isNight ? 0.14 : (0.22 + duskAmt * 0.16), depthWrite: false, fog: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }); winRoomMats.push(dmat)
-      const dust = new THREE.Points(dgeo, dmat); dust.frustumCulled = false; dust.renderOrder = 6; winRoom.add(dust)
+      const dmat = new THREE.PointsNodeMaterial({ color: dCol, size: 0.026, transparent: true, opacity: isNight ? 0.14 : (0.22 + duskAmt * 0.16), depthWrite: false, fog: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }); winRoomMats.push(dmat)
+      const dust = pointCloud(dgeo, dmat); dust.renderOrder = 6; winRoom.add(dust)
       winDust = { geo: dgeo, arr: dp, base }
     }
     // ── 窓辺の日だまりで丸くなる猫（“居る部屋”の主役。顔まで作り込む）。子群ローカルは素のMeshBasic（grad黒落ち回避）。──
@@ -7624,7 +7657,7 @@ export async function mountTown3d(parent, opts = {}) {
       ]
       const coat = COATS[(Math.random() * COATS.length) | 0], dk = (h) => new THREE.Color(h).multiplyScalar(0.7).getHex() // 読み込みごとに違う毛色（Math.randomで毎回変える＝シード固定のRと別に）
       // 毛の主要部は陰影付き(MeshToon)で「ふわっとした量感」を出す＝平塗りの塊感を脱す。目/ひげ/鼻は鮮明さのためMeshBasic(M)のまま。
-      const Mt = (h) => { const m = new THREE.MeshToonMaterial({ color: tint(h), gradientMap: grad, fog: false }); winRoomMats.push(m); return m }
+      const Mt = (h) => { const m = new THREE.MeshToonMaterial({ color: tint(h), gradientMap: gradRamp, fog: false }); winRoomMats.push(m); return m } // 注: このスコープの「grad」は採光関数（階調テクスチャは gradRamp）
       const fur = Mt(isNight ? dk(coat.f) : coat.f)   // 地色（陰影付き）
       const furD = Mt(isNight ? dk(coat.d) : coat.d)  // 縞・陰
       const furL = Mt(isNight ? dk(coat.l) : coat.l)  // 背の明るみ
@@ -7752,7 +7785,8 @@ export async function mountTown3d(parent, opts = {}) {
       // 後処理(EffectComposer/Bloom/FXAA)のRenderTargetをGPUから解放（評価 技術-致命2）。
       // これを怠ると情景往復のたびにMSAA RT＋composerのrenderTarget1/2＋bloomの内部RTがGPUに残留し、
       // 低メモリ端末で数往復すると（コード全体が避けようとしている）コンテキスト枯渇/黒画面を誘発する。
-      try { if (composer) { for (const p of composer.passes) { if (p && p.dispose) p.dispose() } composer.dispose() } } catch (e) { /* 無視 */ }
+      try { if (composer && composer.dispose) composer.dispose() } catch (e) { /* 無視 */ }
+      try { if (bloomNode && bloomNode.dispose) bloomNode.dispose() } catch (e) { /* 無視 */ }
       // forceContextLoss() は呼ばない: 上で geometry/material/texture を解放済みなので不要で、
       // 情景往復のたびにコンテキストを強制喪失・再生成するとモバイルでコンテキスト枯渇→3D表示不能の温床になる（評価 技術-H5）。
       renderer.dispose()
@@ -7765,7 +7799,7 @@ export async function mountTown3d(parent, opts = {}) {
     if (!w || !h) return
     lastStageW = w; lastStageH = h
     renderer.setPixelRatio(curPR); renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix()
-    if (composer) { composer.setPixelRatio(curPR); composer.setSize(w, h); if (fxaaPass) fxaaPass.material.uniforms.resolution.value.set(1 / (w * curPR), 1 / (h * curPR)) }
+    // ノード式PostProcessingはrendererの描画サイズに自動追従（旧composerのsetSize/FXAA解像度更新は不要）
   }
   function resize() { applySize() }
   window.addEventListener('resize', resize)
@@ -7990,18 +8024,15 @@ export async function mountTown3d(parent, opts = {}) {
     const mats = []
     const makeBow = (inner, outer, reversed, opScale) => {
       const geo = new THREE.RingGeometry(inner, outer, 120, 1, 0, Math.PI)
-      const mat = new THREE.ShaderMaterial({
-        transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
-        uniforms: { uOp: { value: 0 }, uInner: { value: inner }, uOuter: { value: outer }, uRev: { value: reversed ? 1 : 0 }, uScale: { value: opScale } },
-        vertexShader: 'varying float vR; void main(){ vR=length(position.xy); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
-        fragmentShader: 'varying float vR; uniform float uOp,uInner,uOuter,uRev,uScale;' +
-          'vec3 hsv(float h){ vec3 p=abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.); return clamp(p-1.,0.,1.); }' +
-          'void main(){ float rr=(vR-uInner)/(uOuter-uInner);' +
-          'float h=mix(0.78,0.0,rr); if(uRev>0.5) h=mix(0.0,0.78,rr);' +          // 主虹:外赤内紫 / 副虹:反転
-          'vec3 col=mix(vec3(1.0),hsv(h),0.58);' +                                // 白を多めに＝水彩の空気感
-          'float edge=smoothstep(0.0,0.22,rr)*(1.0-smoothstep(0.78,1.0,rr));' +   // 帯の縁をやわらかく溶かす
-          'gl_FragColor=vec4(col, edge*uOp*uScale); }',
-      })
+      // 旧ShaderMaterialをTSLで（主虹:外赤内紫 / 副虹:反転。白を多めに＝水彩の空気感。uOpのみframeから更新）。
+      const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide })
+      mat.uniforms = { uOp: TSL.uniform(0) }
+      const rr = TSL.positionLocal.xy.length().sub(inner).div(outer - inner)
+      const h = reversed ? TSL.mix(TSL.float(0.0), TSL.float(0.78), rr) : TSL.mix(TSL.float(0.78), TSL.float(0.0), rr)
+      const hsv = TSL.fract(h.add(TSL.vec3(0.0, 2.0 / 3.0, 1.0 / 3.0))).mul(6.0).sub(3.0).abs().sub(1.0).clamp(0.0, 1.0)
+      const col = TSL.mix(TSL.vec3(1.0), hsv, 0.58)
+      const edge = TSL.smoothstep(0.0, 0.22, rr).mul(TSL.smoothstep(0.78, 1.0, rr).oneMinus()) // 帯の縁をやわらかく溶かす
+      mat.colorNode = TSL.vec4(col, edge.mul(mat.uniforms.uOp).mul(opScale))
       const ring = new THREE.Mesh(geo, mat); ring.frustumCulled = false; grp.add(ring); mats.push(mat)
     }
     makeBow(80, 103, false, 1.0)   // 主虹
@@ -8089,13 +8120,13 @@ export async function mountTown3d(parent, opts = {}) {
       const a = evAnchor(); const [cx, cy, cz] = evPos((R() - 0.5) * 60, 56 + R() * 18, -70 - R() * 30, a) // 飛行中は自分の上空に開く
       for (let i = 0; i < N; i++) { pos[i * 3] = cx; pos[i * 3 + 1] = cy; pos[i * 3 + 2] = cz; const th = R() * 6.28, ph = Math.acos(2 * R() - 1), sp = 11 + R() * 7; vel.push([Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp]) }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-      const mat = new THREE.PointsMaterial({ color: new THREE.Color().setHSL(R(), 0.78, 0.66).getHex(), size: 1.5, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
-      const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts)
+      const mat = new THREE.PointsNodeMaterial({ color: new THREE.Color().setHSL(R(), 0.78, 0.66).getHex(), size: 1.5, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
+      const pts = pointCloud(geo, mat); scene.add(pts)
       live.push({ pts, geo, mat, pos, vel, N, age: 0 })
       // 開花の“芯”＝中心の白い大玉を一瞬だけ強く（パッと開く手応え）
       const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([cx, cy, cz]), 3))
-      const fm = new THREE.PointsMaterial({ color: 0xfff6e8, size: 7, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
-      const fp = new THREE.Points(fg, fm); fp.frustumCulled = false; scene.add(fp)
+      const fm = new THREE.PointsNodeMaterial({ color: 0xfff6e8, size: 7, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: true })
+      const fp = pointCloud(fg, fm); scene.add(fp)
       live.push({ pts: fp, geo: fg, mat: fm, N: 0, age: 0, flash: true })
     }
     const dur = 10
@@ -8238,13 +8269,18 @@ export async function mountTown3d(parent, opts = {}) {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     geo.setAttribute('aph', new THREE.BufferAttribute(aph, 1))
-    const mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uT: { value: 0 }, uOp: { value: 0 }, uCol: { value: new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2) } },
-      vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.35+0.65*(0.5+0.5*sin(uT*2.6+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=3.2*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
-      fragmentShader: 'varying float vtw; uniform vec3 uCol; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(uCol, a*vtw*uOp); }',
-    })
-    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; town.add(pts) // town座標系（街と一緒に動く）
+    // 旧ShaderMaterialのPoints → Sprite点群（TSL）。uT/uOpのみframeから更新。
+    const mat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+    mat.uniforms = { uT: TSL.uniform(0), uOp: TSL.uniform(0), uCol: TSL.uniform(new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2)) }
+    {
+      const aphN = TSL.instancedBufferAttribute(new THREE.InstancedBufferAttribute(aph, 1), 'float')
+      const vtw = TSL.sin(mat.uniforms.uT.mul(2.6).add(aphN)).mul(0.5).add(0.5).mul(0.65).add(0.35)
+      const a = TSL.smoothstep(0.5, 0.0, TSL.uv().sub(0.5).length())
+      mat.colorNode = TSL.vec4(mat.uniforms.uCol, a.mul(vtw).mul(mat.uniforms.uOp))
+      mat.sizeAttenuation = false
+      mat.sizeNode = TSL.float(60.0).div(TSL.positionView.z.negate().max(1.0)).mul(3.2).div(TSL.screenDPR)
+    }
+    const pts = pointCloud(geo, mat); town.add(pts) // town座標系（街と一緒に動く）
     const dur = 17
     addFx({
       update: (age) => { mat.uniforms.uT.value = age; mat.uniforms.uOp.value = 0.62 * Math.min(1, age / 3) * Math.min(1, Math.max(0, (dur - age) / 6)); return age < dur },
@@ -8281,13 +8317,18 @@ export async function mountTown3d(parent, opts = {}) {
     const wpos = new Float32Array(M * 3); const waph = new Float32Array(M)
     for (let i = 0; i < M; i++) { wloc[i * 2] = (R() - 0.5) * 30; wloc[i * 2 + 1] = (R() - 0.5) * 34; wpos[i * 3 + 1] = 0.12; waph[i] = R() * 6.28 }
     const wgeo = new THREE.BufferGeometry(); wgeo.setAttribute('position', new THREE.BufferAttribute(wpos, 3)); wgeo.setAttribute('aph', new THREE.BufferAttribute(waph, 1))
-    const wmat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uT: { value: 0 }, uOp: { value: 0.5 }, uCol: { value: new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2) } },
-      vertexShader: 'attribute float aph; varying float vtw; uniform float uT; void main(){ vtw=0.35+0.65*(0.5+0.5*sin(uT*2.6+aph)); vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=3.4*(60.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
-      fragmentShader: 'varying float vtw; uniform vec3 uCol; uniform float uOp; void main(){ float a=smoothstep(0.5,0.0,length(gl_PointCoord-0.5)); gl_FragColor=vec4(uCol, a*vtw*uOp); }',
-    })
-    const wpts = new THREE.Points(wgeo, wmat); wpts.frustumCulled = false; scene.add(wpts)
+    // 旧ShaderMaterialのPoints → Sprite点群（TSL）。uT/uOpのみframeから更新。
+    const wmat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+    wmat.uniforms = { uT: TSL.uniform(0), uOp: TSL.uniform(0.5), uCol: TSL.uniform(new THREE.Color(isNight ? 0xffd6a0 : 0xcfe4f2)) }
+    {
+      const aphN = TSL.instancedBufferAttribute(new THREE.InstancedBufferAttribute(waph, 1), 'float')
+      const vtw = TSL.sin(wmat.uniforms.uT.mul(2.6).add(aphN)).mul(0.5).add(0.5).mul(0.65).add(0.35)
+      const a = TSL.smoothstep(0.5, 0.0, TSL.uv().sub(0.5).length())
+      wmat.colorNode = TSL.vec4(wmat.uniforms.uCol, a.mul(vtw).mul(wmat.uniforms.uOp))
+      wmat.sizeAttenuation = false
+      wmat.sizeNode = TSL.float(60.0).div(TSL.positionView.z.negate().max(1.0)).mul(3.4).div(TSL.screenDPR)
+    }
+    const wpts = pointCloud(wgeo, wmat); scene.add(wpts)
     let wLastX = 1e9, wLastZ = 1e9 // 直近に地形をサンプルした自機位置（停止中は再計算しない）
     addFx({ update: (age) => { wmat.uniforms.uT.value = age
       const a = evAnchor(); const ra = rainAlt(a); wmat.uniforms.uOp.value = 0.5 * ra; wpts.visible = ra > 0.01 // 雲海の上＝濡れた路面のきらめきも消す
@@ -8315,20 +8356,22 @@ export async function mountTown3d(parent, opts = {}) {
   // ── オーロラ（夜の超レア大当たり。緑〜紫のカーテンが空に揺らめき流れる。計算で描画） ──
   function evAurora() {
     const geo = new THREE.PlaneGeometry(340, 96)
-    const mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-      uniforms: { uT: { value: 0 }, uOp: { value: 0 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
-      fragmentShader:
-        'varying vec2 vUv; uniform float uT,uOp;' +
-        'void main(){ float x=vUv.x, y=vUv.y; float t=uT*0.12; float curt=0.0;' +
-        'for(int i=0;i<3;i++){ float fi=float(i); float ph=x*(7.0+fi*5.0)+t*(1.0+fi*0.5)+fi*2.1; curt+=(sin(ph)*0.5+0.5)*(0.5-fi*0.12); }' +
-        'curt/=1.4; float ray=pow(curt,1.4);' +              // 縦のカーテン状の濃淡が横に流れる
-        'float vfall=smoothstep(1.0,0.12,y)*smoothstep(0.0,0.18,y);' + // 上下端へやわらかく消える
-        'vec3 green=vec3(0.30,1.0,0.55), violet=vec3(0.66,0.34,1.0);' +
-        'vec3 col=mix(green,violet,smoothstep(0.30,0.95,y));' +        // 色はフルに保ち、濃淡はアルファで（加算でも色が出る）
-        'gl_FragColor=vec4(col, ray*vfall*uOp); }',
-    })
+    // 旧ShaderMaterial（縦のカーテン状の濃淡が横に流れる）をTSLで。uT/uOpのみframeから更新。
+    const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })
+    mat.uniforms = { uT: TSL.uniform(0), uOp: TSL.uniform(0) }
+    mat.colorNode = TSL.Fn(() => {
+      const x = TSL.uv().x, y = TSL.uv().y
+      const t = mat.uniforms.uT.mul(0.12)
+      const curt = TSL.float(0.0).toVar()
+      for (let i = 0; i < 3; i++) { // 3層のカーテン（旧GLSLのループを展開）
+        const ph = x.mul(7.0 + i * 5.0).add(t.mul(1.0 + i * 0.5)).add(i * 2.1)
+        curt.addAssign(TSL.sin(ph).mul(0.5).add(0.5).mul(0.5 - i * 0.12))
+      }
+      const ray = curt.div(1.4).pow(1.4)
+      const vfall = TSL.smoothstep(1.0, 0.12, y).mul(TSL.smoothstep(0.0, 0.18, y)) // 上下端へやわらかく消える
+      const col = TSL.mix(TSL.vec3(0.30, 1.0, 0.55), TSL.vec3(0.66, 0.34, 1.0), TSL.smoothstep(0.30, 0.95, y)) // 緑→菫。濃淡はアルファで（加算でも色が出る）
+      return TSL.vec4(col, ray.mul(vfall).mul(mat.uniforms.uOp))
+    })()
     const m = new THREE.Mesh(geo, mat); const a = evAnchor(); const [mx, my, mz] = evPos(0, 74, eye.z - 205, a); m.position.set(mx, my, mz); m.rotation.y = -a.yaw; m.frustumCulled = false; scene.add(m) // 飛行中は自分の進む先の空に懸かる
     const dur = 56
     addFx({
@@ -8348,8 +8391,8 @@ export async function mountTown3d(parent, opts = {}) {
     const geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), seed = new Array(N)
     for (let i = 0; i < N; i++) { const lx = (R() - 0.5) * 72, ly = 2 + R() * 26, lz = -4 - R() * 60; pos[i * 3] = lx; pos[i * 3 + 1] = ly; pos[i * 3 + 2] = lz; seed[i] = { lx, ly, lz, ph: R() * 6.28, sp: 0.7 + R() * 0.8, sw: 0.6 + R() * 1.2 } }
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    const mat = new THREE.PointsMaterial({ color: cfg.col, size: cfg.sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true })
-    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 2; scene.add(pts)
+    const mat = new THREE.PointsNodeMaterial({ color: cfg.col, size: cfg.sz, transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true })
+    const pts = pointCloud(geo, mat); pts.renderOrder = 2; scene.add(pts)
     const dur = 26, wind = (R() < 0.5 ? 1 : -1) * (2.2 + R() * 1.0), peak = season === 'winter' ? 0.85 : 0.78
     addFx({
       update: (age, dt) => {
@@ -8481,8 +8524,14 @@ export async function mountTown3d(parent, opts = {}) {
   const trailGeo = new THREE.BufferGeometry()
   trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(trailN * 3), 3))
   trailGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(trailN * 3), 3)) // 各粒の濃さ(白×alpha)
-  const trailMat = new THREE.PointsMaterial({ map: trailTex, size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true })
-  const trail = new THREE.Points(trailGeo, trailMat); trail.frustumCulled = false; trail.visible = false; scene.add(trail)
+  const trailMat = new THREE.PointsNodeMaterial({ map: trailTex, size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+  { // 各粒の濃さ(旧vertexColors)＝毎フレーム更新されるためInterleavedBufferで包み直し、needsUpdateを転送する
+    const cib = new THREE.InstancedInterleavedBuffer(trailGeo.attributes.color.array, 3)
+    cib.setUsage(THREE.DynamicDrawUsage)
+    trailGeo.setAttribute("color", new THREE.InterleavedBufferAttribute(cib, 3, 0))
+    trailMat.colorNode = TSL.vec4(TSL.materialColor).mul(TSL.vec4(TSL.instancedBufferAttribute(cib, "vec3"), 1.0))
+  }
+  const trail = pointCloud(trailGeo, trailMat); trail.visible = false; scene.add(trail)
   const trailAlpha = new Float32Array(trailN) // 各粒の寿命(0..1)
   let trailIdx = 0, trailAccum = 0
   let birdFlushCool = 0 // 鳥の羽音の連発抑制タイマー(秒)
@@ -8498,8 +8547,8 @@ export async function mountTown3d(parent, opts = {}) {
     gr.addColorStop(0, 'rgba(255,244,214,0.95)'); gr.addColorStop(0.5, 'rgba(255,236,196,0.4)'); gr.addColorStop(1, 'rgba(255,232,190,0)')
     g.fillStyle = gr; g.fillRect(0, 0, s, s); return new THREE.CanvasTexture(c)
   })()
-  const moteMat = new THREE.PointsMaterial({ map: moteTex, size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
-  const motes = new THREE.Points(moteGeo, moteMat); motes.frustumCulled = false; motes.visible = false; scene.add(motes)
+  const moteMat = new THREE.PointsNodeMaterial({ map: moteTex, size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
+  const motes = pointCloud(moteGeo, moteMat); motes.visible = false; scene.add(motes)
 
   addContactShadows(homeTreeShadows) // 静的影の外に立つhome/谷戸の遠い木の足元へ接地影を一括(1メッシュ)＝浮きを消す（評価アート: 接地影が時代の木だけだった）
   // ── 時代エリアの距離カリング：遠い時代の街(±640)は海/霧で見えない。時代ごとに群へまとめ、カメラが遠い時は丸ごと
@@ -10248,8 +10297,8 @@ export async function mountTown3d(parent, opts = {}) {
   // この一斉リコンパイルが、上昇ボタンの長押しを iOS に pointercancel させ「雲海突入直前で1回解除」させていた実機FBの主因。直後の compile で透明版を温める。
   // 低空では cloudObjs.visible=false なので、常時透明でも低空の描画コスト（オーバードロー）は増えない。
   if (cloudObjs && cloudObjs.length) { cloudRevealMats = []; for (const o of cloudObjs) o.traverse((c) => { if (c.isMesh) { const mm = Array.isArray(c.material) ? c.material : [c.material]; for (const m of mm) { if (m && m.__revBase === undefined) { m.__revBase = (m.opacity == null ? 1 : m.opacity); m.transparent = true; m.opacity = 0; cloudRevealMats.push(m) } } } }) }
-  try { renderer.compile(scene, camera) } catch { /* コンパイル先行に失敗しても描画は継続 */ }
-  renderer.shadowMap.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的）
+  try { renderer.compileAsync(scene, camera).catch(() => {}) } catch { /* コンパイル先行に失敗しても描画は継続 */ }
+  sun.shadow.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的。WebGPU版はライト側で制御）
   frame()
   requestAnimationFrame(() => stage.classList.add('town3d-stage--in'))
 
@@ -10259,7 +10308,8 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dPaused = (on) => setTown3dPaused(!!on) // 検証用: おやすみ相当の描画停止/再開（active.pausedを立てる）
     window.__town3dBloom = (on) => { if (bloomPass) { bloomPass.enabled = !!on; return bloomPass.strength } return null } // 検証用: ブルームを強制ON/OFF（同一フレームでのAB＝アニメ差を排除）
     window.__town3dBloomInfo = () => bloomPass ? { enabled: bloomPass.enabled, strength: +bloomPass.strength.toFixed(3), wanted: bloomWanted } : null // 検証用: 現情景のブルーム状態
-    window.__town3dFrame = () => renderer.info.render.frame // 検証用: 実描画したフレーム総数（停止中は増えない＝停止の確認に使う）
+    window.__town3dFrame = () => renderer.info.frame // 検証用: 実描画したフレーム総数（停止中は増えない＝停止の確認に使う。WebGPU版は info.frame）
+    window.__town3dBackend = () => (renderer.backend && renderer.backend.isWebGPUBackend) ? 'webgpu' : 'webgl2代替' // 検証用: いまどちらのバックエンドで描いているか
     window.__town3dFly = (b) => setTown3dFly(!!b) // 検証用: 空へ飛び立つ/窓へもどる
     window.__town3dLand = (b) => setTown3dLand(!!b) // 検証用: 着地して歩く/また飛び立つ
     window.__town3dMove = (x, y) => { if (active) { active.moveX = x || 0; active.moveY = y || 0 } } // 検証用: スティック入力(-1..1)。0,0で離す
@@ -10295,13 +10345,14 @@ export async function mountTown3d(parent, opts = {}) {
       if (!active || !active.camera) return null
       const ar = renderer.info.autoReset; renderer.info.autoReset = false; renderer.info.reset()
       renderer.render(scene, active.camera)
-      const r = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, progs: renderer.info.programs ? renderer.info.programs.length : -1, texMem: renderer.info.memory.textures, geoMem: renderer.info.memory.geometries }
+      const ri = renderer.info.render
+      const r = { calls: ri.drawCalls !== undefined ? ri.drawCalls : ri.calls, tris: ri.triangles, progs: renderer.info.programs ? renderer.info.programs.length : -1, texMem: renderer.info.memory.textures, geoMem: renderer.info.memory.geometries }
       renderer.info.autoReset = ar; return r
     }
     window.__town3dAttribute = () => { // 検証用: カテゴリを隠して描画コールの差分を測る＝各カテゴリの描画コール寄与
       if (!active || !active.camera) return null
       const ar = renderer.info.autoReset; renderer.info.autoReset = false
-      const measure = () => { renderer.info.reset(); renderer.render(scene, active.camera); return renderer.info.render.calls }
+      const measure = () => { renderer.info.reset(); renderer.render(scene, active.camera); const ri = renderer.info.render; return ri.drawCalls !== undefined ? ri.drawCalls : ri.calls }
       const base = measure()
       const cat = (objs) => { const vis = (objs || []).filter((o) => o && o.visible); vis.forEach((o) => { o.visible = false }); const c = measure(); vis.forEach((o) => { o.visible = true }); return base - c }
       // 特殊構造物（学校/観覧車/公園/寺/駅/展望塔/副都心）を位置で拾って寄与を測る
@@ -10359,7 +10410,7 @@ export async function mountTown3d(parent, opts = {}) {
       yaw: +active.flyYaw.toFixed(2), camYaw: +(active.walkCamYaw || 0).toFixed(2), pitch: +active.flyPitch.toFixed(2),
       vel: +Math.hypot(active.vel.x, active.vel.y, active.vel.z).toFixed(2), mvX: +active.moveX.toFixed(2), mvY: +active.moveY.toFixed(2), bank: +active.bankCur.toFixed(2),
     })
-    window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2), ddt: +lastDDT.toFixed(3), low: adQLow, ok: adQOk } } // 検証用: 描画コール/三角形/オブジェクト数/自動品質状態
+    window.__town3dStats = () => { const r = renderer.info.render; let objs = 0; scene.traverse(() => objs++); return { calls: r.drawCalls !== undefined ? r.drawCalls : r.calls, tris: r.triangles, objs, pr: +curPR.toFixed(2), ddt: +lastDDT.toFixed(3), low: adQLow, ok: adQOk } } // 検証用: 描画コール/三角形/オブジェクト数/自動品質状態
     window.__town3dResInfo = () => residents.map((r) => ({ x: +r.position.x.toFixed(1), y: +r.position.y.toFixed(1), z: +r.position.z.toFixed(1), face: +r.rotation.y.toFixed(2) })) // 検証用: 住人の位置・向き
     window.__town3dPeepFront = (i, dist = 4, lift = 0.9) => { const p = peeps[i]; if (!p) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); const u = p.userData; u.loiter = true; u.hx = t.x; u.hz = t.z; u.rad = 0; u.sp = 0; u.face = Math.atan2(camera.position.x - t.x, camera.position.z - t.z); p.position.set(t.x, t.y - lift, t.z); p.rotation.y = u.face } // 検証用: 簡易peepをカメラ正面の視線上に立たせる（壺感の確認）
     window.__town3dPeepPin = (i, x, z, face = 0, yOver) => { const p = peeps[i]; if (!p) return; const u = p.userData; u.frozen = true; p.position.set(x, yOver !== undefined ? yOver : heightAt(x, z), z); p.rotation.y = face } // 検証用: 簡易peepを座標(任意y)に凍結（shotAtで接写）
@@ -10370,7 +10421,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dQuadPin = (i, x, z, y, face = 0) => { const q = quads[i]; if (!q) return; const u = q.userData; u.moving = false; u.moveT = 1e9; u.hx = x; u.hz = z; q.position.set(x, y !== undefined ? y : heightAt(x, z), z); q.rotation.y = face } // 検証用: 犬猫を座標(任意y)に固定（shotAtで接写）
     window.__town3dQuadCount = () => quads.length
     window.__town3dQuadDbg = (i) => { const q = quads[i]; if (!q) return null; return { x: q.position.x, y: q.position.y, z: q.position.z, vis: q.visible, sc: q.userData.sc } } // 検証用: 犬猫の現在位置/可視/スケール
-    window.__town3dQuadShot = (col = 0x8a7a5a, sc = 0.7, yaw = 2.0, kind) => { // 検証用: 犬猫馬を原点に1頭だけ作り、隔離シーンで正確に接写（造形の確認）
+    window.__town3dQuadShot = async (col = 0x8a7a5a, sc = 0.7, yaw = 2.0, kind) => { // 検証用: 犬猫馬を原点に1頭だけ作り、隔離シーンで正確に接写（造形の確認）
       const g = mkQuad(0, 0, 0, yaw, col, sc, kind); town.remove(g); const qi = quads.indexOf(g); if (qi >= 0) quads.splice(qi, 1)
       const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
       const dl = new THREE.DirectionalLight(0xffffff, 0.9); dl.position.set(0.4, 1, 1.2); s.add(dl)
@@ -10378,15 +10429,15 @@ export async function mountTown3d(parent, opts = {}) {
       const horse = (kind || (sc >= 0.9 ? 'horse' : '')) === 'horse'
       const W = 520, H = 460, cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 30), r = (horse ? 3.4 : 2.5) * sc
       cam.position.set(r, (horse ? 1.5 : 0.85) * sc, r); cam.lookAt(0, (horse ? 0.95 : 0.5) * sc, 0)
-      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const rt = new THREE.RenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
-      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
-      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.render(s, cam)
+      const buf = await readRTPixels(rt, W, H); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
       const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
-      const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
+      const img = cx.createImageData(W, H); img.data.set(buf.subarray(0, W * H * 4)); cx.putImageData(img, 0, 0)
       s.remove(g); g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() }); rt.dispose(); return cv.toDataURL()
     }
-    window.__town3dCrowdShot = (col = 0xb0432e, sc = 0.7, yaw = 0) => { // 検証用: 群衆の一人(mkCrowdPerson)を隔離シーンで接写（顔・腕の造形確認）
+    window.__town3dCrowdShot = async (col = 0xb0432e, sc = 0.7, yaw = 0) => { // 検証用: 群衆の一人(mkCrowdPerson)を隔離シーンで接写（顔・腕の造形確認）
       const p = mkCrowdPerson(0, 0, 0, col, sc); if (!p) return null
       town.remove(p); const ci = crowdAnim.indexOf(p); if (ci >= 0) crowdAnim.splice(ci, 1); p.rotation.y = yaw
       const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
@@ -10394,26 +10445,26 @@ export async function mountTown3d(parent, opts = {}) {
       const dl2 = new THREE.DirectionalLight(0xeaf0ff, 0.25); dl2.position.set(-0.7, 0.4, 0.6); s.add(dl2); s.add(p)
       const W = 360, H = 560, cam = new THREE.OrthographicCamera(-0.62 * sc, 0.62 * sc, 0.95 * sc, -0.95 * sc, 0.1, 12)
       cam.position.set(0, 0.78 * sc, 5); cam.lookAt(0, 0.78 * sc, 0)
-      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const rt = new THREE.RenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
-      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
-      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.render(s, cam)
+      const buf = await readRTPixels(rt, W, H); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
       const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx2 = cv.getContext('2d')
-      const img = cx2.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx2.putImageData(img, 0, 0)
+      const img = cx2.createImageData(W, H); img.data.set(buf.subarray(0, W * H * 4)); cx2.putImageData(img, 0, 0)
       s.remove(p); p.geometry.dispose(); rt.dispose(); return cv.toDataURL()
     }
-    window.__town3dCarShot = (col = 0x3a5a7a) => { // 検証用: 駐車車両(mkCar)を隔離シーンで接写（車輪/窓の確認）
+    window.__town3dCarShot = async (col = 0x3a5a7a) => { // 検証用: 駐車車両(mkCar)を隔離シーンで接写（車輪/窓の確認）
       const g = mkCar(0, 0, 0, 0.5, col)
       const s = new THREE.Scene(); s.add(new THREE.AmbientLight(0xfff6ec, 0.9))
       const dl = new THREE.DirectionalLight(0xffffff, 0.9); dl.position.set(0.4, 1, 1.2); s.add(dl); s.add(g)
       const W = 560, H = 420, cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 30)
       cam.position.set(3.6, 1.8, 3.6); cam.lookAt(0, 0.7, 0)
-      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const rt = new THREE.RenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(), pA = renderer.getClearAlpha(), pC = new THREE.Color(); renderer.getClearColor(pC)
-      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam)
-      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
+      renderer.setClearColor(0xc2ccce, 1); renderer.setRenderTarget(rt); renderer.render(s, cam)
+      const buf = await readRTPixels(rt, W, H); renderer.setRenderTarget(pRT); renderer.setClearColor(pC, pA)
       const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d')
-      const img = cx.createImageData(W, H); for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); cx.putImageData(img, 0, 0)
+      const img = cx.createImageData(W, H); img.data.set(buf.subarray(0, W * H * 4)); cx.putImageData(img, 0, 0)
       s.remove(g); g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() }); rt.dispose(); return cv.toDataURL()
     }
     window.__town3dResClip = () => { // 検証用: 建物コライダーに食い込んでいる住民/peepの数（実機FB「住民が建物に食い込む」の定量化）
@@ -10444,7 +10495,7 @@ export async function mountTown3d(parent, opts = {}) {
     window.__town3dResFront = (i, dist = 9, lift = 0.9) => { const r = residents[i]; if (!r) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); r.position.set(t.x, t.y - lift, t.z); const u = r.userData; u.ax = t.x; u.az = t.z; u.tx = t.x; u.tz = t.z; u.moving = false; u.pauseT = 999 } // 検証用: 3D住人をカメラ正面の視線上に立たせる（窓の遮蔽回避）
     window.__town3dGirlFront = (i, dist = 5) => { const g = standees[i]; if (!g) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); const t = camera.position.clone().addScaledVector(d, dist); g.position.set(t.x, t.y - 1.0, t.z) } // 検証用: 立ち絵をカメラ正面の視線上へ
     window.__town3dGirlCount = () => standees.length
-    window.__town3dShotAt = (cx, cy, cz, lx, ly, lz, fov) => { // 検証用: 任意のカメラ位置/注視点でシーンを正確に1枚撮る（飛行の三人称オフセット無し）
+    window.__town3dShotAt = async (cx, cy, cz, lx, ly, lz, fov) => { // 検証用: 任意のカメラ位置/注視点でシーンを正確に1枚撮る（飛行の三人称オフセット無し）
       const W = 640, H = 560
       const cam = new THREE.PerspectiveCamera(fov || 55, W / H, 0.1, 2200); cam.position.set(cx, cy, cz); cam.lookAt(lx, ly, lz)
       // 空ドーム/太陽光輪はアニメ毎フレームでカメラへ追従する（L7685付近）。単発撮影はそれが走らず、
@@ -10452,12 +10503,12 @@ export async function mountTown3d(parent, opts = {}) {
       const sdP = skyDome && skyDome.position.clone(); if (skyDome) skyDome.position.set(cx, cy, cz)
       const sgP = sunGlow && sunGlow.position.clone(); if (sunGlow) sunGlow.position.set(cx + sunDir.x * 470, cy + sunDir.y * 470, cz + sunDir.z * 470)
       const sdkP = sunDisk && sunDisk.position.clone(); if (sunDisk) sunDisk.position.set(cx + sunDir.x * 472, cy + sunDir.y * 472, cz + sunDir.z * 472)
-      const rt = new THREE.WebGLRenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
+      const rt = new THREE.RenderTarget(W, H, { samples: LIGHT ? 0 : 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace
       const pRT = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, cam)
-      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf); renderer.setRenderTarget(pRT)
+      const buf = await readRTPixels(rt, W, H); renderer.setRenderTarget(pRT)
       if (skyDome && sdP) skyDome.position.copy(sdP); if (sunGlow && sgP) sunGlow.position.copy(sgP); if (sunDisk && sdkP) sunDisk.position.copy(sdkP) // 追従位置を元へ戻す
       const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); const img = x.createImageData(W, H)
-      for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); x.putImageData(img, 0, 0); rt.dispose()
+      img.data.set(buf.subarray(0, W * H * 4)); x.putImageData(img, 0, 0); rt.dispose()
       return c.toDataURL()
     }
     window.__town3dGroundAt = (x, z) => heightAt(x, z) // 検証用: 地面の高さ（カメラを地中に潜らせない/正しい歩行目線に置く）

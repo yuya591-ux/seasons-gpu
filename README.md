@@ -5,6 +5,12 @@
 > - 発熱ベンチ: https://yuya591-ux.github.io/seasons-gpu/bench.html （WebGLとWebGPUを同一負荷で比べる）
 > - キャッシュは wgpu- 系統に分離済み（同一オリジンの本家キャッシュと干渉しない）
 > - 本家の改良の取り込み: `git fetch upstream && git merge upstream/main`
+>
+> **Phase 2（本移植）済み**: 立体の街（town3d）の描画エンジンを WebGPURenderer に載せ替え済み。
+> - vite設定の `three-webgpu-swap` が素の `'three'` を `'three/webgpu'` へ付け替える（例外: benchGL / splatViewer / gaussian-splats はクラシックWebGLのまま）
+> - 旧GLSL注入（onBeforeCompile / ShaderMaterial）は TSL ノードへ移植（colorNode / outputNode / positionNode）
+> - 点群（星・ほこり・花火・雨のきらめき等）はWebGPUでPointsが1px固定のため「Sprite＋インスタンス属性」方式（town3dViewer.js の pointCloud ヘルパー）
+> - WebGPU非対応環境は three 内蔵の WebGL2 代替バックエンドへ自動フォールバック（CIのヘッドレス検証もこの経路）
 
 ---
 
