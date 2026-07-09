@@ -8,7 +8,7 @@ const id = process.argv[2] || 'kitaterao-window-3d'
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 1 })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.evaluate((sid) => window.__applyScene && window.__applyScene(sid), id)

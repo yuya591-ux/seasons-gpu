@@ -3,7 +3,7 @@ const port = process.env.PORT || '4801'
 const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 1.8 })
 const errs=[]; p.on('pageerror',e=>errs.push(String(e)))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(()=>{})
 await p.waitForTimeout(700)
 await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')); await p.waitForTimeout(2700) // 昼=朝もや向き

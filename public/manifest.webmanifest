@@ -1,7 +1,7 @@
 {
-  "name": "窓のむこう ｜ 季節と記憶の町",
-  "short_name": "窓のむこう",
-  "description": "四季と天気にうつろう記憶の町を、窓辺から眺めて、ときどき窓のむこうへ出かけるアンビエント",
+  "name": "窓のむこう β ｜ WebGPU検証版",
+  "short_name": "窓のむこうβ",
+  "description": "「窓のむこう」のWebGPU移行を試す実験版。正式版（/seasons/）はそのまま変わりません",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

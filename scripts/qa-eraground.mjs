@@ -6,7 +6,7 @@ const C = { edo:[640,-46], sengoku:[140,-640], taisho:[-640,-30] }[era]
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 820, height: 480 } })
 const errs=[]; page.on('pageerror',e=>errs.push(e.message))
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(1500)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d')).catch(()=>{})

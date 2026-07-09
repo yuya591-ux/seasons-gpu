@@ -2,7 +2,7 @@
 // 使い方: プレビュー(4790)を起動した状態で  node scripts/verify-grade.mjs
 import { chromium } from 'playwright'
 
-const BASE = 'http://localhost:4790/seasons/'
+const BASE = 'http://localhost:4790/seasons-gpu/'
 const OUT = 'scripts/_shots'
 import { mkdirSync } from 'node:fs'
 mkdirSync(OUT, { recursive: true })

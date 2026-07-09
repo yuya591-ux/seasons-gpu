@@ -5,7 +5,7 @@ const page = await browser.newPage({ viewport: { width: 480, height: 860 } })
 const errs = []
 page.on('pageerror', (e) => errs.push('PE:' + e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CE:' + m.text()) })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1&fest=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1&fest=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 for (const id of ['kitaterao-window-3d', 'summer-dusk-downtown', 'autumn-dusk-corner-room', 'spring-morning-yato']) {

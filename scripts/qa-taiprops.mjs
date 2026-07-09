@@ -9,7 +9,7 @@ async function shot(scene, name, pose){
   await p.evaluate((pose)=>window.__town3dFlyPose(...pose), pose); await p.waitForTimeout(900)
   await p.screenshot({ path:`scripts/_shots/${name}.png` })
 }
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(()=>{})
 await p.waitForTimeout(800)
 await shot('kitaterao-window-3d-night','taiprops-night',[-640+18,14,-30+16,-2.2,-0.22])

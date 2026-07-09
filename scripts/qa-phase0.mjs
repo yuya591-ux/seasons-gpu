@@ -4,7 +4,7 @@ const port = process.env.PORT || '4801'
 const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
 p.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(() => {})
 await p.waitForTimeout(700)
 await p.evaluate(() => window.__applyScene('kitaterao-window-3d'))

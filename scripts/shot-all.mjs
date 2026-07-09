@@ -6,7 +6,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 400, height: 850 } })
 const errs = []
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
-await page.goto('http://localhost:4790/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4790/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(600)
 await page.addStyleTag({ content: '.ui{display:none !important}' })

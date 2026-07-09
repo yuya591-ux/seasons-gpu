@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 
 const PORT = process.env.PORT || 4943
-const BASE = `http://localhost:${PORT}/seasons/`
+const BASE = `http://localhost:${PORT}/seasons-gpu/`
 const srv = spawn(`npx vite preview --port ${PORT} --strictPort`, { shell: true, stdio: 'ignore' })
 const cleanup = () => { try { srv.kill() } catch { /* 無視 */ } }
 process.on('exit', cleanup)

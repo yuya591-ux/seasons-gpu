@@ -4,7 +4,7 @@ const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 2 })
 const errs = []
 p.on('pageerror', (e) => errs.push(String(e)))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(() => {})
 await p.waitForTimeout(800)
 await p.evaluate(() => window.__applyScene('kitaterao-window-3d-sunset'))

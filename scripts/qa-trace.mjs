@@ -4,7 +4,7 @@ import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
 
 const PORT = process.env.PORT || 4947
-const BASE = `http://localhost:${PORT}/seasons/`
+const BASE = `http://localhost:${PORT}/seasons-gpu/`
 const srv = spawn(`npx vite preview --port ${PORT} --strictPort`, { shell: true, stdio: 'ignore' })
 const cleanup = () => { try { srv.kill() } catch { /* 無視 */ } }
 process.on('exit', cleanup)

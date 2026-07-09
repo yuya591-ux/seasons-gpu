@@ -1,3 +1,13 @@
+# 窓のむこう β ｜ WebGPU検証・移行リポジトリ
+
+> ここは本家 [seasons](https://github.com/yuya591-ux/seasons) の**複製（実験用）**。描画エンジンのWebGPU移行を、本家に一切触れずに試す場所。
+> - 公開URL: https://yuya591-ux.github.io/seasons-gpu/ （本家: /seasons/）
+> - 発熱ベンチ: https://yuya591-ux.github.io/seasons-gpu/bench.html （WebGLとWebGPUを同一負荷で比べる）
+> - キャッシュは wgpu- 系統に分離済み（同一オリジンの本家キャッシュと干渉しない）
+> - 本家の改良の取り込み: `git fetch upstream && git merge upstream/main`
+
+---
+
 # 窓のむこう ｜ Beyond the Window
 
 > 窓辺から眺めて、ととのう。そしてときどき、窓のむこうへ。

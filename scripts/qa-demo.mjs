@@ -3,7 +3,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 1 })
 const errs = []
 page.on('pageerror', (e) => errs.push(e.message))
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 // 初回フラグを消し、初期情景をシェーダー情景に固定
 await page.evaluate(() => {
   localStorage.removeItem('seasons_look_demo')

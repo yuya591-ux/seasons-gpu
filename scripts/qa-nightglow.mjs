@@ -3,7 +3,7 @@ const port = process.env.PORT || '4801'
 const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 1.6 })
 const errs=[]; p.on('pageerror',e=>errs.push(String(e)))
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(()=>{})
 await p.waitForTimeout(700)
 // 戦国の夜（鳥のシーンは無いので night home scene→戦国へ飛ぶ。夜のグローを見る）

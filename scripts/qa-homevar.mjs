@@ -5,7 +5,7 @@ const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:4
 let cur=''; const hits=[]
 p.on('pageerror',e=>hits.push(`[${cur}] PE:${e.message}`))
 p.on('console',m=>{ if(m.type()==='error'){ const t=m.text(); if(!/Failed to load|favicon|404|net::ERR|コンパイルに失敗/.test(t)) hits.push(`[${cur}] CE:${t.slice(0,120)}`) }})
-await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
 for(const s of SC){ cur=s; await p.evaluate(x=>window.__applyScene(x),s).catch(e=>hits.push(`[${s}] throw ${e.message}`)); await p.waitForTimeout(2400)
   // 飛んで海辺に寄り、渚の生成経路を確実に踏む

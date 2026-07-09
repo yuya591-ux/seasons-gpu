@@ -8,7 +8,7 @@ const page = await browser.newPage({ viewport: { width: 600, height: 700 }, devi
 page.on('pageerror', e => console.log('PAGEERR', e.message))
 const save = (name, url) => { if (url && url.startsWith('data:image')) { fs.writeFileSync(`${OUT}/${name}.png`, Buffer.from(url.split(',')[1], 'base64')); console.log('saved', name) } else console.log('NO IMG', name) }
 
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(()=>{})
 await page.waitForTimeout(800)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d')); await page.waitForTimeout(2600)

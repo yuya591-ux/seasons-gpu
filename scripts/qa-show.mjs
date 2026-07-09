@@ -3,7 +3,7 @@ import { writeFileSync } from 'fs'
 const PORT = process.env.PORT || 4888
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1000, height: 480 } })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))

@@ -4,7 +4,7 @@ const port = process.env.PORT || '5121'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 480, height: 640 }, deviceScaleFactor: 2 })
 page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${port}/seasons/?dev=1&fest=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1&fest=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.addStyleTag({ content: '.ui,[class*="toast"],[class*="hint"],[class*="cruise"]{display:none !important}' })

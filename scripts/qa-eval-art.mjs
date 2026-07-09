@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width: 440, height: 900 }, devi
 const errs = []
 page.on('pageerror', (e) => { errs.push('PAGEERR ' + e.message); console.log('PAGE ERROR', e.message) })
 page.on('console', (m) => { if (m.type() === 'error') { errs.push('CONSOLE ' + m.text()); } })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.addStyleTag({ content: '.ui{display:none !important}' })

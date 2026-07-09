@@ -5,7 +5,7 @@ const OUT = 'C:\\Users\\yuya.satake\\ClaudeCode\\seasons\\.qa-shots'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 560, height: 640 }, deviceScaleFactor: 2 })
 const errs = []; page.on('pageerror', e => errs.push(e.message))
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1&fest=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1&fest=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {}); await page.waitForTimeout(1200)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d')).catch(() => {}); await page.waitForTimeout(3200)
 const cnt = await page.evaluate(() => window.__town3dFolkCount && window.__town3dFolkCount()).catch(() => 0)

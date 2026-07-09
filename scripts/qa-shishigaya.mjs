@@ -5,7 +5,7 @@ const id = process.argv[2] || 'shishigaya-morning-yato'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 880, height: 470 } })
 const errs=[]; page.on('pageerror',e=>errs.push('PE:'+e.message))
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(1500)
 await page.evaluate((s) => window.__applyScene(s), id).catch(()=>{})

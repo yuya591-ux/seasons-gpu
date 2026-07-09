@@ -6,7 +6,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
 page.on('console', (m) => { if (m.type() === 'error') errors.push('[c] ' + m.text()) })
 page.on('pageerror', (e) => errors.push('[p] ' + e.message))
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(600)
 for (const id of ['kitaterao-window-3d', 'autumn-dusk-corner-room', 'photo-window-autumn']) {

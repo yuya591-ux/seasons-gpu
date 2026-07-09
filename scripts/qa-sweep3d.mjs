@@ -5,7 +5,7 @@ const p = await b.newPage({ viewport:{width:430,height:850}, deviceScaleFactor:2
 let cur=''; const hits=[]
 p.on('pageerror',e=>hits.push(`[${cur}] PE: ${e.message}`))
 p.on('console',m=>{ if(m.type()==='error'){ const t=m.text(); if(!/Failed to load resource|favicon|404|net::ERR/.test(t)) hits.push(`[${cur}] CE: ${t.slice(0,140)}`) }})
-await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
 const evs=['birds','balloon','star','contrail','cloudShade','duskLights','rainbow','mist','godRays','drift','fireworks','fireworksFinale','aurora','milkyway','rain','wetRoad']
 async function exercise(scene, areas){

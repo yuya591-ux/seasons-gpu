@@ -4,7 +4,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 2 })
 const errs = []
 page.on('pageerror', (e) => errs.push(e.message))
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(600)

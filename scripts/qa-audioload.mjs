@@ -7,7 +7,7 @@ const errs = []; const audioReq = []
 page.on('pageerror', (e) => errs.push('PE:' + e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CE:' + m.text().slice(0, 120)) })
 page.on('response', (r) => { const u = r.url(); if (u.includes('/audio/') && u.endsWith('.mp3')) audioReq.push(r.status() + ' ' + u.split('/audio/')[1]) })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(1200)
 for (const id of ['summer-rain-dusk', 'autumn-dusk-corner-room', 'spring-dusk-corner-room']) {

@@ -5,7 +5,7 @@ const suffix = process.argv[2] || 'sr'
 const ids = ['photo-window-town', 'photo-window-dusk', 'photo-window-sea', 'photo-window-night']
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 for (const id of ids) {

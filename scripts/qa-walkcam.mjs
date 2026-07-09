@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
 
 const PORT = process.env.PORT || 4952
-const BASE = `http://localhost:${PORT}/seasons/`
+const BASE = `http://localhost:${PORT}/seasons-gpu/`
 const SCENE = process.env.SCENE || 'kitaterao-window-3d'
 mkdirSync('scripts/_shots', { recursive: true })
 const srv = spawn(`npx vite preview --port ${PORT} --strictPort`, { shell: true, stdio: 'ignore' })

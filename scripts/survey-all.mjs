@@ -9,7 +9,7 @@ const errsByScene = {}
 let curScene = '(init)'
 page.on('pageerror', (e) => { (errsByScene[curScene] ||= []).push(String(e).slice(0, 120)) })
 page.on('console', (m) => { if (m.type() === 'error') (errsByScene[curScene] ||= []).push(m.text().slice(0, 120)) })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 const ids = await page.evaluate(() => window.__sceneIds || [])

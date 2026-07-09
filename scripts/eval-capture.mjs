@@ -13,7 +13,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
-await page.goto('http://localhost:4790/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4790/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(600)

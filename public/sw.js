@@ -2,8 +2,10 @@
 // 方針: 外部依存ゼロ・同一オリジンのみ。一度開けば、電波が無くても・将来サーバが消えても眺められる。
 // 戦略: ページ遷移=ネット優先(失敗時キャッシュ)／資産=stale-while-revalidate(即表示→裏で更新)。
 // 版を上げると activate で旧版キャッシュを全て掃除する＝古い情景レジストリ/チャンクの残留(メニュー破壊の元)を断つ。
-// デプロイで中身が変わる時は必ずこの版を上げること（v4→v5: 改名「窓のむこう」＋新アイコン＝シェル一式の更新）。
-const VERSION = 'seasons-v5'
+// デプロイで中身が変わる時は必ずこの版を上げること。
+// 【β版の掟】本家(/seasons/)と同一オリジンでキャッシュ置き場を共有するため、版名は必ず wgpu- で始め、
+// 掃除も wgpu- 系統だけに限定する（本家 seasons-v* のキャッシュには絶対に触れない）。
+const VERSION = 'wgpu-v1'
 const ASSET_CACHE = `${VERSION}-assets`
 
 // install: シェル（index.html/JS/CSS/manifest/icon）を事前キャッシュ＝一度も情景を開かずオフラインでも起動。
@@ -31,7 +33,8 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     (async () => {
       const keys = await caches.keys()
-      await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))) // 旧版の掃除
+      // 旧版の掃除は自分の系統(wgpu-)だけ＝同居する本家のキャッシュを消さない
+      await Promise.all(keys.filter((k) => k.startsWith('wgpu-') && !k.startsWith(VERSION)).map((k) => caches.delete(k)))
       await self.clients.claim()
     })(),
   )

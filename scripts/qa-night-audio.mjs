@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width: 440, height: 900 }, devi
 let errs = 0
 page.on('pageerror', (e) => { errs++; console.log('PAGE ERROR', e.message) })
 page.on('console', (m) => { if (m.type() === 'error') { errs++; console.log('CONSOLE ERROR', m.text()) } })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(400)
 await page.evaluate(() => window.__audio && window.__audio.start && window.__audio.start())

@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process'
 import { SCENES } from '../src/data/scenes/index.js'
 
 const PORT = process.env.PORT || 4938
-const BASE = `http://localhost:${PORT}/seasons/`
+const BASE = `http://localhost:${PORT}/seasons-gpu/`
 const ids = SCENES.filter((s) => s.status === 'ready' && s.public !== false).map((s) => s.id)
 
 // vite preview を子プロセスで起動（CIでもローカルでも自己完結）。shell:true には引数を文字列で渡す（args配列だと非推奨警告）。

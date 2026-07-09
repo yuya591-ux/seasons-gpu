@@ -1,6 +1,6 @@
 // 遠雷フラッシュの確認: 夏の雨・夕暮れで uFlash を立ち上げ、発光の有無を撮り比べる。
 import { chromium } from 'playwright'
-const BASE = 'http://localhost:4790/seasons/?dev=1'
+const BASE = 'http://localhost:4790/seasons-gpu/?dev=1'
 import { mkdirSync } from 'node:fs'
 mkdirSync('scripts/_shots', { recursive: true })
 

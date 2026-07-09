@@ -2,7 +2,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:480,height:440}, deviceScaleFactor:2 })
 const errs=[]; p.on('pageerror',e=>errs.push(e.message))
-await p.goto('http://localhost:4920/seasons/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto('http://localhost:4920/seasons-gpu/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
 await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(2600)
 await p.evaluate(()=>window.__town3dFlyPose(0,10,0,Math.PI,-0.1)).catch(()=>{}); await p.waitForTimeout(1500)

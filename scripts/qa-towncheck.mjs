@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(500)
 await page.addStyleTag({ content: '.ui{display:none !important}' })

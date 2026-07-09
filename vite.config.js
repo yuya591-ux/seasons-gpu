@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const BASE = '/seasons/'
+// WebGPU移行の実験リポジトリ（本家 seasons の複製）。公開パスは /seasons-gpu/。
+const BASE = '/seasons-gpu/'
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ビルド成果物（ハッシュ付きJS/CSS＋index.html＋PWAの核）の一覧を precache-manifest.json に書き出す。
 // service worker が install 時にこれを読んでシェルを事前キャッシュ＝「一度も情景を開かずオフラインでも起動」
@@ -36,5 +40,15 @@ export default defineConfig({
   plugins: [precacheManifest()],
   // three.module は意図的に大きい（動的importで分割済み・PWAで事前キャッシュ）。
   // 既定500KBの警告が出続けて保守ノイズになるため許容上限を上げる（評価 技術-L6）。
-  build: { chunkSizeWarningLimit: 900 },
+  build: {
+    chunkSizeWarningLimit: 900,
+    // bench.html = 発熱ベンチ（WebGL/WebGPUを同一負荷で比べる検証ページ）。キーを index にして
+    // 入口チャンク名 index-*.js を保つ（precacheManifest の正規表現が拾えるように）。
+    rollupOptions: {
+      input: {
+        index: path.resolve(__dirname, 'index.html'),
+        bench: path.resolve(__dirname, 'bench.html'),
+      },
+    },
+  },
 })

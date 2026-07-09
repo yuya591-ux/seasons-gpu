@@ -2,7 +2,7 @@
 // Flux背景が反映されているかを撮影する（キャッシュ/SWの影響を受けない新規コンテキスト）。
 import { chromium } from 'playwright'
 
-const URL = 'https://yuya591-ux.github.io/seasons/?dev=1'
+const URL = 'https://yuya591-ux.github.io/seasons-gpu/?dev=1'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
 const errors = []

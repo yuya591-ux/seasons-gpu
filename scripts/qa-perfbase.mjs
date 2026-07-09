@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'
 const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:440,height:840} })
-await p.goto('http://localhost:4920/seasons/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto('http://localhost:4920/seasons-gpu/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
 const hooks = await p.evaluate(()=>Object.keys(window).filter(k=>k.startsWith('__town3d')))
 console.log('hooks:', hooks.join(','))

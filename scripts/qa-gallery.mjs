@@ -4,7 +4,7 @@ const port = process.env.PORT || '4801'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 2 })
 page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${port}/seasons/`, { waitUntil: 'networkidle' }) // dev=1なし＝公開のみ
+await page.goto(`http://localhost:${port}/seasons-gpu/`, { waitUntil: 'networkidle' }) // dev=1なし＝公開のみ
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.getByRole('button', { name: '情景' }).click()

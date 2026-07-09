@@ -7,7 +7,7 @@ mkdirSync('public/thumbs', { recursive: true })
 const port = process.env.PORT || '4790'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 1 })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(400)

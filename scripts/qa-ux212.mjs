@@ -6,7 +6,7 @@ fs.mkdirSync(OUT, { recursive: true })
 const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
 const errs = []; p.on('pageerror', e => errs.push(e.message))
-await p.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await p.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 // 1) ゲート（機能予告は立体の街でだけ。起動シーンに依存するので有無を報告）
 await p.waitForTimeout(700)
 const teaser = await p.locator('.gate__teaser').count()

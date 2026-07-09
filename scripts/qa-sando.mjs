@@ -4,7 +4,7 @@ const p = await b.newPage({ viewport: { width: 900, height: 540 }, deviceScaleFa
 const errs = []
 p.on('pageerror', (e) => errs.push(String(e)))
 p.on('console', (m)=>{ if(m.type()==='error') errs.push(m.text()) })
-await p.goto('http://localhost:4801/seasons/?dev=1', { waitUntil: 'networkidle' })
+await p.goto('http://localhost:4801/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(()=>{})
 await p.waitForTimeout(700)
 await p.evaluate(()=>window.__applyScene('kitaterao-window-3d-night'))

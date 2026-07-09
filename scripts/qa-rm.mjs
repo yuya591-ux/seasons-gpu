@@ -5,7 +5,7 @@ await page.emulateMedia({ reducedMotion: 'reduce' }) // OSの「視差効果を�
 const errs = []
 page.on('pageerror', (e) => errs.push('PE:' + e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CE:' + m.text()) })
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(500)
 for (const id of ['summer-rain-night-downtown', 'autumn-rain-night-corner-room', 'kitaterao-window-3d-night', 'summer-dusk-seaside']) {

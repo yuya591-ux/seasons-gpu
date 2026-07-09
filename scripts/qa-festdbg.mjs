@@ -3,7 +3,7 @@ const PORT = process.env.PORT || 4877
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 480, height: 640 } })
 page.on('console', (m) => { if (/fest|season|FORCE/i.test(m.text())) console.log('PAGE:', m.text()) })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1&fest=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1&fest=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 for (const id of ['summer-dusk-downtown','summer-night-downtown','kitaterao-window-3d']) {

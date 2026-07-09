@@ -19,7 +19,7 @@ import { SCENES } from '../src/data/scenes/index.js'
 
 const PORT = process.env.PORT || 4955
 const DEEP = process.env.QA_DEEP === '1'
-const BASE = `http://localhost:${PORT}/seasons/`
+const BASE = `http://localhost:${PORT}/seasons-gpu/`
 const __dir = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(__dir, '..', '.qa-shots', 'debug-walk')
 fs.rmSync(OUT, { recursive: true, force: true })

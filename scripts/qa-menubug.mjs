@@ -5,7 +5,7 @@ const page = await browser.newPage({ viewport: { width: 760, height: 600 }, devi
 const errs = []
 page.on('pageerror', (e) => errs.push('PAGEERROR ' + e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()) })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(800)
 // 情景パネルを開いてカード数を記録（初期）

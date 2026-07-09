@@ -11,7 +11,7 @@ const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push('PAGEERROR ' + e.message))
 
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => typeof window.__applyScene === 'function', { timeout: 8000 })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(400)

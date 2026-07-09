@@ -6,7 +6,7 @@ const page = await ctx.newPage()
 const errs = []
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
 // 1) オンラインで開く（SW登録）
-await page.goto('http://localhost:4790/seasons/', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4790/seasons-gpu/', { waitUntil: 'networkidle' })
 await page.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready)
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(1500)

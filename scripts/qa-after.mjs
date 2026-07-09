@@ -5,7 +5,7 @@ const page = await browser.newPage({ viewport: { width: 760, height: 720 }, devi
 const errs = []
 page.on('pageerror', (e) => errs.push('PE:' + e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CE:' + m.text()) })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1&fest=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1&fest=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))

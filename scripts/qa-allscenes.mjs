@@ -3,7 +3,7 @@ const PORT = process.env.PORT || 4807
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 460, height: 800 } })
 const errs=[]; page.on('pageerror',e=>errs.push('PE:'+e.message)); page.on('console',m=>{if(m.type()==='error')errs.push('CE:'+m.text())})
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(1500)
 for (const id of ['kitaterao-window-3d','kitaterao-window-3d-night','shishigaya-morning-yato','shishigaya-window-3d','autumn-dusk-corner-room','spring-dusk-corner-room']) {

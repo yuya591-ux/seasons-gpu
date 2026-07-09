@@ -7,7 +7,7 @@ const outName = process.argv[5] || 'hires'        // 出力ファイル名（並
 const port = process.env.PORT || '4790'           // 開発サーバのポート（既定4790）
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: +(process.env.W || 440), height: +(process.env.H || 900) }, deviceScaleFactor: 2 })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.evaluate((sid) => window.__applyScene && window.__applyScene(sid), id)

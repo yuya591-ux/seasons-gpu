@@ -1,6 +1,6 @@
 // 部屋スプラットが（fade-in/GPUソート判定/下地色の変更後も）描画されるか、長めに待って確認する。
 import { chromium } from 'playwright'
-const BASE = 'http://localhost:4790/seasons/?dev=1' + (process.argv[2] || '') // 診断を出して状態を見る
+const BASE = 'http://localhost:4790/seasons-gpu/?dev=1' + (process.argv[2] || '') // 診断を出して状態を見る
 import { mkdirSync } from 'node:fs'
 mkdirSync('scripts/_shots', { recursive: true })
 

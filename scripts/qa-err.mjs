@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'
 const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:440,height:800} })
 const errs=[]; p.on('pageerror',e=>errs.push('PE:'+e.message)); p.on('console',m=>{if(m.type()==='error')errs.push('CE:'+m.text().slice(0,200))})
-await p.goto('http://localhost:4920/seasons/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto('http://localhost:4920/seasons-gpu/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1500)
 await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(3000)
 const hasHook = await p.evaluate(()=>typeof window.__town3dShotAt==='function')

@@ -1,6 +1,6 @@
 // 角部屋シェーダーの確認: 正面・右を向く（隣の壁が迫る）・見下ろす を撮影。
 import { chromium } from 'playwright'
-const BASE = 'http://localhost:4790/seasons/'
+const BASE = 'http://localhost:4790/seasons-gpu/'
 import { mkdirSync } from 'node:fs'
 mkdirSync('scripts/_shots', { recursive: true })
 

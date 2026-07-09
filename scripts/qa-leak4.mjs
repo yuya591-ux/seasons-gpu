@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 480, height: 840 } })
 const errs = []; p.on('pageerror', e => errs.push(e.message))
-await p.goto('http://localhost:4922/seasons/?dev=1', { waitUntil: 'domcontentloaded', timeout: 60000 })
+await p.goto('http://localhost:4922/seasons-gpu/?dev=1', { waitUntil: 'domcontentloaded', timeout: 60000 })
 await p.locator('.gate').click().catch(() => {}); await p.waitForTimeout(1200)
 await p.evaluate(() => window.__applyScene('kitaterao-window-3d')).catch(() => {}); await p.waitForTimeout(3000)
 const draw = () => p.evaluate(() => window.__town3dDraw ? window.__town3dDraw() : null)

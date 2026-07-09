@@ -13,7 +13,7 @@ async function setup(scene) {
   await page.evaluate(() => window.__town3dFly(true)); await page.waitForTimeout(300)
   await page.evaluate(() => window.__town3dCruise(false))
 }
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.addStyleTag({ content: '.ui{display:none !important}' })

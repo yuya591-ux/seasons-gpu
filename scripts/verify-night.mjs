@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1100, height: 720 } })
-await page.goto('http://localhost:4790/seasons/', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4790/seasons-gpu/', { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(500)

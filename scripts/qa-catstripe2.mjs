@@ -8,7 +8,7 @@ for (const [label, rnd] of cases) {
   const page = await browser.newPage({ viewport: { width: 560, height: 600 }, deviceScaleFactor: 2 })
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await page.addInitScript((r) => { Math.random = () => r }, rnd)
-  await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+  await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
   await page.locator('.gate').click().catch(() => {})
   await page.waitForTimeout(400)
   await page.addStyleTag({ content: '.ui{display:none !important}' })

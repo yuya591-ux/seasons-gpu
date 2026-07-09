@@ -3,7 +3,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 440, height: 900 }, deviceScaleFactor: 1 })
 const errs = []
 page.on('pageerror', (e) => errs.push(e.message))
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(500)
 await page.evaluate(() => window.__applyScene && window.__applyScene('summer-dusk-seaside'))

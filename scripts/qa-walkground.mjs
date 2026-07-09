@@ -4,7 +4,7 @@ const tag = process.argv[2] || 'before'
 const browser = await chromium.launch()
 // 横画面（実機のlandscape）でベースライン
 const page = await browser.newPage({ viewport: { width: 880, height: 420 }, deviceScaleFactor: 1.5 })
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d'))

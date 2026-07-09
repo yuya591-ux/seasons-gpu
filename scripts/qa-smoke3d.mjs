@@ -4,7 +4,7 @@ const port = process.env.PORT || '4801'
 const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: 800, height: 500 }, deviceScaleFactor: 1.5 })
 const scenes = ['kitaterao-window-3d','kitaterao-window-3d-sunset','kitaterao-window-3d-rain','kitaterao-window-3d-rain-night','kitaterao-window-3d-night','kitaterao-window-3d-snow','kitaterao-window-3d-snow-night','kitaterao-window-3d-spring','kitaterao-window-3d-autumn','shishigaya-window-3d']
-await p.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await p.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await p.locator('.gate').click().catch(() => {})
 await p.waitForTimeout(700)
 for (const s of scenes) {

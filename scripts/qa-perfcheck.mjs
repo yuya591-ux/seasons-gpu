@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'
 const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:440,height:860} })
-await p.goto('http://localhost:4920/seasons/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto('http://localhost:4920/seasons-gpu/?dev=1',{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1200)
 await p.evaluate(()=>window.__applyScene('kitaterao-window-3d')).catch(()=>{}); await p.waitForTimeout(2600)
 const win = await p.evaluate(()=>({calls:window.__renderer?.info?.render?.calls, tris:window.__renderer?.info?.render?.triangles}))

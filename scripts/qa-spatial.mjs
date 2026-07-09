@@ -4,7 +4,7 @@ const page = await browser.newPage({ viewport: { width: 440, height: 900 }, devi
 const errs = []
 page.on('pageerror', (e) => errs.push(e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CE:' + m.text()) })
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(700)
 await page.evaluate(() => window.__applyScene && window.__applyScene('summer-dusk-seaside'))

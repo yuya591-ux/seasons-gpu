@@ -4,7 +4,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
 const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
-await page.goto('http://localhost:4790/seasons/', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4790/seasons-gpu/', { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(500)

@@ -4,7 +4,7 @@ const OUT = 'C:\\Users\\yuya.satake\\ClaudeCode\\seasons\\.qa-shots'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 500, height: 760 }, deviceScaleFactor: 2 })
 const errs = []; page.on('pageerror', e => errs.push(e.message))
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {}); await page.waitForTimeout(1800)
 // 設定ボタンを押す
 const btn = page.locator('button', { hasText: '設定' }).first()

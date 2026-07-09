@@ -5,7 +5,7 @@ const [, , sceneId = 'summer-rain-evening-corner-room'] = process.argv
 const port = process.env.PORT || '4790'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 400, height: 850 } })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(800)
 await page.evaluate((id) => window.__applyScene && window.__applyScene(id), sceneId)

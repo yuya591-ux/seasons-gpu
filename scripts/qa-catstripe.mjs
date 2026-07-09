@@ -5,7 +5,7 @@ const browser = await chromium.launch()
 for (let n = 0; n < 5; n++) {
   const page = await browser.newPage({ viewport: { width: 560, height: 600 }, deviceScaleFactor: 2 })
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-  await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+  await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
   await page.locator('.gate').click().catch(() => {})
   await page.waitForTimeout(400)
   await page.addStyleTag({ content: '.ui{display:none !important}' })

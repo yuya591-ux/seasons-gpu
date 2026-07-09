@@ -4,7 +4,7 @@ const port = process.env.PORT || '5090'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 480, height: 760 }, deviceScaleFactor: 2 })
 page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})   // 音脈を起こす（ユーザー操作）
 await page.waitForTimeout(900)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d-rain-night'))

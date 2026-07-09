@@ -10,7 +10,7 @@ async function shoot(tag,x,y,z,yaw){
   await p.evaluate(([x,y,z,yaw])=>window.__town3dFlyPose(x,y,z,yaw,-0.16),[x,y,z,yaw]).catch(()=>{}); await p.waitForTimeout(3200)
   await p.screenshot({ path:`era2-${tag}.png` }); console.log('shot '+tag)
 }
-await p.goto(`http://localhost:${PORT}/seasons/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
+await p.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`,{waitUntil:'domcontentloaded',timeout:60000})
 await p.locator('.gate').click().catch(()=>{}); await p.waitForTimeout(1500)
 await shoot('sengoku',140,20,-612,0.1)   // 戦国の谷を見下ろす
 await shoot('edo',628,12,-30,0.3)        // 江戸の城下を低く

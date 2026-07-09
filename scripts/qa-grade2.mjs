@@ -4,7 +4,7 @@ const OUT = 'C:\\Users\\yuya.satake\\ClaudeCode\\seasons\\.qa-shots'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 880, height: 560 }, deviceScaleFactor: 2 })
 const errs = []; page.on('pageerror', e => errs.push(e.message))
-await page.goto(`http://localhost:${PORT}/seasons/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+await page.goto(`http://localhost:${PORT}/seasons-gpu/?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 await page.locator('.gate').click().catch(() => {}); await page.waitForTimeout(1200)
 await page.evaluate(() => window.__applyScene('kitaterao-window-3d-spring')).catch(() => {}); await page.waitForTimeout(3200)
 await page.screenshot({ path: `${OUT}\\grade2-window.png` }); console.log('grade2-window')

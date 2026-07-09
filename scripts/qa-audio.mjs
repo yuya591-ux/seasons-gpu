@@ -4,7 +4,7 @@ const page = await browser.newPage({ viewport: { width: 440, height: 900 }, devi
 const errs = []
 page.on('pageerror', (e) => errs.push('pageerror: ' + e.message))
 page.on('console', (m) => { if (m.type() === 'error') errs.push('console.error: ' + m.text()) })
-await page.goto('http://localhost:4875/seasons/?dev=1', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4875/seasons-gpu/?dev=1', { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.gate').click().catch(() => {}) // ジェスチャ起点でaudio.start()→風レイヤー
 await page.waitForTimeout(900)

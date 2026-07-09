@@ -4,7 +4,7 @@ const port = process.env.PORT || '4860'
 const VW = parseInt(process.env.VW || '900', 10), VH = parseInt(process.env.VH || '414', 10)
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: 2 })
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(800)
 // 情景ギャラリーを開く

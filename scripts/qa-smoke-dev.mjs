@@ -4,7 +4,7 @@
 import { chromium } from 'playwright'
 import { SCENES } from '../src/data/scenes/index.js'
 const PORT = process.env.PORT || 4917
-const BASE = `http://localhost:${PORT}/seasons/`
+const BASE = `http://localhost:${PORT}/seasons-gpu/`
 const ids = SCENES.filter((s) => s.status === 'ready' && s.public !== false).map((s) => s.id)
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 480, height: 720 } })

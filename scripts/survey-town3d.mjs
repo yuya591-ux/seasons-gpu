@@ -12,7 +12,7 @@ const page = await browser.newPage({ viewport: { width: 440, height: 900 }, devi
 const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`[console] ${m.text()}`) })
 page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`))
-await page.goto(`http://localhost:${port}/seasons/?dev=1`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${port}/seasons-gpu/?dev=1`, { waitUntil: 'networkidle' })
 await page.locator('.gate').click().catch(() => {})
 await page.waitForTimeout(600)
 for (const id of ids) {
