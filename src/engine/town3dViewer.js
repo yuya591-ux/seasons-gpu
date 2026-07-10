@@ -313,7 +313,9 @@ export async function mountTown3d(parent, opts = {}) {
   // composer読込失敗時のフォールバック(直描き)のみAA無しになるが、発生は例外時だけ＝許容（2026-07 発熱対策）。
   // WebGPURenderer＝iOSのWebGL→Metal変換税を払わない直結描画（実機AB: フレームCPU -37%）。
   // WebGPU非対応の環境（ヘッドレスCI・古い端末）は内蔵のWebGL2代替バックエンドへ自動で落ちて動作は維持する。
-  const renderer = new THREE.WebGPURenderer({ antialias: false, alpha: false, powerPreference: 'low-power' })
+  // ?gl=1 ＝実機A/B用: 同一コードのままWebGL2代替バックエンドを強制（WebGPUとの差を同条件で測る）。
+  const FORCE_GL = /[?&]gl=1/.test(location.search)
+  const renderer = new THREE.WebGPURenderer({ antialias: false, alpha: false, powerPreference: 'low-power', forceWebGL: FORCE_GL })
   try { await renderer.init() } catch (e) { /* 初期化失敗でも代替経路で描画継続を試みる */ }
   if (my !== token) { try { renderer.dispose() } catch (e2) { /* 無視 */ } if (stage.parentNode) stage.parentNode.removeChild(stage); return }
   // 異方性フィルタの上限（WebGPU版は renderer.getMaxAnisotropy()。取得失敗時は控えめな8）
@@ -361,6 +363,14 @@ export async function mountTown3d(parent, opts = {}) {
   // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
   // WebGPU版は renderer.shadowMap.autoUpdate が無く、ライト側（sun.shadow.autoUpdate/needsUpdate）で制御する（sun作成箇所で設定）。
   stage.appendChild(renderer.domElement)
+  // 実機診断HUD（?hud=1）: バックエンド／解像度(DPR)／フレーム間隔／JS時間／描画コールを実機画面で読む
+  // （Phase 2の実機比較用。通常URLでは出ない・操作を邪魔しない）。
+  let perfHud = null, perfHudT = 0
+  if (/[?&]hud=1/.test(location.search)) {
+    perfHud = document.createElement('div')
+    perfHud.style.cssText = 'position:absolute;left:8px;top:calc(env(safe-area-inset-top, 0px) + 52px);z-index:30;font:11px/1.7 ui-monospace,monospace;color:#f2eee2;background:rgba(10,12,16,.66);padding:6px 9px;border-radius:8px;pointer-events:none;white-space:pre'
+    stage.appendChild(perfHud)
+  }
   // WebGLコンテキスト喪失への備え（評価 技術-致命3）。preventDefault しないと二度と復帰できず黒画面が固定化する。
   // 立体の街は全構築物をmount時に生成するため、その場での再構築は非現実的→復帰時は同じ情景を「組み直す」(onContextRestore)。
   let contextLost = false
@@ -10289,6 +10299,14 @@ export async function mountTown3d(parent, opts = {}) {
     lastJsMs = lastJsMs * 0.9 + (performance.now() - _js0) * 0.1 // 毎フレームのJS処理時間（移動平均・検証用）
     // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に。輪郭のギザギザはFXAAでなめらかに（発熱をほぼ増やさず）。
     if (composer) { try { composer.render() } catch (e) { composer = null; renderer.render(scene, camera) } } else renderer.render(scene, camera)
+    if (perfHud) { // 実機診断HUD（?hud=1・0.5秒ごとに更新）。描画コールは描画後のinfoから読む
+      const _hn = performance.now()
+      if (_hn - perfHudT > 500) {
+        perfHudT = _hn
+        const ri = renderer.info.render
+        perfHud.textContent = `${(renderer.backend && renderer.backend.isWebGPUBackend) ? 'WebGPU' : 'WebGL2代替'}  解像度x${curPR.toFixed(2)}\n${(1 / Math.max(lastDDT, 0.001)).toFixed(0)}コマ/秒  JS ${lastJsMs.toFixed(1)}ms\n描画 ${ri.drawCalls !== undefined ? ri.drawCalls : ri.calls}`
+      }
+    }
   }
   // 初回フレームでの「可視マテリアルの一斉シェーダーコンパイル」(progs多数=数百msのヒッチ)を、
   // 描画を始める前にまとめて済ませる＝マウント直後の最初のframe()が固まらない（暗転の裏で温める）。
@@ -10297,7 +10315,10 @@ export async function mountTown3d(parent, opts = {}) {
   // この一斉リコンパイルが、上昇ボタンの長押しを iOS に pointercancel させ「雲海突入直前で1回解除」させていた実機FBの主因。直後の compile で透明版を温める。
   // 低空では cloudObjs.visible=false なので、常時透明でも低空の描画コスト（オーバードロー）は増えない。
   if (cloudObjs && cloudObjs.length) { cloudRevealMats = []; for (const o of cloudObjs) o.traverse((c) => { if (c.isMesh) { const mm = Array.isArray(c.material) ? c.material : [c.material]; for (const m of mm) { if (m && m.__revBase === undefined) { m.__revBase = (m.opacity == null ? 1 : m.opacity); m.transparent = true; m.opacity = 0; cloudRevealMats.push(m) } } } }) }
-  try { renderer.compileAsync(scene, camera).catch(() => {}) } catch { /* コンパイル先行に失敗しても描画は継続 */ }
+  // コンパイル先行は「待ってから」最初のフレームへ＝初回表示や見回し始めの逐次コンパイルのつっかかりを防ぐ
+  // （実機FB: 室内が重い/つっかかる。旧WebGL版の同期compileと同じ「温めてから描く」流れをasyncで再現）。
+  try { await renderer.compileAsync(scene, camera) } catch (e) { /* コンパイル先行に失敗しても描画は継続 */ }
+  if (my !== token) return // await中に情景切替＝unmount側(active.dispose)が掃除済みなので何もせず退く
   sun.shadow.needsUpdate = true // 影を最初の描画で一度だけ焼く（以降は静的。WebGPU版はライト側で制御）
   frame()
   requestAnimationFrame(() => stage.classList.add('town3d-stage--in'))
