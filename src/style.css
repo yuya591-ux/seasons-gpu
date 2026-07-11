@@ -740,6 +740,14 @@ body.idle .town3d-stick {
 .town3d-stage--light .town3d-bleed {
   display: none;
 }
+/* 検証用キルスイッチ(?nocss=1): 全画面ブレンド4層(wash/paper/paper2/bleed)を止め、コンポジタ合成の負荷を切り分ける。
+   このクラスはURLに ?nocss=1 がある時だけJS側(town3dViewer)が付与＝既定の見た目・挙動は完全に不変。色味が変わるのは織り込み済み。 */
+body.dbg-nocss .town3d-wash,
+body.dbg-nocss .town3d-paper,
+body.dbg-nocss .town3d-paper2,
+body.dbg-nocss .town3d-bleed {
+  display: none !important;
+}
 
 /* 情景切替のなめらかな暗転（情景の空色へ一瞬沈み、静かに戻る） */
 .scene-fade {

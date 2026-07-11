@@ -315,6 +315,13 @@ export async function mountTown3d(parent, opts = {}) {
   // WebGPU非対応の環境（ヘッドレスCI・古い端末）は内蔵のWebGL2代替バックエンドへ自動で落ちて動作は維持する。
   // ?gl=1 ＝実機A/B用: 同一コードのままWebGL2代替バックエンドを強制（WebGPUとの差を同条件で測る）。
   const FORCE_GL = /[?&]gl=1/.test(location.search)
+  // ── 検証用キルスイッチ（発熱の原因切り分け・複数併用可）。URLパラメータが無ければ全て偽＝既定の挙動・描画は完全に不変。
+  //    ?nocss=1: 全画面CSS合成レイヤー4層(乗算/ソフトライト)を隠す ／ ?nofx=1: 後処理をシーン描画＋出力変換のみに ／
+  //    ?noalpha=1: 雲海帯の半透明群(雲塊・光芒・霧ヴェール・加算スプライト)を一括で隠す。
+  const KILL_CSS = /[?&]nocss=1/.test(location.search)
+  const KILL_FX = /[?&]nofx=1/.test(location.search)
+  const KILL_ALPHA = /[?&]noalpha=1/.test(location.search)
+  if (KILL_CSS) document.body.classList.add('dbg-nocss') // style.css側の検証規則が4層をdisplay:noneにする
   const renderer = new THREE.WebGPURenderer({ antialias: false, alpha: false, powerPreference: 'low-power', forceWebGL: FORCE_GL })
   try { await renderer.init() } catch (e) { /* 初期化失敗でも代替経路で描画継続を試みる */ }
   if (my !== token) { try { renderer.dispose() } catch (e2) { /* 無視 */ } if (stage.parentNode) stage.parentNode.removeChild(stage); return }
@@ -366,10 +373,15 @@ export async function mountTown3d(parent, opts = {}) {
   // 実機診断HUD（?hud=1）: バックエンド／解像度(DPR)／フレーム間隔／JS時間／描画コールを実機画面で読む
   // （Phase 2の実機比較用。通常URLでは出ない・操作を邪魔しない）。
   let perfHud = null, perfHudT = 0
+  let hudWin0 = 0, hudN = 0, hudFtSum = 0, hudFtMax = 0 // HUD: 直近1秒窓の集計（描いたコマ数・フレーム間隔）
+  let hudFps = 0, hudFtAvg = 0, hudFtPk = 0 // HUD: 直近1秒の確定値（表示用）
+  const hudHist = [] // HUD: 1秒ごとのFPS履歴（初期30秒 vs 直近30秒の低下率＝発熱による性能低下の観測）
+  let hudSw = ''
   if (/[?&]hud=1/.test(location.search)) {
     perfHud = document.createElement('div')
     perfHud.style.cssText = 'position:absolute;left:8px;top:calc(env(safe-area-inset-top, 0px) + 52px);z-index:30;font:11px/1.7 ui-monospace,monospace;color:#f2eee2;background:rgba(10,12,16,.66);padding:6px 9px;border-radius:8px;pointer-events:none;white-space:pre'
     stage.appendChild(perfHud)
+    hudSw = [FORCE_GL && 'gl', KILL_CSS && 'nocss', KILL_FX && 'nofx', KILL_ALPHA && 'noalpha'].filter(Boolean).join('+') || 'なし' // 現在有効な検証スイッチの一覧
   }
   // WebGLコンテキスト喪失への備え（評価 技術-致命3）。preventDefault しないと二度と復帰できず黒画面が固定化する。
   // 立体の街は全構築物をmount時に生成するため、その場での再構築は非現実的→復帰時は同じ情景を「組み直す」(onContextRestore)。
@@ -7279,6 +7291,8 @@ export async function mountTown3d(parent, opts = {}) {
     composer = new THREE.PostProcessing(renderer)
     composer.outputColorTransform = false // 出力変換(renderOutput)を自前でFXAAの前に置く＝sRGB化した最終画にAAをかける（旧OutputPass相当）
     rebuildPost = () => {
+      // 検証用キルスイッチ(?nofx=1): ブルームとFXAAを外し「シーン描画＋出力変換(sRGB)」だけにする（負荷の切り分け用・既定では通らない）
+      if (KILL_FX) { composer.outputNode = TSL.renderOutput(scenePassColor); composer.needsUpdate = true; return }
       const src = (bloomOn && bloomNode) ? scenePassColor.add(bloomNode) : scenePassColor
       composer.outputNode = fxaa(TSL.renderOutput(src))
       composer.needsUpdate = true
@@ -10279,6 +10293,13 @@ export async function mountTown3d(parent, opts = {}) {
     if (cloudHi && cloudRevealMats) {
       for (const m of cloudRevealMats) m.opacity = m.__revBase * cloudReveal // y58で滲み始めy88で実体化（雲海seaOp y70→92に重なり、白い霞seaCrossが仕上げを覆う）。材の収集とtransparent切替はマウント時に済ませ済み（reveal時のリコンパイル大ヒッチを廃す）
     }
+    // 検証用キルスイッチ(?noalpha=1): 雲海帯の半透明群（雲海の雲塊・入道雲/島々・光芒・霧ヴェール・加算スプライトなどの漂いもの）を
+    // 毎フレーム末尾で一括非表示＝上の表示ロジックの結果だけを上書きする（負荷の切り分け用。既定では素通り）。
+    if (KILL_ALPHA) {
+      if (cloudSea) cloudSea.visible = false
+      for (const d of skyDrifters) d.o.visible = false
+      for (const o of cloudObjs) o.visible = false
+    }
     // 雲海の奥深く（雲の層の上＝眼下の街は雲deckに隠れる高度）では街を丸ごと非表示＝「雲海＋街」の二重描画を解消し負荷を半減（雲海の重さ対策）。ヒステリシスでチラつき防止。
     const deepCloud = cloudHi && active.flyPos.y > (lastDeep ? SEA_Y + 2 : SEA_Y + 10)
     if (deepCloud !== lastDeep) { lastDeep = deepCloud; town.visible = !deepCloud }
@@ -10299,12 +10320,30 @@ export async function mountTown3d(parent, opts = {}) {
     lastJsMs = lastJsMs * 0.9 + (performance.now() - _js0) * 0.1 // 毎フレームのJS処理時間（移動平均・検証用）
     // 飛行中も解像度は最高(qCap=1.6)のまま保つ＝景色を一望する時こそ綺麗に。輪郭のギザギザはFXAAでなめらかに（発熱をほぼ増やさず）。
     if (composer) { try { composer.render() } catch (e) { composer = null; renderer.render(scene, camera) } } else renderer.render(scene, camera)
-    if (perfHud) { // 実機診断HUD（?hud=1・0.5秒ごとに更新）。描画コールは描画後のinfoから読む
+    if (perfHud) { // 実機診断HUD（?hud=1・表示は0.5秒ごとに更新）。描画コールは描画後のinfoから読む
       const _hn = performance.now()
+      // 直近1秒窓の実測: 描いたコマ数(FPS)とフレーム間隔のavg/max。1秒ごとに確定して履歴へ積む（初期30秒 vs 直近30秒の比較用）
+      if (!hudWin0) hudWin0 = _hn
+      hudN++; const _ft = drawDt * 1000; hudFtSum += _ft; if (_ft > hudFtMax) hudFtMax = _ft
+      if (_hn - hudWin0 >= 1000) {
+        hudFps = hudN * 1000 / (_hn - hudWin0)
+        hudFtAvg = hudFtSum / Math.max(1, hudN); hudFtPk = hudFtMax
+        hudHist.push(hudFps); if (hudHist.length > 3600) hudHist.shift() // 1時間分で頭打ち（配列の肥大防止）
+        hudN = 0; hudFtSum = 0; hudFtMax = 0; hudWin0 = _hn
+      }
       if (_hn - perfHudT > 500) {
         perfHudT = _hn
         const ri = renderer.info.render
-        perfHud.textContent = `${(renderer.backend && renderer.backend.isWebGPUBackend) ? 'WebGPU' : 'WebGL2代替'}  解像度x${curPR.toFixed(2)}\n${(1 / Math.max(lastDDT, 0.001)).toFixed(0)}コマ/秒  JS ${lastJsMs.toFixed(1)}ms\n描画 ${ri.drawCalls !== undefined ? ri.drawCalls : ri.calls}`
+        const _calls = ri.drawCalls !== undefined ? ri.drawCalls : ri.calls
+        const _tris = ri.triangles !== undefined ? `${(ri.triangles / 10000).toFixed(1)}万` : '不明'
+        // 初期30秒 vs 直近30秒の平均FPS低下率（発熱による尻下がりの観測。60秒たまるまでは計測中）
+        let _drop = `計測中 ${hudHist.length}秒`
+        if (hudHist.length >= 60) {
+          const _e = hudHist.slice(0, 30), _l = hudHist.slice(-30)
+          const _ea = _e.reduce((a, b) => a + b, 0) / 30, _la = _l.reduce((a, b) => a + b, 0) / 30
+          _drop = `${_ea > 0 ? ((1 - _la / _ea) * 100).toFixed(1) : '0.0'}%（${_ea.toFixed(1)}→${_la.toFixed(1)}）`
+        }
+        perfHud.textContent = `${(renderer.backend && renderer.backend.isWebGPUBackend) ? 'WebGPU' : 'WebGL2代替'}  解像度x${curPR.toFixed(2)}\n${hudFps.toFixed(1)}コマ/秒  フレーム ${hudFtAvg.toFixed(1)}/${hudFtPk.toFixed(0)}ms\nJS ${lastJsMs.toFixed(1)}ms  描画 ${_calls}  三角 ${_tris}\nスイッチ: ${hudSw}\nFPS低下率(初期30秒比): ${_drop}`
       }
     }
   }

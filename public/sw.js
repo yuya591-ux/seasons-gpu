@@ -5,7 +5,7 @@
 // デプロイで中身が変わる時は必ずこの版を上げること。
 // 【β版の掟】本家(/seasons/)と同一オリジンでキャッシュ置き場を共有するため、版名は必ず wgpu- で始め、
 // 掃除も wgpu- 系統だけに限定する（本家 seasons-v* のキャッシュには絶対に触れない）。
-const VERSION = 'wgpu-v3' // v3: 実機診断HUD(?hud=1)・WebGL2代替の強制(?gl=1)・コンパイル先行を待つ(つっかかり対策)
+const VERSION = 'wgpu-v4' // v4: 検証用キルスイッチ(?nocss/?nofx/?noalpha)＋診断HUD拡充(1秒窓FPS/フレーム時間/三角形/低下率)
 const ASSET_CACHE = `${VERSION}-assets`
 
 // install: シェル（index.html/JS/CSS/manifest/icon）を事前キャッシュ＝一度も情景を開かずオフラインでも起動。
