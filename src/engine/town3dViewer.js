@@ -7924,17 +7924,15 @@ export async function mountTown3d(parent, opts = {}) {
   const atmo = document.createElement('div')
   atmo.className = 'town3d-atmo'
   stage.appendChild(atmo)
-  // 発熱最適化（2026-07 案B・PERF_REPORT.md）: ソフトライト3層（wash/paper2/bleed）は全品質で畳む。
-  // ネイティブ解像度のCSSブレンド合成が全ピクセル仕事の最大項（約12MP/フレーム=WebGL全パイプの5倍超）だった一方、
-  // 見た目の同一性は紙目（paper=乗算）と大気（atmo）が担っており、これは「軽やか」品質で実績のある組み合わせ。
-  // 戻す時・見比べたい時は ?fullcss=1（旧4層を完全再現＝A/B比較用。既定は畳み）。
+  // 発熱最適化（2026-07 案B・PERF_REPORT.md）: 全画面ブレンド4層のうち paper2/bleed の2層を全品質で畳む（合成-50%）。
+  // ネイティブ解像度のCSSブレンド合成が全ピクセル仕事の最大項（約12MP/フレーム=WebGL全パイプの5倍超）だったため。
+  // wash（情景の光の暖色ウォッシュ=夜の琥珀トーンの主役）と紙目（paper=乗算）は残す＝A/B画像で「全部畳むと夜が寒色に沈む」と
+  // 確認したための絞り込み。戻す時・見比べたい時は ?fullcss=1（旧4層を完全再現）。
   const FULL_CSS_LAYERS = /[?&]fullcss=1/.test(location.search)
-  if (FULL_CSS_LAYERS) {
-    // 情景の光で全体を一枚の空気に統一する淡いウォッシュ（局所色＝緑の木/灰の道/赤い看板を一つの光へまとめる）
-    const wash = document.createElement('div')
-    wash.className = 'town3d-wash'
-    stage.appendChild(wash)
-  }
+  // 情景の光で全体を一枚の空気に統一する淡いウォッシュ（局所色＝緑の木/灰の道/赤い看板を一つの光へまとめる）
+  const wash = document.createElement('div')
+  wash.className = 'town3d-wash'
+  stage.appendChild(wash)
   const paper = document.createElement('div')
   paper.className = 'town3d-paper'
   stage.appendChild(paper)
