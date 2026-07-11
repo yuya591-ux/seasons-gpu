@@ -322,6 +322,11 @@ export async function mountTown3d(parent, opts = {}) {
   const KILL_FX = /[?&]nofx=1/.test(location.search)
   const KILL_ALPHA = /[?&]noalpha=1/.test(location.search)
   if (KILL_CSS) document.body.classList.add('dbg-nocss') // style.css側の検証規則が4層をdisplay:noneにする
+  // ── 計測用スイッチ（性能の自動計測用・URLに無ければ全て既定のまま）──
+  //    ?noshadow=1: 影を丸ごと切る（影サンプリングの画素コスト計測） ／ ?dpr=0.96等: 解像度を固定し自動品質も凍結 ／ ?fpscap=60等: fps上限の一時変更
+  const KILL_SHADOW = /[?&]noshadow=1/.test(location.search)
+  const DPR_OVR = (() => { const m = location.search.match(/[?&]dpr=([0-9.]+)/); const v = m ? parseFloat(m[1]) : 0; return (v >= 0.5 && v <= 3) ? v : 0 })()
+  const FPS_OVR = (() => { const m = location.search.match(/[?&]fpscap=(\d+)/); const v = m ? parseInt(m[1], 10) : 0; return (v >= 10 && v <= 120) ? v : 0 })()
   const renderer = new THREE.WebGPURenderer({ antialias: false, alpha: false, powerPreference: 'low-power', forceWebGL: FORCE_GL })
   try { await renderer.init() } catch (e) { /* 初期化失敗でも代替経路で描画継続を試みる */ }
   if (my !== token) { try { renderer.dispose() } catch (e2) { /* 無視 */ } if (stage.parentNode) stage.parentNode.removeChild(stage); return }
@@ -353,6 +358,7 @@ export async function mountTown3d(parent, opts = {}) {
   }
   let curPR = Math.min(window.devicePixelRatio || 1, PR_CAP)
   let qCap = PR_CAP // 現在の画質上限（setQualityで変わる）。自動品質調整はこれを天井に戻す
+  if (DPR_OVR) { curPR = DPR_OVR; qCap = DPR_OVR } // 計測用(?dpr=): 解像度を固定
   let curQual = QUAL // 現在の描き込み（setQualityで変わる）。'light'では灯りのブルームも切る＝解像度に加え後処理も軽くする
   let bloomWanted = false // この情景でブルームを焚きたいか（夜/はっきりした夕）。light品質ではこれが真でも切る
   let adQLow = 0, adQOk = 0 // 自動品質調整: 重いフレーム/快適フレームの連続カウント（ヒステリシス）
@@ -367,6 +373,7 @@ export async function mountTown3d(parent, opts = {}) {
   renderer.setSize(W, H)
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFShadowMap // PCFSoftShadowMapは非推奨で実際は自動でPCFに落ちる→明示してThree.jsの警告を消す（静的影なので見た目は同一）
+  if (KILL_SHADOW) renderer.shadowMap.enabled = false // 計測用(?noshadow=1): 影パスと全材質の影サンプリングを丸ごと切る
   // 影を「一度だけ焼く」静的影に（太陽は固定＝建物/木の影は不変）。毎フレームの影パス（数百の投影体の再ラスタライズ）を撤廃して発熱を大きく下げる。動く車/人の影は捨てる（小さく目立たない）。
   // WebGPU版は renderer.shadowMap.autoUpdate が無く、ライト側（sun.shadow.autoUpdate/needsUpdate）で制御する（sun作成箇所で設定）。
   stage.appendChild(renderer.domElement)
@@ -381,7 +388,7 @@ export async function mountTown3d(parent, opts = {}) {
     perfHud = document.createElement('div')
     perfHud.style.cssText = 'position:absolute;left:8px;top:calc(env(safe-area-inset-top, 0px) + 52px);z-index:30;font:11px/1.7 ui-monospace,monospace;color:#f2eee2;background:rgba(10,12,16,.66);padding:6px 9px;border-radius:8px;pointer-events:none;white-space:pre'
     stage.appendChild(perfHud)
-    hudSw = [FORCE_GL && 'gl', KILL_CSS && 'nocss', KILL_FX && 'nofx', KILL_ALPHA && 'noalpha'].filter(Boolean).join('+') || 'なし' // 現在有効な検証スイッチの一覧
+    hudSw = [FORCE_GL && 'gl', KILL_CSS && 'nocss', KILL_FX && 'nofx', KILL_ALPHA && 'noalpha', KILL_SHADOW && 'noshadow', DPR_OVR && `dpr=${DPR_OVR}`, FPS_OVR && `fps=${FPS_OVR}`].filter(Boolean).join('+') || 'なし' // 現在有効な検証スイッチの一覧
   }
   // WebGLコンテキスト喪失への備え（評価 技術-致命3）。preventDefault しないと二度と復帰できず黒画面が固定化する。
   // 立体の街は全構築物をmount時に生成するため、その場での再構築は非現実的→復帰時は同じ情景を「組み直す」(onContextRestore)。
@@ -8884,13 +8891,14 @@ export async function mountTown3d(parent, opts = {}) {
     // 「眺めている時」は描画頻度だけ約16fpsへ落とす＝発熱/電池を抑える（主用途＝長時間ぼーっと眺める）。
     // 方針=鮮明さ優先: 解像度は落とさない（静止画こそ鮮明に見たい）。動きはクロック基準なので16fpsでも滑らか。操作再開で即30fps。
     // ※以前は idle で解像度も×0.8 に落としていたが、眺める静止画がぼやけるため取りやめ（fps低下が発熱の主レバー＝それは維持）。
-    if (t - lastDraw < (restIdle ? 0.06 : 0.032)) return // 眺めている時は約16fps／能動時は約30fps
+    if (t - lastDraw < (FPS_OVR ? 1 / FPS_OVR : (restIdle ? 0.06 : 0.032))) return // 眺めている時は約16fps／能動時は約30fps（?fpscap=は計測用の一時上書き）
     const drawDt = lastDraw < 0 ? 0.033 : t - lastDraw // 実際の描画間隔（カク付き検知）
     lastDraw = t
     const _js0 = performance.now() // 毎フレームのJS処理時間を測る（検証用・CPU負荷）
     // ── 自動品質調整：能動飛行中、描画が30fpsに間に合わない状態が続いたら解像度を一段下げて「常に滑らか」を死守。
     //    安定が長く続けば鮮やかさ(qCap)へ少しずつ戻す。ヒステリシスで頻繁な切替を防ぐ。restIdle/タブ復帰の巨大gapは無視。
     lastDDT = drawDt
+    if (DPR_OVR) { adQLow = 0; adQOk = 0 } // 計測用(?dpr=): 解像度固定中は自動品質を凍結（計測を汚さない）
     if (!restIdle && drawDt > 0.001 && drawDt < 0.4) {
       if (drawDt > 0.047) { adQLow++; adQOk = 0 } else if (drawDt < 0.038) { adQOk++; adQLow = 0 } else { if (adQLow) adQLow--; if (adQOk) adQOk-- }
       // 重い時はまず「重い後処理(ブルーム=複数回のぼかしパス)」を切る＝解像度(鮮明さ)を保ったまま大きく軽くする。次に解像度を譲る。
