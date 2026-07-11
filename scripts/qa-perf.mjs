@@ -22,6 +22,7 @@ const OUT = path.join(ROOT, '.qa-shots', 'perf')
 fs.mkdirSync(OUT, { recursive: true })
 
 const SCENARIO = process.env.SCENARIO || 'fly'
+const FILTER = process.env.FILTER || '' // 例: FILTER=noise → そのペアだけ実行（変更前後の素早い再計測用）
 const CPU_RATE = 4           // iPhone模擬のCPUスロットル倍率
 const PIN = 'dpr=1.6'        // 基準構成（標準品質の上限に固定・自動品質凍結）
 
@@ -122,7 +123,7 @@ results.auto = await runOne('auto', '')
 console.log(`[${SCENARIO}/auto] fps=${results.auto.fps} jsMs=${results.auto.jsMs} calls=${results.auto.calls} pr=${results.auto.pr} errs=${results.auto.errs}`)
 
 // ペア比較: base(基準) → 要素OFF を隣接実行し、差分=その要素のコスト
-for (const [name, params] of ELEMENTS[SCENARIO]) {
+for (const [name, params] of ELEMENTS[SCENARIO].filter(([n]) => !FILTER || n === FILTER)) {
   const ref = await runOne(`ref-${name}`, PIN)
   const el = await runOne(name, params)
   const pair = { name, ref, el, dFps: +(el.fps - ref.fps).toFixed(2), dFrameMs: +(el.frameMs - ref.frameMs).toFixed(1) }
@@ -163,7 +164,7 @@ for (const pair of results.pairs) {
 await diffPage.close()
 
 // 飛行シナリオでは描画コールのカテゴリ寄与も1回だけ採る（どこがコールを食っているか）
-if (SCENARIO === 'fly') {
+if (SCENARIO === 'fly' && !FILTER) {
   const page = await context.newPage()
   await page.goto(`${BASE}?dev=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
   await page.locator('.gate').click().catch(() => {})
