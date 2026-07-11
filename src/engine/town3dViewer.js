@@ -306,7 +306,12 @@ export async function mountTown3d(parent, opts = {}) {
   // 重い時は自動品質(curPR↓・下のadQ)が実測で天井から下げる安全網に任せる（先回りで眠くしない）。
   // ※起動時(ここ)と setQuality(設定変更時)で上限が食い違うと「設定を触ると急に鮮明化」する＝両者を同値に統一。
   const PR_CAP = LIGHT ? 1.2 : QUAL === 'soft' ? 2 : 1.6
-  const PR_FLOOR = LIGHT ? 0.82 : 0.96 // 自動品質調整で下げられる解像度の下限（これ以上は下げない＝鮮やかさを保つ）。高DPR端末で「荒すぎる」のを防ぐため一段引き上げ
+  // 自動品質調整で下げられる解像度の下限。案B(2026-07 PERF_REPORT.md): 0.96→1.2へ引き上げ＝「画質がすごく悪い」状態の根絶。
+  // 下げ幅を失う分の予算は、CSS層の畳み込み(C1)と飛行中の解像度帯(FLY_PR)で先に確保している。
+  const PR_FLOOR = LIGHT ? 0.82 : 1.2
+  // 飛行中の解像度の天井（案B）: 動きがボケを隠す間だけ一段軽く（1.6→1.2で画素-44%＝発熱の主レバー）。
+  // 窓辺静止・着地歩行では qCap（標準1.6）へ即復帰＝じっくり眺める絵は常に鮮明。切替は離陸/帰還の時だけ（毎フレームのsetSizeはしない）。
+  const FLY_PR = LIGHT ? 1.0 : QUAL === 'soft' ? 1.35 : 1.2
   const SHADOW_SIZE = LIGHT ? 1024 : 2048
   // アンビエント用途＝省電力GPUを選ばせ発熱/電池を抑える（perf監督C6）。眺める時間が長いので high-performance より low-power が適切。
   // antialias:false＝AAは常用のcomposer(MSAA付き中間RT＋FXAA)が担うため、デフォルトFBのMSAAは最終ブリット(全画面三角形)にしか効かず純粋な無駄（GPUメモリ帯域の浪費・three公式見解）。
@@ -8906,6 +8911,13 @@ export async function mountTown3d(parent, opts = {}) {
     //    安定が長く続けば鮮やかさ(qCap)へ少しずつ戻す。ヒステリシスで頻繁な切替を防ぐ。restIdle/タブ復帰の巨大gapは無視。
     lastDDT = drawDt
     if (DPR_OVR) { adQLow = 0; adQOk = 0 } // 計測用(?dpr=): 解像度固定中は自動品質を凍結（計測を汚さない）
+    // 飛行中の解像度帯（案B）: 空にいる間は天井をFLY_PRへ（下限1.2と一致＝飛行中は固定）。窓/地上へ戻ると qCap へ即復帰。
+    const flyNow = active.mode === 'fly'
+    if (!DPR_OVR && flyNow !== prFly) {
+      prFly = flyNow
+      curPR = flyNow ? Math.min(curPR, Math.min(FLY_PR, qCap)) : qCap
+      applySize()
+    }
     if (!restIdle && drawDt > 0.001 && drawDt < 0.4) {
       if (drawDt > 0.047) { adQLow++; adQOk = 0 } else if (drawDt < 0.038) { adQOk++; adQLow = 0 } else { if (adQLow) adQLow--; if (adQOk) adQOk-- }
       // 重い時はまず「重い後処理(ブルーム=複数回のぼかしパス)」を切る＝解像度(鮮明さ)を保ったまま大きく軽くする。次に解像度を譲る。
@@ -8913,7 +8925,8 @@ export async function mountTown3d(parent, opts = {}) {
       if (adQLow >= 10 && bloomPass && bloomPass.enabled) { bloomPass.enabled = false; adQLow = 0; adQOk = 0 } // 段1: ブルームを落とす（最大の塗り負荷を削り鮮明さは保つ）
       else if (adQLow >= 16 && curPR > PR_FLOOR + 0.001) { curPR = Math.max(PR_FLOOR, curPR - 0.12); applySize(); adQLow = 0; adQOk = 0 } // 段2: 解像度を譲る
       else if (adQOk >= 40) { // 安定が続けば逆順で戻す: まず解像度、次にブルーム
-        if (curPR < qCap - 0.001) { curPR = Math.min(qCap, curPR + 0.12); applySize(); adQOk = 0 }
+        const capNow = prFly ? Math.min(FLY_PR, qCap) : qCap // 飛行中の天井はFLY_PR（案B）＝空で1.6へ戻ってしまわない
+        if (curPR < capNow - 0.001) { curPR = Math.min(capNow, curPR + 0.12); applySize(); adQOk = 0 }
         else if (bloomPass && bloomWanted && !bloomPass.enabled) { bloomPass.enabled = true; adQOk = 0 }
       }
     }
