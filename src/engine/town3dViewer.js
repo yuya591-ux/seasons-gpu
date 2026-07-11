@@ -7924,15 +7924,24 @@ export async function mountTown3d(parent, opts = {}) {
   const atmo = document.createElement('div')
   atmo.className = 'town3d-atmo'
   stage.appendChild(atmo)
-  // 情景の光で全体を一枚の空気に統一する淡いウォッシュ（局所色＝緑の木/灰の道/赤い看板を一つの光へまとめる）
-  const wash = document.createElement('div')
-  wash.className = 'town3d-wash'
-  stage.appendChild(wash)
+  // 発熱最適化（2026-07 案B・PERF_REPORT.md）: ソフトライト3層（wash/paper2/bleed）は全品質で畳む。
+  // ネイティブ解像度のCSSブレンド合成が全ピクセル仕事の最大項（約12MP/フレーム=WebGL全パイプの5倍超）だった一方、
+  // 見た目の同一性は紙目（paper=乗算）と大気（atmo）が担っており、これは「軽やか」品質で実績のある組み合わせ。
+  // 戻す時は FULL_CSS_LAYERS=true（コード温存・非破壊）。
+  const FULL_CSS_LAYERS = false
+  if (FULL_CSS_LAYERS) {
+    // 情景の光で全体を一枚の空気に統一する淡いウォッシュ（局所色＝緑の木/灰の道/赤い看板を一つの光へまとめる）
+    const wash = document.createElement('div')
+    wash.className = 'town3d-wash'
+    stage.appendChild(wash)
+  }
   const paper = document.createElement('div')
   paper.className = 'town3d-paper'
   stage.appendChild(paper)
-  const paper2 = document.createElement('div'); paper2.className = 'town3d-paper2'; stage.appendChild(paper2) // 紙目2層め（粗いにじみ）
-  const bleed = document.createElement('div'); bleed.className = 'town3d-bleed'; stage.appendChild(bleed) // 縁のにじみ（一枚の絵として縁取る）
+  if (FULL_CSS_LAYERS) {
+    const paper2 = document.createElement('div'); paper2.className = 'town3d-paper2'; stage.appendChild(paper2) // 紙目2層め（粗いにじみ）
+    const bleed = document.createElement('div'); bleed.className = 'town3d-bleed'; stage.appendChild(bleed) // 縁のにじみ（一枚の絵として縁取る）
+  }
   const glass = document.createElement('div'); glass.className = 'town3d-glass'; stage.appendChild(glass)
   const cross = document.createElement('div'); cross.className = 'town3d-cross'; stage.appendChild(cross)
   const sill = document.createElement('div'); sill.className = 'town3d-sill'; stage.appendChild(sill)
