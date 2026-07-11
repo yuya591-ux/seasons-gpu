@@ -8903,7 +8903,9 @@ export async function mountTown3d(parent, opts = {}) {
     // 「眺めている時」は描画頻度だけ約16fpsへ落とす＝発熱/電池を抑える（主用途＝長時間ぼーっと眺める）。
     // 方針=鮮明さ優先: 解像度は落とさない（静止画こそ鮮明に見たい）。動きはクロック基準なので16fpsでも滑らか。操作再開で即30fps。
     // ※以前は idle で解像度も×0.8 に落としていたが、眺める静止画がぼやけるため取りやめ（fps低下が発熱の主レバー＝それは維持）。
-    if (t - lastDraw < (FPS_OVR ? 1 / FPS_OVR : (restIdle ? 0.06 : 0.032))) return // 眺めている時は約16fps／能動時は約30fps（?fpscap=は計測用の一時上書き）
+    // 眺めている時は約16fps／能動時は約40fps上限（案B: 30→40。rAFが60Hz上限の環境では2tick毎=従来どおり安定30fpsに量子化され、
+    // ProMotion等の120Hz環境(8.3ms tick)でだけ3tick毎=真の40fpsが出る＝ガタつく擬似40fpsを生まない安全な引き上げ）。?fpscap=は計測用の一時上書き。
+    if (t - lastDraw < (FPS_OVR ? 1 / FPS_OVR : (restIdle ? 0.06 : 0.024))) return
     const drawDt = lastDraw < 0 ? 0.033 : t - lastDraw // 実際の描画間隔（カク付き検知）
     lastDraw = t
     const _js0 = performance.now() // 毎フレームのJS処理時間を測る（検証用・CPU負荷）
