@@ -10453,6 +10453,19 @@ export async function mountTown3d(parent, opts = {}) {
       const out = { base, residents: cat(residents), critters: cat(critters.map((c) => c.g)), cityWalkers: cat(cityWalkers.map((c) => c.g)), trees: cat(treesArr), clouds: cat(clouds), birds: cat(birds), skyDrifters: cat(skyDrifters.map((d) => d.o || d)), winRoom: cat([winRoom]), school: cat(near(54, -18, 9)), ferris: cat(near(-26, -66, 11)), park: cat(near(16, -27, 10)), temple: cat(near(40, -74, 12)), downtown: cat(near(-118, -56, 30)), outlines: catOut(), outlineN, townChildren: town.children.length }
       renderer.info.autoReset = ar; return out
     }
+    window.__town3dCloudBreak = () => { // 検証用: 雲海高度の描画コール内訳（skyDrifters種類別・cloudObjs・cloudSeaの寄与）
+      if (!active || !active.camera) return null
+      const ar = renderer.info.autoReset; renderer.info.autoReset = false
+      const measure = () => { renderer.info.reset(); renderer.render(scene, active.camera); const ri = renderer.info.render; return ri.drawCalls !== undefined ? ri.drawCalls : ri.calls }
+      const base = measure()
+      const hideAnd = (objs) => { const vis = (objs || []).filter((o) => o && o.visible); vis.forEach((o) => { o.visible = false }); const c = measure(); vis.forEach((o) => { o.visible = true }); return base - c }
+      const byKind = {}
+      for (const d of skyDrifters) { (byKind[d.kind] = byKind[d.kind] || []).push(d.o || d) }
+      const kinds = {}
+      for (const k of Object.keys(byKind)) kinds[k] = hideAnd(byKind[k])
+      const out = { base, cloudSea: cloudSea ? hideAnd([cloudSea]) : 0, cloudObjs: hideAnd(cloudObjs), kinds }
+      renderer.info.autoReset = ar; return out
+    }
     window.__town3dMeshHisto = () => { // 検証用: town直下の各childが持つ可視メッシュ数のヒストグラム＝メッシュ(描画コール)の集中箇所
       let totalMesh = 0, totalSprite = 0, lines = 0; const perChild = []
       const countMesh = (o) => { let n = 0; o.traverse((c) => { if (c.visible && (c.isMesh || c.isPoints)) n++ }); return n }
